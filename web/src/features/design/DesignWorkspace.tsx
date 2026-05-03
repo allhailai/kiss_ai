@@ -29,7 +29,6 @@ export function DesignWorkspace({
   onDraft: (value: string) => void;
   onRevert: () => void;
   onSave: () => void;
-  onRefresh: () => void;
 }) {
   const colors = design?.parsed.colors ?? {};
   const parsedDraft = useMemo(() => parseDesignIdentityDraft(draft), [draft]);

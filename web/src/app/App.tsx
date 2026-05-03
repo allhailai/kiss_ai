@@ -144,7 +144,6 @@ export function App() {
             onDraft={workspace.setDraft}
             onRevert={() => void workspace.revertSelected()}
             onSave={() => void workspace.saveSelected()}
-            onRefresh={() => void workspace.refreshDesign()}
           />
         ) : null}
         {workspace.view === "rebuild" ? (

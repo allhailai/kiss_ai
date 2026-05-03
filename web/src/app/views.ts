@@ -32,3 +32,12 @@ export const designProjectFile: ProjectFile = {
 };
 export const requirementsExplainer =
   "These files are the source of truth for the project. Saving here directly changes human-owned project intent.";
+
+export function viewForProjectPath(path: string): View | null {
+  if (path === "human_design_identity.md") return "design";
+  if (path.startsWith("human_")) return "requirements";
+  if (path.startsWith("inputs_human/")) return "inputs";
+  if (path.startsWith("inputs_ai/")) return "annotations";
+  if (path.startsWith("outputs_ai/")) return "outputs";
+  return null;
+}

@@ -10,10 +10,9 @@ import {
   type RebuildState,
 } from "../api";
 import { uniqueFiles } from "../domain/files";
-import { viewForProjectPath } from "../domain/links";
 import { type Toast } from "../features/toast/ToastViewport";
 import { buildRouteHash, parseRouteHash } from "./routes";
-import { designProjectFile, selectedProjectStorageKey, type RouteState, type View } from "./views";
+import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type RouteState, type View } from "./views";
 
 export function useProjectWorkspace() {
   const [view, setView] = useState<View>("dashboard");
@@ -197,7 +196,7 @@ export function useProjectWorkspace() {
 
   const openProjectFile = useCallback(
     (path: string) => {
-      const nextView = viewForProjectPath(path, view);
+      const nextView = viewForProjectPath(path);
 
       if (!nextView) {
         setNotice("This link points to a file that is not available in the lab UI yet.");
@@ -206,7 +205,7 @@ export function useProjectWorkspace() {
 
       navigateTo(nextView, path);
     },
-    [navigateTo, setNotice, view],
+    [navigateTo, setNotice],
   );
 
   const selectProject = useCallback((projectSlug: string) => {

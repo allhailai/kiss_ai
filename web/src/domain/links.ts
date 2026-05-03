@@ -1,5 +1,4 @@
 import type { ProjectFile } from "../api";
-import type { View } from "../app/views";
 import { fileBasename } from "./files";
 
 export type WikiLinkResolution =
@@ -110,16 +109,6 @@ export function resolveMarkdownLink(rawTarget: string, files: ProjectFile[], sel
   if (basenameMatches.length > 1) return { status: "ambiguous", matches: basenameMatches };
 
   return { status: "missing" };
-}
-
-export function viewForProjectPath(path: string, currentView: View): View | null {
-  void currentView;
-  if (path === "human_design_identity.md") return "design";
-  if (path.startsWith("human_")) return "requirements";
-  if (path.startsWith("inputs_human/")) return "inputs";
-  if (path.startsWith("inputs_ai/")) return "annotations";
-  if (path.startsWith("outputs_ai/")) return "outputs";
-  return null;
 }
 
 export function linkResolutionClass(resolution: WikiLinkResolution) {

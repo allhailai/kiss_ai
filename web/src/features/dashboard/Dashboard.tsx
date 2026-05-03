@@ -77,7 +77,7 @@ export function Dashboard({
   );
 }
 
-export function StatusCard({ label, value, onClick }: { label: string; value: string; onClick?: () => void }) {
+function StatusCard({ label, value, onClick }: { label: string; value: string; onClick?: () => void }) {
   const content = (
     <>
       <span className="eyebrow">{label}</span>
