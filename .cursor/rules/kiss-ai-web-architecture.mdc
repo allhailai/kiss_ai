@@ -1,0 +1,31 @@
+---
+description: kiss_ai web architecture boundaries for agentic development
+alwaysApply: true
+---
+
+# kiss_ai web architecture
+
+Use these boundaries when changing `_kiss_ai/web/**`.
+
+## Core rule
+
+`web/src/App.tsx` is a compatibility export only. The real app shell is `web/src/app/App.tsx`, and it should remain a composition map rather than a feature implementation file.
+
+## Where code belongs
+
+- App-wide routing, view metadata, theme mapping, and workspace orchestration belong in `web/src/app/`.
+- Reusable project logic belongs in `web/src/domain/`. Domain modules must not import React or feature components.
+- CodeMirror wrappers, widgets, and extensions belong in `web/src/editor/`. Editor modules may import domain helpers and API types, but not app feature components.
+- User-facing workflows belong in `web/src/features/<feature>/` with one exported root component per workflow.
+- API contract types and transport helpers belong in `web/src/api.ts`. Touch this file only when the backend API contract changes.
+- Styles should follow durable ownership. Shared shell styles can stay central; editor-specific styles belong beside editor code; feature-specific styles should be split only when they have clear ownership.
+
+## Development directives
+
+- Do not add new feature logic to either `web/src/App.tsx` or `web/src/app/App.tsx`.
+- For a new workflow, add a folder under `web/src/features/`, add view metadata in `web/src/app/views.ts`, and route/load behavior in `web/src/app/useProjectWorkspace.ts`.
+- Keep public module APIs narrow. Export root components, hooks, and pure helpers intentionally.
+- Avoid barrel files until repeated imports prove they reduce friction.
+- Preserve route hash formats and `kiss_ai.selectedProject` local storage behavior unless explicitly asked to migrate them.
+- Preserve behavior during extraction before adding new features.
+- After frontend changes, run `npm run check` from `web/`.

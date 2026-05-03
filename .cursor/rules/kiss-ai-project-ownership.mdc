@@ -1,0 +1,22 @@
+---
+description: kiss_ai projects — hub/framework vs managed project paths
+alwaysApply: true
+---
+
+# kiss_ai projects ownership
+
+## `_kiss_ai/` — shared hub and framework code
+
+- `_kiss_ai/` contains the shared local hub/framework code, including `web/**`.
+- Edit `_kiss_ai/**` when the user asks to change hub/framework behavior or tooling.
+- Do not treat `_kiss_ai/` itself as a managed research project.
+
+## Managed research project roots
+
+- For normal research work, prefer root `human_*.md` requirement files.
+- Use `inputs_human/` for notes, sources, and uploads.
+
+## AI-managed areas
+
+- In managed project roots, treat `inputs_ai/**` and `outputs_ai/**` as AI-managed output areas.
+- Preserve human annotations there; do not silently overwrite annotated content.
