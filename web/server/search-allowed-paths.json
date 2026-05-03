@@ -1,0 +1,4 @@
+{
+  "directories": ["inputs_ai/", "inputs_human/", "outputs_ai/"],
+  "files": ["human_*.md"]
+}
