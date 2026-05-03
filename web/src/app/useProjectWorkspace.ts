@@ -10,8 +10,8 @@ import {
   type RebuildState,
 } from "../api";
 import { uniqueFiles } from "../domain/files";
-import { type Toast } from "../features/toast/ToastViewport";
 import { buildRouteHash, parseRouteHash } from "./routes";
+import { type Toast } from "./toast";
 import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type RouteState, type View } from "./views";
 
 export function useProjectWorkspace() {

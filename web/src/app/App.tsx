@@ -11,6 +11,24 @@ import { RebuildWorkspace } from "../features/rebuild/RebuildWorkspace";
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
 
+const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: string }>> = {
+  requirements: {
+    title: "Human-Owned Requirements",
+  },
+  inputs: {
+    title: "Human Inputs",
+    explainer: "Human source material belongs under inputs_human/. Upload support comes later; this lab currently browses and edits Markdown.",
+  },
+  outputs: {
+    title: "Outputs",
+    explainer: "Generated outputs can be reviewed and edited here. Saves write directly to outputs_ai/.",
+  },
+  annotations: {
+    title: "Annotation Workspace",
+    explainer: "Files under inputs_ai/ are AI-managed. Human edits here are intentionally visualized as annotations and detected through Git diff.",
+  },
+};
+
 export function App() {
   const workspace = useProjectWorkspace();
   const themeStyle = useMemo(() => buildThemeStyle(workspace.design), [workspace.design]);
@@ -31,6 +49,7 @@ export function App() {
   }
 
   const navigateTo = (view: View, filePath?: string | null) => workspace.navigateTo(view, filePath);
+  const fileWorkspace = fileWorkspaceByView[workspace.view];
 
   return (
     <main className="app-shell" style={themeStyle}>
@@ -75,54 +94,10 @@ export function App() {
             onRefresh={() => void workspace.refreshStatus()}
           />
         ) : null}
-        {workspace.view === "requirements" ? (
+        {fileWorkspace ? (
           <FileWorkspace
-            title="Human-Owned Requirements"
-            selected={workspace.selected}
-            selectedDiff={workspace.selectedDiff}
-            draft={workspace.draft}
-            projectFiles={workspace.projectFiles}
-            onDraft={workspace.setDraft}
-            onNotice={workspace.setNotice}
-            onOpenFile={workspace.openProjectFile}
-            onRevert={() => void workspace.revertSelected()}
-            onSave={() => void workspace.saveSelected()}
-          />
-        ) : null}
-        {workspace.view === "inputs" ? (
-          <FileWorkspace
-            title="Human Inputs"
-            explainer="Human source material belongs under inputs_human/. Upload support comes later; this lab currently browses and edits Markdown."
-            selected={workspace.selected}
-            selectedDiff={workspace.selectedDiff}
-            draft={workspace.draft}
-            projectFiles={workspace.projectFiles}
-            onDraft={workspace.setDraft}
-            onNotice={workspace.setNotice}
-            onOpenFile={workspace.openProjectFile}
-            onRevert={() => void workspace.revertSelected()}
-            onSave={() => void workspace.saveSelected()}
-          />
-        ) : null}
-        {workspace.view === "outputs" ? (
-          <FileWorkspace
-            title="Outputs"
-            explainer="Generated outputs can be reviewed and edited here. Saves write directly to outputs_ai/."
-            selected={workspace.selected}
-            selectedDiff={workspace.selectedDiff}
-            draft={workspace.draft}
-            projectFiles={workspace.projectFiles}
-            onDraft={workspace.setDraft}
-            onNotice={workspace.setNotice}
-            onOpenFile={workspace.openProjectFile}
-            onRevert={() => void workspace.revertSelected()}
-            onSave={() => void workspace.saveSelected()}
-          />
-        ) : null}
-        {workspace.view === "annotations" ? (
-          <FileWorkspace
-            title="Annotation Workspace"
-            explainer="Files under inputs_ai/ are AI-managed. Human edits here are intentionally visualized as annotations and detected through Git diff."
+            title={fileWorkspace.title}
+            explainer={fileWorkspace.explainer}
             selected={workspace.selected}
             selectedDiff={workspace.selectedDiff}
             draft={workspace.draft}

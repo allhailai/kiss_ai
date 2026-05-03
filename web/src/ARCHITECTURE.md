@@ -15,11 +15,15 @@ src/
 
 ## App Layer
 
+`main.tsx` imports the real app shell from `app/App.tsx`.
+
 `app/App.tsx` composes the shell, sidebar, and active workflow. It should read like the map of the UI. Keep data loading, route application, saving, reverting, rebuild polling, and project selection in `app/useProjectWorkspace.ts`.
 
 `app/views.ts` owns view ids, route-backed view metadata, local storage keys, and file-path-to-view policy. Route hash behavior belongs in `app/routes.ts`.
 
 `App.tsx` at the source root is only a compatibility export.
+
+App-owned state shapes belong in `app/`. For example, toast state is typed in `app/toast.ts`, while `features/toast/` owns the rendering component.
 
 ## Domain Layer
 
@@ -38,9 +42,11 @@ Domain modules should not import React, components, hooks, CodeMirror widgets, o
 Use `editor/` for CodeMirror-specific behavior:
 
 - `MarkdownEditor.tsx`: React wrapper for the configured editor.
+- `MarkdownEditor.css`: CodeMirror wrapper, diff, wiki link, and base table editor styles.
 - `diffExtension.ts`: saved and unsaved diff decorations.
 - `wikiLinkExtension.ts`: clickable wiki and markdown links.
-- `markdownTableExtension.ts`: table editing extension public API and table-specific editor styling.
+- `markdownTableExtension.ts`: table editing extension public API.
+- `markdownTableExtension.css`: table interaction styling, including handles, selection, active cells, and context menus.
 
 Editor modules may import domain helpers and API types. They should receive app behavior through callbacks rather than importing workflow components.
 
