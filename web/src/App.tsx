@@ -1479,6 +1479,7 @@ function GlobalFileSearch({
     setQuery("");
     setResults([]);
     setIsOpen(false);
+    setActiveResultIndex(-1);
   }
 
   function handleSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -1499,7 +1500,7 @@ function GlobalFileSearch({
     }
 
     if (event.key === "Enter") {
-      const activeResult = results[activeResultIndex];
+      const activeResult = results[activeResultIndex] ?? results[0];
       if (!activeResult) return;
       event.preventDefault();
       openResult(activeResult.path);
@@ -1542,6 +1543,7 @@ function GlobalFileSearch({
                       aria-selected={index === activeResultIndex}
                       className={index === activeResultIndex ? "global-search-result active" : "global-search-result"}
                       key={file.path}
+                      onMouseEnter={() => setActiveResultIndex(index)}
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => openResult(file.path)}
                       role="option"
