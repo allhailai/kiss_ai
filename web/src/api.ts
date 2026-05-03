@@ -1,4 +1,5 @@
 export type ProjectStatus = {
+  projectSlug: string;
   projectName: string;
   setupStatus: string;
   setupInitializedAt: string | null;

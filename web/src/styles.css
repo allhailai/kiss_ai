@@ -51,6 +51,7 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 16px;
   padding: 8px 24px;
   border-bottom: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-surface) 94%, var(--color-background));
@@ -180,17 +181,24 @@ button:disabled {
 }
 
 .project-switch-button {
-  margin-top: 12px;
-  padding: 8px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: var(--color-surface);
-  color: var(--color-secondary);
-  font-size: 0.86rem;
+  position: absolute;
+  top: 8px;
+  right: 24px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, white 50%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-secondary) 50%, transparent);
+  color: white;
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .project-switch-button:hover {
-  color: var(--color-accent);
+  background: var(--color-secondary);
+  border-color: white;
+  color: white;
 }
 
 .eyebrow {

@@ -117,7 +117,7 @@ async function discoverProjects() {
 
     projects.push({
       slug: entry.name,
-      name: harness.project_name ?? humanizePathSegment(entry.name),
+      name: displayProjectName(harness.project_name, harness.project_slug ?? entry.name),
       path: projectRootReal,
       setupStatus: harness.setup?.status ?? "unknown",
       modifiedAt: stat.mtime.toISOString(),
@@ -215,9 +215,24 @@ function humanizePathSegment(pathSegment) {
     .split(/\s+/)
     .map((word) => {
       const lower = word.toLowerCase();
+      if (lower.length <= 3) return lower.toUpperCase();
       return `${lower.charAt(0).toUpperCase()}${lower.slice(1)}`;
     })
     .join(" ");
+}
+
+function isMachineReadableName(value) {
+  return /^[a-z0-9]+([_-][a-z0-9]+)*$/i.test(value.trim());
+}
+
+function displayProjectName(projectName, projectSlug) {
+  const candidate = String(projectName ?? "").trim();
+
+  if (!candidate || isMachineReadableName(candidate)) {
+    return humanizePathSegment(projectSlug);
+  }
+
+  return candidate;
 }
 
 async function readTextFile(projectRoot, relativePath) {
@@ -795,7 +810,8 @@ app.get("/api/projects/:projectSlug/status", async (request, response, next) => 
     const inputAnnotations = await listMarkdownFiles(project.path, "inputs_ai", "ai", false, true);
 
     response.json({
-      projectName: harness.project_name ?? project.name ?? path.basename(project.path),
+      projectSlug: harness.project_slug ?? project.slug,
+      projectName: displayProjectName(harness.project_name ?? project.name, harness.project_slug ?? project.slug),
       setupStatus: harness.setup?.status ?? "unknown",
       setupInitializedAt: harness.setup?.initialized_at ?? null,
       lastRunAt: harness.last_run_at ?? null,

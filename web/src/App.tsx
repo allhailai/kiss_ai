@@ -1199,7 +1199,7 @@ export function App() {
 
   return (
     <main className="app-shell" style={themeStyle}>
-      <GlobalFileSearch projectSlug={selectedProjectSlug} onOpenFile={openProjectFile} />
+      <GlobalFileSearch projectSlug={selectedProjectSlug} onOpenFile={openProjectFile} onSwitchProject={clearSelectedProject} />
       <ToastViewport toasts={toasts} onDismiss={dismissToast} />
 
       <aside className="sidebar">
@@ -1207,9 +1207,6 @@ export function App() {
           <span className="eyebrow">kiss_ai lab</span>
           <button className="home-link" onClick={() => navigateTo("dashboard")}>
             {status?.projectName ?? selectedProject.name}
-          </button>
-          <button className="project-switch-button" onClick={clearSelectedProject} type="button">
-            Switch project
           </button>
         </div>
 
@@ -1419,7 +1416,15 @@ function MainWorkflowMenu({
   );
 }
 
-function GlobalFileSearch({ projectSlug, onOpenFile }: { projectSlug: string; onOpenFile: (path: string) => void }) {
+function GlobalFileSearch({
+  projectSlug,
+  onOpenFile,
+  onSwitchProject,
+}: {
+  projectSlug: string;
+  onOpenFile: (path: string) => void;
+  onSwitchProject: () => void;
+}) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProjectFile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1552,6 +1557,9 @@ function GlobalFileSearch({ projectSlug, onOpenFile }: { projectSlug: string; on
           ) : null}
         </div>
       </div>
+      <button className="project-switch-button" onClick={onSwitchProject} type="button">
+        Switch project
+      </button>
     </header>
   );
 }
