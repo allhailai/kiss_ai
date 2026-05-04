@@ -1,4 +1,9 @@
 /web/node_modules/
 /web/dist/
 /web/.env
+/web/.runtime/
 *.log
+
+# macOS
+.DS_Store
+**/.DS_Store

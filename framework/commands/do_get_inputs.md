@@ -24,7 +24,7 @@ Create or refresh AI-managed source inputs according to `human_input_requirement
    - Do not rely on a single glob/search-tool result as the source of truth. If a glob, semantic search, or IDE index says `inputs_human/` is empty or only contains placeholder files, cross-check with direct filesystem enumeration before reporting that to the user.
    - Include hidden files, binary documents, and filenames with spaces or parentheses. Treat `.pptx`, `.pdf`, `.docx`, images, spreadsheets, and other non-Markdown files as real source inputs unless the project explicitly excludes them.
    - For every discovered file, decide whether it is readable directly, needs extraction/conversion, is a placeholder such as `.gitkeep`, or is intentionally out of scope.
-   - If any non-placeholder file cannot be read or converted, add an open question and stop before downstream rebuild unless the user approves excluding it.
+   - If any non-placeholder file cannot be read or converted, add an open question and treat it as a fatal input blocker unless the project requirements explicitly allow excluding or deferring that file.
 3. Determine the expected source inventory using `human_input_requirements.md`, `.harness-state.json`, and the verified `inputs_human/` inventory.
 4. Ensure the required `inputs_ai/` folders exist. Use only the folders explicitly defined by the project requirements.
 5. Read any source manifest or update runbook required by the project.
@@ -34,7 +34,7 @@ Create or refresh AI-managed source inputs according to `human_input_requirement
    - For each **required** leaf directory under `inputs_ai/` implied by requirements: ensure **either** at least one substantive, non-placeholder source file **or** an explicit gap file in that directory (e.g. `source_gap.md`, or `README.md` if requirements specify it) containing: URLs or titles attempted, why content is missing, downstream impact, and **`blocks_outputs: true|false`**.
    - **Do not** leave required leaf directories empty without a qualifying gap file on first acquisition.
    - When credible sources exist (official data, primary publications, project-approved URLs), **fetch or synthesize** into `inputs_ai/` per project schema. **Placeholder-only stubs do not satisfy** required coverage on first acquisition.
-   - If a required category cannot be populated after reasonable attempts, write the gap file with `blocks_outputs: true` when material conclusions would be unsupported; stop before wiki/output generation unless the user or requirements explicitly defer. Record counts in `.harness-state.json.last_input_refresh`: include `empty_required_without_gap` (must be **0** to proceed past gate), `populated_categories`, `gapped_categories`, `blocked_categories`.
+   - If a required category cannot be populated after reasonable attempts, write the gap file with `blocks_outputs: true` when material conclusions would be unsupported; continue downstream only when the gap is explicitly documented and generated outputs can carry the limitation as a caveat. Record counts in `.harness-state.json.last_input_refresh`: include `empty_required_without_gap` (must be **0** to proceed), `populated_categories`, `gapped_categories`, `blocked_categories`.
 7. For initial population:
    - satisfy the first-build acquisition gate when applicable
    - create the required AI-managed source files in `inputs_ai/`
@@ -63,16 +63,16 @@ Create or refresh AI-managed source inputs according to `human_input_requirement
 14. Prepend requirement or source-process changes to `change_logs/change_logs.md`.
 15. Update `.harness-state.json` with input refresh status, including the verified `inputs_human/` inventory, unreadable or excluded files, source inventory status, **category coverage ledger path and summary**, source-side scaling signals, stale sources, material changes, and likely downstream impact.
 
-## Review Gates
+## Continuation Rules
 
-Ask for approval before continuing if:
+Do not stop before downstream output generation solely because refreshed inputs may change final outputs. Record source changes and downstream impact clearly, then continue through the rebuild when execution is otherwise possible.
 
-- A required source category is added or removed.
-- A source file is excluded.
-- A non-placeholder file under `inputs_human/` cannot be read or converted.
-- A material source change would alter final outputs.
-- The project scope or required source organization changes.
-- First-build acquisition gate fails (`empty_required_without_gap` > 0) and the user must defer or narrow scope.
+- If a required source category is added or removed, record the requirement change and update source coverage ledgers. Continue with the current best interpretation unless the requirements are impossible to satisfy.
+- If a source file is excluded, record the exclusion, rationale, and affected outputs. Continue only when exclusion is allowed by requirements or when the file is not required for execution.
+- If a non-placeholder file under `inputs_human/` cannot be read or converted, stop only when the file is required and no requirement allows deferring or excluding it.
+- If a material source change would alter final outputs, record the material change and rebuild affected outputs with caveats.
+- If project scope or required source organization changes, continue with current requirements and record the proposed change unless the current requirements become contradictory or impossible.
+- If first-build acquisition has `empty_required_without_gap` > 0, create qualifying gap files or stop as a fatal acquisition error. Do not proceed with silent empty required categories.
 
 ## Output
 
@@ -89,4 +89,4 @@ Report:
 - material changes
 - likely downstream impact
 - open questions added or resolved
-- whether downstream rebuild may continue
+- downstream caveats, blockers, or limitations

@@ -24,4 +24,4 @@ What should the final outputs help you decide?
 
 List important rules the agent must follow. For example: do not invent facts, cite sources, preserve open questions, or ask before changing scope.
 
-Scaling and rebuild depth are automated by the agent. The user should only be asked to approve material requirement changes, source exclusions, schema changes, output-structure changes, or review gates.
+Scaling and rebuild depth are automated by the agent. The agent should continue rebuilds with documented caveats when outputs are affected by material changes. Ask the user only when a fatal requirement, source-exclusion, schema, or output-structure decision makes the current requirements impossible to execute.

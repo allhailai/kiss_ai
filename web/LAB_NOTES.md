@@ -30,7 +30,7 @@ The `_kiss_ai` repo tracks hub and framework code. Each managed project remains 
 ## Open Questions
 
 - Whether the rebuild runner should remain Cursor SDK based, become a framework CLI, or support both.
-- How review gates should become structured machine-readable events rather than prose-only agent stops.
+- How rebuild caveats and unresolved decisions should become structured machine-readable events rather than prose-only agent notes.
 - Whether upload/conversion for PDFs, spreadsheets, and screenshots belongs in the shared UI or a later plugin.
 - How to lock or queue UI edits while a rebuild is running.
 - How much Git history/recovery to expose to non-technical users.

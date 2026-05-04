@@ -51,22 +51,23 @@ Run the full `kiss_ai` research project loop from requirements to generated outp
    - Update `.harness-state.json` after the commit with the baseline commit hash, then commit that state update with a message such as `kiss_ai record initial baseline: <project_name> (YYYY-MM-DD)`. If the user prefers a single baseline commit, update state before committing and include the intended baseline marker in that commit.
    - If commit fails or the user does not approve committing, stop before annotation processing. Do not run the first build without an explicit decision to defer the baseline.
 6. Run the centralized `do_process_annotations.md` command.
-7. If annotation processing produces unresolved review items, stop and ask the user to decide before continuing.
+7. If annotation processing produces unresolved review items, record them in `.harness-state.json`, `change_logs/annotation_change_logs.md`, and generated outputs where relevant. Continue unless the annotations make the project impossible to execute safely, such as contradictory required schemas or missing required source decisions.
 8. Run the centralized `do_get_inputs.md` command.
-9. Run the canonical rebuild-level scaling assessment before downstream generation, even when input refresh reports material changes that may block downstream rebuild:
+9. Run the canonical rebuild-level scaling assessment before downstream generation:
     - Use input refresh results, verified source inventory, source counts, source categories, output requirements, prior compile state, prior lint findings, and project-defined dependency ledgers when available.
     - Classify the build as `simple`, `baseline_dependency_tracking`, or `large_project_scaling`.
     - Use the centralized `framework/playbooks/large_project_scaling.md` as the source of truth for choosing among the three modes.
     - Always use the baseline scaling safeguards: source-to-page mapping, output dependency mapping, stale-source/stale-output detection, blocked or low-confidence reporting, and preservation of unchanged outputs only when dependencies are unchanged.
     - In every mode, record enough source inventory, source-to-page mapping, output dependency mapping, stale detection, and preservation rationale to justify what changed and what remained unchanged.
     - Escalate to `large_project_scaling` when the signals in the centralized `framework/playbooks/large_project_scaling.md` show that a broad synthesis pass risks degraded output quality. The agent decides this automatically; do not ask non-technical users to choose the mode.
-    - On first escalation, create or refresh the minimum project-defined intermediate ledgers needed for reliable synthesis. Ask the user only if escalation requires changing requirements, output schemas, source exclusions, or review gates.
-    - If escalation requires ledgers that are not yet defined by project requirements, mark first escalation as `blocked` or `deferred` and ask only for the required requirement or schema decision.
-    - If first escalation requires a one-time broader rebuild to establish dependency maps or intermediate ledgers, record whether the broader rebuild is required, blocked, completed, or deferred.
-    - Update `.harness-state.json` with `scaling_assessment.status`, `assessed_at`, `selected_mode`, `intended_mode_after_unblock` when blocked, structured trigger signals, baseline safeguard statuses, required ledgers, first scaling escalation status, broader rebuild status, mode history, and notes.
-10. If input refresh reports material changes requiring approval, stop after the scaling assessment is recorded and ask the user to approve or defer downstream rebuild:
-    - Mark affected wiki pages, intermediate ledgers, and directed outputs as `stale`, `blocked`, or `pending_rebuild` in `.harness-state.json` rather than leaving prior successful state looking current.
-    - Update `rebuild_scope` with the affected artifacts and uncertainty.
+    - On first escalation, create or refresh the minimum project-defined intermediate ledgers needed for reliable synthesis. Ask the user only if escalation exposes a fatal requirement, schema, or source-exclusion decision that makes the run impossible to execute.
+    - If escalation would benefit from ledgers that are not yet defined by project requirements, continue with the strongest available baseline safeguards and record the missing ledger definition as a caveat or deferred requirement decision.
+    - If first escalation requires a one-time broader rebuild to establish dependency maps or intermediate ledgers, perform that broader rebuild when feasible and record whether it was completed, partially completed, or deferred with caveats.
+    - Update `.harness-state.json` with `scaling_assessment.status`, `assessed_at`, `selected_mode`, structured trigger signals, baseline safeguard statuses, required ledgers, first scaling escalation status, broader rebuild status, mode history, and notes.
+10. If input refresh reports material changes, continue through downstream rebuild:
+    - Mark affected wiki pages, intermediate ledgers, and directed outputs as changed, stale before rebuild, rebuilt, low-confidence, or uncertain in `.harness-state.json`.
+    - Update `rebuild_scope` with the affected artifacts, downstream impact, uncertainty, and caveats.
+    - Carry material-change caveats into generated wiki pages, directed outputs, stale-output ledgers, and the run summary.
 11. Determine rebuild scope before downstream generation:
     - Use input refresh results, source inventory, prior compile state, scaling assessment, and project-defined dependency ledgers when available.
     - Identify changed source categories, affected wiki pages, affected intermediate ledgers, affected final outputs, and outputs that may now be stale.
@@ -90,7 +91,7 @@ Run the full `kiss_ai` research project loop from requirements to generated outp
     - If the `_kiss_ai` repo has uncommitted changes under `framework/**` compared to `HEAD` (for example `git -C ../_kiss_ai status --short -- framework` or `git -C ../_kiss_ai diff --stat -- framework` is non-empty), stop and **ask** whether those centralized framework changes are **intentional**.
     - If **not intentional**, ask whether to defer the project snapshot until the centralized framework tree is fixed. Do not claim a successful rebuild snapshot that silently hides accidental framework drift.
     - If **intentional**, commit or defer the centralized framework change in the `_kiss_ai` repo before continuing, or record a user-confirmed reason in the project run summary and `change_logs/change_logs.md` if the user explicitly wants the project snapshot to proceed before that separate framework commit.
-18. **Git snapshot of the whole project (required on successful rebuild):** If steps 6 through 14 completed without a blocking stop (review gates respected), and step 17 did not block waiting on user intent, record the full project tree in Git so the next rebuild has a clean baseline for diffs and annotations.
+18. **Git snapshot of the whole project (required on successful rebuild):** If steps 6 through 14 completed without a fatal execution stop, and step 17 did not block waiting on user intent, record the full project tree in Git so the next rebuild has a clean baseline for diffs and annotations.
     - Run **from the project root** (the directory that contains `human_goal_requirements.md`, `inputs_human/`, `inputs_ai/`, `outputs_ai/`, and `change_logs/`).
     - Stage **everything under this project root only** — human files, logs, state, inputs, and outputs:
       - `git add -A .`
@@ -99,16 +100,14 @@ Run the full `kiss_ai` research project loop from requirements to generated outp
       - `kiss_ai rebuild snapshot: <project_name> (YYYY-MM-DD)`
     - If `git commit` fails (missing author identity, empty commit, hook failure), stop and report the error. Do not claim a successful rebuild until the snapshot commit exists or the user explicitly defers commits.
 
-## Review Gates
+## Rebuild Caveats And Escalations
 
-Stop before regenerating downstream outputs if any of these are true:
+Do not stop before regenerating downstream outputs solely because findings are material, low-confidence, high-impact, or require human attention. Instead, continue the rebuild and make the uncertainty visible in state, logs, ledgers, and outputs.
 
-- An annotation proposes a goal or scope change.
-- An annotation proposes excluding a previously required source or topic.
-- An annotation proposes major wiki reorganization.
-- An annotation changes directed output standards.
-- Input refresh finds a material source or requirement change.
-- Conflicting annotations cannot be reconciled.
+- If an annotation proposes a goal, scope, source, topic, wiki organization, or output-standard change, preserve the proposal as an unresolved item and continue with the current requirements unless the requirements become impossible to apply.
+- If input refresh finds a material source or requirement change, rebuild affected downstream artifacts and include source caveats, uncertainty, and stale-before-rebuild status.
+- If annotations conflict, record the conflict and choose the most conservative interpretation that still satisfies current requirements.
+- Stop only for fatal execution blockers, such as missing required project files, unreadable required human inputs with no allowed exclusion path, impossible schemas, command failures, or Git/framework snapshot problems.
 
 ## Completion Message
 
@@ -122,4 +121,4 @@ Report:
 - Directed outputs written.
 - Lint status.
 - Git snapshot commit hash and summary (or why commit was skipped or failed).
-- Any deferred review items.
+- Any caveats, unresolved items, or deferred decisions.

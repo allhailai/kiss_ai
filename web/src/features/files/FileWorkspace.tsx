@@ -117,7 +117,7 @@ function EditorPane({
 
       {selected.annotation ? (
         <div className="annotation-callout">
-          This AI-managed content is read-only here. Use the rebuild workflow and review gates to update annotation state.
+          This AI-managed content is read-only here. Use the rebuild workflow to update annotation state.
         </div>
       ) : null}
 

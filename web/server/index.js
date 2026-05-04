@@ -12,6 +12,7 @@ const PROJECTS_ROOT = path.resolve(process.env.KISS_AI_PROJECTS_ROOT ?? path.res
 const PORT = Number(process.env.KISS_AI_UI_PORT ?? 8787);
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_SEARCH_RESULTS = 25;
+const REBUILD_STATE_DIR = path.join(WEB_ROOT, ".runtime", "rebuild");
 const warnedCursorKeyMessages = new Set();
 const reservedProjectDirectories = new Set(["_kiss_ai", ".obsidian", "_archive", "_templates"]);
 const projectSlugPattern = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
@@ -35,6 +36,7 @@ const app = express();
 app.use(express.json({ limit: "4mb" }));
 
 const rebuildStates = new Map();
+const activeRebuilds = new Set();
 
 function createIdleRebuildState() {
   return {
@@ -50,18 +52,89 @@ function createIdleRebuildState() {
   };
 }
 
-function getRebuildState(projectSlug) {
+function normalizeRebuildState(value) {
+  const fallback = createIdleRebuildState();
+  const source = value && typeof value === "object" ? value : {};
+  const status = ["idle", "running", "finished", "error", "blocked", "interrupted"].includes(source.status)
+    ? source.status
+    : fallback.status;
+
+  return {
+    running: Boolean(source.running),
+    runId: typeof source.runId === "string" ? source.runId : null,
+    agentId: typeof source.agentId === "string" ? source.agentId : null,
+    status,
+    startedAt: typeof source.startedAt === "string" ? source.startedAt : null,
+    finishedAt: typeof source.finishedAt === "string" ? source.finishedAt : null,
+    modelId: typeof source.modelId === "string" ? source.modelId : null,
+    message: typeof source.message === "string" ? source.message : fallback.message,
+    log: Array.isArray(source.log) ? source.log.filter((entry) => typeof entry === "string").slice(-300) : [],
+  };
+}
+
+function rebuildStatePath(projectSlug) {
+  if (!projectSlugPattern.test(projectSlug)) {
+    throw new Error("Invalid project slug.");
+  }
+
+  return path.join(REBUILD_STATE_DIR, `${projectSlug}.json`);
+}
+
+async function readPersistedRebuildState(projectSlug) {
+  try {
+    return normalizeRebuildState(JSON.parse(await fs.readFile(rebuildStatePath(projectSlug), "utf8")));
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      console.warn(`[kiss_ai UI warning] Could not read rebuild state for ${projectSlug}: ${error.message}`);
+    }
+
+    return createIdleRebuildState();
+  }
+}
+
+async function writePersistedRebuildState(projectSlug, state) {
+  await fs.mkdir(REBUILD_STATE_DIR, { recursive: true });
+
+  const target = rebuildStatePath(projectSlug);
+  const temporary = `${target}.${process.pid}.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`;
+  await fs.writeFile(temporary, `${JSON.stringify(normalizeRebuildState(state), null, 2)}\n`, "utf8");
+  await fs.rename(temporary, target);
+}
+
+function markInterruptedRebuildState(state) {
+  const finishedAt = new Date().toISOString();
+  const message = "Rebuild status is unknown because the web server restarted while this run was marked running.";
+
+  return {
+    ...state,
+    running: false,
+    status: "interrupted",
+    finishedAt,
+    message,
+    log: [...state.log.slice(-299), `[${finishedAt}] ${message}`],
+  };
+}
+
+async function getRebuildState(projectSlug) {
   const existing = rebuildStates.get(projectSlug);
   if (existing) return existing;
 
-  const next = createIdleRebuildState();
+  let next = await readPersistedRebuildState(projectSlug);
+
+  if (next.running && !activeRebuilds.has(projectSlug)) {
+    next = markInterruptedRebuildState(next);
+    await writePersistedRebuildState(projectSlug, next);
+  }
+
   rebuildStates.set(projectSlug, next);
   return next;
 }
 
-function setRebuildState(projectSlug, nextState) {
-  rebuildStates.set(projectSlug, nextState);
-  return nextState;
+async function setRebuildState(projectSlug, nextState) {
+  const normalized = normalizeRebuildState(nextState);
+  rebuildStates.set(projectSlug, normalized);
+  await writePersistedRebuildState(projectSlug, normalized);
+  return normalized;
 }
 
 function isPathInsideRoot(root, candidate) {
@@ -719,16 +792,16 @@ async function lintDesignIdentity(projectRoot) {
   });
 }
 
-function appendRunLog(projectSlug, message) {
-  const rebuildState = getRebuildState(projectSlug);
-  setRebuildState(projectSlug, {
+async function appendRunLog(projectSlug, message) {
+  const rebuildState = await getRebuildState(projectSlug);
+  await setRebuildState(projectSlug, {
     ...rebuildState,
     log: [...rebuildState.log.slice(-300), `[${new Date().toISOString()}] ${message}`],
   });
 }
 
 async function startRebuild(project, requestedModelId) {
-  const rebuildState = getRebuildState(project.slug);
+  const rebuildState = await getRebuildState(project.slug);
 
   if (rebuildState.running) {
     return rebuildState;
@@ -737,7 +810,7 @@ async function startRebuild(project, requestedModelId) {
   const cursorApiKey = await resolveCursorApiKey();
 
   if (!cursorApiKey.available) {
-    return setRebuildState(project.slug, {
+    return await setRebuildState(project.slug, {
       ...rebuildState,
       running: false,
       status: "blocked",
@@ -750,7 +823,7 @@ async function startRebuild(project, requestedModelId) {
   const models = await listCursorModels(cursorApiKey.apiKey);
 
   if (!models.length) {
-    return setRebuildState(project.slug, {
+    return await setRebuildState(project.slug, {
       ...rebuildState,
       running: false,
       status: "blocked",
@@ -762,7 +835,7 @@ async function startRebuild(project, requestedModelId) {
 
   const modelId = pickRebuildModelId(models, requestedModelId);
 
-  setRebuildState(project.slug, {
+  await setRebuildState(project.slug, {
     running: true,
     runId: null,
     agentId: null,
@@ -774,26 +847,29 @@ async function startRebuild(project, requestedModelId) {
     log: [],
   });
 
-  appendRunLog(project.slug, `Using Cursor API key from ${cursorApiKey.source}.`);
-  appendRunLog(project.slug, `Using Cursor model: ${modelId}.`);
+  await appendRunLog(project.slug, `Using Cursor API key from ${cursorApiKey.source}.`);
+  await appendRunLog(project.slug, `Using Cursor model: ${modelId}.`);
 
   runRebuildAgent(project, cursorApiKey.apiKey, modelId).catch((error) => {
-    const current = getRebuildState(project.slug);
-    setRebuildState(project.slug, {
-      ...current,
-      running: false,
-      status: "error",
-      finishedAt: new Date().toISOString(),
-      message: error instanceof Error ? error.message : "Unknown rebuild error.",
-    });
-    appendRunLog(project.slug, getRebuildState(project.slug).message);
+    void (async () => {
+      const current = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...current,
+        running: false,
+        status: "error",
+        finishedAt: new Date().toISOString(),
+        message: error instanceof Error ? error.message : "Unknown rebuild error.",
+      });
+      await appendRunLog(project.slug, (await getRebuildState(project.slug)).message);
+    })();
   });
 
-  return getRebuildState(project.slug);
+  return await getRebuildState(project.slug);
 }
 
 async function runRebuildAgent(project, apiKey, modelId) {
   let agent;
+  activeRebuilds.add(project.slug);
 
   try {
     agent = await Agent.create({
@@ -802,24 +878,24 @@ async function runRebuildAgent(project, apiKey, modelId) {
       local: { cwd: project.path },
     });
 
-    const createdState = getRebuildState(project.slug);
-    setRebuildState(project.slug, { ...createdState, agentId: agent.agentId ?? null });
-    appendRunLog(project.slug, `Agent created: ${getRebuildState(project.slug).agentId ?? "local"}`);
+    const createdState = await getRebuildState(project.slug);
+    await setRebuildState(project.slug, { ...createdState, agentId: agent.agentId ?? null });
+    await appendRunLog(project.slug, `Agent created: ${(await getRebuildState(project.slug)).agentId ?? "local"}`);
 
     const prompt = [
       "Run the kiss_ai rebuild for this project.",
       "",
       "Follow /opt/all_hail_ai/kiss_ai_projects/_kiss_ai/framework/commands/do_all_rebuild.md exactly.",
-      "Respect all review gates. If a review gate blocks, stop and report the blocker clearly.",
+      "Do not stop before downstream outputs for material source or output-impact findings; rebuild affected artifacts and record caveats clearly.",
       "Use /opt/all_hail_ai/kiss_ai_projects/_kiss_ai/framework as the canonical framework root.",
       "Do not create or depend on a project-local framework/ folder.",
       "Do not operate outside this project root.",
     ].join("\n");
 
     const run = await agent.send(prompt);
-    const startedState = getRebuildState(project.slug);
-    setRebuildState(project.slug, { ...startedState, runId: run.id ?? null });
-    appendRunLog(project.slug, `Run started: ${getRebuildState(project.slug).runId ?? "unknown"}`);
+    const startedState = await getRebuildState(project.slug);
+    await setRebuildState(project.slug, { ...startedState, runId: run.id ?? null });
+    await appendRunLog(project.slug, `Run started: ${(await getRebuildState(project.slug)).runId ?? "unknown"}`);
 
     if (run.supports("stream")) {
       for await (const event of run.stream()) {
@@ -827,15 +903,15 @@ async function runRebuildAgent(project, apiKey, modelId) {
 
         for (const block of event.message.content) {
           if (block.type === "text" && block.text.trim()) {
-            appendRunLog(project.slug, block.text.trim());
+            await appendRunLog(project.slug, block.text.trim());
           }
         }
       }
     }
 
     const result = await run.wait();
-    const completedState = getRebuildState(project.slug);
-    setRebuildState(project.slug, {
+    const completedState = await getRebuildState(project.slug);
+    await setRebuildState(project.slug, {
       ...completedState,
       running: false,
       status: result.status === "finished" ? "finished" : "error",
@@ -845,7 +921,7 @@ async function runRebuildAgent(project, apiKey, modelId) {
           ? "Rebuild run finished."
           : `Rebuild run ended with status: ${result.status}`,
     });
-    appendRunLog(project.slug, getRebuildState(project.slug).message);
+    await appendRunLog(project.slug, (await getRebuildState(project.slug)).message);
   } catch (error) {
     const message =
       error instanceof CursorAgentError
@@ -854,16 +930,17 @@ async function runRebuildAgent(project, apiKey, modelId) {
           ? error.message
           : "Unknown Cursor SDK rebuild failure.";
 
-    const current = getRebuildState(project.slug);
-    setRebuildState(project.slug, {
+    const current = await getRebuildState(project.slug);
+    await setRebuildState(project.slug, {
       ...current,
       running: false,
       status: "error",
       finishedAt: new Date().toISOString(),
       message,
     });
-    appendRunLog(project.slug, message);
+    await appendRunLog(project.slug, message);
   } finally {
+    activeRebuilds.delete(project.slug);
     if (agent) {
       await agent[Symbol.asyncDispose]();
     }
@@ -1024,8 +1101,12 @@ app.get("/api/projects/:projectSlug/design", async (request, response, next) => 
   }
 });
 
-app.get("/api/projects/:projectSlug/rebuild", (request, response) => {
-  response.json(getRebuildState(request.project.slug));
+app.get("/api/projects/:projectSlug/rebuild", async (request, response, next) => {
+  try {
+    response.json(await getRebuildState(request.project.slug));
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.post("/api/projects/:projectSlug/rebuild/start", async (request, response, next) => {

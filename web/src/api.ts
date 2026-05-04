@@ -75,7 +75,7 @@ export type RebuildState = {
   runId: string | null;
   agentId: string | null;
   modelId: string | null;
-  status: "idle" | "running" | "finished" | "error" | "blocked";
+  status: "idle" | "running" | "finished" | "error" | "blocked" | "interrupted";
   startedAt: string | null;
   finishedAt: string | null;
   message: string;

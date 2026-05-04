@@ -8,9 +8,46 @@ const modelTierLabels: Record<RebuildModel["tier"], string> = {
 
 const modelTierOrder: RebuildModel["tier"][] = ["medium", "high", "small"];
 
+function formatLocalDateTime(value: string | null | undefined) {
+  if (!value) return "Not recorded";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleString();
+}
+
 function formatModelLabel(model: RebuildModel) {
   const modelName = model.displayName || model.id;
   return model.provider ? `${modelName} - ${model.provider}` : modelName;
+}
+
+function formatRunDuration(rebuild: RebuildState | null) {
+  if (!rebuild?.startedAt) return "Not started";
+
+  const startedAt = new Date(rebuild.startedAt).getTime();
+  const finishedAt = rebuild.finishedAt ? new Date(rebuild.finishedAt).getTime() : Date.now();
+
+  if (Number.isNaN(startedAt) || Number.isNaN(finishedAt) || finishedAt < startedAt) return "Unknown";
+
+  const totalSeconds = Math.max(0, Math.round((finishedAt - startedAt) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes === 0) return `${seconds}s`;
+  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
+}
+
+function getLatestLogEntry(rebuild: RebuildState | null) {
+  return rebuild?.log.at(-1) ?? null;
+}
+
+function getLatestLogTimestamp(entry: string | null) {
+  return entry?.match(/^\[([^\]]+)\]/)?.[1] ?? null;
+}
+
+function getLatestLogText(entry: string | null) {
+  return entry?.replace(/^\[[^\]]+\]\s*/, "").trim() || "No log entries yet.";
 }
 
 export function RebuildWorkspace({
@@ -32,6 +69,8 @@ export function RebuildWorkspace({
 }) {
   const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
   const startDisabled = Boolean(rebuild?.running) || !status?.cursorApiKeyAvailable || !selectedModelId || !models.length;
+  const latestLogEntry = getLatestLogEntry(rebuild);
+  const latestLogTimestamp = getLatestLogTimestamp(latestLogEntry);
 
   return (
     <div className="panel-stack">
@@ -110,6 +149,52 @@ export function RebuildWorkspace({
             </ul>
           </div>
         ) : null}
+      </section>
+
+      <section className="content-card">
+        <h3>Runner details</h3>
+        <div className="rebuild-runner-grid">
+          <div>
+            <span>Status</span>
+            <strong>{rebuild?.status ?? "idle"}</strong>
+          </div>
+          <div>
+            <span>Cursor SDK agent</span>
+            <strong>{rebuild?.agentId ?? "Not created yet"}</strong>
+          </div>
+          <div>
+            <span>Run ID</span>
+            <strong>{rebuild?.runId ?? "Not started yet"}</strong>
+          </div>
+          <div>
+            <span>Model</span>
+            <strong>{rebuild?.modelId ?? (selectedModelId || "Not selected")}</strong>
+          </div>
+          <div>
+            <span>Started</span>
+            <strong>{formatLocalDateTime(rebuild?.startedAt)}</strong>
+          </div>
+          <div>
+            <span>{rebuild?.running ? "Elapsed" : "Duration"}</span>
+            <strong>{formatRunDuration(rebuild)}</strong>
+          </div>
+          <div>
+            <span>Last update</span>
+            <strong>{formatLocalDateTime(latestLogTimestamp)}</strong>
+          </div>
+          <div>
+            <span>Project binding</span>
+            <strong>One persisted runner state per project</strong>
+          </div>
+        </div>
+        <p className="rebuild-runner-note">
+          Starting rebuilds in different projects creates separate Cursor SDK agents. This page shows the agent and run IDs tied to
+          the selected project.
+        </p>
+        <div className="rebuild-latest-log">
+          <span>Latest runner message</span>
+          <p>{getLatestLogText(latestLogEntry)}</p>
+        </div>
       </section>
 
       <section className="content-card">

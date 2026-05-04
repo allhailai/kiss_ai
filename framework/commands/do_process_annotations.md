@@ -21,7 +21,7 @@ Treat them as **human taxonomy and structure guidance** for the wiki, not casual
 2. **Log** every schema edit in `change_logs/annotation_change_logs.md` with the same fields as other annotation candidates (path **project-relative**, for example `outputs_ai/wiki/schema.md` or a project-configured segmented schema path).
 3. **Infer intent**, for example: rename a topic slug, clarify a description, add or retire a concept row, update naming conventions, or add an evolution log note.
 4. **Propose follow-ups** when needed:
-   - If the change should become durable policy, propose updates to `human_output_requirements.md` (topic hints, concept rules, review gates).
+   - If the change should become durable policy, propose updates to `human_output_requirements.md` (topic hints, concept rules, caveat or escalation rules).
    - If the change is purely organizational, the next `do_organize_data.md` / `compile_wiki.md` run should **merge** the logged human intent into the regenerated `schema.md` instead of discarding it silently (see `framework/skills/compile_wiki.md` Phase 6).
 
 Do not skip logging schema edits just because the file looks like “configuration.” It is generated output that humans may intentionally curate between compiles.
@@ -87,4 +87,4 @@ Return:
 - number logged
 - proposed requirement changes
 - unresolved review items
-- whether rebuild may continue
+- unresolved items or caveats the rebuild should carry forward

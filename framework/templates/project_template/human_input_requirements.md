@@ -25,7 +25,7 @@ Inventory rule:
 - Before concluding which human inputs exist, the agent must build a verified inventory of `inputs_human/` using direct filesystem enumeration from the project root.
 - The inventory must include non-Markdown and binary files, hidden files, and filenames with spaces or punctuation.
 - Placeholder files such as `.gitkeep` may be ignored, but every other discovered file must be read, converted, summarized, or explicitly reported as unreadable/out of scope.
-- If a discovered non-placeholder file is excluded or unreadable, the agent must stop and ask before downstream rebuild unless this file explicitly permits that exclusion.
+- If a discovered non-placeholder file is excluded or unreadable, the agent must record the exclusion or read failure and continue only when this file explicitly permits that exclusion or deferral.
 
 ## AI-Managed Source Locations
 
@@ -45,7 +45,7 @@ Start simple. Leave project-specific ledger details blank unless the project tru
 
 If the project grows, define any project-specific source inventory, dependency, coverage, or intermediate ledger files needed to keep rebuilds focused and reliable. The agent should choose whether to stay simple, persist baseline dependency tracking, or escalate to the full large-project workflow when source volume, source categories, binary inputs, stale-source risk, or dependency complexity would make one broad synthesis pass unreliable.
 
-The user does not choose the scaling mode. The agent may ask only for material requirement changes, source exclusions, schema decisions, or review gates.
+The user does not choose the scaling mode. The agent should continue with documented caveats for material source changes and may ask only for fatal requirement, source-exclusion, or schema decisions that make the current run impossible to execute.
 
 ## Required Source Categories
 

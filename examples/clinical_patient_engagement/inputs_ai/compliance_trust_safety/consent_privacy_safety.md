@@ -9,7 +9,7 @@
 - population or setting: Patients and caregivers, especially Medicaid and HCBS contexts
 - modality: SMS, phone, AI voice, email, portal, mail
 - agentic capability: AI-generated communication, voice agents, summaries, automation governance
-- workflow stage: review gates and safety controls
+- workflow stage: caveats and safety controls
 - last_checked date: 2026-04-27
 - status: initial baseline source synthesis
 

@@ -46,7 +46,7 @@ Start simple. Leave project-specific ledger details blank unless the project tru
 
 If the project grows, define output families, dependency maps, intermediate ledgers, coverage ledgers, stale-output rules, and low-confidence handling needed to keep final outputs reliable. The agent should choose whether to stay simple, persist baseline dependency tracking, or escalate to the full large-project workflow. Escalation may require a one-time broader rebuild to establish dependency maps or intermediate ledgers. Preserve unchanged outputs only when their sources, wiki pages, ledgers, schemas, and requirements are unchanged.
 
-The user does not choose the scaling mode. Approving a schema, source-exclusion, output-structure, or review-gate change is not a scaling-mode decision.
+The user does not choose the scaling mode. Material source or output-impact changes should be handled by rebuilding affected outputs with explicit caveats. Ask for approval only when a schema, source-exclusion, or output-structure decision is required to execute the current requirements.
 
 ## Citation Standards
 
@@ -54,6 +54,6 @@ Describe when the agent must cite source files, wiki articles, or both.
 
 Source and wiki references should be clickable in Obsidian. For files outside the generated file's folder, use relative Markdown links such as `[inputs_ai/example.md](../inputs_ai/example.md)`, not code-formatted paths.
 
-## Review Gates
+## Caveats And Escalations
 
-List changes that require user approval before rebuilding outputs, such as scope changes, source exclusions, output structure changes, or unresolved blockers.
+List findings that generated outputs must surface clearly, such as scope uncertainty, source exclusions, output structure changes, low-confidence evidence, or unresolved blockers. These findings should not prevent rebuilding outputs unless they make the current requirements impossible to execute.

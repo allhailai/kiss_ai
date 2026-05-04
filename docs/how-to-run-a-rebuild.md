@@ -41,4 +41,4 @@ During every rebuild, the agent chooses whether the project can stay simple, nee
 - Change logs: `change_logs/`
 - Human review questions: `human_open_questions.md`
 
-If the agent finds a material change, missing schema, source exclusion, review gate, or ambiguous annotation, it should stop and ask before regenerating downstream outputs. When it stops, it should mark affected wiki pages or outputs as stale, blocked, or pending rebuild in `.harness-state.json`.
+If the agent finds a material change, missing schema, source exclusion, or ambiguous annotation, it should continue when execution is possible and carry the finding into rebuilt downstream outputs as a caveat. It should mark affected wiki pages or outputs as stale-before-rebuild, rebuilt with caveats, low-confidence, uncertain, or blocked only when impossible to generate in `.harness-state.json`.

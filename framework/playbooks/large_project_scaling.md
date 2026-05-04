@@ -24,7 +24,7 @@ Choose the mode automatically during every rebuild:
 - Use `baseline_dependency_tracking` when the full large-project workflow is not required, but dependency maps, stale-source/stale-output records, and preservation decisions should be persisted because sources, wiki pages, or outputs can change independently.
 - Use `large_project_scaling` when the escalation rubric below is met and the project needs project-defined intermediate ledgers, staged synthesis, or focused incremental rebuilds to avoid degraded output quality.
 
-Do not present these modes as choices to the user. If a user-facing approval is needed, ask only for the material requirement, schema, source-exclusion, or review-gate decision.
+Do not present these modes as choices to the user. Continue with documented caveats for material source or output-impact findings. Ask only for fatal requirement, schema, or source-exclusion decisions that make the current run impossible to execute.
 
 ## When To Use
 
@@ -67,11 +67,11 @@ Escalate to the full large-project workflow when two or more of these signals ar
 
 Severe single signals include high-impact decision outputs, one output depending on many heterogeneous source types, prior shallow or stale synthesis, or an uncertain dependency map that makes preservation decisions unreliable.
 
-On first escalation, build or refresh the minimum project-defined ledgers needed to make dependencies explicit. If the requirements do not yet define the needed ledger names or schemas, stop before inventing hidden structures and mark first escalation as `blocked` or `deferred`. A broader rebuild may be needed once to establish the new baseline. Record whether that broader rebuild is required, blocked, deferred, completed, and any remaining baseline gaps. After that, use the ledgers to keep incremental rebuilds focused.
+On first escalation, build or refresh the minimum project-defined ledgers needed to make dependencies explicit. If the requirements do not yet define useful ledger names or schemas, continue with the strongest available baseline safeguards instead of inventing hidden structures. A broader rebuild may be needed once to establish the new baseline. Record whether that broader rebuild was completed, partially completed, or deferred with caveats. After that, use the ledgers to keep incremental rebuilds focused.
 
-If escalation is required but the project requirements do not yet define the needed ledger schemas, mark first escalation as `blocked` or `deferred` and ask the user only for the material requirement, schema, source-exclusion, or review-gate decision needed to proceed. Do not invent hidden ledger structures that are not represented in the project requirements.
+If escalation is required but the project requirements do not yet define the needed ledger schemas, continue with baseline dependency tracking and record the missing schema as a caveat or deferred requirement decision. Do not invent hidden ledger structures that are not represented in the project requirements.
 
-Do not ask non-technical users to choose the scaling mode. Ask only when escalation requires a material requirement change, a new output schema, exclusion of a source, or a review gate decision.
+Do not ask non-technical users to choose the scaling mode. Ask only when escalation requires a fatal material requirement change, a new output schema, or exclusion of a required source before the run can execute.
 
 ## Core Pattern
 
@@ -94,7 +94,7 @@ Before relying on incremental scoped refreshes, large **first** builds must esta
 - Treat `human_input_requirements.md` as a source-acquisition contract: every **required** source category and expected `inputs_ai/` leaf path must be either populated with source-backed content or documented with an explicit gap/status file per `framework/commands/do_get_inputs.md` and `framework/skills/refresh_inputs.md`.
 - **Empty required leaf directories are not acceptable** as silent scaffolding. Optional-only categories must be labeled optional in requirements; otherwise lint may emit critical findings (see `framework/commands/do_lint.md`).
 - Broad source coverage across required categories should exist **before** final synthesis stages that commit strategic or decision outputs.
-- If full acquisition is infeasible in one run, the build must create explicit gap files, update open questions, mark affected outputs **blocked**, **low-confidence**, or **stale** as appropriate, and record this in `.harness-state.json` and run summaries.
+- If full acquisition is infeasible in one run, the build must create explicit gap files, update open questions, mark affected outputs **low-confidence**, **stale before rebuild**, **rebuilt with caveats**, or **blocked only when impossible to generate** as appropriate, and record this in `.harness-state.json` and run summaries.
 
 ## Incremental Build Workflow
 
@@ -149,7 +149,7 @@ For large projects, `human_input_requirements.md` should define:
 - refresh cadence or refresh triggers;
 - material-change rules;
 - intermediate ledgers required before final output synthesis;
-- open questions that block downstream outputs.
+- open questions that must appear as downstream output caveats.
 
 For large projects, `human_output_requirements.md` should define:
 
@@ -158,19 +158,21 @@ For large projects, `human_output_requirements.md` should define:
 - stable table or section schemas;
 - which outputs require intermediate ledgers;
 - coverage ledgers or completeness checks;
-- review gates for low-confidence or high-impact conclusions.
+- caveat rules for low-confidence or high-impact conclusions.
 
 ## Quality Gates
 
-Large-project rebuilds should stop or mark outputs as stale when:
+Large-project rebuilds should rebuild affected outputs and clearly mark caveats, stale-before-rebuild status, or low-confidence areas when:
 
 - required source categories are missing;
 - source extraction fails for a required human-owned file;
-- a source category changes materially but dependent outputs are not rebuilt;
+- a source category changes materially and dependent outputs need refresh;
 - a final output depends on an intermediate ledger that is missing or stale;
 - coverage review finds shallow synthesis, link-only sections, or missing required sections;
 - low-confidence conclusions are presented without caveats;
 - material recommendations are unsupported by cited sources.
+
+Stop only for fatal execution blockers, such as unreadable required human-owned files with no allowed deferral, missing required project files, impossible schemas, command failures, or Git/framework snapshot problems.
 
 ## Reporting
 

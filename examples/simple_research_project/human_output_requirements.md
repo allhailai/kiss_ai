@@ -38,6 +38,6 @@ For each output, include:
 
 Every material claim should cite a source file or clearly state that it is an assumption.
 
-## Review Gates
+## Caveats And Escalations
 
-Ask for approval before changing the project scope, excluding a source category, or adding large new output types.
+Record project-scope uncertainty, source exclusions, and large output-type changes as caveats in generated outputs. Ask for approval only when the current requirements become impossible to execute.

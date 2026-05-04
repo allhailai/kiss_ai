@@ -26,7 +26,7 @@ Here are some ideas:
 
 Build a project-local web experience for a newly initialized or existing `kiss_ai` project. The first exercise should use `kiss_ai_projects/economics_and_equity_markets/` as a realistic reference project and regression fixture, then port the reusable workflow back into `kiss_ai` so future projects inherit the same non-technical experience.
 
-The goal is not to build the UI for creating a new project. The goal is to let a user work inside a project after it exists: review requirements, add human inputs, run or review rebuilds, answer review gates, and browse outputs without directly using Cursor, Obsidian, Git, or raw folders.
+The goal is not to build the UI for creating a new project. The goal is to let a user work inside a project after it exists: review requirements, add human inputs, run or review rebuilds, inspect caveats and unresolved decisions, and browse outputs without directly using Cursor, Obsidian, Git, or raw folders.
 
 Key points:
 - Use `economics_and_equity_markets` to prove the UI can handle real project complexity.
@@ -35,7 +35,7 @@ Key points:
 - Give each project a customizable design identity using a human-owned `human_design_identity.md` file.
 - Preserve the ownership boundary between human-authored files and AI-managed files while still allowing humans to annotate AI-managed content.
 - Make annotation edits visually distinct from direct edits to human-owned files.
-- Hide technical machinery, but still surface blocked rebuilds, review gates, stale outputs, and source gaps clearly.
+- Hide technical machinery, but still surface blocked rebuilds, caveats, stale outputs, and source gaps clearly.
 - Port reusable UI and workflow primitives back into `kiss_ai`, not economics-specific assumptions.
 
 More detailed execution plan:
@@ -48,7 +48,7 @@ More detailed execution plan:
 2. Define the project status model.
    - Read status from `.harness-state.json`, `human_*_requirements.md`, `human_open_questions.md`, `inputs_human/`, `inputs_ai/`, and `outputs_ai/`.
    - Show whether the project is fresh, ready to build, rebuilding, blocked, stale, or successfully rebuilt.
-   - Make review gates first-class UI events rather than hidden agent failures.
+   - Make rebuild caveats and unresolved decisions first-class UI events rather than hidden agent notes.
 
 3. Add project design identity.
    - Create a human-owned `human_design_identity.md` file using the DESIGN.md format from `google-labs-code/design.md`.
@@ -64,7 +64,7 @@ More detailed execution plan:
    - Annotation editor for AI-managed files under `inputs_ai/` and `outputs_ai/`, where human edits are captured as guidance for the next rebuild.
    - Visual annotation treatment so users can tell when they are editing source-of-truth requirements versus marking up AI-generated content.
    - Rebuild panel that starts the project build and reports progress in plain language.
-   - Review gate panel for approvals, blocked source categories, unreadable files, and scope changes.
+   - Caveat and blocker panel for approvals, blocked source categories, unreadable files, and scope changes.
    - Output browser for wiki pages, directed outputs, dated reports, dependency maps, and stale-output notes.
 
 5. Exercise the UI against `economics_and_equity_markets`.
@@ -84,7 +84,7 @@ Guardrails:
 - Do not overfit the interface to economics, equity markets, or capital-preservation outputs.
 - Do not hard-code one visual brand into the framework; use `human_design_identity.md` plus sensible defaults.
 - Do not make AI-managed annotation edits look the same as direct human-owned requirement edits.
-- Do not hide review gates so much that blocked or stale outputs appear successful.
+- Do not hide caveats or blockers so much that uncertain, blocked, or stale outputs appear clean.
 - Do not copy project-specific framework drift back into `kiss_ai` without separating reusable behavior from local customization.
 - Keep the first implementation small enough to validate the workflow before broadening the interface.
 
@@ -108,7 +108,7 @@ Execution plan:
 
 1. Prototype inside the economics project.
    - Use `kiss_ai_projects/economics_and_equity_markets/` as the first working fixture.
-   - Exercise the UI against real generated outputs, source inventories, stale-output tracking, dependency maps, dated reports, review gates, and AI-owned files.
+   - Exercise the UI against real generated outputs, source inventories, stale-output tracking, dependency maps, dated reports, caveats, blockers, and AI-owned files.
    - Avoid treating economics or capital-preservation content as the default shape for every project.
 
 2. Keep the UI project-local at first.
@@ -122,7 +122,7 @@ Execution plan:
    - "Add source material" for `inputs_human/`.
    - "Review AI research" for generated `inputs_ai/` and `outputs_ai/`.
    - "Annotate generated content" for AI-owned files that should be processed through Git diff.
-   - "Resolve blockers" for review gates and unreadable or missing sources.
+   - "Resolve blockers" for caveats, unreadable files, or missing sources.
    - "Run rebuild" for the project build loop.
    - "Browse final outputs" for wiki pages, directed outputs, and dated reports.
 
@@ -144,7 +144,7 @@ Execution plan:
    - Add or revise human inputs.
    - Annotate AI outputs.
    - Run annotation processing.
-   - Hit and resolve at least one review gate.
+   - Surface and resolve at least one caveat or blocker.
    - Rebuild and inspect fresh versus stale outputs.
    - Repeat until the user workflow feels stable and understandable.
 
@@ -154,7 +154,7 @@ Execution plan:
    - Design identity loader and editor model.
    - AI annotation editor model.
    - Rebuild runner and status model.
-   - Review gate model.
+   - Caveat and blocker model.
    - Human input inventory model.
    - Output browser model.
 

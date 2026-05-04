@@ -241,12 +241,14 @@ Outputs should be practical, not theoretical. Recommendations should make clear:
 - what could become an AI-enabled platform feature;
 - what source gaps remain.
 
-## Review Gates
+## Caveats And Escalations
 
-Ask for approval before changing:
+Record caveats before changing:
 
 - source categories;
 - topic/concept structure;
 - directed output structure;
 - citation standards;
 - final-output recommendation posture.
+
+Continue rebuilding affected outputs with explicit caveats unless the current requirements become impossible to execute.
