@@ -1,0 +1,22 @@
+---
+description: kiss_ai project — human vs centralized framework vs AI-managed paths
+alwaysApply: true
+---
+
+# kiss_ai project ownership
+
+## Prefer these for normal research work
+
+- Root `human_*.md` requirement files
+- `inputs_human/` for notes, sources, and uploads
+
+## Centralized framework
+
+- The shared framework lives at sibling path `../_kiss_ai/framework/`.
+- Do not create a project-local `framework/` folder.
+- **Do not** edit files under `_kiss_ai/framework/**` unless the user **explicitly** asks to customize the shared framework.
+- If the user intentionally changes the shared framework, say so in your reply. Framework changes should be committed in the `_kiss_ai` repo, separate from this project's rebuild snapshot.
+
+## AI-managed areas
+
+- Treat edits under `inputs_ai/**` and `outputs_ai/**` per the centralized `do_process_annotations.md` command (annotations), not as silent overwrites.

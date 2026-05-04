@@ -7,14 +7,19 @@ alwaysApply: true
 
 ## `_kiss_ai/` — shared hub and framework code
 
-- `_kiss_ai/` contains the shared local hub/framework code, including `web/**`.
+- `_kiss_ai/` contains the shared local hub/framework code, including `framework/**` and `web/**`.
+- `_kiss_ai/framework/` is the canonical framework for agentic builds.
+- `_kiss_ai/web/` is the shared web app for managed projects.
 - Edit `_kiss_ai/**` when the user asks to change hub/framework behavior or tooling.
 - Do not treat `_kiss_ai/` itself as a managed research project.
+- Do not recreate copied `framework/` folders inside managed project roots.
 
 ## Managed research project roots
 
 - For normal research work, prefer root `human_*.md` requirement files.
 - Use `inputs_human/` for notes, sources, and uploads.
+- Run build commands from the selected project root, but follow the central command docs under `_kiss_ai/framework/commands/`.
+- Keep Git status, diffs, annotation detection, and snapshot commits scoped to the selected project root.
 
 ## AI-managed areas
 

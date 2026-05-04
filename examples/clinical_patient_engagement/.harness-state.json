@@ -1,0 +1,347 @@
+{
+  "version": 2,
+  "project_name": "Clinical Patient Engagement",
+  "last_run_at": "2026-04-27T20:58:00Z",
+  "last_successful_run_at": "2026-04-27T20:58:00Z",
+  "setup": {
+    "status": "initialized",
+    "initialized_at": "2026-04-27T19:06:56Z",
+    "initial_human_baseline_commit": null,
+    "initial_human_baseline_at": null,
+    "source": "_kiss_ai/framework/templates/project_template via _kiss_ai/framework/commands/do_init_project.md",
+    "baseline_note": "Migrated example state. New projects should create an initial human-authored baseline commit before the first build, then create a generated rebuild snapshot after the build succeeds."
+  },
+  "requirement_files": {
+    "goal": "human_goal_requirements.md",
+    "input": "human_input_requirements.md",
+    "output": "human_output_requirements.md",
+    "open_questions": "human_open_questions.md"
+  },
+  "paths": {
+    "inputs_human": "inputs_human/",
+    "inputs_ai": "inputs_ai/",
+    "outputs_ai": "outputs_ai/",
+    "wiki": "outputs_ai/wiki/",
+    "human_open_questions": "human_open_questions.md",
+    "change_logs": "change_logs/",
+    "change_log": "change_logs/change_logs.md",
+    "annotation_change_log": "change_logs/annotation_change_logs.md"
+  },
+  "scaling_assessment": {
+    "status": "assessed",
+    "assessed_at": "2026-04-27T20:58:00Z",
+    "selected_mode": "baseline_dependency_tracking",
+    "intended_mode_after_unblock": null,
+    "trigger_signals": [
+      {
+        "id": "several_output_families",
+        "severity": "moderate",
+        "evidence": "Example includes wiki pages, playbooks, and multiple strategy output families.",
+        "source": "human_output_requirements.md",
+        "notes": "Persist dependency and preservation decisions even without project-defined intermediate ledgers."
+      },
+      {
+        "id": "decision_support_outputs",
+        "severity": "moderate",
+        "evidence": "Example includes matrices, strategy briefs, and measurement plans.",
+        "source": "outputs_ai/",
+        "notes": "Not marked as full large-project scaling because this migrated example does not define intermediate ledger schemas."
+      }
+    ],
+    "baseline_safeguards": [
+      {
+        "id": "verified_source_inventory",
+        "status": "applied",
+        "evidence_path": null,
+        "notes": "Migrated example records counts from the prior run."
+      },
+      {
+        "id": "source_to_page_mapping",
+        "status": "applied",
+        "evidence_path": "outputs_ai/wiki/.compile-state.json",
+        "notes": "Wiki compile state is the expected evidence location when no separate ledger path is defined."
+      },
+      {
+        "id": "output_dependency_mapping",
+        "status": "applied",
+        "evidence_path": null,
+        "notes": "Migrated example keeps dependency evidence inline in harness state."
+      },
+      {
+        "id": "stale_source_detection",
+        "status": "applied",
+        "evidence_path": null,
+        "notes": ""
+      },
+      {
+        "id": "stale_output_detection",
+        "status": "applied",
+        "evidence_path": null,
+        "notes": ""
+      },
+      {
+        "id": "blocked_missing_low_confidence_reporting",
+        "status": "applied",
+        "evidence_path": null,
+        "notes": ""
+      },
+      {
+        "id": "preservation_only_when_dependencies_unchanged",
+        "status": "applied",
+        "evidence_path": null,
+        "notes": "No preserved outputs were recorded in the migrated run."
+      }
+    ],
+    "required_ledgers": [],
+    "first_scaling_escalation": {
+      "status": "not_required",
+      "escalated_at": null,
+      "reason": "",
+      "blocked_reason": "",
+      "remaining_gaps": []
+    },
+    "broader_rebuild": {
+      "status": "not_required",
+      "required_at": null,
+      "completed_at": null,
+      "reason": "",
+      "blocked_reason": "",
+      "remaining_gaps": []
+    },
+    "history": [
+      {
+        "at": "2026-04-27T20:58:00Z",
+        "previous_mode": null,
+        "new_mode": "baseline_dependency_tracking",
+        "triggers": [
+          "several_output_families",
+          "decision_support_outputs"
+        ]
+      }
+    ],
+    "notes": [
+      "Migrated example state; future rebuilds should refresh this assessment from current requirements and sources."
+    ]
+  },
+  "rebuild_scope": {
+    "status": "success",
+    "assessed_at": "2026-04-27T20:58:00Z",
+    "sources_changed": [],
+    "wiki_pages_rebuilt": [],
+    "wiki_pages_preserved": [],
+    "wiki_pages_marked_stale": [],
+    "outputs_rebuilt": [
+      "outputs_ai/playbooks/agentic_platform_opportunity_map.md",
+      "outputs_ai/playbooks/best_in_class_strategy_brief.md",
+      "outputs_ai/playbooks/cross_industry_transferability_matrix.md",
+      "outputs_ai/playbooks/engagement_measurement_plan.md",
+      "outputs_ai/playbooks/modality_selection_matrix.md",
+      "outputs_ai/playbooks/outreach_workflow_templates.md",
+      "outputs_ai/playbooks/patient_engagement_strategy.md",
+      "outputs_ai/playbooks/vendor_capability_matrix.md",
+      "outputs_ai/strategies/ai_heavy_engagement_strategies/README.md",
+      "outputs_ai/strategies/ai_heavy_engagement_strategies/agentic_source_monitoring_and_curation.md",
+      "outputs_ai/strategies/ai_heavy_engagement_strategies/ai_voice_no_show_recovery.md",
+      "outputs_ai/strategies/ai_heavy_engagement_strategies/patient_facing_agentic_engagement_strategy.md",
+      "outputs_ai/strategies/human_ai_engagement_strategies/README.md",
+      "outputs_ai/strategies/human_ai_engagement_strategies/ai_triaged_human_callback_workflow.md",
+      "outputs_ai/strategies/human_only_engagement_strategies/README.md",
+      "outputs_ai/strategies/human_only_engagement_strategies/high_risk_caregiver_supported_navigator_outreach.md"
+    ],
+    "outputs_preserved": [],
+    "outputs_marked_stale": [],
+    "blocked_artifacts": [],
+    "uncertain_artifacts": [],
+    "preservation_decisions": []
+  },
+  "last_annotation_scan": {
+    "status": "annotations_found",
+    "files_scanned": [
+      "inputs_ai/",
+      "outputs_ai/"
+    ],
+    "annotations_logged": 1,
+    "unresolved_review_items": []
+  },
+  "last_input_refresh": {
+    "status": "success",
+    "sources_expected": 13,
+    "auxiliary_inputs": [
+      "human_open_questions.md"
+    ],
+    "sources_checked": 13,
+    "sources_updated": 1,
+    "verified_inputs_human_inventory": [],
+    "unreadable_files": [],
+    "excluded_files": [],
+    "source_inventory_status": "complete",
+    "source_side_scaling_signals": [
+      {
+        "id": "many_generated_sources",
+        "severity": "moderate",
+        "evidence": "Prior run tracked 13 expected sources.",
+        "source": ".harness-state.json",
+        "notes": "Migrated from prior state counts."
+      }
+    ],
+    "stale_sources": [],
+    "material_changes": [],
+    "downstream_impact": {
+      "source_categories": [],
+      "wiki_pages": [],
+      "intermediate_ledgers": [],
+      "outputs": [],
+      "uncertain": false
+    }
+  },
+  "last_wiki_compile": {
+    "status": "success",
+    "topics": [
+      "accessibility-and-language",
+      "agentic-data-curation",
+      "ai-voice-agents",
+      "appointment-reminders",
+      "best-in-class-healthcare-engagement",
+      "care-plan-follow-up",
+      "consent-privacy-compliance",
+      "cross-industry-engagement-patterns",
+      "custom-ui-for-engagement-operations",
+      "digital-to-live-escalation",
+      "email-and-portal-messaging",
+      "hybrid-channel-orchestration",
+      "mailing-and-print",
+      "measurement-and-kpis",
+      "no-show-reduction",
+      "patient-facing-agentic-engagement",
+      "patient-segmentation",
+      "phone-outreach",
+      "sms-engagement",
+      "vendor-capabilities-and-constraints"
+    ],
+    "concepts": [
+      "channel-strategy",
+      "human-ai-fit",
+      "medicaid-mltss-hcbs",
+      "consent-and-governance",
+      "measurement-loop"
+    ],
+    "sources_scanned": 13,
+    "sources_changed": 1,
+    "auxiliary_inputs": [
+      "human_open_questions.md"
+    ],
+    "affected_pages": [],
+    "unchanged_pages": [],
+    "stale_pages": [],
+    "uncertain_mapping_pages": [],
+    "source_to_page_ledger": {
+      "name": "source_to_page_ledger",
+      "path": "outputs_ai/wiki/.compile-state.json",
+      "required_by": "baseline_safeguard",
+      "status": "present",
+      "schema_defined": true,
+      "last_updated_at": "2026-04-27T20:58:00Z",
+      "notes": "Migrated example uses compile state as source-to-page evidence."
+    },
+    "low_confidence_pages": []
+  },
+  "last_output_build": {
+    "status": "success",
+    "outputs_expected": [
+      "outputs_ai/playbooks/agentic_platform_opportunity_map.md",
+      "outputs_ai/playbooks/best_in_class_strategy_brief.md",
+      "outputs_ai/playbooks/cross_industry_transferability_matrix.md",
+      "outputs_ai/playbooks/engagement_measurement_plan.md",
+      "outputs_ai/playbooks/modality_selection_matrix.md",
+      "outputs_ai/playbooks/outreach_workflow_templates.md",
+      "outputs_ai/playbooks/patient_engagement_strategy.md",
+      "outputs_ai/playbooks/vendor_capability_matrix.md",
+      "outputs_ai/strategies/ai_heavy_engagement_strategies/README.md",
+      "outputs_ai/strategies/ai_heavy_engagement_strategies/agentic_source_monitoring_and_curation.md",
+      "outputs_ai/strategies/ai_heavy_engagement_strategies/ai_voice_no_show_recovery.md",
+      "outputs_ai/strategies/ai_heavy_engagement_strategies/patient_facing_agentic_engagement_strategy.md",
+      "outputs_ai/strategies/human_ai_engagement_strategies/README.md",
+      "outputs_ai/strategies/human_ai_engagement_strategies/ai_triaged_human_callback_workflow.md",
+      "outputs_ai/strategies/human_only_engagement_strategies/README.md",
+      "outputs_ai/strategies/human_only_engagement_strategies/high_risk_caregiver_supported_navigator_outreach.md"
+    ],
+    "outputs_written": [
+      "outputs_ai/playbooks/agentic_platform_opportunity_map.md",
+      "outputs_ai/playbooks/best_in_class_strategy_brief.md",
+      "outputs_ai/playbooks/cross_industry_transferability_matrix.md",
+      "outputs_ai/playbooks/engagement_measurement_plan.md",
+      "outputs_ai/playbooks/modality_selection_matrix.md",
+      "outputs_ai/playbooks/outreach_workflow_templates.md",
+      "outputs_ai/playbooks/patient_engagement_strategy.md",
+      "outputs_ai/playbooks/vendor_capability_matrix.md",
+      "outputs_ai/strategies/ai_heavy_engagement_strategies/README.md",
+      "outputs_ai/strategies/ai_heavy_engagement_strategies/agentic_source_monitoring_and_curation.md",
+      "outputs_ai/strategies/ai_heavy_engagement_strategies/ai_voice_no_show_recovery.md",
+      "outputs_ai/strategies/ai_heavy_engagement_strategies/patient_facing_agentic_engagement_strategy.md",
+      "outputs_ai/strategies/human_ai_engagement_strategies/README.md",
+      "outputs_ai/strategies/human_ai_engagement_strategies/ai_triaged_human_callback_workflow.md",
+      "outputs_ai/strategies/human_only_engagement_strategies/README.md",
+      "outputs_ai/strategies/human_only_engagement_strategies/high_risk_caregiver_supported_navigator_outreach.md"
+    ],
+    "outputs_unchanged": [],
+    "outputs_marked_stale": [],
+    "blocked_outputs": [],
+    "low_confidence_outputs": [],
+    "output_side_scaling_signals": [
+      {
+        "id": "several_output_families",
+        "severity": "moderate",
+        "evidence": "16 directed outputs across playbooks and strategy folders.",
+        "source": "outputs_ai/",
+        "notes": ""
+      },
+      {
+        "id": "matrix_and_strategy_outputs",
+        "severity": "moderate",
+        "evidence": "Output names include matrices, strategy brief, and measurement plan.",
+        "source": "human_output_requirements.md",
+        "notes": ""
+      }
+    ],
+    "output_dependency_map": {
+      "name": "output_dependency_map",
+      "path": null,
+      "required_by": "baseline_safeguard",
+      "status": "present",
+      "schema_defined": true,
+      "last_updated_at": "2026-04-27T20:58:00Z",
+      "notes": "Migrated example keeps dependency evidence inline in harness state."
+    },
+    "intermediate_ledger_status": [],
+    "coverage_ledger_status": {
+      "name": "coverage_ledger",
+      "path": null,
+      "required_by": "project_requirements_when_applicable",
+      "status": "not_required",
+      "schema_defined": false,
+      "last_updated_at": null,
+      "notes": "No project-defined coverage ledger was present in the migrated example."
+    },
+    "preservation_decisions": []
+  },
+  "last_lint": {
+    "status": "passed",
+    "findings": [
+      {
+        "severity": "info",
+        "code": "legacy_example_migrated",
+        "message": "Annotation rebuild lint completed with 0 critical findings and 0 warnings.",
+        "path": null,
+        "artifact": null,
+        "blocking": false
+      }
+    ]
+  },
+  "extensions": {
+    "framework_guard": {
+      "framework_copy_source": "omitted: static example fixture",
+      "intentional_customization_acknowledged_at": null,
+      "intentional_customization_note": "Static example only; runnable projects should be created under kiss_ai_projects/ and use the centralized _kiss_ai/framework/ folder."
+    }
+  }
+}

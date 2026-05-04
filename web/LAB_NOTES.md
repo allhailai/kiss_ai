@@ -35,8 +35,8 @@ The `_kiss_ai` repo tracks hub and framework code. Each managed project remains 
 - How to lock or queue UI edits while a rebuild is running.
 - How much Git history/recovery to expose to non-technical users.
 
-## Deferred Framework Relocation
+## Centralized Framework
 
-The multi-project hub now treats `kiss_ai_projects/` as the project browser root, but the canonical `kiss_ai` framework remains outside that folder for this phase. Moving or mirroring `/opt/all_hail_ai/kiss_ai` into `kiss_ai_projects/` should be a separate migration after the hub proves project selection, project-scoped file access, and project-scoped rebuilds across multiple existing projects.
+The canonical `kiss_ai` framework now lives at `kiss_ai_projects/_kiss_ai/framework/`. Managed projects should not keep copied `framework/` folders. Rebuild agents run from the selected project root, but follow the central command docs, normally `../_kiss_ai/framework/commands/do_all_rebuild.md`.
 
-That later migration should update framework creation docs, `framework/commands/do_init_project.md`, project templates, and framework guard semantics together so project creation and rebuild behavior do not change accidentally during the hub refactor.
+Framework changes are committed in the `_kiss_ai` repo. Project rebuild snapshots remain project-local and should continue to commit generated inputs, outputs, logs, state, and human requirement changes from the selected project root only.

@@ -1,0 +1,993 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kiss-ai.local/framework/harness-state.schema.json",
+  "title": "kiss_ai Harness State",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "project_name",
+    "last_run_at",
+    "last_successful_run_at",
+    "setup",
+    "requirement_files",
+    "paths",
+    "scaling_assessment",
+    "rebuild_scope",
+    "last_annotation_scan",
+    "last_input_refresh",
+    "last_wiki_compile",
+    "last_output_build",
+    "last_lint",
+    "extensions"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 2
+    },
+    "project_name": {
+      "type": "string"
+    },
+    "last_run_at": {
+      "$ref": "#/$defs/nullableTimestamp"
+    },
+    "last_successful_run_at": {
+      "$ref": "#/$defs/nullableTimestamp"
+    },
+    "setup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "initialized_at",
+        "initial_human_baseline_commit",
+        "initial_human_baseline_at",
+        "source",
+        "baseline_note"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "template",
+            "initialized",
+            "migrated_baseline_ready"
+          ]
+        },
+        "initialized_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "initial_human_baseline_commit": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "initial_human_baseline_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "source": {
+          "type": "string"
+        },
+        "baseline_note": {
+          "type": "string"
+        }
+      }
+    },
+    "requirement_files": {
+      "$ref": "#/$defs/requirementFiles"
+    },
+    "paths": {
+      "$ref": "#/$defs/paths"
+    },
+    "scaling_assessment": {
+      "$ref": "#/$defs/scalingAssessment"
+    },
+    "rebuild_scope": {
+      "$ref": "#/$defs/rebuildScope"
+    },
+    "last_annotation_scan": {
+      "$ref": "#/$defs/annotationScan"
+    },
+    "last_input_refresh": {
+      "$ref": "#/$defs/inputRefresh"
+    },
+    "last_wiki_compile": {
+      "$ref": "#/$defs/wikiCompile"
+    },
+    "last_output_build": {
+      "$ref": "#/$defs/outputBuild"
+    },
+    "last_lint": {
+      "$ref": "#/$defs/lintRun"
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Project-specific metadata, such as period segmentation, when explicitly required by project requirements. New projects may include `framework_guard` (central framework provenance and intentional framework customization acknowledgements)."
+    }
+  },
+  "$defs": {
+    "nullableTimestamp": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableString": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "enum": [
+        "not_run",
+        "success",
+        "warnings",
+        "needs_review",
+        "blocked",
+        "failed",
+        "stale",
+        "pending_rebuild"
+      ]
+    },
+    "requirementFiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "goal",
+        "input",
+        "output",
+        "open_questions"
+      ],
+      "properties": {
+        "goal": {
+          "type": "string"
+        },
+        "input": {
+          "type": "string"
+        },
+        "output": {
+          "type": "string"
+        },
+        "open_questions": {
+          "type": "string"
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputs_human",
+        "inputs_ai",
+        "outputs_ai",
+        "wiki",
+        "human_open_questions",
+        "change_logs",
+        "change_log",
+        "annotation_change_log"
+      ],
+      "properties": {
+        "inputs_human": {
+          "type": "string"
+        },
+        "inputs_ai": {
+          "type": "string"
+        },
+        "outputs_ai": {
+          "type": "string"
+        },
+        "wiki": {
+          "type": "string"
+        },
+        "human_open_questions": {
+          "type": "string"
+        },
+        "change_logs": {
+          "type": "string"
+        },
+        "change_log": {
+          "type": "string"
+        },
+        "annotation_change_log": {
+          "type": "string"
+        }
+      }
+    },
+    "scalingAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "assessed_at",
+        "selected_mode",
+        "intended_mode_after_unblock",
+        "trigger_signals",
+        "baseline_safeguards",
+        "required_ledgers",
+        "first_scaling_escalation",
+        "broader_rebuild",
+        "history",
+        "notes"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_run",
+            "assessed",
+            "blocked"
+          ]
+        },
+        "assessed_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "selected_mode": {
+          "$ref": "#/$defs/scalingMode"
+        },
+        "intended_mode_after_unblock": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/scalingMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trigger_signals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scalingSignal"
+          }
+        },
+        "baseline_safeguards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/safeguardStatus"
+          }
+        },
+        "required_ledgers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ledgerStatus"
+          }
+        },
+        "first_scaling_escalation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "escalated_at",
+            "reason",
+            "blocked_reason",
+            "remaining_gaps"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "not_required",
+                "required",
+                "completed",
+                "blocked",
+                "deferred"
+              ]
+            },
+            "escalated_at": {
+              "$ref": "#/$defs/nullableTimestamp"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "blocked_reason": {
+              "type": "string"
+            },
+            "remaining_gaps": {
+              "$ref": "#/$defs/stringArray"
+            }
+          }
+        },
+        "broader_rebuild": {
+          "$ref": "#/$defs/broaderRebuild"
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/modeTransition"
+          }
+        },
+        "notes": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
+    "scalingMode": {
+      "enum": [
+        "simple",
+        "baseline_dependency_tracking",
+        "large_project_scaling"
+      ]
+    },
+    "scalingSignal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "severity",
+        "evidence",
+        "source",
+        "notes"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "moderate",
+            "severe"
+          ]
+        },
+        "evidence": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "safeguardStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "evidence_path",
+        "notes"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "verified_source_inventory",
+            "source_to_page_mapping",
+            "output_dependency_mapping",
+            "stale_source_detection",
+            "stale_output_detection",
+            "blocked_missing_low_confidence_reporting",
+            "preservation_only_when_dependencies_unchanged"
+          ]
+        },
+        "status": {
+          "enum": [
+            "not_run",
+            "applied",
+            "blocked",
+            "not_applicable"
+          ]
+        },
+        "evidence_path": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "ledgerStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "path",
+        "required_by",
+        "status",
+        "schema_defined",
+        "last_updated_at",
+        "notes"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "required_by": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "not_required",
+            "required",
+            "present",
+            "missing",
+            "stale",
+            "blocked",
+            "deferred"
+          ]
+        },
+        "schema_defined": {
+          "type": "boolean"
+        },
+        "last_updated_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "broaderRebuild": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "required_at",
+        "completed_at",
+        "reason",
+        "blocked_reason",
+        "remaining_gaps"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_required",
+            "required",
+            "in_progress",
+            "completed",
+            "blocked",
+            "deferred"
+          ]
+        },
+        "required_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "completed_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "blocked_reason": {
+          "type": "string"
+        },
+        "remaining_gaps": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
+    "modeTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "at",
+        "previous_mode",
+        "new_mode",
+        "triggers"
+      ],
+      "properties": {
+        "at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "previous_mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/scalingMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "new_mode": {
+          "$ref": "#/$defs/scalingMode"
+        },
+        "triggers": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
+    "rebuildScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "assessed_at",
+        "sources_changed",
+        "wiki_pages_rebuilt",
+        "wiki_pages_preserved",
+        "wiki_pages_marked_stale",
+        "outputs_rebuilt",
+        "outputs_preserved",
+        "outputs_marked_stale",
+        "blocked_artifacts",
+        "uncertain_artifacts",
+        "preservation_decisions"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "assessed_at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "sources_changed": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "wiki_pages_rebuilt": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "wiki_pages_preserved": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "wiki_pages_marked_stale": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "outputs_rebuilt": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "outputs_preserved": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "outputs_marked_stale": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "blocked_artifacts": {
+          "$ref": "#/$defs/artifactStatusArray"
+        },
+        "uncertain_artifacts": {
+          "$ref": "#/$defs/artifactStatusArray"
+        },
+        "preservation_decisions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/preservationDecision"
+          }
+        }
+      }
+    },
+    "annotationScan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "files_scanned",
+        "annotations_logged",
+        "unresolved_review_items"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_run",
+            "clean",
+            "annotations_found",
+            "blocked",
+            "failed"
+          ]
+        },
+        "files_scanned": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "annotations_logged": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_review_items": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
+    "inputRefresh": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "sources_expected",
+        "auxiliary_inputs",
+        "sources_checked",
+        "sources_updated",
+        "verified_inputs_human_inventory",
+        "unreadable_files",
+        "excluded_files",
+        "source_inventory_status",
+        "source_side_scaling_signals",
+        "stale_sources",
+        "material_changes",
+        "downstream_impact"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "sources_expected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "auxiliary_inputs": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "sources_checked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sources_updated": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "verified_inputs_human_inventory": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceInventoryItem"
+          }
+        },
+        "unreadable_files": {
+          "$ref": "#/$defs/artifactStatusArray"
+        },
+        "excluded_files": {
+          "$ref": "#/$defs/artifactStatusArray"
+        },
+        "source_inventory_status": {
+          "enum": [
+            "not_run",
+            "complete",
+            "incomplete",
+            "blocked",
+            "uncertain"
+          ]
+        },
+        "source_side_scaling_signals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scalingSignal"
+          }
+        },
+        "stale_sources": {
+          "$ref": "#/$defs/artifactStatusArray"
+        },
+        "material_changes": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "downstream_impact": {
+          "$ref": "#/$defs/downstreamImpact"
+        }
+      }
+    },
+    "wikiCompile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "topics",
+        "concepts",
+        "sources_scanned",
+        "sources_changed",
+        "auxiliary_inputs",
+        "affected_pages",
+        "unchanged_pages",
+        "stale_pages",
+        "uncertain_mapping_pages",
+        "source_to_page_ledger",
+        "low_confidence_pages"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "topics": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "concepts": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "sources_scanned": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sources_changed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "auxiliary_inputs": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "affected_pages": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "unchanged_pages": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "stale_pages": {
+          "$ref": "#/$defs/artifactStatusArray"
+        },
+        "uncertain_mapping_pages": {
+          "$ref": "#/$defs/artifactStatusArray"
+        },
+        "source_to_page_ledger": {
+          "$ref": "#/$defs/ledgerStatus"
+        },
+        "low_confidence_pages": {
+          "$ref": "#/$defs/artifactStatusArray"
+        }
+      }
+    },
+    "outputBuild": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "outputs_expected",
+        "outputs_written",
+        "outputs_unchanged",
+        "outputs_marked_stale",
+        "blocked_outputs",
+        "low_confidence_outputs",
+        "output_side_scaling_signals",
+        "output_dependency_map",
+        "intermediate_ledger_status",
+        "coverage_ledger_status",
+        "preservation_decisions"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "outputs_expected": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "outputs_written": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "outputs_unchanged": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "outputs_marked_stale": {
+          "$ref": "#/$defs/artifactStatusArray"
+        },
+        "blocked_outputs": {
+          "$ref": "#/$defs/artifactStatusArray"
+        },
+        "low_confidence_outputs": {
+          "$ref": "#/$defs/artifactStatusArray"
+        },
+        "output_side_scaling_signals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scalingSignal"
+          }
+        },
+        "output_dependency_map": {
+          "$ref": "#/$defs/ledgerStatus"
+        },
+        "intermediate_ledger_status": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ledgerStatus"
+          }
+        },
+        "coverage_ledger_status": {
+          "$ref": "#/$defs/ledgerStatus"
+        },
+        "preservation_decisions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/preservationDecision"
+          }
+        }
+      }
+    },
+    "lintRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "findings"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_run",
+            "passed",
+            "warnings",
+            "failed"
+          ]
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/lintFinding"
+          }
+        }
+      }
+    },
+    "sourceInventoryItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "kind",
+        "status",
+        "notes"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "markdown",
+            "binary",
+            "directory",
+            "placeholder",
+            "other"
+          ]
+        },
+        "status": {
+          "enum": [
+            "readable",
+            "converted",
+            "summarized",
+            "unreadable",
+            "excluded",
+            "placeholder"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "artifactStatusArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifactStatus"
+      }
+    },
+    "artifactStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "reason",
+        "severity",
+        "notes"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "critical"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "downstreamImpact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_categories",
+        "wiki_pages",
+        "intermediate_ledgers",
+        "outputs",
+        "uncertain"
+      ],
+      "properties": {
+        "source_categories": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "wiki_pages": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "intermediate_ledgers": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "outputs": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "uncertain": {
+          "type": "boolean"
+        }
+      }
+    },
+    "preservationDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact",
+        "artifact_type",
+        "preserved",
+        "dependency_status",
+        "rationale"
+      ],
+      "properties": {
+        "artifact": {
+          "type": "string"
+        },
+        "artifact_type": {
+          "enum": [
+            "wiki_page",
+            "directed_output",
+            "ledger",
+            "source"
+          ]
+        },
+        "preserved": {
+          "type": "boolean"
+        },
+        "dependency_status": {
+          "enum": [
+            "unchanged",
+            "changed",
+            "stale",
+            "uncertain",
+            "blocked"
+          ]
+        },
+        "rationale": {
+          "type": "string"
+        }
+      }
+    },
+    "lintFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "severity",
+        "code",
+        "message",
+        "path",
+        "artifact",
+        "blocking"
+      ],
+      "properties": {
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "critical"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "artifact": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "blocking": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

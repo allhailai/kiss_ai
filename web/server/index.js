@@ -730,8 +730,10 @@ async function runRebuildAgent(project, apiKey) {
     const prompt = [
       "Run the kiss_ai rebuild for this project.",
       "",
-      "Follow framework/commands/do_all_rebuild.md exactly.",
+      "Follow /opt/all_hail_ai/kiss_ai_projects/_kiss_ai/framework/commands/do_all_rebuild.md exactly.",
       "Respect all review gates. If a review gate blocks, stop and report the blocker clearly.",
+      "Use /opt/all_hail_ai/kiss_ai_projects/_kiss_ai/framework as the canonical framework root.",
+      "Do not create or depend on a project-local framework/ folder.",
       "Do not operate outside this project root.",
     ].join("\n");
 

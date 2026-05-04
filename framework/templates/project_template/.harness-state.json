@@ -1,0 +1,207 @@
+{
+  "version": 2,
+  "project_name": "New kiss_ai Research Project",
+  "last_run_at": null,
+  "last_successful_run_at": null,
+  "setup": {
+    "status": "template",
+    "initialized_at": null,
+    "initial_human_baseline_commit": null,
+    "initial_human_baseline_at": null,
+    "source": "framework/templates/project_template",
+    "baseline_note": "New projects should create an initial human-authored baseline commit before the first build, then create a generated rebuild snapshot after the build succeeds."
+  },
+  "requirement_files": {
+    "goal": "human_goal_requirements.md",
+    "input": "human_input_requirements.md",
+    "output": "human_output_requirements.md",
+    "open_questions": "human_open_questions.md"
+  },
+  "paths": {
+    "inputs_human": "inputs_human/",
+    "inputs_ai": "inputs_ai/",
+    "outputs_ai": "outputs_ai/",
+    "wiki": "outputs_ai/wiki/",
+    "human_open_questions": "human_open_questions.md",
+    "change_logs": "change_logs/",
+    "change_log": "change_logs/change_logs.md",
+    "annotation_change_log": "change_logs/annotation_change_logs.md"
+  },
+  "scaling_assessment": {
+    "status": "not_run",
+    "assessed_at": null,
+    "selected_mode": "simple",
+    "intended_mode_after_unblock": null,
+    "trigger_signals": [],
+    "baseline_safeguards": [
+      {
+        "id": "verified_source_inventory",
+        "status": "not_run",
+        "evidence_path": null,
+        "notes": ""
+      },
+      {
+        "id": "source_to_page_mapping",
+        "status": "not_run",
+        "evidence_path": null,
+        "notes": ""
+      },
+      {
+        "id": "output_dependency_mapping",
+        "status": "not_run",
+        "evidence_path": null,
+        "notes": ""
+      },
+      {
+        "id": "stale_source_detection",
+        "status": "not_run",
+        "evidence_path": null,
+        "notes": ""
+      },
+      {
+        "id": "stale_output_detection",
+        "status": "not_run",
+        "evidence_path": null,
+        "notes": ""
+      },
+      {
+        "id": "blocked_missing_low_confidence_reporting",
+        "status": "not_run",
+        "evidence_path": null,
+        "notes": ""
+      },
+      {
+        "id": "preservation_only_when_dependencies_unchanged",
+        "status": "not_run",
+        "evidence_path": null,
+        "notes": ""
+      }
+    ],
+    "required_ledgers": [],
+    "first_scaling_escalation": {
+      "status": "not_required",
+      "escalated_at": null,
+      "reason": "",
+      "blocked_reason": "",
+      "remaining_gaps": []
+    },
+    "broader_rebuild": {
+      "status": "not_required",
+      "required_at": null,
+      "completed_at": null,
+      "reason": "",
+      "blocked_reason": "",
+      "remaining_gaps": []
+    },
+    "history": [],
+    "notes": []
+  },
+  "rebuild_scope": {
+    "status": "not_run",
+    "assessed_at": null,
+    "sources_changed": [],
+    "wiki_pages_rebuilt": [],
+    "wiki_pages_preserved": [],
+    "wiki_pages_marked_stale": [],
+    "outputs_rebuilt": [],
+    "outputs_preserved": [],
+    "outputs_marked_stale": [],
+    "blocked_artifacts": [],
+    "uncertain_artifacts": [],
+    "preservation_decisions": []
+  },
+  "last_annotation_scan": {
+    "status": "not_run",
+    "files_scanned": [],
+    "annotations_logged": 0,
+    "unresolved_review_items": []
+  },
+  "last_input_refresh": {
+    "status": "not_run",
+    "sources_expected": 0,
+    "auxiliary_inputs": [
+      "human_open_questions.md"
+    ],
+    "sources_checked": 0,
+    "sources_updated": 0,
+    "verified_inputs_human_inventory": [],
+    "unreadable_files": [],
+    "excluded_files": [],
+    "source_inventory_status": "not_run",
+    "source_side_scaling_signals": [],
+    "stale_sources": [],
+    "material_changes": [],
+    "downstream_impact": {
+      "source_categories": [],
+      "wiki_pages": [],
+      "intermediate_ledgers": [],
+      "outputs": [],
+      "uncertain": false
+    }
+  },
+  "last_wiki_compile": {
+    "status": "not_run",
+    "topics": [],
+    "concepts": [],
+    "sources_scanned": 0,
+    "sources_changed": 0,
+    "auxiliary_inputs": [
+      "human_open_questions.md"
+    ],
+    "affected_pages": [],
+    "unchanged_pages": [],
+    "stale_pages": [],
+    "uncertain_mapping_pages": [],
+    "source_to_page_ledger": {
+      "name": "source_to_page_ledger",
+      "path": null,
+      "required_by": "baseline_safeguard",
+      "status": "required",
+      "schema_defined": true,
+      "last_updated_at": null,
+      "notes": "Baseline wiki safeguard; may be recorded inline in compile state or a project-defined ledger path."
+    },
+    "low_confidence_pages": []
+  },
+  "last_output_build": {
+    "status": "not_run",
+    "outputs_expected": [],
+    "outputs_written": [],
+    "outputs_unchanged": [],
+    "outputs_marked_stale": [],
+    "blocked_outputs": [],
+    "low_confidence_outputs": [],
+    "output_side_scaling_signals": [],
+    "output_dependency_map": {
+      "name": "output_dependency_map",
+      "path": null,
+      "required_by": "baseline_safeguard",
+      "status": "required",
+      "schema_defined": true,
+      "last_updated_at": null,
+      "notes": "Baseline directed-output safeguard; may be recorded inline in harness state or a project-defined ledger path."
+    },
+    "intermediate_ledger_status": [],
+    "coverage_ledger_status": {
+      "name": "coverage_ledger",
+      "path": null,
+      "required_by": "project_requirements_when_applicable",
+      "status": "not_required",
+      "schema_defined": false,
+      "last_updated_at": null,
+      "notes": ""
+    },
+    "preservation_decisions": []
+  },
+  "last_lint": {
+    "status": "not_run",
+    "findings": []
+  },
+  "extensions": {
+    "framework_guard": {
+      "framework_copy_source": "centralized: ../_kiss_ai/framework",
+      "intentional_customization_acknowledged_at": null,
+      "intentional_customization_note": null
+    }
+  }
+}
