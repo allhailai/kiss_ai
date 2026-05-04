@@ -125,10 +125,14 @@ export function App() {
           <RebuildWorkspace
             status={workspace.status}
             rebuild={workspace.rebuild}
+            models={workspace.rebuildModels}
+            selectedModelId={workspace.selectedRebuildModelId}
+            onModelChange={workspace.setSelectedRebuildModelId}
             onStart={() => void workspace.startRebuild()}
             onRefresh={() => {
               void workspace.refreshRebuild();
               void workspace.refreshStatus();
+              void workspace.refreshRebuildModels();
             }}
           />
         ) : null}

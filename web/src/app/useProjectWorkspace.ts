@@ -7,6 +7,7 @@ import {
   type ProjectFile,
   type ProjectStatus,
   type ProjectSummary,
+  type RebuildModel,
   type RebuildState,
 } from "../api";
 import { uniqueFiles } from "../domain/files";
@@ -24,6 +25,8 @@ export function useProjectWorkspace() {
   const [projectsError, setProjectsError] = useState("");
   const [status, setStatus] = useState<ProjectStatus | null>(null);
   const [rebuild, setRebuild] = useState<RebuildState | null>(null);
+  const [rebuildModels, setRebuildModels] = useState<RebuildModel[]>([]);
+  const [selectedRebuildModelId, setSelectedRebuildModelId] = useState("");
   const [design, setDesign] = useState<DesignState | null>(null);
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([designProjectFile]);
@@ -90,6 +93,15 @@ export function useProjectWorkspace() {
   const refreshRebuild = useCallback(async () => {
     setRebuild(await api.rebuildState(requireSelectedProjectSlug()));
   }, [requireSelectedProjectSlug]);
+
+  const refreshRebuildModels = useCallback(async () => {
+    const response = await api.rebuildModels();
+    setRebuildModels(response.models);
+    setSelectedRebuildModelId((current) => {
+      if (current && response.models.some((model) => model.id === current)) return current;
+      return response.defaultModelId ?? response.models[0]?.id ?? "";
+    });
+  }, []);
 
   const refreshProjectFiles = useCallback(async () => {
     const projectSlug = requireSelectedProjectSlug();
@@ -171,13 +183,14 @@ export function useProjectWorkspace() {
 
       if (nextView === "rebuild") {
         await refreshRebuild();
+        await refreshRebuildModels();
       }
 
       if (route.filePath && nextView !== "design") {
         await selectFile(route.filePath);
       }
     },
-    [loadTree, refreshDesign, refreshRebuild, selectFile, selectedProjectSlug, setNotice],
+    [loadTree, refreshDesign, refreshRebuild, refreshRebuildModels, selectFile, selectedProjectSlug, setNotice],
   );
 
   const navigateTo = useCallback(
@@ -256,13 +269,13 @@ export function useProjectWorkspace() {
 
   const startRebuild = useCallback(async () => {
     setNotice("");
-    const next = await api.startRebuild(requireSelectedProjectSlug());
+    const next = await api.startRebuild(requireSelectedProjectSlug(), selectedRebuildModelId || rebuildModels[0]?.id || "default");
     setRebuild(next);
 
     if (next.status === "blocked") {
       setNotice(next.message);
     }
-  }, [requireSelectedProjectSlug, setNotice]);
+  }, [rebuildModels, requireSelectedProjectSlug, selectedRebuildModelId, setNotice]);
 
   useEffect(() => {
     void refreshProjects();
@@ -273,6 +286,8 @@ export function useProjectWorkspace() {
       window.localStorage.removeItem(selectedProjectStorageKey);
       setStatus(null);
       setRebuild(null);
+      setRebuildModels([]);
+      setSelectedRebuildModelId("");
       setDesign(null);
       setFiles([]);
       setProjectFiles([designProjectFile]);
@@ -286,8 +301,9 @@ export function useProjectWorkspace() {
     void refreshStatus();
     void refreshDesign();
     void refreshRebuild();
+    void refreshRebuildModels();
     void refreshProjectFiles();
-  }, [refreshDesign, refreshProjectFiles, refreshRebuild, refreshStatus, selectedProjectSlug]);
+  }, [refreshDesign, refreshProjectFiles, refreshRebuild, refreshRebuildModels, refreshStatus, selectedProjectSlug]);
 
   useEffect(() => {
     if (!projects.length || !selectedProjectSlug) return;
@@ -351,6 +367,8 @@ export function useProjectWorkspace() {
     projectsError,
     status,
     rebuild,
+    rebuildModels,
+    selectedRebuildModelId,
     design,
     files,
     projectFiles,
@@ -361,12 +379,14 @@ export function useProjectWorkspace() {
     loading,
     workflowMenuOpen,
     setDraft,
+    setSelectedRebuildModelId,
     setWorkflowMenuOpen,
     dismissToast,
     refreshProjects,
     refreshStatus,
     refreshDesign,
     refreshRebuild,
+    refreshRebuildModels,
     navigateTo,
     openProjectFile,
     selectProject,

@@ -1,5 +1,5 @@
 import express from "express";
-import { Agent, CursorAgentError } from "@cursor/sdk";
+import { Agent, Cursor, CursorAgentError } from "@cursor/sdk";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
@@ -44,6 +44,7 @@ function createIdleRebuildState() {
     status: "idle",
     startedAt: null,
     finishedAt: null,
+    modelId: null,
     message: "No rebuild has been started from the UI.",
     log: [],
   };
@@ -614,6 +615,67 @@ async function resolveCursorApiKey() {
   };
 }
 
+function isMaxModeModel(model) {
+  const display = String(model.displayName ?? "").toLowerCase();
+  const id = String(model.id ?? "").toLowerCase();
+  if (/\bmax\s*mode\b/.test(display)) return true;
+  if (/\(max\)/.test(display)) return true;
+  if (/-max$/.test(id) || /-max-/.test(id)) return true;
+  return false;
+}
+
+function isAutoModel(model) {
+  return String(model.id ?? "").toLowerCase() === "default";
+}
+
+function getRebuildModelTier(model) {
+  const text = `${model.id ?? ""} ${model.displayName ?? ""}`.toLowerCase();
+
+  if (/\b(composer|haiku|flash|mini|nano|spark|fast)\b/.test(text)) return "small";
+  if (/\b(opus|pro|grok|extra high|high)\b/.test(text)) return "high";
+  return "medium";
+}
+
+function getRebuildModelProvider(model) {
+  const text = `${model.id ?? ""} ${model.displayName ?? ""}`.toLowerCase();
+
+  if (/\b(composer)\b/.test(text)) return "Cursor";
+  if (/\b(gpt|codex)\b/.test(text)) return "OpenAI";
+  if (/\b(claude|sonnet|opus|haiku)\b/.test(text)) return "Anthropic";
+  if (/\b(gemini)\b/.test(text)) return "Google";
+  if (/\b(grok)\b/.test(text)) return "xAI";
+  return "";
+}
+
+async function listCursorModels(apiKey) {
+  const models = await Cursor.models.list({ apiKey });
+  return models
+    .filter((model) => !isMaxModeModel(model))
+    .filter((model) => !isAutoModel(model))
+    .map((model) => ({
+      id: model.id,
+      displayName: model.displayName,
+      description: model.description ?? "",
+      provider: getRebuildModelProvider(model),
+      tier: getRebuildModelTier(model),
+    }));
+}
+
+function pickRebuildModelId(models, requestedModelId) {
+  const availableModelIds = new Set(models.map((model) => model.id));
+  const trimmedRequestedModelId = requestedModelId?.trim() || "";
+
+  if (trimmedRequestedModelId) {
+    if (availableModelIds.has(trimmedRequestedModelId)) return trimmedRequestedModelId;
+    throw new Error(`Cannot use this model: ${trimmedRequestedModelId}. Available models: ${models.map((model) => model.id).join(", ")}.`);
+  }
+
+  const mediumOpenAiModel = models.find((model) => model.tier === "medium" && /^gpt-/.test(model.id));
+  const mediumModel = models.find((model) => model.tier === "medium");
+  const preferredModelIds = [process.env.CURSOR_MODEL?.trim(), "gpt-5.5", mediumOpenAiModel?.id, mediumModel?.id].filter(Boolean);
+  return preferredModelIds.find((modelId) => availableModelIds.has(modelId)) ?? models[0]?.id ?? "gpt-5.5";
+}
+
 function parseDesignIdentity(markdown) {
   const match = markdown.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   const tokens = match ? YAML.parse(match[1]) ?? {} : {};
@@ -665,7 +727,7 @@ function appendRunLog(projectSlug, message) {
   });
 }
 
-async function startRebuild(project) {
+async function startRebuild(project, requestedModelId) {
   const rebuildState = getRebuildState(project.slug);
 
   if (rebuildState.running) {
@@ -685,6 +747,21 @@ async function startRebuild(project) {
     });
   }
 
+  const models = await listCursorModels(cursorApiKey.apiKey);
+
+  if (!models.length) {
+    return setRebuildState(project.slug, {
+      ...rebuildState,
+      running: false,
+      status: "blocked",
+      message:
+        "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
+      finishedAt: new Date().toISOString(),
+    });
+  }
+
+  const modelId = pickRebuildModelId(models, requestedModelId);
+
   setRebuildState(project.slug, {
     running: true,
     runId: null,
@@ -692,13 +769,15 @@ async function startRebuild(project) {
     status: "running",
     startedAt: new Date().toISOString(),
     finishedAt: null,
+    modelId,
     message: "Starting local Cursor agent rebuild.",
     log: [],
   });
 
   appendRunLog(project.slug, `Using Cursor API key from ${cursorApiKey.source}.`);
+  appendRunLog(project.slug, `Using Cursor model: ${modelId}.`);
 
-  runRebuildAgent(project, cursorApiKey.apiKey).catch((error) => {
+  runRebuildAgent(project, cursorApiKey.apiKey, modelId).catch((error) => {
     const current = getRebuildState(project.slug);
     setRebuildState(project.slug, {
       ...current,
@@ -713,13 +792,13 @@ async function startRebuild(project) {
   return getRebuildState(project.slug);
 }
 
-async function runRebuildAgent(project, apiKey) {
+async function runRebuildAgent(project, apiKey, modelId) {
   let agent;
 
   try {
-    agent = Agent.create({
+    agent = await Agent.create({
       apiKey,
-      model: { id: process.env.CURSOR_MODEL ?? "auto" },
+      model: { id: modelId },
       local: { cwd: project.path },
     });
 
@@ -796,6 +875,32 @@ app.get("/api/projects", async (_request, response, next) => {
     response.json({
       projectsRoot: PROJECTS_ROOT,
       projects: await discoverProjects(),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/cursor/models", async (_request, response, next) => {
+  try {
+    const cursorApiKey = await resolveCursorApiKey();
+
+    if (!cursorApiKey.available) {
+      response.json({
+        available: false,
+        defaultModelId: null,
+        models: [],
+        source: null,
+      });
+      return;
+    }
+
+    const models = await listCursorModels(cursorApiKey.apiKey);
+    response.json({
+      available: true,
+      defaultModelId: pickRebuildModelId(models),
+      models,
+      source: cursorApiKey.source,
     });
   } catch (error) {
     next(error);
@@ -925,7 +1030,7 @@ app.get("/api/projects/:projectSlug/rebuild", (request, response) => {
 
 app.post("/api/projects/:projectSlug/rebuild/start", async (request, response, next) => {
   try {
-    response.json(await startRebuild(request.project));
+    response.json(await startRebuild(request.project, request.body.modelId));
   } catch (error) {
     next(error);
   }

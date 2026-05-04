@@ -20,6 +20,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -580,6 +581,35 @@ button:disabled {
   background: var(--color-accent);
   color: white;
   font-weight: 800;
+}
+
+.rebuild-model-field {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0;
+  max-width: 420px;
+}
+
+.rebuild-model-field span {
+  color: var(--color-secondary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rebuild-model-field select {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: white;
+  color: var(--color-primary);
+  padding: 10px 12px;
+}
+
+.rebuild-model-note {
+  margin-top: -6px;
+  font-size: 0.9rem;
 }
 
 .compact-list {

@@ -74,11 +74,27 @@ export type RebuildState = {
   running: boolean;
   runId: string | null;
   agentId: string | null;
+  modelId: string | null;
   status: "idle" | "running" | "finished" | "error" | "blocked";
   startedAt: string | null;
   finishedAt: string | null;
   message: string;
   log: string[];
+};
+
+export type RebuildModel = {
+  id: string;
+  displayName: string;
+  description: string;
+  provider: string;
+  tier: "medium" | "high" | "small";
+};
+
+export type RebuildModelsResponse = {
+  available: boolean;
+  defaultModelId: string | null;
+  models: RebuildModel[];
+  source: string | null;
 };
 
 export type DesignState = {
@@ -123,6 +139,7 @@ function projectBase(projectSlug: string) {
 
 export const api = {
   projects: () => request<ProjectListResponse>("/api/projects"),
+  rebuildModels: () => request<RebuildModelsResponse>("/api/cursor/models"),
   status: (projectSlug: string) => request<ProjectStatus>(`${projectBase(projectSlug)}/status`),
   tree: (projectSlug: string, section: string) => request<TreeResponse>(`${projectBase(projectSlug)}/tree/${section}`),
   searchFiles: (projectSlug: string, query: string) =>
@@ -142,5 +159,9 @@ export const api = {
     }),
   design: (projectSlug: string) => request<DesignState>(`${projectBase(projectSlug)}/design`),
   rebuildState: (projectSlug: string) => request<RebuildState>(`${projectBase(projectSlug)}/rebuild`),
-  startRebuild: (projectSlug: string) => request<RebuildState>(`${projectBase(projectSlug)}/rebuild/start`, { method: "POST" }),
+  startRebuild: (projectSlug: string, modelId: string) =>
+    request<RebuildState>(`${projectBase(projectSlug)}/rebuild/start`, {
+      method: "POST",
+      body: JSON.stringify({ modelId }),
+    }),
 };
