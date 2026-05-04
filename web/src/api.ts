@@ -74,12 +74,28 @@ export type RebuildState = {
   running: boolean;
   runId: string | null;
   agentId: string | null;
+  runtime: string;
   modelId: string | null;
   status: "idle" | "running" | "finished" | "error" | "blocked" | "interrupted";
   startedAt: string | null;
   finishedAt: string | null;
   message: string;
+  activeAssistantMessageId: string | null;
+  events: AgentRunEvent[];
   log: string[];
+};
+
+export type AgentRunEvent = {
+  id: string;
+  type: "system" | "assistant_message" | "run_status" | "tool_activity" | "artifact_change" | "error";
+  role: string;
+  title: string;
+  text: string;
+  status: string | null;
+  runtime: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type RebuildModel = {
@@ -159,6 +175,7 @@ export const api = {
     }),
   design: (projectSlug: string) => request<DesignState>(`${projectBase(projectSlug)}/design`),
   rebuildState: (projectSlug: string) => request<RebuildState>(`${projectBase(projectSlug)}/rebuild`),
+  rebuildEventsUrl: (projectSlug: string) => `${projectBase(projectSlug)}/rebuild/events`,
   startRebuild: (projectSlug: string, modelId: string) =>
     request<RebuildState>(`${projectBase(projectSlug)}/rebuild/start`, {
       method: "POST",

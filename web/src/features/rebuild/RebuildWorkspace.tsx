@@ -1,4 +1,5 @@
 import type { ProjectStatus, RebuildModel, RebuildState } from "../../api";
+import { AgentTranscript } from "../agents/AgentTranscript";
 
 const modelTierLabels: Record<RebuildModel["tier"], string> = {
   medium: "Medium ($$)",
@@ -197,10 +198,7 @@ export function RebuildWorkspace({
         </div>
       </section>
 
-      <section className="content-card">
-        <h3>Run log</h3>
-        <pre className="run-log">{rebuild?.log.length ? rebuild.log.join("\n\n") : "No UI-started rebuild log yet."}</pre>
-      </section>
+      <AgentTranscript events={rebuild?.events ?? []} log={rebuild?.log ?? []} />
     </div>
   );
 }

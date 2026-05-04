@@ -358,6 +358,32 @@ export function useProjectWorkspace() {
     return () => window.clearInterval(interval);
   }, [rebuild?.running, refreshRebuild, refreshStatus]);
 
+  useEffect(() => {
+    if (!selectedProjectSlug || !rebuild?.running || typeof EventSource === "undefined") return;
+
+    const eventSource = new EventSource(api.rebuildEventsUrl(selectedProjectSlug));
+    const syncRebuild = (event: MessageEvent<string>) => {
+      try {
+        const payload = JSON.parse(event.data) as unknown;
+        const next =
+          payload && typeof payload === "object" && "state" in payload
+            ? (payload as { state?: RebuildState }).state
+            : (payload as RebuildState);
+        if (next) setRebuild(next);
+      } catch {
+        // Polling remains the fallback if the live event payload cannot be parsed.
+      }
+    };
+
+    eventSource.addEventListener("snapshot", syncRebuild);
+    eventSource.addEventListener("event", syncRebuild);
+    eventSource.onerror = () => {
+      eventSource.close();
+    };
+
+    return () => eventSource.close();
+  }, [rebuild?.running, selectedProjectSlug]);
+
   return {
     view,
     projectsRoot,

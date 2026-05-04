@@ -1,10 +1,12 @@
 import express from "express";
-import { Agent, Cursor, CursorAgentError } from "@cursor/sdk";
+import { Cursor } from "@cursor/sdk";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
 import path from "node:path";
 import YAML from "yaml";
+import { createRebuildStore } from "./agentRuns.js";
+import { runCursorAgent } from "./agentRuntimes/cursorSdk.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(__dirname, "..");
@@ -35,107 +37,16 @@ const treeRoots = new Map([
 const app = express();
 app.use(express.json({ limit: "4mb" }));
 
-const rebuildStates = new Map();
-const activeRebuilds = new Set();
-
-function createIdleRebuildState() {
-  return {
-    running: false,
-    runId: null,
-    agentId: null,
-    status: "idle",
-    startedAt: null,
-    finishedAt: null,
-    modelId: null,
-    message: "No rebuild has been started from the UI.",
-    log: [],
-  };
-}
-
-function normalizeRebuildState(value) {
-  const fallback = createIdleRebuildState();
-  const source = value && typeof value === "object" ? value : {};
-  const status = ["idle", "running", "finished", "error", "blocked", "interrupted"].includes(source.status)
-    ? source.status
-    : fallback.status;
-
-  return {
-    running: Boolean(source.running),
-    runId: typeof source.runId === "string" ? source.runId : null,
-    agentId: typeof source.agentId === "string" ? source.agentId : null,
-    status,
-    startedAt: typeof source.startedAt === "string" ? source.startedAt : null,
-    finishedAt: typeof source.finishedAt === "string" ? source.finishedAt : null,
-    modelId: typeof source.modelId === "string" ? source.modelId : null,
-    message: typeof source.message === "string" ? source.message : fallback.message,
-    log: Array.isArray(source.log) ? source.log.filter((entry) => typeof entry === "string").slice(-300) : [],
-  };
-}
-
-function rebuildStatePath(projectSlug) {
-  if (!projectSlugPattern.test(projectSlug)) {
-    throw new Error("Invalid project slug.");
-  }
-
-  return path.join(REBUILD_STATE_DIR, `${projectSlug}.json`);
-}
-
-async function readPersistedRebuildState(projectSlug) {
-  try {
-    return normalizeRebuildState(JSON.parse(await fs.readFile(rebuildStatePath(projectSlug), "utf8")));
-  } catch (error) {
-    if (error?.code !== "ENOENT") {
-      console.warn(`[kiss_ai UI warning] Could not read rebuild state for ${projectSlug}: ${error.message}`);
-    }
-
-    return createIdleRebuildState();
-  }
-}
-
-async function writePersistedRebuildState(projectSlug, state) {
-  await fs.mkdir(REBUILD_STATE_DIR, { recursive: true });
-
-  const target = rebuildStatePath(projectSlug);
-  const temporary = `${target}.${process.pid}.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`;
-  await fs.writeFile(temporary, `${JSON.stringify(normalizeRebuildState(state), null, 2)}\n`, "utf8");
-  await fs.rename(temporary, target);
-}
-
-function markInterruptedRebuildState(state) {
-  const finishedAt = new Date().toISOString();
-  const message = "Rebuild status is unknown because the web server restarted while this run was marked running.";
-
-  return {
-    ...state,
-    running: false,
-    status: "interrupted",
-    finishedAt,
-    message,
-    log: [...state.log.slice(-299), `[${finishedAt}] ${message}`],
-  };
-}
-
-async function getRebuildState(projectSlug) {
-  const existing = rebuildStates.get(projectSlug);
-  if (existing) return existing;
-
-  let next = await readPersistedRebuildState(projectSlug);
-
-  if (next.running && !activeRebuilds.has(projectSlug)) {
-    next = markInterruptedRebuildState(next);
-    await writePersistedRebuildState(projectSlug, next);
-  }
-
-  rebuildStates.set(projectSlug, next);
-  return next;
-}
-
-async function setRebuildState(projectSlug, nextState) {
-  const normalized = normalizeRebuildState(nextState);
-  rebuildStates.set(projectSlug, normalized);
-  await writePersistedRebuildState(projectSlug, normalized);
-  return normalized;
-}
+const rebuildStore = createRebuildStore({ stateDir: REBUILD_STATE_DIR, projectSlugPattern });
+const {
+  activeRebuilds,
+  appendAssistantDelta,
+  appendRunEvent,
+  finishAssistantMessage,
+  getRebuildState,
+  setRebuildState,
+  subscribe: subscribeToRebuild,
+} = rebuildStore;
 
 function isPathInsideRoot(root, candidate) {
   return candidate === root || candidate.startsWith(`${root}${path.sep}`);
@@ -793,10 +704,11 @@ async function lintDesignIdentity(projectRoot) {
 }
 
 async function appendRunLog(projectSlug, message) {
-  const rebuildState = await getRebuildState(projectSlug);
-  await setRebuildState(projectSlug, {
-    ...rebuildState,
-    log: [...rebuildState.log.slice(-300), `[${new Date().toISOString()}] ${message}`],
+  await appendRunEvent(projectSlug, {
+    type: "system",
+    title: message,
+    text: message,
+    runtime: "cursor",
   });
 }
 
@@ -810,7 +722,7 @@ async function startRebuild(project, requestedModelId) {
   const cursorApiKey = await resolveCursorApiKey();
 
   if (!cursorApiKey.available) {
-    return await setRebuildState(project.slug, {
+    await setRebuildState(project.slug, {
       ...rebuildState,
       running: false,
       status: "blocked",
@@ -818,12 +730,20 @@ async function startRebuild(project, requestedModelId) {
         "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Rebuilds are unavailable from the UI.",
       finishedAt: new Date().toISOString(),
     });
+    await appendRunEvent(project.slug, {
+      type: "error",
+      title: "Rebuild blocked",
+      text: (await getRebuildState(project.slug)).message,
+      status: "blocked",
+      runtime: "cursor",
+    });
+    return await getRebuildState(project.slug);
   }
 
   const models = await listCursorModels(cursorApiKey.apiKey);
 
   if (!models.length) {
-    return await setRebuildState(project.slug, {
+    await setRebuildState(project.slug, {
       ...rebuildState,
       running: false,
       status: "blocked",
@@ -831,6 +751,14 @@ async function startRebuild(project, requestedModelId) {
         "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
       finishedAt: new Date().toISOString(),
     });
+    await appendRunEvent(project.slug, {
+      type: "error",
+      title: "Rebuild blocked",
+      text: (await getRebuildState(project.slug)).message,
+      status: "blocked",
+      runtime: "cursor",
+    });
+    return await getRebuildState(project.slug);
   }
 
   const modelId = pickRebuildModelId(models, requestedModelId);
@@ -839,11 +767,14 @@ async function startRebuild(project, requestedModelId) {
     running: true,
     runId: null,
     agentId: null,
+    runtime: "cursor",
     status: "running",
     startedAt: new Date().toISOString(),
     finishedAt: null,
     modelId,
     message: "Starting local Cursor agent rebuild.",
+    activeAssistantMessageId: null,
+    events: [],
     log: [],
   });
 
@@ -868,20 +799,9 @@ async function startRebuild(project, requestedModelId) {
 }
 
 async function runRebuildAgent(project, apiKey, modelId) {
-  let agent;
   activeRebuilds.add(project.slug);
 
   try {
-    agent = await Agent.create({
-      apiKey,
-      model: { id: modelId },
-      local: { cwd: project.path },
-    });
-
-    const createdState = await getRebuildState(project.slug);
-    await setRebuildState(project.slug, { ...createdState, agentId: agent.agentId ?? null });
-    await appendRunLog(project.slug, `Agent created: ${(await getRebuildState(project.slug)).agentId ?? "local"}`);
-
     const prompt = [
       "Run the kiss_ai rebuild for this project.",
       "",
@@ -892,43 +812,49 @@ async function runRebuildAgent(project, apiKey, modelId) {
       "Do not operate outside this project root.",
     ].join("\n");
 
-    const run = await agent.send(prompt);
-    const startedState = await getRebuildState(project.slug);
-    await setRebuildState(project.slug, { ...startedState, runId: run.id ?? null });
-    await appendRunLog(project.slug, `Run started: ${(await getRebuildState(project.slug)).runId ?? "unknown"}`);
-
-    if (run.supports("stream")) {
-      for await (const event of run.stream()) {
-        if (event.type !== "assistant") continue;
-
-        for (const block of event.message.content) {
-          if (block.type === "text" && block.text.trim()) {
-            await appendRunLog(project.slug, block.text.trim());
-          }
+    const result = await runCursorAgent({
+      project,
+      apiKey,
+      modelId,
+      prompt,
+      onEvent: async (event) => {
+        if (event.type === "assistant_delta") {
+          await appendAssistantDelta(project.slug, event.text, event.metadata);
+          return;
         }
-      }
-    }
 
-    const result = await run.wait();
+        const current = await getRebuildState(project.slug);
+        await setRebuildState(project.slug, {
+          ...current,
+          agentId: typeof event.metadata?.agentId === "string" ? event.metadata.agentId : current.agentId,
+          runId: typeof event.metadata?.runId === "string" ? event.metadata.runId : current.runId,
+        });
+        await appendRunEvent(project.slug, event);
+      },
+    });
+
+    await finishAssistantMessage(project.slug);
     const completedState = await getRebuildState(project.slug);
+    const message =
+      result.status === "finished" ? "Rebuild run finished." : `Rebuild run ended with status: ${result.status}`;
     await setRebuildState(project.slug, {
       ...completedState,
       running: false,
       status: result.status === "finished" ? "finished" : "error",
       finishedAt: new Date().toISOString(),
-      message:
-        result.status === "finished"
-          ? "Rebuild run finished."
-          : `Rebuild run ended with status: ${result.status}`,
+      message,
     });
-    await appendRunLog(project.slug, (await getRebuildState(project.slug)).message);
+    await appendRunEvent(project.slug, {
+      type: result.status === "finished" ? "run_status" : "error",
+      title: result.status === "finished" ? "Run finished" : "Run ended with an error",
+      text: message,
+      status: result.status === "finished" ? "finished" : "error",
+      runtime: "cursor",
+      metadata: { resultStatus: result.status },
+    });
   } catch (error) {
-    const message =
-      error instanceof CursorAgentError
-        ? `Cursor SDK startup failed: ${error.message}`
-        : error instanceof Error
-          ? error.message
-          : "Unknown Cursor SDK rebuild failure.";
+    await finishAssistantMessage(project.slug);
+    const message = error instanceof Error ? error.message : "Unknown Cursor SDK rebuild failure.";
 
     const current = await getRebuildState(project.slug);
     await setRebuildState(project.slug, {
@@ -938,12 +864,15 @@ async function runRebuildAgent(project, apiKey, modelId) {
       finishedAt: new Date().toISOString(),
       message,
     });
-    await appendRunLog(project.slug, message);
+    await appendRunEvent(project.slug, {
+      type: "error",
+      title: "Run failed",
+      text: message,
+      status: "error",
+      runtime: "cursor",
+    });
   } finally {
     activeRebuilds.delete(project.slug);
-    if (agent) {
-      await agent[Symbol.asyncDispose]();
-    }
   }
 }
 
@@ -1104,6 +1033,34 @@ app.get("/api/projects/:projectSlug/design", async (request, response, next) => 
 app.get("/api/projects/:projectSlug/rebuild", async (request, response, next) => {
   try {
     response.json(await getRebuildState(request.project.slug));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/projects/:projectSlug/rebuild/events", async (request, response, next) => {
+  try {
+    response.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    });
+    response.flushHeaders?.();
+
+    const send = (eventName, payload) => {
+      response.write(`event: ${eventName}\n`);
+      response.write(`data: ${JSON.stringify(payload)}\n\n`);
+    };
+    const unsubscribe = subscribeToRebuild(request.project.slug, ({ state, event }) => {
+      send("event", { state, event });
+    });
+
+    send("snapshot", await getRebuildState(request.project.slug));
+
+    request.on("close", () => {
+      unsubscribe();
+      response.end();
+    });
   } catch (error) {
     next(error);
   }

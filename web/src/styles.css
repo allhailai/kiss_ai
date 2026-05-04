@@ -655,6 +655,79 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.agent-transcript-card .section-heading p {
+  margin: 4px 0 0;
+  color: var(--color-secondary);
+}
+
+.agent-transcript {
+  display: grid;
+  gap: 12px;
+}
+
+.agent-event {
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--color-surface) 92%, var(--color-background));
+}
+
+.agent-event header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.agent-event header strong {
+  color: var(--color-primary);
+}
+
+.agent-event header span,
+.agent-event-status {
+  color: var(--color-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.agent-event-assistant_message {
+  border-color: color-mix(in srgb, var(--color-accent) 44%, var(--color-border));
+  background: color-mix(in srgb, var(--color-surface) 86%, var(--color-accent));
+}
+
+.agent-event-error {
+  border-color: color-mix(in srgb, var(--color-warning) 54%, var(--color-border));
+}
+
+.agent-event-body {
+  color: var(--color-primary);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.agent-event-body p {
+  margin: 0 0 10px;
+}
+
+.agent-event-body p:last-child {
+  margin-bottom: 0;
+}
+
+.agent-transcript-empty {
+  margin: 0;
+  color: var(--color-secondary);
+}
+
+.agent-debug-log {
+  margin-top: 16px;
+}
+
+.agent-debug-log summary {
+  color: var(--color-secondary);
+  cursor: pointer;
+  font-weight: 800;
+}
+
 .compact-list {
   margin: 0;
   padding-left: 18px;
