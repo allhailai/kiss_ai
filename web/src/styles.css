@@ -1115,7 +1115,7 @@ button:disabled {
 }
 
 .warning-callout {
-  margin-top: 14px;
+  margin: 14px 0 18px;
   padding: 14px 16px;
   border-left: 5px solid var(--color-warning);
   border-radius: 12px;
@@ -1127,6 +1127,56 @@ button:disabled {
 .warning-callout ul {
   margin: 8px 0 0;
   padding-left: 18px;
+}
+
+.attention-resolution-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.attention-resolution-item {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface) 92%, var(--color-warning));
+}
+
+.attention-resolution-attempt,
+.attention-resolution-empty {
+  margin: 6px 0 0;
+  color: var(--color-secondary);
+  font-size: 0.9rem;
+}
+
+.attention-resolution-options,
+.attention-resolution-manual-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attention-resolution-options button,
+.attention-resolution-manual button {
+  padding: 8px 12px;
+  border-radius: 999px;
+}
+
+.attention-resolution-manual {
+  display: grid;
+  gap: 8px;
+}
+
+.attention-resolution-manual textarea {
+  min-height: 96px;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--color-primary);
 }
 
 .swatch-grid {

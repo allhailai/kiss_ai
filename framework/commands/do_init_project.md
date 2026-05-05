@@ -74,7 +74,7 @@ If the user asks about alternate source or output organization, use the relevant
     - all run statuses as `not_run`
     - `extensions.human_attention` with queue path, null update timestamp, and an empty `open_items` array
     - `extensions.rebuild_summaries` with null latest summary fields and an empty notes array
-    - **Framework guard / provenance:** ensure `extensions.framework_guard` exists (merge keys if an older file lacks them). Set `extensions.framework_guard.framework_copy_source` to `centralized: ../_kiss_ai/framework` or the absolute central framework path used. Leave `intentional_customization_acknowledged_at` and `intentional_customization_note` as `null` unless the user already declared an intentional centralized framework change during setup.
+    - **Framework provenance:** ensure `extensions.framework_guard` exists (merge keys if an older file lacks them). Set `extensions.framework_guard.framework_copy_source` to `centralized: ../_kiss_ai/framework` or the absolute central framework path used. This is informational provenance only; centralized framework working-tree status must not block project setup, rebuilds, snapshots, or create human-attention items.
 12. Prepend an initialization entry to `change_logs/change_logs.md`.
 13. Stop and report next steps. Do not run `do_all_rebuild.md` automatically.
 

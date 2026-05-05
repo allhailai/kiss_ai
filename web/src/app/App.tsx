@@ -143,6 +143,7 @@ export function App() {
             selectedModelId={workspace.selectedRebuildModelId}
             onModelChange={workspace.setSelectedRebuildModelId}
             onStart={() => void workspace.startRebuild()}
+            onResolve={(request) => void workspace.resolveHumanAttention(request)}
             onRefresh={() => {
               void workspace.refreshRebuild();
               void workspace.refreshStatus();

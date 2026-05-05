@@ -4,6 +4,7 @@ import path from "node:path";
 const maxEvents = 500;
 const maxLogEntries = 300;
 const rebuildStatuses = new Set(["idle", "running", "finished", "finished_with_attention", "error", "blocked", "interrupted"]);
+const runKinds = new Set(["rebuild", "human_attention_resolve"]);
 const eventTypes = new Set(["system", "assistant_message", "run_status", "tool_activity", "artifact_change", "error"]);
 
 function nowIso() {
@@ -63,6 +64,8 @@ export function createIdleRebuildState() {
     modelId: null,
     message: "No rebuild has been started from the UI.",
     activeAssistantMessageId: null,
+    runKind: "rebuild",
+    attentionContext: null,
     events: [],
     log: [],
   };
@@ -100,6 +103,11 @@ export function normalizeRebuildState(value) {
     modelId: typeof source.modelId === "string" ? source.modelId : null,
     message: typeof source.message === "string" ? source.message : fallback.message,
     activeAssistantMessageId: typeof source.activeAssistantMessageId === "string" ? source.activeAssistantMessageId : null,
+    runKind: runKinds.has(source.runKind) ? source.runKind : fallback.runKind,
+    attentionContext:
+      source.attentionContext && typeof source.attentionContext === "object" && !Array.isArray(source.attentionContext)
+        ? source.attentionContext
+        : null,
     events,
     log: deriveLog(events, legacyLog),
   };

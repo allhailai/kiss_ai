@@ -14,7 +14,7 @@ The framework assumes an LLM agent is executing the command files. Commands shou
 - Human edits in AI-managed paths are annotations, not durable source-of-truth changes.
 - Material requirement changes are captured as human-attention items unless the current requirement files already authorize the change.
 - Logs live under `change_logs/` and are prepended in reverse chronological order.
-- Human-attention items live in `change_logs/human_attention_queue.md` and `.harness-state.json.extensions.human_attention`.
+- Human-attention items live in `change_logs/human_attention_queue.md` and `.harness-state.json.extensions.human_attention`. Each open item should include stable resolution options so the web UI can launch a non-interactive follow-up agent run.
 - Generated outputs must be reproducible from requirements and inputs.
 
 ## Command Order

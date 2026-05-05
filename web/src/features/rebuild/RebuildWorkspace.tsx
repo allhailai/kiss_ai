@@ -1,4 +1,5 @@
-import type { ProjectStatus, RebuildModel, RebuildState } from "../../api";
+import { useState } from "react";
+import type { HumanAttentionItem, ProjectStatus, RebuildModel, RebuildState, ResolutionAttempt, ResolutionOption } from "../../api";
 import { AgentTranscript } from "../agents/AgentTranscript";
 
 const modelTierLabels: Record<RebuildModel["tier"], string> = {
@@ -51,27 +52,23 @@ function getLatestLogText(entry: string | null) {
   return entry?.replace(/^\[[^\]]+\]\s*/, "").trim() || "No log entries yet.";
 }
 
-function attentionItemText(item: unknown) {
-  if (!item || typeof item !== "object") return String(item);
-  const source = item as Record<string, unknown>;
-  const severity = typeof source.severity === "string" ? source.severity : "attention";
-  const category = typeof source.category === "string" ? source.category : "review";
+function attentionItemText(item: HumanAttentionItem) {
+  const severity = item.severity ?? "attention";
+  const category = item.category ?? "review";
   const summary =
-    typeof source.summary === "string"
-      ? source.summary
-      : typeof source.issue === "string"
-        ? source.issue
-        : typeof source.message === "string"
-          ? source.message
-          : "Review needed.";
-  const nextAction =
-    typeof source.next_human_action === "string"
-      ? source.next_human_action
-      : typeof source.nextAction === "string"
-        ? source.nextAction
-        : "";
+    item.summary || (typeof item.issue === "string" ? item.issue : typeof item.message === "string" ? item.message : "Review needed.");
+  const nextAction = item.next_human_action ?? item.nextAction ?? "";
 
   return `${severity}/${category}: ${summary}${nextAction ? ` Next: ${nextAction}` : ""}`;
+}
+
+function latestResolutionAttempt(item: HumanAttentionItem): ResolutionAttempt | null {
+  if (item.last_resolution_attempt) return item.last_resolution_attempt;
+  return item.resolution_attempts?.at(-1) ?? null;
+}
+
+function optionLabel(option: ResolutionOption) {
+  return `${option.recommended ? "Recommended: " : ""}${option.label || option.id}`;
 }
 
 export function RebuildWorkspace({
@@ -81,6 +78,7 @@ export function RebuildWorkspace({
   selectedModelId,
   onModelChange,
   onStart,
+  onResolve,
   onRefresh,
 }: {
   status: ProjectStatus | null;
@@ -89,12 +87,26 @@ export function RebuildWorkspace({
   selectedModelId: string;
   onModelChange: (modelId: string) => void;
   onStart: () => void;
+  onResolve: (request: { itemId: string; resolutionOptionId?: string; manualPrompt?: string }) => void;
   onRefresh: () => void;
 }) {
+  const [manualItemId, setManualItemId] = useState<string | null>(null);
+  const [manualPrompt, setManualPrompt] = useState("");
   const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
   const startDisabled = Boolean(rebuild?.running) || !status?.cursorApiKeyAvailable || !selectedModelId || !models.length;
+  const resolveDisabled = startDisabled;
   const latestLogEntry = getLatestLogEntry(rebuild);
   const latestLogTimestamp = getLatestLogTimestamp(latestLogEntry);
+  const attentionItems = status?.humanAttentionItems ?? [];
+
+  const submitManualPrompt = (itemId: string) => {
+    const trimmedPrompt = manualPrompt.trim();
+    if (!trimmedPrompt) return;
+
+    onResolve({ itemId, manualPrompt: trimmedPrompt });
+    setManualItemId(null);
+    setManualPrompt("");
+  };
 
   return (
     <div className="panel-stack">
@@ -157,12 +169,82 @@ export function RebuildWorkspace({
               The rebuild can finish without stopping for questions. Review {status?.humanAttentionCount ?? 0} item
               {(status?.humanAttentionCount ?? 0) === 1 ? "" : "s"} in `change_logs/human_attention_queue.md`.
             </p>
-            {status?.humanAttentionItems?.length ? (
-              <ul>
-                {status.humanAttentionItems.slice(0, 5).map((item, index) => (
-                  <li key={index}>{attentionItemText(item)}</li>
-                ))}
-              </ul>
+            {attentionItems.length ? (
+              <div className="attention-resolution-list">
+                {attentionItems.map((item) => {
+                  const attempt = latestResolutionAttempt(item);
+
+                  return (
+                    <article className="attention-resolution-item" key={item.id}>
+                      <div>
+                        <strong>{attentionItemText(item)}</strong>
+                        {attempt?.summary ? (
+                          <p className="attention-resolution-attempt">
+                            Last attempt: {attempt.outcome ?? "incomplete"} - {attempt.summary}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      {item.resolution_options.length ? (
+                        <div className="attention-resolution-options">
+                          {item.resolution_options.map((option) => (
+                            <button
+                              disabled={resolveDisabled}
+                              key={option.id}
+                              onClick={() => onResolve({ itemId: item.id, resolutionOptionId: option.id })}
+                              title={option.description || option.prompt}
+                              type="button"
+                            >
+                              {optionLabel(option)}
+                              {option.riskLevel ? ` (${option.riskLevel})` : ""}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="attention-resolution-empty">No suggested options are stored yet. Use a manual prompt.</p>
+                      )}
+
+                      <div className="attention-resolution-manual">
+                        {manualItemId === item.id ? (
+                          <>
+                            <textarea
+                              onChange={(event) => setManualPrompt(event.target.value)}
+                              placeholder="Tell the agent exactly how to resolve this item."
+                              value={manualPrompt}
+                            />
+                            <div className="attention-resolution-manual-actions">
+                              <button disabled={resolveDisabled || !manualPrompt.trim()} onClick={() => submitManualPrompt(item.id)} type="button">
+                                Submit Manual Prompt
+                              </button>
+                              <button
+                                disabled={resolveDisabled}
+                                onClick={() => {
+                                  setManualItemId(null);
+                                  setManualPrompt("");
+                                }}
+                                type="button"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <button
+                            disabled={resolveDisabled}
+                            onClick={() => {
+                              setManualItemId(item.id);
+                              setManualPrompt("");
+                            }}
+                            type="button"
+                          >
+                            Manual resolution prompt
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
             ) : null}
           </div>
         ) : null}

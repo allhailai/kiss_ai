@@ -30,9 +30,11 @@ Run the full `kiss_ai` research project loop from requirements to generated outp
 
 Web-triggered rebuilds must not ask for mid-run human confirmation. When a decision would normally require user input, choose the conservative default that preserves current requirements and source truth, continue when technically possible, and record a structured human-attention item in `.harness-state.json.extensions.human_attention.open_items` and `change_logs/human_attention_queue.md`.
 
-Use these categories for attention items: `annotation`, `source_gap`, `git_snapshot`, `framework_guard`, `lint`, `schema`, `output_review`, and `runtime`.
+Use these categories for attention items: `annotation`, `source_gap`, `git_snapshot`, `lint`, `schema`, `output_review`, and `runtime`.
 
-Each item should include severity (`info`, `warning`, or `blocked`), category, concise issue summary, affected files, default action taken, and the next human action. A run with generated outputs plus open attention items should be reported as completed with attention, not as an interactive block.
+Each item should include a stable `id`, severity (`info`, `warning`, or `blocked`), category, concise issue summary, affected files, default action taken, the next human action, and `resolution_options`. A run with generated outputs plus open attention items should be reported as completed with attention, not as an interactive block.
+
+`resolution_options` must contain the best one or two suggested resolution prompts by default, with more options only when genuinely useful. Each option must include `id`, `attentionItemId`, `label`, `prompt`, `description`, `riskLevel` (`low`, `medium`, or `high`), `recommended`, and `createdAt`. The prompt should be complete enough for a future non-interactive agent run to attempt the resolution without asking follow-up questions. The web UI always adds a manual prompt option, so do not add a manual placeholder to `resolution_options`.
 
 ## Instructions
 
@@ -91,7 +93,7 @@ Each item should include severity (`info`, `warning`, or `blocked`), category, c
 14. Run the centralized `do_lint.md` command.
 15. Establish one shared `run_timestamp` for rebuild finalization, using the current local ISO timestamp. Reuse this exact timestamp for the build summary section, `.harness-state.json.last_run_at`, `.harness-state.json.last_successful_run_at` when applicable, summary metadata, and the aggregate change-log entry.
 16. Run the centralized `do_write_rebuild_summary.md` command with the shared `run_timestamp`.
-    - If the summary cannot be written, stop before the framework guard and Git snapshot. Report the failure and record `extensions.rebuild_summaries.latest_summary_status: "failed"` in `.harness-state.json` if state can be updated safely.
+    - If the summary cannot be written, stop before the Git snapshot. Report the failure and record `extensions.rebuild_summaries.latest_summary_status: "failed"` in `.harness-state.json` if state can be updated safely.
 17. Update `.harness-state.json` with:
     - `last_run_at` using the shared `run_timestamp`
     - `last_successful_run_at` if all steps passed
@@ -105,11 +107,7 @@ Each item should include severity (`info`, `warning`, or `blocked`), category, c
     - unresolved review items
     - `extensions.human_attention`, including queue path, update timestamp, and open items
 18. Prepend a run entry to `change_logs/change_logs.md` using the shared `run_timestamp`. Include a link to the per-rebuild summary report under `change_logs/summaries/`.
-19. **Central framework snapshot guard (before Git snapshot):** Resolve the centralized framework root. Prefer `KISS_AI_FRAMEWORK_ROOT` when set; otherwise use `../_kiss_ai/framework/` from the project root. Verify that path exists and that its Git root is `_kiss_ai`.
-    - If the `_kiss_ai` repo has uncommitted changes under `framework/**` compared to `HEAD` (for example `git -C ../_kiss_ai status --short -- framework` or `git -C ../_kiss_ai diff --stat -- framework` is non-empty), do not ask mid-run. Record a `framework_guard` human-attention warning with the changed framework paths and default action.
-    - Default action: defer the project Git snapshot until the centralized framework tree is reviewed or committed separately, but keep generated artifacts, state, logs, and summaries written.
-    - Do not claim a clean successful rebuild snapshot when centralized framework drift was detected.
-20. **Git snapshot of the whole project (required on successful rebuild):** If steps 6 through 18 completed without a fatal execution stop, and step 19 did not block waiting on user intent, record the full project tree in Git so the next rebuild has a clean baseline for diffs and annotations.
+19. **Git snapshot of the whole project (required on successful rebuild):** If steps 6 through 18 completed without a fatal execution stop, record the full project tree in Git so the next rebuild has a clean baseline for diffs and annotations. Do not inspect or gate this project snapshot on the working-tree status of the centralized `_kiss_ai/framework` repo; framework development state is outside the non-technical project user's control and must not create project human-attention items.
     - Run **from the project root** (the directory that contains `human_goal_requirements.md`, `inputs_human/`, `inputs_ai/`, `outputs_ai/`, and `change_logs/`).
     - Stage **everything under this project root only** — human files, logs, state, inputs, and outputs:
       - `git add -A .`
@@ -125,7 +123,7 @@ Do not stop before regenerating downstream outputs solely because findings are m
 - If an annotation proposes a goal, scope, source, topic, wiki organization, or output-standard change, preserve the proposal as an unresolved item and continue with the current requirements unless the requirements become impossible to apply.
 - If input refresh finds a material source or requirement change, rebuild affected downstream artifacts and include source caveats, uncertainty, and stale-before-rebuild status.
 - If annotations conflict, record the conflict and choose the most conservative interpretation that still satisfies current requirements.
-- Stop only for technical execution blockers that make file generation impossible, such as missing required project files, unreadable required human inputs with no allowed exclusion path, impossible schemas with no conservative default, command failures, or filesystem write failures. Git/framework snapshot problems should normally finish with attention after generated artifacts, state, logs, and summaries are written.
+- Before recording human attention, first attempt the strongest safe in-project fix using the current requirements and source files. Stop or finish with human attention only for unresolved project-local issues that the agent cannot safely resolve, such as missing required project files, unreadable required human inputs with no allowed exclusion path, impossible schemas with no conservative default, command failures, filesystem write failures, or project Git snapshot failures. Centralized `_kiss_ai/framework` working-tree status is not a project-local issue and must not create human attention.
 
 ## Completion Message
 

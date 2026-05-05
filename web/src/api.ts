@@ -1,3 +1,46 @@
+export type ResolutionOption = {
+  id: string;
+  attentionItemId?: string;
+  label: string;
+  prompt: string;
+  description?: string;
+  riskLevel?: "low" | "medium" | "high" | string;
+  recommended?: boolean;
+  createdAt?: string | null;
+};
+
+export type ResolutionAttempt = {
+  attemptedAt?: string | null;
+  outcome?: "resolved" | "failed" | "incomplete" | string;
+  selectedResolutionOptionId?: string;
+  manualPrompt?: string;
+  summary?: string;
+  failureDetails?: string;
+};
+
+export type HumanAttentionItem = {
+  id: string;
+  severity?: string;
+  category?: string;
+  summary: string;
+  issue?: string;
+  message?: string;
+  affected_files?: string[];
+  default_action_taken?: string;
+  next_human_action?: string;
+  nextAction?: string;
+  resolution_options: ResolutionOption[];
+  resolution_attempts?: ResolutionAttempt[];
+  last_resolution_attempt?: ResolutionAttempt;
+};
+
+export type ResolveHumanAttentionRequest = {
+  modelId: string;
+  itemId: string;
+  resolutionOptionId?: string;
+  manualPrompt?: string;
+};
+
 export type ProjectStatus = {
   projectSlug: string;
   projectName: string;
@@ -14,7 +57,7 @@ export type ProjectStatus = {
   unresolvedReviewItems: unknown[];
   blockedArtifacts: unknown[];
   staleOutputs: unknown[];
-  humanAttentionItems: unknown[];
+  humanAttentionItems: HumanAttentionItem[];
   humanAttentionCount: number;
   cursorApiKeyAvailable: boolean;
   cursorApiKeySource: string | null;
@@ -83,6 +126,8 @@ export type RebuildState = {
   finishedAt: string | null;
   message: string;
   activeAssistantMessageId: string | null;
+  runKind: "rebuild" | "human_attention_resolve";
+  attentionContext: Record<string, unknown> | null;
   events: AgentRunEvent[];
   log: string[];
 };
@@ -215,5 +260,10 @@ export const api = {
     request<RebuildState>(`${projectBase(projectSlug)}/rebuild/start`, {
       method: "POST",
       body: JSON.stringify({ modelId }),
+    }),
+  resolveHumanAttention: (projectSlug: string, body: ResolveHumanAttentionRequest) =>
+    request<RebuildState>(`${projectBase(projectSlug)}/human-attention/resolve`, {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
 };

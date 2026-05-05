@@ -100,7 +100,31 @@
     },
     "extensions": {
       "type": "object",
-      "description": "Project-specific metadata, such as period segmentation, when explicitly required by project requirements. New projects may include `framework_guard` (central framework provenance and intentional framework customization acknowledgements) and `rebuild_summaries` (latest per-rebuild summary metadata)."
+      "description": "Project-specific metadata, such as period segmentation, when explicitly required by project requirements. New projects may include `human_attention` (open non-interactive rebuild decisions, suggested resolution options, and resolution attempts), `framework_guard` (informational central framework provenance only), and `rebuild_summaries` (latest per-rebuild summary metadata).",
+      "properties": {
+        "human_attention": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "queue_path": {
+              "type": "string"
+            },
+            "last_updated_at": {
+              "$ref": "#/$defs/nullableTimestamp"
+            },
+            "updated_at": {
+              "$ref": "#/$defs/nullableTimestamp"
+            },
+            "open_items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/humanAttentionOpenItem"
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": true
     }
   },
   "$defs": {
@@ -129,6 +153,133 @@
       "type": "array",
       "items": {
         "type": "string"
+      }
+    },
+    "humanAttentionResolutionOption": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "label",
+        "prompt",
+        "riskLevel",
+        "recommended",
+        "createdAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "attentionItemId": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "riskLevel": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "recommended": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/nullableTimestamp"
+        }
+      }
+    },
+    "humanAttentionResolutionAttempt": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "attemptedAt",
+        "outcome",
+        "summary"
+      ],
+      "properties": {
+        "attemptedAt": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "outcome": {
+          "enum": [
+            "resolved",
+            "failed",
+            "incomplete"
+          ]
+        },
+        "selectedResolutionOptionId": {
+          "type": "string"
+        },
+        "manualPrompt": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "failureDetails": {
+          "type": "string"
+        }
+      }
+    },
+    "humanAttentionOpenItem": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "severity",
+        "category",
+        "summary"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "blocked"
+          ]
+        },
+        "category": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "affected_files": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "default_action_taken": {
+          "type": "string"
+        },
+        "next_human_action": {
+          "type": "string"
+        },
+        "resolution_options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/humanAttentionResolutionOption"
+          }
+        },
+        "resolution_attempts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/humanAttentionResolutionAttempt"
+          }
+        },
+        "last_resolution_attempt": {
+          "$ref": "#/$defs/humanAttentionResolutionAttempt"
+        }
       }
     },
     "status": {

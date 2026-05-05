@@ -225,9 +225,7 @@
       "latest_summary_notes": []
     },
     "framework_guard": {
-      "framework_copy_source": "centralized: ../_kiss_ai/framework",
-      "intentional_customization_acknowledged_at": null,
-      "intentional_customization_note": null
+      "framework_copy_source": "centralized: ../_kiss_ai/framework"
     }
   }
 }

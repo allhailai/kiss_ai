@@ -10,6 +10,7 @@ import {
   type ProjectSummary,
   type RebuildModel,
   type RebuildState,
+  type ResolveHumanAttentionRequest,
 } from "../api";
 import { uniqueFiles } from "../domain/files";
 import { buildRouteHash, parseRouteHash } from "./routes";
@@ -290,6 +291,22 @@ export function useProjectWorkspace() {
     }
   }, [rebuildModels, requireSelectedProjectSlug, selectedRebuildModelId, setNotice]);
 
+  const resolveHumanAttention = useCallback(
+    async (request: Omit<ResolveHumanAttentionRequest, "modelId">) => {
+      setNotice("");
+      const next = await api.resolveHumanAttention(requireSelectedProjectSlug(), {
+        ...request,
+        modelId: selectedRebuildModelId || rebuildModels[0]?.id || "default",
+      });
+      setRebuild(next);
+
+      if (next.status === "blocked" || next.status === "error") {
+        setNotice(next.message);
+      }
+    },
+    [rebuildModels, requireSelectedProjectSlug, selectedRebuildModelId, setNotice],
+  );
+
   useEffect(() => {
     void refreshProjects();
   }, [refreshProjects]);
@@ -383,7 +400,13 @@ export function useProjectWorkspace() {
           payload && typeof payload === "object" && "state" in payload
             ? (payload as { state?: RebuildState }).state
             : (payload as RebuildState);
-        if (next) setRebuild(next);
+        if (next) {
+          setRebuild(next);
+          if (!next.running && ["finished", "finished_with_attention", "error", "blocked", "interrupted"].includes(next.status)) {
+            void refreshStatus();
+            void refreshBuildLog();
+          }
+        }
       } catch {
         // Polling remains the fallback if the live event payload cannot be parsed.
       }
@@ -396,7 +419,7 @@ export function useProjectWorkspace() {
     };
 
     return () => eventSource.close();
-  }, [rebuild?.running, selectedProjectSlug]);
+  }, [rebuild?.running, refreshBuildLog, refreshStatus, selectedProjectSlug]);
 
   return {
     view,
@@ -436,6 +459,7 @@ export function useProjectWorkspace() {
     saveSelected,
     revertSelected,
     startRebuild,
+    resolveHumanAttention,
     setNotice,
   };
 }

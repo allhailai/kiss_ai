@@ -1,6 +1,7 @@
 import express from "express";
 import { Cursor } from "@cursor/sdk";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -16,6 +17,7 @@ const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_SEARCH_RESULTS = 25;
 const MAX_AGGREGATE_LOG_SECTIONS = 8;
 const REBUILD_STATE_DIR = path.join(WEB_ROOT, ".runtime", "rebuild");
+const FRAMEWORK_ROOT = path.resolve(process.env.KISS_AI_FRAMEWORK_ROOT ?? path.join(PROJECTS_ROOT, "_kiss_ai", "framework"));
 const warnedCursorKeyMessages = new Set();
 const reservedProjectDirectories = new Set(["_kiss_ai", ".obsidian", "_archive", "_templates"]);
 const projectSlugPattern = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
@@ -74,9 +76,49 @@ async function readProjectHarness(projectRoot) {
   }
 }
 
+function hashStableValue(value) {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
+}
+
+function normalizeHumanAttentionItem(item) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return {
+      id: `legacy_${hashStableValue({ value: String(item) })}`,
+      severity: "warning",
+      category: "review",
+      summary: String(item),
+      resolution_options: [],
+    };
+  }
+
+  const source = item;
+  const summary =
+    typeof source.summary === "string"
+      ? source.summary
+      : typeof source.issue === "string"
+        ? source.issue
+        : typeof source.message === "string"
+          ? source.message
+          : "Review needed.";
+  const legacyId = hashStableValue({
+    severity: source.severity,
+    category: source.category,
+    summary,
+    next_human_action: source.next_human_action ?? source.nextAction,
+    default_action_taken: source.default_action_taken,
+  });
+
+  return {
+    ...source,
+    id: typeof source.id === "string" && source.id.trim() ? source.id : `legacy_${legacyId}`,
+    summary,
+    resolution_options: Array.isArray(source.resolution_options) ? source.resolution_options : [],
+  };
+}
+
 function getHumanAttentionItems(harness) {
   const items = harness?.extensions?.human_attention?.open_items;
-  return Array.isArray(items) ? items : [];
+  return Array.isArray(items) ? items.map(normalizeHumanAttentionItem) : [];
 }
 
 function hasHumanAttentionItems(harness) {
@@ -833,7 +875,125 @@ async function appendRunLog(projectSlug, message) {
   });
 }
 
-async function startRebuild(project, requestedModelId) {
+function createRebuildPrompt(project) {
+  return [
+    "Run the kiss_ai rebuild for this project.",
+    "",
+    `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_all_rebuild.md")} exactly.`,
+    "This is a non-interactive web-triggered rebuild. Never ask the user for confirmation or wait for input mid-run.",
+    "When a human decision is needed, choose the conservative default supported by current requirements, record a human-attention item with resolution_options, and continue when technically possible.",
+    "Do not stop before downstream outputs for material source or output-impact findings; rebuild affected artifacts and record caveats clearly.",
+    `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
+    "Do not create or depend on a project-local framework/ folder.",
+    "Do not operate outside this project root.",
+    `Project root: ${project.path}`,
+  ].join("\n");
+}
+
+function getResolutionOption(item, resolutionOptionId) {
+  const options = Array.isArray(item.resolution_options) ? item.resolution_options : [];
+  return options.find((option) => option && typeof option === "object" && option.id === resolutionOptionId) ?? null;
+}
+
+function requireResolutionRequest(body) {
+  const itemId = String(body?.itemId ?? "").trim();
+  const resolutionOptionId = String(body?.resolutionOptionId ?? "").trim();
+  const manualPrompt = String(body?.manualPrompt ?? "").trim();
+
+  if (!itemId) throw new Error("A human-attention item id is required.");
+  if (resolutionOptionId && manualPrompt) throw new Error("Choose either a suggested option or a manual prompt, not both.");
+  if (!resolutionOptionId && !manualPrompt) throw new Error("Choose a suggested option or provide a manual prompt.");
+
+  return { itemId, resolutionOptionId: resolutionOptionId || null, manualPrompt: manualPrompt || null };
+}
+
+async function createHumanAttentionResolutionPrompt(project, requestBody) {
+  const { itemId, resolutionOptionId, manualPrompt } = requireResolutionRequest(requestBody);
+  const harness = await readProjectHarness(project.path);
+  const item = getHumanAttentionItems(harness).find((candidate) => candidate.id === itemId);
+
+  if (!item) {
+    throw new Error("Human-attention item was not found or is no longer open.");
+  }
+
+  const selectedOption = resolutionOptionId ? getResolutionOption(item, resolutionOptionId) : null;
+  if (resolutionOptionId && !selectedOption) {
+    throw new Error("Selected resolution option was not found on this human-attention item.");
+  }
+
+  const selectedResolution = selectedOption
+    ? {
+        type: "suggested_option",
+        id: selectedOption.id,
+        label: selectedOption.label,
+        prompt: selectedOption.prompt,
+      }
+    : {
+        type: "manual_prompt",
+        prompt: manualPrompt,
+      };
+
+  return {
+    item,
+    selectedOption,
+    prompt: [
+      "Resolve one kiss_ai human-attention item for this project.",
+      "",
+      `Project root: ${project.path}`,
+      `Framework root: ${FRAMEWORK_ROOT}`,
+      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_resolve_human_attention_item.md")} exactly.`,
+      "",
+      "This is a non-interactive web-triggered resolution run. Never ask the user for confirmation or wait for input mid-run.",
+      "If the selected action cannot safely resolve the issue, keep the item open, record failure details, and generate updated resolution_options instead of asking a question.",
+      "Do not operate outside this project root.",
+      "",
+      `attention_item_id: ${item.id}`,
+      "",
+      "Serialized attention item:",
+      JSON.stringify(item, null, 2),
+      "",
+      "Selected resolution action:",
+      JSON.stringify(selectedResolution, null, 2),
+      "",
+      "After completion, update .harness-state.json.extensions.human_attention.open_items and change_logs/human_attention_queue.md consistently.",
+      "If all human-attention items are resolved, leave the project in a clean successful state where the existing harness status permits it.",
+    ].join("\n"),
+    context: {
+      itemId: item.id,
+      resolutionOptionId: selectedOption?.id ?? null,
+      manual: Boolean(manualPrompt),
+    },
+  };
+}
+
+function createAgentJobCompletionMessage(jobName) {
+  return async ({ project, result }) => {
+    const harness = await readProjectHarness(project.path);
+    const attentionCount = getHumanAttentionItems(harness).length;
+    const finishedWithAttention = result.status === "finished" && attentionCount > 0;
+    const status = result.status === "finished" ? (finishedWithAttention ? "finished_with_attention" : "finished") : "error";
+    const message =
+      result.status === "finished"
+        ? finishedWithAttention
+          ? `${jobName} finished with ${attentionCount} human-attention item${attentionCount === 1 ? "" : "s"} still open.`
+          : `${jobName} finished.`
+        : `${jobName} ended with status: ${result.status}`;
+
+    return { attentionCount, finishedWithAttention, message, status };
+  };
+}
+
+async function startAgentJob({
+  project,
+  requestedModelId,
+  runKind,
+  attentionContext = null,
+  startMessage,
+  noApiKeyMessage,
+  noModelsMessage,
+  jobName,
+  prompt,
+}) {
   const rebuildState = await getRebuildState(project.slug);
 
   if (rebuildState.running) {
@@ -847,13 +1007,14 @@ async function startRebuild(project, requestedModelId) {
       ...rebuildState,
       running: false,
       status: "blocked",
-      message:
-        "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Rebuilds are unavailable from the UI.",
+      message: noApiKeyMessage,
       finishedAt: new Date().toISOString(),
+      runKind,
+      attentionContext,
     });
     await appendRunEvent(project.slug, {
       type: "error",
-      title: "Rebuild blocked",
+      title: `${jobName} blocked`,
       text: (await getRebuildState(project.slug)).message,
       status: "blocked",
       runtime: "cursor",
@@ -868,13 +1029,14 @@ async function startRebuild(project, requestedModelId) {
       ...rebuildState,
       running: false,
       status: "blocked",
-      message:
-        "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
+      message: noModelsMessage,
       finishedAt: new Date().toISOString(),
+      runKind,
+      attentionContext,
     });
     await appendRunEvent(project.slug, {
       type: "error",
-      title: "Rebuild blocked",
+      title: `${jobName} blocked`,
       text: (await getRebuildState(project.slug)).message,
       status: "blocked",
       runtime: "cursor",
@@ -893,16 +1055,18 @@ async function startRebuild(project, requestedModelId) {
     startedAt: new Date().toISOString(),
     finishedAt: null,
     modelId,
-    message: "Starting local Cursor agent rebuild.",
+    message: startMessage,
     activeAssistantMessageId: null,
     events: [],
     log: [],
+    runKind,
+    attentionContext,
   });
 
   await appendRunLog(project.slug, `Using Cursor API key from ${cursorApiKey.source}.`);
   await appendRunLog(project.slug, `Using Cursor model: ${modelId}.`);
 
-  runRebuildAgent(project, cursorApiKey.apiKey, modelId).catch((error) => {
+  runAgentJob({ project, apiKey: cursorApiKey.apiKey, modelId, prompt, jobName }).catch((error) => {
     void (async () => {
       const current = await getRebuildState(project.slug);
       await setRebuildState(project.slug, {
@@ -910,7 +1074,7 @@ async function startRebuild(project, requestedModelId) {
         running: false,
         status: "error",
         finishedAt: new Date().toISOString(),
-        message: error instanceof Error ? error.message : "Unknown rebuild error.",
+        message: error instanceof Error ? error.message : `Unknown ${jobName.toLowerCase()} error.`,
       });
       await appendRunLog(project.slug, (await getRebuildState(project.slug)).message);
     })();
@@ -919,22 +1083,41 @@ async function startRebuild(project, requestedModelId) {
   return await getRebuildState(project.slug);
 }
 
-async function runRebuildAgent(project, apiKey, modelId) {
+async function startRebuild(project, requestedModelId) {
+  return await startAgentJob({
+    project,
+    requestedModelId,
+    runKind: "rebuild",
+    startMessage: "Starting local Cursor agent rebuild.",
+    noApiKeyMessage:
+      "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Rebuilds are unavailable from the UI.",
+    noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
+    jobName: "Rebuild run",
+    prompt: createRebuildPrompt(project),
+  });
+}
+
+async function startHumanAttentionResolution(project, requestBody) {
+  const { prompt, context } = await createHumanAttentionResolutionPrompt(project, requestBody);
+
+  return await startAgentJob({
+    project,
+    requestedModelId: requestBody?.modelId,
+    runKind: "human_attention_resolve",
+    attentionContext: context,
+    startMessage: "Starting local Cursor agent human-attention resolution.",
+    noApiKeyMessage:
+      "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Human-attention resolution is unavailable from the UI.",
+    noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
+    jobName: "Human-attention resolution",
+    prompt,
+  });
+}
+
+async function runAgentJob({ project, apiKey, modelId, prompt, jobName }) {
   activeRebuilds.add(project.slug);
 
   try {
-    const prompt = [
-      "Run the kiss_ai rebuild for this project.",
-      "",
-      "Follow /opt/all_hail_ai/kiss_ai_projects/_kiss_ai/framework/commands/do_all_rebuild.md exactly.",
-      "This is a non-interactive web-triggered rebuild. Never ask the user for confirmation or wait for input mid-run.",
-      "When a human decision is needed, choose the conservative default supported by current requirements, record a human-attention item, and continue when technically possible.",
-      "Do not stop before downstream outputs for material source or output-impact findings; rebuild affected artifacts and record caveats clearly.",
-      "Use /opt/all_hail_ai/kiss_ai_projects/_kiss_ai/framework as the canonical framework root.",
-      "Do not create or depend on a project-local framework/ folder.",
-      "Do not operate outside this project root.",
-    ].join("\n");
-
     const result = await runCursorAgent({
       project,
       apiKey,
@@ -958,16 +1141,7 @@ async function runRebuildAgent(project, apiKey, modelId) {
 
     await finishAssistantMessage(project.slug);
     const completedState = await getRebuildState(project.slug);
-    const harness = await readProjectHarness(project.path);
-    const attentionCount = getHumanAttentionItems(harness).length;
-    const finishedWithAttention = result.status === "finished" && attentionCount > 0;
-    const status = result.status === "finished" ? (finishedWithAttention ? "finished_with_attention" : "finished") : "error";
-    const message =
-      result.status === "finished"
-        ? finishedWithAttention
-          ? `Rebuild finished with ${attentionCount} human-attention item${attentionCount === 1 ? "" : "s"}.`
-          : "Rebuild run finished."
-        : `Rebuild run ended with status: ${result.status}`;
+    const { attentionCount, finishedWithAttention, message, status } = await createAgentJobCompletionMessage(jobName)({ project, result });
     await setRebuildState(project.slug, {
       ...completedState,
       running: false,
@@ -977,7 +1151,8 @@ async function runRebuildAgent(project, apiKey, modelId) {
     });
     await appendRunEvent(project.slug, {
       type: result.status === "finished" ? "run_status" : "error",
-      title: finishedWithAttention ? "Run finished with attention needed" : result.status === "finished" ? "Run finished" : "Run ended with an error",
+      title:
+        finishedWithAttention ? `${jobName} finished with attention needed` : result.status === "finished" ? `${jobName} finished` : `${jobName} ended with an error`,
       text: message,
       status,
       runtime: "cursor",
@@ -985,7 +1160,7 @@ async function runRebuildAgent(project, apiKey, modelId) {
     });
   } catch (error) {
     await finishAssistantMessage(project.slug);
-    const message = error instanceof Error ? error.message : "Unknown Cursor SDK rebuild failure.";
+    const message = error instanceof Error ? error.message : `Unknown Cursor SDK ${jobName.toLowerCase()} failure.`;
 
     const current = await getRebuildState(project.slug);
     await setRebuildState(project.slug, {
@@ -997,7 +1172,7 @@ async function runRebuildAgent(project, apiKey, modelId) {
     });
     await appendRunEvent(project.slug, {
       type: "error",
-      title: "Run failed",
+      title: `${jobName} failed`,
       text: message,
       status: "error",
       runtime: "cursor",
@@ -1221,6 +1396,14 @@ app.get("/api/projects/:projectSlug/rebuild/events", async (request, response, n
 app.post("/api/projects/:projectSlug/rebuild/start", async (request, response, next) => {
   try {
     response.json(await startRebuild(request.project, request.body.modelId));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/projects/:projectSlug/human-attention/resolve", async (request, response, next) => {
+  try {
+    response.json(await startHumanAttentionResolution(request.project, request.body));
   } catch (error) {
     next(error);
   }
