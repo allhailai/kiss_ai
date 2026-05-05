@@ -3,7 +3,7 @@ import path from "node:path";
 
 const maxEvents = 500;
 const maxLogEntries = 300;
-const rebuildStatuses = new Set(["idle", "running", "finished", "error", "blocked", "interrupted"]);
+const rebuildStatuses = new Set(["idle", "running", "finished", "finished_with_attention", "error", "blocked", "interrupted"]);
 const eventTypes = new Set(["system", "assistant_message", "run_status", "tool_activity", "artifact_change", "error"]);
 
 function nowIso() {

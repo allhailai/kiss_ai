@@ -46,7 +46,7 @@ Start simple. Leave project-specific ledger details blank unless the project tru
 
 If the project grows, define output families, dependency maps, intermediate ledgers, coverage ledgers, stale-output rules, and low-confidence handling needed to keep final outputs reliable. The agent should choose whether to stay simple, persist baseline dependency tracking, or escalate to the full large-project workflow. Escalation may require a one-time broader rebuild to establish dependency maps or intermediate ledgers. Preserve unchanged outputs only when their sources, wiki pages, ledgers, schemas, and requirements are unchanged.
 
-The user does not choose the scaling mode. Material source or output-impact changes should be handled by rebuilding affected outputs with explicit caveats. Ask for approval only when a schema, source-exclusion, or output-structure decision is required to execute the current requirements.
+The user does not choose the scaling mode. Material source or output-impact changes should be handled by rebuilding affected outputs with explicit caveats. When a schema, source-exclusion, or output-structure decision is unresolved, the rebuild should record a human-attention item and continue with the conservative interpretation of the current requirements when technically possible.
 
 ## Citation Standards
 

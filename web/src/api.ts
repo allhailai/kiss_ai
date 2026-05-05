@@ -14,6 +14,8 @@ export type ProjectStatus = {
   unresolvedReviewItems: unknown[];
   blockedArtifacts: unknown[];
   staleOutputs: unknown[];
+  humanAttentionItems: unknown[];
+  humanAttentionCount: number;
   cursorApiKeyAvailable: boolean;
   cursorApiKeySource: string | null;
   cursorApiKeyWarnings: string[];
@@ -76,7 +78,7 @@ export type RebuildState = {
   agentId: string | null;
   runtime: string;
   modelId: string | null;
-  status: "idle" | "running" | "finished" | "error" | "blocked" | "interrupted";
+  status: "idle" | "running" | "finished" | "finished_with_attention" | "error" | "blocked" | "interrupted";
   startedAt: string | null;
   finishedAt: string | null;
   message: string;

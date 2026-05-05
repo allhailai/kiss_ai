@@ -4,7 +4,7 @@ This folder contains the reusable `kiss_ai` framework. Commands are the user-fac
 
 ## Runtime Contract
 
-The framework assumes an LLM agent is executing the command files. Commands should be explicit enough that the agent can perform the work with file, Git, and shell tools without relying on hidden plugin behavior.
+The framework assumes an LLM agent is executing the command files. Commands should be explicit enough that the agent can perform the work with file, Git, and shell tools without relying on hidden plugin behavior. Rebuild commands must be non-interactive when launched from the web UI: do not wait for human confirmation mid-run; record decisions that need review in the human-attention queue and continue when technically possible.
 
 ## Core Invariants
 
@@ -12,8 +12,9 @@ The framework assumes an LLM agent is executing the command files. Commands shou
 - `inputs_human/` is human-owned.
 - `inputs_ai/` and `outputs_ai/` are AI-managed.
 - Human edits in AI-managed paths are annotations, not durable source-of-truth changes.
-- Material requirement changes require approval before downstream regeneration proceeds.
+- Material requirement changes are captured as human-attention items unless the current requirement files already authorize the change.
 - Logs live under `change_logs/` and are prepended in reverse chronological order.
+- Human-attention items live in `change_logs/human_attention_queue.md` and `.harness-state.json.extensions.human_attention`.
 - Generated outputs must be reproducible from requirements and inputs.
 
 ## Command Order
@@ -27,6 +28,11 @@ The framework assumes an LLM agent is executing the command files. Commands shou
 3. `do_organize_data.md`
 4. `do_build_outputs.md`
 5. `do_lint.md`
+6. `do_write_rebuild_summary.md`
+
+After lint, `do_all_rebuild.md` writes a per-rebuild summary under `change_logs/summaries/` and links it from the aggregate `change_logs/change_logs.md` run entry.
+
+Finalization uses one shared rebuild timestamp for the summary section, harness state, and aggregate change-log entry. Lint checks existing project health before the current summary is written; summary generation itself is a finalization gate, and a failed current-run summary blocks the framework guard and Git snapshot.
 
 ## Testing The Framework
 

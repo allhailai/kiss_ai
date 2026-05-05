@@ -45,7 +45,7 @@ Start simple. Leave project-specific ledger details blank unless the project tru
 
 If the project grows, define any project-specific source inventory, dependency, coverage, or intermediate ledger files needed to keep rebuilds focused and reliable. The agent should choose whether to stay simple, persist baseline dependency tracking, or escalate to the full large-project workflow when source volume, source categories, binary inputs, stale-source risk, or dependency complexity would make one broad synthesis pass unreliable.
 
-The user does not choose the scaling mode. The agent should continue with documented caveats for material source changes and may ask only for fatal requirement, source-exclusion, or schema decisions that make the current run impossible to execute.
+The user does not choose the scaling mode. The agent should continue with documented caveats for material source changes. When a requirement, source-exclusion, or schema decision is unresolved, record a human-attention item and continue with the conservative interpretation of current requirements when technically possible.
 
 ## Required Source Categories
 

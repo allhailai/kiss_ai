@@ -103,9 +103,9 @@ If `schema.md` does not exist:
 
 If it exists:
 
-1. Preserve human-approved topic and concept names.
+1. Preserve human-approved or pending human-attention topic and concept names when they do not conflict with current requirements.
 2. Add new topics/concepts with an evolution log entry.
-3. Do not remove topics/concepts without approval.
+3. Do not remove topics/concepts unless current requirements authorize removal. If removal appears appropriate but is not authorized, preserve the page or mark it stale and record a human-attention item.
 4. **Merge schema annotations:** Read recent entries in `change_logs/annotation_change_logs.md` that reference the configured wiki `schema.md` path. Where a human logged an approved or pending schema change, **incorporate that intent into the updated `schema.md`** (rows, descriptions, naming conventions, evolution log lines) instead of overwriting the file from compile output alone. If intent conflicts with new sources or `human_output_requirements.md`, surface the conflict in the compile summary and in `human_open_questions.md` rather than silently dropping the human edit.
 
 ## Phase 7: Update Index

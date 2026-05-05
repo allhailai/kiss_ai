@@ -73,6 +73,15 @@ async function readProjectHarness(projectRoot) {
   }
 }
 
+function getHumanAttentionItems(harness) {
+  const items = harness?.extensions?.human_attention?.open_items;
+  return Array.isArray(items) ? items : [];
+}
+
+function hasHumanAttentionItems(harness) {
+  return getHumanAttentionItems(harness).length > 0;
+}
+
 async function discoverProjects() {
   const projectsRootReal = await fs.realpath(PROJECTS_ROOT);
   const entries = await fs.readdir(projectsRootReal, { withFileTypes: true });
@@ -806,6 +815,8 @@ async function runRebuildAgent(project, apiKey, modelId) {
       "Run the kiss_ai rebuild for this project.",
       "",
       "Follow /opt/all_hail_ai/kiss_ai_projects/_kiss_ai/framework/commands/do_all_rebuild.md exactly.",
+      "This is a non-interactive web-triggered rebuild. Never ask the user for confirmation or wait for input mid-run.",
+      "When a human decision is needed, choose the conservative default supported by current requirements, record a human-attention item, and continue when technically possible.",
       "Do not stop before downstream outputs for material source or output-impact findings; rebuild affected artifacts and record caveats clearly.",
       "Use /opt/all_hail_ai/kiss_ai_projects/_kiss_ai/framework as the canonical framework root.",
       "Do not create or depend on a project-local framework/ folder.",
@@ -835,22 +846,30 @@ async function runRebuildAgent(project, apiKey, modelId) {
 
     await finishAssistantMessage(project.slug);
     const completedState = await getRebuildState(project.slug);
+    const harness = await readProjectHarness(project.path);
+    const attentionCount = getHumanAttentionItems(harness).length;
+    const finishedWithAttention = result.status === "finished" && attentionCount > 0;
+    const status = result.status === "finished" ? (finishedWithAttention ? "finished_with_attention" : "finished") : "error";
     const message =
-      result.status === "finished" ? "Rebuild run finished." : `Rebuild run ended with status: ${result.status}`;
+      result.status === "finished"
+        ? finishedWithAttention
+          ? `Rebuild finished with ${attentionCount} human-attention item${attentionCount === 1 ? "" : "s"}.`
+          : "Rebuild run finished."
+        : `Rebuild run ended with status: ${result.status}`;
     await setRebuildState(project.slug, {
       ...completedState,
       running: false,
-      status: result.status === "finished" ? "finished" : "error",
+      status,
       finishedAt: new Date().toISOString(),
       message,
     });
     await appendRunEvent(project.slug, {
       type: result.status === "finished" ? "run_status" : "error",
-      title: result.status === "finished" ? "Run finished" : "Run ended with an error",
+      title: finishedWithAttention ? "Run finished with attention needed" : result.status === "finished" ? "Run finished" : "Run ended with an error",
       text: message,
-      status: result.status === "finished" ? "finished" : "error",
+      status,
       runtime: "cursor",
-      metadata: { resultStatus: result.status },
+      metadata: { resultStatus: result.status, attentionCount },
     });
   } catch (error) {
     await finishAssistantMessage(project.slug);
@@ -938,6 +957,8 @@ app.get("/api/projects/:projectSlug/status", async (request, response, next) => 
       unresolvedReviewItems: harness.last_annotation_scan?.unresolved_review_items ?? [],
       blockedArtifacts: harness.rebuild_scope?.blocked_artifacts ?? [],
       staleOutputs: harness.rebuild_scope?.outputs_marked_stale ?? [],
+      humanAttentionItems: getHumanAttentionItems(harness),
+      humanAttentionCount: getHumanAttentionItems(harness).length,
       cursorApiKeyAvailable: cursorApiKey.available,
       cursorApiKeySource: cursorApiKey.source,
       cursorApiKeyWarnings: cursorApiKey.warnings,

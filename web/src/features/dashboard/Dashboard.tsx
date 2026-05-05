@@ -27,6 +27,7 @@ export function Dashboard({
         <StatusCard label="Scaling mode" value={status?.scalingMode ?? "Unknown"} />
         <StatusCard label="Rebuild scope" value={status?.rebuildStatus ?? "Unknown"} />
         <StatusCard label="Lint" value={status?.lintStatus ?? "Unknown"} />
+        <StatusCard label="Needs attention" value={String(status?.humanAttentionCount ?? 0)} />
       </div>
 
       <div className="card-grid dashboard-action-grid">

@@ -100,7 +100,7 @@
     },
     "extensions": {
       "type": "object",
-      "description": "Project-specific metadata, such as period segmentation, when explicitly required by project requirements. New projects may include `framework_guard` (central framework provenance and intentional framework customization acknowledgements)."
+      "description": "Project-specific metadata, such as period segmentation, when explicitly required by project requirements. New projects may include `framework_guard` (central framework provenance and intentional framework customization acknowledgements) and `rebuild_summaries` (latest per-rebuild summary metadata)."
     }
   },
   "$defs": {
@@ -197,6 +197,12 @@
           "type": "string"
         },
         "change_logs": {
+          "type": "string"
+        },
+        "build_summaries": {
+          "type": "string"
+        },
+        "human_attention_queue": {
           "type": "string"
         },
         "change_log": {
@@ -650,6 +656,22 @@
             "blocked",
             "uncertain"
           ]
+        },
+        "empty_required_without_gap": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "populated_categories": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "gapped_categories": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "blocked_categories": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "category_coverage_ledger": {
+          "$ref": "#/$defs/ledgerStatus"
         },
         "source_side_scaling_signals": {
           "type": "array",

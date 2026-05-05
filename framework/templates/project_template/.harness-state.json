@@ -24,6 +24,8 @@
     "wiki": "outputs_ai/wiki/",
     "human_open_questions": "human_open_questions.md",
     "change_logs": "change_logs/",
+    "build_summaries": "change_logs/summaries/",
+    "human_attention_queue": "change_logs/human_attention_queue.md",
     "change_log": "change_logs/change_logs.md",
     "annotation_change_log": "change_logs/annotation_change_logs.md"
   },
@@ -128,6 +130,19 @@
     "unreadable_files": [],
     "excluded_files": [],
     "source_inventory_status": "not_run",
+    "empty_required_without_gap": 0,
+    "populated_categories": [],
+    "gapped_categories": [],
+    "blocked_categories": [],
+    "category_coverage_ledger": {
+      "name": "source_category_coverage",
+      "path": "inputs_ai/source_category_coverage.md",
+      "required_by": "first_build_acquisition_gate",
+      "status": "required",
+      "schema_defined": true,
+      "last_updated_at": null,
+      "notes": "Tracks required source categories, coverage status, gap files, and downstream proceed/block decisions."
+    },
     "source_side_scaling_signals": [],
     "stale_sources": [],
     "material_changes": [],
@@ -198,6 +213,17 @@
     "findings": []
   },
   "extensions": {
+    "human_attention": {
+      "queue_path": "change_logs/human_attention_queue.md",
+      "last_updated_at": null,
+      "open_items": []
+    },
+    "rebuild_summaries": {
+      "latest_summary_path": null,
+      "latest_summary_section_timestamp": null,
+      "latest_summary_status": "not_run",
+      "latest_summary_notes": []
+    },
     "framework_guard": {
       "framework_copy_source": "centralized: ../_kiss_ai/framework",
       "intentional_customization_acknowledged_at": null,

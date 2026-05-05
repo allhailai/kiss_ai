@@ -29,9 +29,9 @@ Convert edits in AI-managed paths into structured feedback for requirement files
    - goal/scope changes -> `human_goal_requirements.md`
    - source changes -> `human_input_requirements.md`
    - wiki/output changes -> `human_output_requirements.md`
-7. Decide whether approval is required.
+7. Decide whether the annotation can be applied under current requirements.
 8. Create a log entry.
-9. Propose precise requirement-file patches only when confidence is high or the user approves.
+9. Propose precise requirement-file patches in the log and human-attention queue when useful, but do not pause the rebuild waiting for approval.
 
 ## Log Entry Template
 

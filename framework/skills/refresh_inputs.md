@@ -11,7 +11,7 @@ Maintain AI-managed source files under `inputs_ai/` according to `human_input_re
 ## Safety Rules
 
 - Do not edit `inputs_human/**`.
-- Do not remove source files unless the requirements or user approval explicitly call for removal.
+- Do not remove source files unless the requirements explicitly call for removal. If removal seems needed but is not authorized, preserve the file or mark it stale and record a human-attention item.
 - Flag material changes before downstream outputs are trusted.
 - Preserve source URLs, effective dates, and check dates whenever possible.
 

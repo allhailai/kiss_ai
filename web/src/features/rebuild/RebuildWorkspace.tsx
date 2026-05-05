@@ -51,6 +51,29 @@ function getLatestLogText(entry: string | null) {
   return entry?.replace(/^\[[^\]]+\]\s*/, "").trim() || "No log entries yet.";
 }
 
+function attentionItemText(item: unknown) {
+  if (!item || typeof item !== "object") return String(item);
+  const source = item as Record<string, unknown>;
+  const severity = typeof source.severity === "string" ? source.severity : "attention";
+  const category = typeof source.category === "string" ? source.category : "review";
+  const summary =
+    typeof source.summary === "string"
+      ? source.summary
+      : typeof source.issue === "string"
+        ? source.issue
+        : typeof source.message === "string"
+          ? source.message
+          : "Review needed.";
+  const nextAction =
+    typeof source.next_human_action === "string"
+      ? source.next_human_action
+      : typeof source.nextAction === "string"
+        ? source.nextAction
+        : "";
+
+  return `${severity}/${category}: ${summary}${nextAction ? ` Next: ${nextAction}` : ""}`;
+}
+
 export function RebuildWorkspace({
   status,
   rebuild,
@@ -127,6 +150,22 @@ export function RebuildWorkspace({
           </p>
         ) : null}
         <p>{rebuild?.message ?? "No rebuild state loaded."}</p>
+        {rebuild?.status === "finished_with_attention" || status?.humanAttentionCount ? (
+          <div className="warning-callout">
+            <strong>Human attention needed</strong>
+            <p>
+              The rebuild can finish without stopping for questions. Review {status?.humanAttentionCount ?? 0} item
+              {(status?.humanAttentionCount ?? 0) === 1 ? "" : "s"} in `change_logs/human_attention_queue.md`.
+            </p>
+            {status?.humanAttentionItems?.length ? (
+              <ul>
+                {status.humanAttentionItems.slice(0, 5).map((item, index) => (
+                  <li key={index}>{attentionItemText(item)}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
         <button disabled={startDisabled} onClick={onStart}>
           {rebuild?.running ? "Rebuild Running" : "Start Rebuild"}
         </button>

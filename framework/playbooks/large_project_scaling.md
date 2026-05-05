@@ -24,7 +24,7 @@ Choose the mode automatically during every rebuild:
 - Use `baseline_dependency_tracking` when the full large-project workflow is not required, but dependency maps, stale-source/stale-output records, and preservation decisions should be persisted because sources, wiki pages, or outputs can change independently.
 - Use `large_project_scaling` when the escalation rubric below is met and the project needs project-defined intermediate ledgers, staged synthesis, or focused incremental rebuilds to avoid degraded output quality.
 
-Do not present these modes as choices to the user. Continue with documented caveats for material source or output-impact findings. Ask only for fatal requirement, schema, or source-exclusion decisions that make the current run impossible to execute.
+Do not present these modes as choices to the user. Continue with documented caveats for material source or output-impact findings. If a requirement, schema, or source-exclusion decision is unresolved, choose the conservative default supported by current requirements, record a human-attention item, and continue when technically possible.
 
 ## When To Use
 
@@ -71,7 +71,7 @@ On first escalation, build or refresh the minimum project-defined ledgers needed
 
 If escalation is required but the project requirements do not yet define the needed ledger schemas, continue with baseline dependency tracking and record the missing schema as a caveat or deferred requirement decision. Do not invent hidden ledger structures that are not represented in the project requirements.
 
-Do not ask non-technical users to choose the scaling mode. Ask only when escalation requires a fatal material requirement change, a new output schema, or exclusion of a required source before the run can execute.
+Do not ask non-technical users to choose the scaling mode. When escalation would benefit from a material requirement change, a new output schema, or exclusion of a required source, record the decision as a human-attention item and continue with the strongest current-requirements interpretation that can execute safely.
 
 ## Core Pattern
 

@@ -31,6 +31,7 @@ If the user asks about alternate source or output organization, use the relevant
    - Do not create user projects under `_kiss_ai/examples/` or inside `_kiss_ai/framework/`.
 2. Create these folders if they do not exist:
    - `change_logs/`
+   - `change_logs/summaries/`
    - `inputs_human/`
    - `inputs_ai/`
    - `outputs_ai/`
@@ -42,6 +43,7 @@ If the user asks about alternate source or output organization, use the relevant
    - `.harness-state.json`
    - `change_logs/change_logs.md`
    - `change_logs/annotation_change_logs.md`
+   - `change_logs/human_attention_queue.md`
    - `README.md`
 4. Use `_kiss_ai/framework/templates/project_template/` as the default content source. Copy hidden files such as `.harness-state.json` and `.cursor/**`; do not skip dotfiles.
 5. Fill the project display name into `.harness-state.json` and use default evergreen paths such as `inputs_ai/` and `outputs_ai/wiki/`.
@@ -54,7 +56,7 @@ If the user asks about alternate source or output organization, use the relevant
 9. Verify the required project shape:
    - required files exist
    - required folders exist
-   - `change_logs/change_logs.md` and `change_logs/annotation_change_logs.md` exist
+   - `change_logs/change_logs.md`, `change_logs/annotation_change_logs.md`, `change_logs/human_attention_queue.md`, and `change_logs/summaries/` exist
    - no root-level `change_logs.md` or `change_annotation_logs.md` exists
    - `../_kiss_ai/framework/commands/do_all_rebuild.md` is reachable from the project root, or `KISS_AI_FRAMEWORK_ROOT` points to a reachable central framework
    - `.cursor/rules/` exists with the template ownership rule (restore from `_kiss_ai/framework/templates/project_template/.cursor/rules/` if an older template copy omitted it)
@@ -65,9 +67,13 @@ If the user asks about alternate source or output organization, use the relevant
     - setup status `initialized`
     - initialized timestamp
     - project name
+    - `paths.build_summaries: "change_logs/summaries/"`
+    - `paths.human_attention_queue: "change_logs/human_attention_queue.md"`
     - `setup.initial_human_baseline_commit: null`
     - `setup.initial_human_baseline_at: null`
     - all run statuses as `not_run`
+    - `extensions.human_attention` with queue path, null update timestamp, and an empty `open_items` array
+    - `extensions.rebuild_summaries` with null latest summary fields and an empty notes array
     - **Framework guard / provenance:** ensure `extensions.framework_guard` exists (merge keys if an older file lacks them). Set `extensions.framework_guard.framework_copy_source` to `centralized: ../_kiss_ai/framework` or the absolute central framework path used. Leave `intentional_customization_acknowledged_at` and `intentional_customization_note` as `null` unless the user already declared an intentional centralized framework change during setup.
 12. Prepend an initialization entry to `change_logs/change_logs.md`.
 13. Stop and report next steps. Do not run `do_all_rebuild.md` automatically.

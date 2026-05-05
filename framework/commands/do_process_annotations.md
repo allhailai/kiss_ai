@@ -29,7 +29,7 @@ Do not skip logging schema edits just because the file looks like “configurati
 ## Instructions
 
 1. Read `human_goal_requirements.md`, `human_input_requirements.md`, `human_output_requirements.md`, and `human_open_questions.md` to understand the current source of truth and review queue.
-2. Verify the project root is the Git root. If Git is missing or only a parent folder is a Git repo, stop and ask whether to initialize Git in the project root before continuing.
+2. Verify the project root is the Git root. If Git is unavailable, do not prompt the user. Record a `git_snapshot` or `runtime` human-attention item and continue with best-effort annotation handling from available file state.
 3. Use Git status and Git diff to find added, modified, renamed, and deleted files under only those AI-managed pathspecs. For example, from the project root use:
    - `git status -- inputs_ai outputs_ai`
    - `git diff -- inputs_ai outputs_ai`
@@ -51,14 +51,14 @@ Do not skip logging schema edits just because the file looks like “configurati
    - review requirement
    - recommended action
 6. Prepend entries to `change_logs/annotation_change_logs.md`.
-7. If the annotation is low-risk and unambiguous, propose a small requirement-file change.
-8. If the annotation is material, ambiguous, or a deletion, ask for review before changing requirements.
-9. Do not restore or overwrite the edited AI-managed file until the annotation has been logged and review handling is complete.
+7. If the annotation is low-risk and unambiguous, propose a small requirement-file change in the annotation log and human-attention queue. Do not apply it automatically unless current requirements already authorize that change.
+8. If the annotation is material, ambiguous, or a deletion, do not ask mid-run. Record a human-attention item with the inferred intent, default action, affected files, and next human action.
+9. Use current requirement files as the source of truth for regeneration. For deleted generated content, regenerate it when the current requirements still call for it, and record the deletion as a pending attention item.
 10. Update `.harness-state.json.last_annotation_scan` with scan status, scanned paths, number logged, and unresolved review items.
 
 ## Deletion Handling
 
-For deleted generated content, ask explicitly:
+For deleted generated content, log this non-interactive attention item:
 
 ```markdown
 Annotation Review Needed
@@ -68,14 +68,11 @@ I noticed generated content was deleted from `{path}`.
 Possible interpretation:
 You may be saying this content is wrong, irrelevant, duplicated, too detailed, or should be deprioritized.
 
-Recommended action:
-Do not change requirements until you confirm the intent.
+Default action taken:
+The rebuild kept the current requirements as source of truth and regenerated the content when still required.
 
-Choose one:
-1. Exclude or deprioritize this content in the requirements.
-2. Keep this content and regenerate it.
-3. The deletion was accidental.
-4. I am not sure; ask again later.
+Human next action:
+Edit the requirement files if this content should be excluded, deprioritized, or regenerated differently.
 ```
 
 ## Output
