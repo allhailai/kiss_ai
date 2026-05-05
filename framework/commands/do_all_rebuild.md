@@ -80,7 +80,7 @@ Each item should include severity (`info`, `warning`, or `blocked`), category, c
 10. If input refresh reports material changes, continue through downstream rebuild:
     - Mark affected wiki pages, intermediate ledgers, and directed outputs as changed, stale before rebuild, rebuilt, low-confidence, or uncertain in `.harness-state.json`.
     - Update `rebuild_scope` with the affected artifacts, downstream impact, uncertainty, and caveats.
-    - Carry material-change caveats into generated wiki pages, directed outputs, stale-output ledgers, and the run summary.
+    - Carry material-change caveats into generated wiki pages, directed outputs, stale-output ledgers, and the executive rebuild summary as user-facing implications.
 11. Determine rebuild scope before downstream generation:
     - Use input refresh results, source inventory, prior compile state, scaling assessment, and project-defined dependency ledgers when available.
     - Identify changed source categories, affected wiki pages, affected intermediate ledgers, affected final outputs, and outputs that may now be stale.
