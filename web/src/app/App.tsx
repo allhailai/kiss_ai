@@ -39,7 +39,9 @@ export function App() {
       <main className="app-shell project-picker-shell" style={themeStyle}>
         <ToastViewport toasts={workspace.toasts} onDismiss={workspace.dismissToast} />
         <ProjectPicker
+          creatingProject={workspace.creatingProject}
           error={workspace.projectsError}
+          onCreateProject={workspace.createProject}
           onRefresh={() => void workspace.refreshProjects()}
           onSelect={workspace.selectProject}
           projects={workspace.projects}

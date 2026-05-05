@@ -38,6 +38,7 @@ export function useProjectWorkspace() {
   const [draft, setDraft] = useState("");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [loading, setLoading] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
   const [workflowMenuOpen, setWorkflowMenuOpen] = useState(false);
 
   const selectedProject = useMemo(
@@ -247,6 +248,25 @@ export function useProjectWorkspace() {
     window.location.hash = "#/projects";
   }, []);
 
+  const createProject = useCallback(
+    async (name: string, slug?: string) => {
+      setCreatingProject(true);
+      setNotice("");
+      try {
+        const project = await api.createProject({ name, slug });
+        await refreshProjects();
+        setNotice(`Created ${project.name}.`);
+        selectProject(project.slug);
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : "Could not create the project.");
+        throw error;
+      } finally {
+        setCreatingProject(false);
+      }
+    },
+    [refreshProjects, selectProject, setNotice],
+  );
+
   const saveSelected = useCallback(async () => {
     if (!selected) return;
     const projectSlug = requireSelectedProjectSlug();
@@ -441,6 +461,7 @@ export function useProjectWorkspace() {
     draft,
     toasts,
     loading,
+    creatingProject,
     workflowMenuOpen,
     setDraft,
     setSelectedRebuildModelId,
@@ -456,6 +477,7 @@ export function useProjectWorkspace() {
     openProjectFile,
     selectProject,
     clearSelectedProject,
+    createProject,
     saveSelected,
     revertSelected,
     startRebuild,

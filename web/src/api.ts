@@ -78,6 +78,11 @@ export type ProjectListResponse = {
   projects: ProjectSummary[];
 };
 
+export type CreateProjectRequest = {
+  name: string;
+  slug?: string;
+};
+
 export type ProjectFile = {
   path: string;
   name: string;
@@ -227,6 +232,11 @@ function projectBase(projectSlug: string) {
 
 export const api = {
   projects: () => request<ProjectListResponse>("/api/projects"),
+  createProject: (body: CreateProjectRequest) =>
+    request<ProjectSummary>("/api/projects", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   rebuildModels: () => request<RebuildModelsResponse>("/api/cursor/models"),
   status: (projectSlug: string) => request<ProjectStatus>(`${projectBase(projectSlug)}/status`),
   buildLog: (projectSlug: string, summaryPath?: string | null, sectionId?: string | null) => {
