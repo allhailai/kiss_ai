@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   api,
+  type BuildLogState,
   type DesignState,
   type FileContent,
   type FileDiff,
@@ -16,7 +17,7 @@ import { type Toast } from "./toast";
 import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type RouteState, type View } from "./views";
 
 export function useProjectWorkspace() {
-  const [view, setView] = useState<View>("dashboard");
+  const [view, setView] = useState<View>("build-log");
   const [projectsRoot, setProjectsRoot] = useState("");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [selectedProjectSlug, setSelectedProjectSlug] = useState<string | null>(() =>
@@ -24,6 +25,7 @@ export function useProjectWorkspace() {
   );
   const [projectsError, setProjectsError] = useState("");
   const [status, setStatus] = useState<ProjectStatus | null>(null);
+  const [buildLog, setBuildLog] = useState<BuildLogState | null>(null);
   const [rebuild, setRebuild] = useState<RebuildState | null>(null);
   const [rebuildModels, setRebuildModels] = useState<RebuildModel[]>([]);
   const [selectedRebuildModelId, setSelectedRebuildModelId] = useState("");
@@ -85,6 +87,13 @@ export function useProjectWorkspace() {
   const refreshStatus = useCallback(async () => {
     setStatus(await api.status(requireSelectedProjectSlug()));
   }, [requireSelectedProjectSlug]);
+
+  const refreshBuildLog = useCallback(
+    async (summaryPath?: string | null, sectionId?: string | null) => {
+      setBuildLog(await api.buildLog(requireSelectedProjectSlug(), summaryPath, sectionId));
+    },
+    [requireSelectedProjectSlug],
+  );
 
   const refreshDesign = useCallback(async () => {
     setDesign(await api.design(requireSelectedProjectSlug()));
@@ -186,11 +195,15 @@ export function useProjectWorkspace() {
         await refreshRebuildModels();
       }
 
+      if (nextView === "build-log") {
+        await refreshBuildLog();
+      }
+
       if (route.filePath && nextView !== "design") {
         await selectFile(route.filePath);
       }
     },
-    [loadTree, refreshDesign, refreshRebuild, refreshRebuildModels, selectFile, selectedProjectSlug, setNotice],
+    [loadTree, refreshBuildLog, refreshDesign, refreshRebuild, refreshRebuildModels, selectFile, selectedProjectSlug, setNotice],
   );
 
   const navigateTo = useCallback(
@@ -224,7 +237,7 @@ export function useProjectWorkspace() {
   const selectProject = useCallback((projectSlug: string) => {
     setSelectedProjectSlug(projectSlug);
     window.localStorage.setItem(selectedProjectStorageKey, projectSlug);
-    window.location.hash = buildRouteHash(projectSlug, "dashboard");
+    window.location.hash = buildRouteHash(projectSlug, "build-log");
   }, []);
 
   const clearSelectedProject = useCallback(() => {
@@ -285,6 +298,7 @@ export function useProjectWorkspace() {
     if (!selectedProjectSlug) {
       window.localStorage.removeItem(selectedProjectStorageKey);
       setStatus(null);
+      setBuildLog(null);
       setRebuild(null);
       setRebuildModels([]);
       setSelectedRebuildModelId("");
@@ -392,6 +406,7 @@ export function useProjectWorkspace() {
     selectedProject,
     projectsError,
     status,
+    buildLog,
     rebuild,
     rebuildModels,
     selectedRebuildModelId,
@@ -410,6 +425,7 @@ export function useProjectWorkspace() {
     dismissToast,
     refreshProjects,
     refreshStatus,
+    refreshBuildLog,
     refreshDesign,
     refreshRebuild,
     refreshRebuildModels,

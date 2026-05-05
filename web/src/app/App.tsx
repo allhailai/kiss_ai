@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { buildThemeStyle } from "./theme";
 import { useProjectWorkspace } from "./useProjectWorkspace";
 import { type View } from "./views";
+import { BuildLogWorkspace } from "../features/buildLog/BuildLogWorkspace";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { DesignWorkspace } from "../features/design/DesignWorkspace";
 import { FileWorkspace } from "../features/files/FileWorkspace";
@@ -63,12 +64,12 @@ export function App() {
       <aside className="sidebar">
         <div className="brand">
           <span className="eyebrow">kiss_ai lab</span>
-          <button className="home-link" onClick={() => navigateTo("dashboard")}>
+          <button className="home-link" onClick={() => navigateTo("build-log")}>
             {workspace.status?.projectName ?? workspace.selectedProject.name}
           </button>
         </div>
 
-        {workspace.view === "dashboard" ? (
+        {workspace.view === "build-log" || workspace.view === "dashboard" ? (
           <MainWorkflowMenu currentView={workspace.view} onOpen={(nextView) => navigateTo(nextView)} />
         ) : (
           <ContextualNavigator
@@ -85,6 +86,19 @@ export function App() {
       </aside>
 
       <section className="workspace">
+        {workspace.view === "build-log" ? (
+          <BuildLogWorkspace
+            buildLog={workspace.buildLog}
+            status={workspace.status}
+            rebuild={workspace.rebuild}
+            onRefresh={() => {
+              void workspace.refreshBuildLog();
+              void workspace.refreshStatus();
+              void workspace.refreshRebuild();
+            }}
+            onSelectSummary={(summaryPath, sectionId) => void workspace.refreshBuildLog(summaryPath, sectionId)}
+          />
+        ) : null}
         {workspace.view === "dashboard" ? (
           <Dashboard
             status={workspace.status}

@@ -1172,6 +1172,108 @@ button:disabled {
   white-space: pre-wrap;
 }
 
+.build-log-workspace .warning-callout {
+  margin-top: 0;
+}
+
+.build-log-latest-card .section-heading {
+  align-items: flex-start;
+}
+
+.build-log-latest-card .section-heading p {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+}
+
+.build-log-markdown {
+  max-height: 560px;
+  overflow: auto;
+  margin: 14px 0 0;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface) 92%, var(--color-background));
+  color: var(--color-primary);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.98rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.build-log-empty {
+  margin: 14px 0 0;
+}
+
+.build-log-summary-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.build-log-summary-item {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface) 95%, var(--color-background));
+}
+
+.build-log-history-card .build-log-summary-button {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-primary);
+  text-align: left;
+}
+
+.build-log-history-card .build-log-summary-button.active,
+.build-log-history-card .build-log-summary-button:hover,
+.build-log-history-card .build-log-summary-button:focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, white);
+  color: var(--color-primary);
+}
+
+.build-log-history-card .build-log-summary-button span {
+  display: grid;
+  gap: 4px;
+}
+
+.build-log-history-card .build-log-summary-button em,
+.build-log-history-card .build-log-summary-button small {
+  color: var(--color-secondary);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.build-log-section-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.build-log-section-list button {
+  border: 1px solid var(--color-border);
+  background: white;
+  color: var(--color-primary);
+  font-size: 0.82rem;
+}
+
+.build-log-section-list button.active,
+.build-log-section-list button:hover,
+.build-log-section-list button:focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, white);
+  color: var(--color-primary);
+}
+
 .project-picker-shell {
   display: block;
   padding: clamp(24px, 5vw, 72px);

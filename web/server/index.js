@@ -14,6 +14,7 @@ const PROJECTS_ROOT = path.resolve(process.env.KISS_AI_PROJECTS_ROOT ?? path.res
 const PORT = Number(process.env.KISS_AI_UI_PORT ?? 8787);
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_SEARCH_RESULTS = 25;
+const MAX_AGGREGATE_LOG_SECTIONS = 8;
 const REBUILD_STATE_DIR = path.join(WEB_ROOT, ".runtime", "rebuild");
 const warnedCursorKeyMessages = new Set();
 const reservedProjectDirectories = new Set(["_kiss_ai", ".obsidian", "_archive", "_templates"]);
@@ -295,6 +296,117 @@ async function listMarkdownFiles(projectRoot, rootRelative, kind, editable, anno
   }
 
   return files.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function markdownHeadingTitle(markdown, fallback) {
+  const heading = markdown.match(/^#\s+(.+)$/m) ?? markdown.match(/^##\s+(.+)$/m);
+  return heading?.[1]?.trim() || fallback;
+}
+
+function markdownSectionId(title, index) {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+
+  return `section-${index + 1}${slug ? `-${slug}` : ""}`;
+}
+
+function parseMarkdownSections(markdown) {
+  const matches = [...markdown.matchAll(/^##\s+(.+)$/gm)];
+
+  return matches.map((match, index) => {
+    const start = match.index ?? 0;
+    const end = matches[index + 1]?.index ?? markdown.length;
+    const title = match[1].trim();
+
+    return {
+      id: markdownSectionId(title, index),
+      title,
+      content: markdown.slice(start, end).trim(),
+    };
+  });
+}
+
+function excerptMarkdownSections(markdown, maxSections) {
+  const matches = [...markdown.matchAll(/^##\s+.+$/gm)];
+
+  if (matches.length <= maxSections) return markdown.trim();
+  if (!matches.length) return markdown.slice(0, MAX_FILE_BYTES).trim();
+
+  const end = matches[maxSections]?.index ?? markdown.length;
+  return markdown.slice(0, end).trim();
+}
+
+function summaryListItem(summary) {
+  return {
+    path: summary.path,
+    name: summary.name,
+    title: summary.title,
+    modifiedAt: summary.modifiedAt,
+    sections: summary.sections.map(({ id, title }) => ({ id, title })),
+  };
+}
+
+function summaryContentItem(summary, sectionId = null) {
+  const section = sectionId ? summary.sections.find((candidate) => candidate.id === sectionId) : null;
+
+  return {
+    ...summaryListItem(summary),
+    selectedSectionId: section?.id ?? null,
+    content: section?.content ?? summary.content,
+    title: section?.title ?? summary.title,
+  };
+}
+
+async function listBuildSummaries(projectRoot) {
+  const root = projectPath(projectRoot, "change_logs/summaries");
+  let entries = [];
+
+  try {
+    entries = await fs.readdir(root.absolute, { withFileTypes: true });
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    return [];
+  }
+
+  const summaries = [];
+
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+
+    const relativePath = `change_logs/summaries/${entry.name}`;
+    const file = await readTextFile(projectRoot, relativePath);
+    const { absolute } = projectPath(projectRoot, file.path);
+    const stat = await fs.stat(absolute);
+    const sections = parseMarkdownSections(file.content);
+
+    summaries.push({
+      path: file.path,
+      name: entry.name,
+      title: markdownHeadingTitle(file.content, humanizePathSegment(entry.name)),
+      modifiedAt: stat.mtime.toISOString(),
+      sections,
+      content: file.content,
+    });
+  }
+
+  return summaries.sort((left, right) => {
+    const nameOrder = right.name.localeCompare(left.name);
+    if (nameOrder !== 0) return nameOrder;
+    return right.modifiedAt.localeCompare(left.modifiedAt);
+  });
+}
+
+async function readAggregateBuildLogExcerpt(projectRoot) {
+  try {
+    const file = await readTextFile(projectRoot, "change_logs/change_logs.md");
+    return excerptMarkdownSections(file.content, MAX_AGGREGATE_LOG_SECTIONS);
+  } catch (error) {
+    if (error.code === "ENOENT") return "";
+    return "";
+  }
 }
 
 async function readSearchAllowedPaths() {
@@ -963,6 +1075,25 @@ app.get("/api/projects/:projectSlug/status", async (request, response, next) => 
       cursorApiKeySource: cursorApiKey.source,
       cursorApiKeyWarnings: cursorApiKey.warnings,
       gitStatus: await gitStatus(project.path),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/projects/:projectSlug/build-log", async (request, response, next) => {
+  try {
+    const summaries = await listBuildSummaries(request.project.path);
+    const latestSummary = summaries[0] ? summaryContentItem(summaries[0]) : null;
+    const requestedSummaryPath = String(request.query.summary ?? "");
+    const requestedSectionId = String(request.query.section ?? "");
+    const requestedSummary = requestedSummaryPath ? summaries.find((summary) => summary.path === requestedSummaryPath) : null;
+
+    response.json({
+      latestSummary,
+      selectedSummary: requestedSummary ? summaryContentItem(requestedSummary, requestedSectionId || null) : null,
+      summaries: summaries.map(summaryListItem),
+      aggregateLogExcerpt: await readAggregateBuildLogExcerpt(request.project.path),
     });
   } catch (error) {
     next(error);

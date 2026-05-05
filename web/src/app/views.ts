@@ -1,6 +1,6 @@
 import type { ProjectFile } from "../api";
 
-export type View = "dashboard" | "requirements" | "inputs" | "outputs" | "annotations" | "design" | "rebuild";
+export type View = "build-log" | "dashboard" | "requirements" | "inputs" | "outputs" | "annotations" | "design" | "rebuild";
 
 export type RouteState = {
   projectSlug: string | null;
@@ -9,6 +9,7 @@ export type RouteState = {
 };
 
 export const views: Array<{ id: View; label: string; description: string }> = [
+  { id: "build-log", label: "Build Log", description: "Latest rebuild summary and history" },
   { id: "requirements", label: "Requirements", description: "Human-owned source of truth" },
   { id: "annotations", label: "AI Input Files", description: "AI-managed files under inputs_ai/" },
   { id: "inputs", label: "Human Input Files", description: "Human source material" },
@@ -21,7 +22,7 @@ export const views: Array<{ id: View; label: string; description: string }> = [
 export const workflowMenuViews = views.filter((item) => item.id !== "design");
 export const viewIds = new Set<View>(views.map((item) => item.id));
 export const fileBackedViews = new Set<View>(["requirements", "inputs", "outputs", "annotations", "design"]);
-export const defaultRoute: RouteState = { projectSlug: null, view: "dashboard", filePath: null };
+export const defaultRoute: RouteState = { projectSlug: null, view: "build-log", filePath: null };
 export const selectedProjectStorageKey = "kiss_ai.selectedProject";
 export const designProjectFile: ProjectFile = {
   path: "human_design_identity.md",

@@ -115,6 +115,31 @@ export type RebuildModelsResponse = {
   source: string | null;
 };
 
+export type BuildSummarySection = {
+  id: string;
+  title: string;
+};
+
+export type BuildSummary = {
+  path: string;
+  name: string;
+  title: string;
+  modifiedAt: string;
+  sections: BuildSummarySection[];
+};
+
+export type BuildSummaryContent = BuildSummary & {
+  selectedSectionId: string | null;
+  content: string;
+};
+
+export type BuildLogState = {
+  latestSummary: BuildSummaryContent | null;
+  selectedSummary: BuildSummaryContent | null;
+  summaries: BuildSummary[];
+  aggregateLogExcerpt: string;
+};
+
 export type DesignState = {
   file: FileContent;
   parsed: {
@@ -159,6 +184,14 @@ export const api = {
   projects: () => request<ProjectListResponse>("/api/projects"),
   rebuildModels: () => request<RebuildModelsResponse>("/api/cursor/models"),
   status: (projectSlug: string) => request<ProjectStatus>(`${projectBase(projectSlug)}/status`),
+  buildLog: (projectSlug: string, summaryPath?: string | null, sectionId?: string | null) => {
+    const params = new URLSearchParams();
+    if (summaryPath) params.set("summary", summaryPath);
+    if (sectionId) params.set("section", sectionId);
+    const query = params.toString();
+
+    return request<BuildLogState>(`${projectBase(projectSlug)}/build-log${query ? `?${query}` : ""}`);
+  },
   tree: (projectSlug: string, section: string) => request<TreeResponse>(`${projectBase(projectSlug)}/tree/${section}`),
   searchFiles: (projectSlug: string, query: string) =>
     request<FileSearchResponse>(`${projectBase(projectSlug)}/search/files?q=${encodeURIComponent(query)}`),
