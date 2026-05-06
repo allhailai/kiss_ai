@@ -95,6 +95,7 @@ export type ProjectFile = {
 export type FileContent = {
   path: string;
   content: string;
+  contentHash: string;
   kind: ProjectFile["kind"];
   editable: boolean;
   annotation: boolean;
@@ -231,6 +232,47 @@ export type AiAssistRequest = {
   previousProposal?: AiAssistProposal;
 };
 
+export type RequirementAutoUpdatePath =
+  | "human_goal_requirements.md"
+  | "human_input_requirements.md"
+  | "human_output_requirements.md";
+
+export type RequirementsAutoUpdateProposal = {
+  filePath: RequirementAutoUpdatePath;
+  contentHash: string;
+  modelId: string;
+  generatedAt: string;
+  summary: string;
+  rationale: string;
+  affectedSections: string[];
+  proposedContent: string;
+  risks: string[];
+  questionsOrAssumptions: string[];
+};
+
+export type RequirementsAutoUpdateProposeRequest = {
+  modelId: string;
+  sourcePath: RequirementAutoUpdatePath;
+  selectedPaths: RequirementAutoUpdatePath[];
+  instruction?: string;
+  contentHashes: Record<RequirementAutoUpdatePath, string>;
+};
+
+export type RequirementsAutoUpdateProposeResponse = {
+  modelId: string;
+  generatedAt: string;
+  proposals: RequirementsAutoUpdateProposal[];
+};
+
+export type RequirementsAutoUpdateAcceptRequest = {
+  proposals: Pick<RequirementsAutoUpdateProposal, "filePath" | "contentHash" | "proposedContent">[];
+};
+
+export type RequirementsAutoUpdateAcceptResponse = {
+  acceptedAt: string;
+  files: FileContent[];
+};
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     headers: {
@@ -287,6 +329,16 @@ export const api = {
     }),
   aiAssistRefine: (projectSlug: string, body: AiAssistRequest) =>
     request<AiAssistProposal>(`${projectBase(projectSlug)}/ai-assist/refine`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  requirementsAutoUpdatePropose: (projectSlug: string, body: RequirementsAutoUpdateProposeRequest) =>
+    request<RequirementsAutoUpdateProposeResponse>(`${projectBase(projectSlug)}/requirements/auto-update/propose`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  requirementsAutoUpdateAccept: (projectSlug: string, body: RequirementsAutoUpdateAcceptRequest) =>
+    request<RequirementsAutoUpdateAcceptResponse>(`${projectBase(projectSlug)}/requirements/auto-update/accept`, {
       method: "POST",
       body: JSON.stringify(body),
     }),

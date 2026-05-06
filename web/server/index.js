@@ -23,6 +23,12 @@ const FRAMEWORK_ROOT = path.resolve(process.env.KISS_AI_FRAMEWORK_ROOT ?? path.j
 const warnedCursorKeyMessages = new Set();
 const reservedProjectDirectories = new Set(["_kiss_ai", ".obsidian", "_archive", "_templates"]);
 const projectSlugPattern = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
+const REQUIREMENT_AUTO_UPDATE_PATHS = [
+  "human_goal_requirements.md",
+  "human_input_requirements.md",
+  "human_output_requirements.md",
+];
+const requirementAutoUpdatePathSet = new Set(REQUIREMENT_AUTO_UPDATE_PATHS);
 
 const humanFiles = new Map([
   ["human_goal_requirements.md", { kind: "human", editable: true, annotation: false }],
@@ -489,9 +495,12 @@ async function readTextFile(projectRoot, relativePath) {
     throw new Error("File is too large to open in the lab UI.");
   }
 
+  const content = await fs.readFile(absolute, "utf8");
+
   return {
     ...meta,
-    content: await fs.readFile(absolute, "utf8"),
+    content,
+    contentHash: hashText(content),
   };
 }
 
@@ -961,6 +970,320 @@ async function runAiAssistProposal(project, body) {
     contentHash,
     modelId,
     generatedAt: new Date().toISOString(),
+  };
+}
+
+function requireRequirementAutoUpdatePath(projectRoot, filePath, label = "Requirement file") {
+  const meta = classifyPath(projectRoot, String(filePath ?? "").trim());
+
+  if (!requirementAutoUpdatePathSet.has(meta.path)) {
+    throw new Error(`${label} must be one of the three root requirement files.`);
+  }
+  if (!meta.editable) {
+    throw new Error(`${label} must be editable.`);
+  }
+
+  return meta.path;
+}
+
+function requireRequirementAutoUpdateRequest(projectRoot, body) {
+  const modelId = String(body?.modelId ?? "").trim();
+  const sourcePath = requireRequirementAutoUpdatePath(projectRoot, body?.sourcePath, "Source file");
+  const selectedPaths = Array.isArray(body?.selectedPaths)
+    ? [...new Set(body.selectedPaths.map((value) => requireRequirementAutoUpdatePath(projectRoot, value, "Selected file")))]
+    : [];
+  const instruction = String(body?.instruction ?? "").trim();
+  const contentHashes = body?.contentHashes && typeof body.contentHashes === "object" && !Array.isArray(body.contentHashes) ? body.contentHashes : {};
+
+  if (!modelId) throw new Error("AI Auto Update requires a model.");
+  if (!selectedPaths.length) throw new Error("Select at least one requirement file to update.");
+
+  for (const filePath of REQUIREMENT_AUTO_UPDATE_PATHS) {
+    const contentHash = String(contentHashes[filePath] ?? "").trim();
+    if (!contentHash) {
+      throw new Error(`AI Auto Update requires a content hash for ${filePath}.`);
+    }
+  }
+
+  return {
+    modelId,
+    sourcePath,
+    selectedPaths,
+    instruction,
+    contentHashes,
+  };
+}
+
+function createRequirementsAutoUpdatePrompt({ project, request, files }) {
+  const payload = {
+    projectRoot: project.path,
+    frameworkRoot: FRAMEWORK_ROOT,
+    sourcePath: request.sourcePath,
+    selectedPaths: request.selectedPaths,
+    instruction: request.instruction || null,
+    requirements: Object.fromEntries(
+      files.map((file) => [
+        file.path,
+        {
+          path: file.path,
+          contentHash: file.contentHash,
+          content: file.content,
+          selectedForUpdate: request.selectedPaths.includes(file.path),
+          sourceOfRecentIntent: file.path === request.sourcePath,
+        },
+      ]),
+    ),
+  };
+
+  return [
+    "Produce an AI Auto Update proposal for this kiss_ai project's root requirement files.",
+    "",
+    `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_requirements_auto_update.md")} exactly.`,
+    "This is a proposal-only web-triggered run. Do not edit files, write logs, update state, or run modifying commands.",
+    "Return only one AI Auto Update proposal using the tagged output contract from do_requirements_auto_update.md.",
+    "Do not wrap the response in Markdown fences. Do not add prose before or after the tagged proposal.",
+    "The response must start with `<requirements_auto_update_proposal>` and end with `</requirements_auto_update_proposal>`.",
+    "Return file proposals only for selectedPaths. Put complete replacement Markdown for each selected file inside its <proposedContent> tag.",
+    "",
+    "Request payload:",
+    JSON.stringify(payload, null, 2),
+  ].join("\n");
+}
+
+function allTagContent(text, tagName) {
+  const pattern = new RegExp(`<${tagName}>\\s*([\\s\\S]*?)\\s*<\\/${tagName}>`, "gi");
+  return [...String(text ?? "").matchAll(pattern)].map((match) => match[1]?.trim() ?? "");
+}
+
+function extractTaggedRequirementsAutoUpdateProposal(rawText) {
+  const text = String(rawText ?? "").trim();
+  const wrapper = firstTagContent(text, "requirements_auto_update_proposal");
+  const source = wrapper || text;
+  const fileProposals = allTagContent(source, "fileProposal").map((proposalText) => ({
+    filePath: firstTagContent(proposalText, "filePath"),
+    summary: firstTagContent(proposalText, "summary") || "AI Auto Update proposal generated.",
+    rationale: firstTagContent(proposalText, "rationale"),
+    affectedSections: parseTaggedList(firstTagContent(proposalText, "affectedSections")),
+    proposedContent: firstTagContent(proposalText, "proposedContent"),
+    risks: parseTaggedList(firstTagContent(proposalText, "risks")),
+    questionsOrAssumptions: parseTaggedList(firstTagContent(proposalText, "questionsOrAssumptions")),
+  }));
+
+  if (!fileProposals.length || fileProposals.some((proposal) => !proposal.filePath || !proposal.proposedContent)) {
+    throw new Error("AI Auto Update did not return tagged proposals for the selected files.");
+  }
+
+  return { proposals: fileProposals };
+}
+
+function createRequirementsAutoUpdateRepairPrompt({ rawText, selectedPaths, fallbackFiles }) {
+  const repairPayload = {
+    malformedResponse: trimForPrompt(rawText, 180000),
+    selectedPaths,
+    fallbackFiles: Object.fromEntries(fallbackFiles.map((file) => [file.path, file.content])),
+  };
+
+  return [
+    "Repair this AI Auto Update response into the tagged multi-file proposal format.",
+    "Return only the tagged proposal. Do not include Markdown fences, prose, comments, or trailing text.",
+    "The response must start with `<requirements_auto_update_proposal>` and end with `</requirements_auto_update_proposal>`.",
+    "If usable proposed content is missing for a selected file, use that file's fallback content and explain the issue in risks.",
+    "",
+    "Required format:",
+    "<requirements_auto_update_proposal>",
+    "<fileProposal>",
+    "<filePath>human_input_requirements.md</filePath>",
+    "<summary>Short human-readable summary.</summary>",
+    "<rationale>Why this change fits.</rationale>",
+    "<affectedSections>",
+    "- Section name",
+    "</affectedSections>",
+    "<proposedContent>",
+    "Full replacement Markdown content for this file.",
+    "</proposedContent>",
+    "<risks>",
+    "- Risk or ambiguity",
+    "</risks>",
+    "<questionsOrAssumptions>",
+    "- Assumption or question",
+    "</questionsOrAssumptions>",
+    "</fileProposal>",
+    "</requirements_auto_update_proposal>",
+    "",
+    "Repair payload:",
+    JSON.stringify(repairPayload, null, 2),
+  ].join("\n");
+}
+
+async function parseOrRepairRequirementsAutoUpdateProposal({ project, apiKey, modelId, rawText, selectedPaths, fallbackFiles }) {
+  try {
+    return extractTaggedRequirementsAutoUpdateProposal(rawText);
+  } catch {
+    // Try JSON before asking the model to repair.
+  }
+
+  try {
+    return extractJsonObject(rawText, "AI Auto Update did not return valid proposal JSON.");
+  } catch (parseError) {
+    const repairPrompt = createRequirementsAutoUpdateRepairPrompt({ rawText, selectedPaths, fallbackFiles });
+    const repairedText = await runCursorAgentText({ project, apiKey, modelId, prompt: repairPrompt });
+
+    try {
+      return extractTaggedRequirementsAutoUpdateProposal(repairedText);
+    } catch {
+      // Fall through to JSON repair parsing below.
+    }
+
+    try {
+      return extractJsonObject(repairedText, "AI Auto Update did not return a valid proposal after a repair attempt.");
+    } catch (repairError) {
+      const preview = trimForPrompt(rawText || repairedText, 1200);
+      console.warn(`[kiss_ai UI warning] AI Auto Update proposal parse failed. Raw response preview:\n${preview}`);
+      throw repairError instanceof Error ? repairError : parseError;
+    }
+  }
+}
+
+function normalizeRequirementsAutoUpdateProposal(value, selectedPaths, filesByPath, modelId) {
+  const source = value && typeof value === "object" ? value : {};
+  const rawProposals = Array.isArray(source.proposals) ? source.proposals : [];
+  const proposalsByPath = new Map();
+
+  for (const rawProposal of rawProposals) {
+    const rawPath = String(rawProposal?.filePath ?? rawProposal?.path ?? "").trim();
+    if (!selectedPaths.includes(rawPath)) continue;
+
+    const originalFile = filesByPath.get(rawPath);
+    const proposedContent = typeof rawProposal?.proposedContent === "string" ? rawProposal.proposedContent : originalFile?.content ?? "";
+
+    if (Buffer.byteLength(proposedContent, "utf8") > MAX_FILE_BYTES) {
+      throw new Error(`AI Auto Update proposed content is too large for ${rawPath}.`);
+    }
+
+    proposalsByPath.set(rawPath, {
+      filePath: rawPath,
+      contentHash: originalFile?.contentHash ?? "",
+      modelId,
+      generatedAt: new Date().toISOString(),
+      summary: String(rawProposal?.summary ?? "AI Auto Update proposal generated.").trim(),
+      rationale: String(rawProposal?.rationale ?? "").trim(),
+      affectedSections: Array.isArray(rawProposal?.affectedSections) ? rawProposal.affectedSections.map(String).filter(Boolean) : [],
+      proposedContent,
+      risks: Array.isArray(rawProposal?.risks) ? rawProposal.risks.map(String).filter(Boolean) : [],
+      questionsOrAssumptions: Array.isArray(rawProposal?.questionsOrAssumptions)
+        ? rawProposal.questionsOrAssumptions.map(String).filter(Boolean)
+        : [],
+    });
+  }
+
+  const missingPaths = selectedPaths.filter((filePath) => !proposalsByPath.has(filePath));
+  if (missingPaths.length) {
+    throw new Error(`AI Auto Update did not return proposals for: ${missingPaths.join(", ")}.`);
+  }
+
+  return {
+    modelId,
+    generatedAt: new Date().toISOString(),
+    proposals: selectedPaths.map((filePath) => proposalsByPath.get(filePath)),
+  };
+}
+
+async function runRequirementsAutoUpdateProposal(project, body) {
+  const request = requireRequirementAutoUpdateRequest(project.path, body);
+  const files = await Promise.all(REQUIREMENT_AUTO_UPDATE_PATHS.map((filePath) => readTextFile(project.path, filePath)));
+  const filesByPath = new Map(files.map((file) => [file.path, file]));
+
+  for (const file of files) {
+    if (String(request.contentHashes[file.path] ?? "") !== file.contentHash) {
+      throw new Error(`The saved file changed before AI Auto Update could start: ${file.path}. Reload and try again.`);
+    }
+    if (Buffer.byteLength(file.content, "utf8") > MAX_AI_ASSIST_FULL_CONTENT_BYTES) {
+      throw new Error(`AI Auto Update requires ${file.path} to be under ${MAX_AI_ASSIST_FULL_CONTENT_BYTES.toLocaleString()} bytes.`);
+    }
+  }
+
+  const cursorApiKey = await resolveCursorApiKey();
+  if (!cursorApiKey.available) {
+    throw new Error("No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. AI Auto Update is unavailable from the UI.");
+  }
+
+  const models = await listCursorModels(cursorApiKey.apiKey);
+  if (!models.length) {
+    throw new Error("No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.");
+  }
+
+  const modelId = pickRebuildModelId(models, request.modelId);
+  const prompt = createRequirementsAutoUpdatePrompt({ project, request, files });
+  const rawText = await runCursorAgentText({ project, apiKey: cursorApiKey.apiKey, modelId, prompt });
+  const parsedProposal = await parseOrRepairRequirementsAutoUpdateProposal({
+    project,
+    apiKey: cursorApiKey.apiKey,
+    modelId,
+    rawText,
+    selectedPaths: request.selectedPaths,
+    fallbackFiles: request.selectedPaths.map((filePath) => filesByPath.get(filePath)).filter(Boolean),
+  });
+  const afterFiles = await Promise.all(REQUIREMENT_AUTO_UPDATE_PATHS.map((filePath) => readTextFile(project.path, filePath)));
+
+  for (const afterFile of afterFiles) {
+    const beforeFile = filesByPath.get(afterFile.path);
+    if (beforeFile && afterFile.content !== beforeFile.content) {
+      const { absolute } = projectPath(project.path, afterFile.path);
+      await fs.writeFile(absolute, beforeFile.content, "utf8");
+      throw new Error("AI Auto Update attempted to edit files directly. The original files were restored; try again with a narrower instruction.");
+    }
+  }
+
+  return normalizeRequirementsAutoUpdateProposal(parsedProposal, request.selectedPaths, filesByPath, modelId);
+}
+
+function requireRequirementsAutoUpdateAcceptRequest(projectRoot, body) {
+  const rawProposals = Array.isArray(body?.proposals) ? body.proposals : [];
+  if (!rawProposals.length) {
+    throw new Error("AI Auto Update requires at least one accepted proposal.");
+  }
+
+  const proposals = rawProposals.map((proposal) => {
+    const filePath = requireRequirementAutoUpdatePath(projectRoot, proposal?.filePath ?? proposal?.path, "Accepted file");
+    const contentHash = String(proposal?.contentHash ?? "").trim();
+    const proposedContent = typeof proposal?.proposedContent === "string" ? proposal.proposedContent : "";
+
+    if (!contentHash) throw new Error(`AI Auto Update requires a content hash for ${filePath}.`);
+    if (!proposedContent) throw new Error(`AI Auto Update requires proposed content for ${filePath}.`);
+    if (Buffer.byteLength(proposedContent, "utf8") > MAX_FILE_BYTES) {
+      throw new Error(`AI Auto Update proposed content is too large for ${filePath}.`);
+    }
+
+    return { filePath, contentHash, proposedContent };
+  });
+
+  const uniquePaths = new Set(proposals.map((proposal) => proposal.filePath));
+  if (uniquePaths.size !== proposals.length) {
+    throw new Error("AI Auto Update accept request contains duplicate files.");
+  }
+
+  return { proposals };
+}
+
+async function acceptRequirementsAutoUpdate(project, body) {
+  const request = requireRequirementsAutoUpdateAcceptRequest(project.path, body);
+  const currentFiles = await Promise.all(request.proposals.map((proposal) => readTextFile(project.path, proposal.filePath)));
+
+  for (const file of currentFiles) {
+    const proposal = request.proposals.find((candidate) => candidate.filePath === file.path);
+    if (proposal && proposal.contentHash !== file.contentHash) {
+      throw new Error(`The saved file changed before AI Auto Update could be accepted: ${file.path}. Regenerate the proposal.`);
+    }
+  }
+
+  const writtenFiles = [];
+  for (const proposal of request.proposals) {
+    writtenFiles.push(await writeTextFile(project.path, proposal.filePath, proposal.proposedContent));
+  }
+
+  return {
+    acceptedAt: new Date().toISOString(),
+    files: writtenFiles,
   };
 }
 
@@ -1956,6 +2279,22 @@ app.post("/api/projects/:projectSlug/ai-assist/propose", async (request, respons
 app.post("/api/projects/:projectSlug/ai-assist/refine", async (request, response, next) => {
   try {
     response.json(await runAiAssistProposal(request.project, request.body));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/projects/:projectSlug/requirements/auto-update/propose", async (request, response, next) => {
+  try {
+    response.json(await runRequirementsAutoUpdateProposal(request.project, request.body));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/projects/:projectSlug/requirements/auto-update/accept", async (request, response, next) => {
+  try {
+    response.json(await acceptRequirementsAutoUpdate(request.project, request.body));
   } catch (error) {
     next(error);
   }

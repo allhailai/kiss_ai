@@ -28,6 +28,8 @@ export function ContextualNavigator({
   loading,
   menuOpen,
   selectedPath,
+  showAiAutoUpdate,
+  onAiAutoUpdate,
   onToggleMenu,
   onOpenView,
   onSelectFile,
@@ -37,6 +39,8 @@ export function ContextualNavigator({
   loading: boolean;
   menuOpen: boolean;
   selectedPath: string | null;
+  showAiAutoUpdate?: boolean;
+  onAiAutoUpdate?: () => void;
   onToggleMenu: () => void;
   onOpenView: (view: View) => void;
   onSelectFile: (path: string) => void;
@@ -95,6 +99,12 @@ export function ContextualNavigator({
               );
             })
           )}
+          {showAiAutoUpdate ? (
+            <button className="local-nav-action" onClick={onAiAutoUpdate} type="button">
+              <strong>AI Auto Update</strong>
+              <span>Propagate concepts across root requirements</span>
+            </button>
+          ) : null}
           {currentView === "requirements" ? <p className="local-nav-note">{requirementsExplainer}</p> : null}
         </nav>
       ) : (

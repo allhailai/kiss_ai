@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { buildThemeStyle } from "./theme";
 import { useProjectWorkspace } from "./useProjectWorkspace";
 import { type View } from "./views";
@@ -6,6 +6,7 @@ import { BuildLogWorkspace } from "../features/buildLog/BuildLogWorkspace";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { DesignWorkspace } from "../features/design/DesignWorkspace";
 import { FileWorkspace } from "../features/files/FileWorkspace";
+import { isRequirementAutoUpdatePath, RequirementsAutoUpdateModal } from "../features/files/RequirementsAutoUpdateModal";
 import { ContextualNavigator, MainWorkflowMenu } from "../features/navigation/WorkflowMenus";
 import { ProjectPicker } from "../features/projectPicker/ProjectPicker";
 import { RebuildWorkspace } from "../features/rebuild/RebuildWorkspace";
@@ -32,6 +33,7 @@ const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: str
 
 export function App() {
   const workspace = useProjectWorkspace();
+  const [autoUpdateOpen, setAutoUpdateOpen] = useState(false);
   const themeStyle = useMemo(() => buildThemeStyle(workspace.design), [workspace.design]);
 
   if (!workspace.selectedProjectSlug || !workspace.selectedProject) {
@@ -53,6 +55,8 @@ export function App() {
 
   const navigateTo = (view: View, filePath?: string | null) => workspace.navigateTo(view, filePath);
   const fileWorkspace = fileWorkspaceByView[workspace.view];
+  const selectedAutoUpdatePath =
+    workspace.selected?.path && isRequirementAutoUpdatePath(workspace.selected.path) ? workspace.selected.path : null;
 
   return (
     <main className="app-shell" style={themeStyle}>
@@ -80,7 +84,9 @@ export function App() {
             loading={workspace.loading}
             menuOpen={workspace.workflowMenuOpen}
             selectedPath={workspace.selected?.path ?? null}
+            showAiAutoUpdate={Boolean(selectedAutoUpdatePath)}
             onToggleMenu={() => workspace.setWorkflowMenuOpen((isOpen) => !isOpen)}
+            onAiAutoUpdate={() => setAutoUpdateOpen(true)}
             onOpenView={(nextView) => navigateTo(nextView)}
             onSelectFile={(path) => navigateTo(workspace.view, path)}
           />
@@ -155,6 +161,25 @@ export function App() {
               void workspace.refreshStatus();
               void workspace.refreshRebuildModels();
             }}
+          />
+        ) : null}
+        {autoUpdateOpen && selectedAutoUpdatePath ? (
+          <RequirementsAutoUpdateModal
+            projectSlug={workspace.selectedProjectSlug}
+            models={workspace.rebuildModels}
+            selectedModelId={workspace.selectedRebuildModelId}
+            sourcePath={selectedAutoUpdatePath}
+            hasUnsavedSourceChanges={workspace.draft !== (workspace.selected?.content ?? "")}
+            onAccepted={async (writtenPaths) => {
+              if (workspace.selected?.path && isRequirementAutoUpdatePath(workspace.selected.path) && writtenPaths.includes(workspace.selected.path)) {
+                await workspace.refreshSelectedFile();
+              } else {
+                await workspace.refreshStatus();
+              }
+            }}
+            onClose={() => setAutoUpdateOpen(false)}
+            onModelChange={workspace.setSelectedRebuildModelId}
+            onNotice={workspace.setNotice}
           />
         ) : null}
       </section>

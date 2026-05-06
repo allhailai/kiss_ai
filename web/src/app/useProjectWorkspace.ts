@@ -284,6 +284,22 @@ export function useProjectWorkspace() {
     await refreshStatus();
   }, [draft, refreshDesign, refreshStatus, requireSelectedProjectSlug, selected]);
 
+  const refreshSelectedFile = useCallback(async () => {
+    if (!selected) return;
+    const projectSlug = requireSelectedProjectSlug();
+    const file = await api.file(projectSlug, selected.path);
+    const diff = await api.fileDiff(projectSlug, file.path);
+    setSelected(file);
+    setSelectedDiff(diff);
+    setDraft(file.content);
+
+    if (file.path === "human_design_identity.md") {
+      await refreshDesign();
+    }
+
+    await refreshStatus();
+  }, [refreshDesign, refreshStatus, requireSelectedProjectSlug, selected]);
+
   const revertSelected = useCallback(async () => {
     if (!selected) return;
     const projectSlug = requireSelectedProjectSlug();
@@ -479,6 +495,7 @@ export function useProjectWorkspace() {
     clearSelectedProject,
     createProject,
     saveSelected,
+    refreshSelectedFile,
     revertSelected,
     startRebuild,
     resolveHumanAttention,

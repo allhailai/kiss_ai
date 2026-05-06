@@ -17,16 +17,16 @@ type DiffEntry = {
   text: string;
 };
 
-const modelTierLabels: Record<RebuildModel["tier"], string> = {
+export const modelTierLabels: Record<RebuildModel["tier"], string> = {
   medium: "Medium ($$)",
   high: "High / Extra High ($$$)",
   small: "Small ($)",
 };
 
-const modelTierOrder: RebuildModel["tier"][] = ["medium", "high", "small"];
+export const modelTierOrder: RebuildModel["tier"][] = ["medium", "high", "small"];
 const defaultAiAssistInstruction = "Expand on the annotations and file.";
 
-function formatModelLabel(model: RebuildModel) {
+export function formatModelLabel(model: RebuildModel) {
   const modelName = model.displayName || model.id;
   return model.provider ? `${modelName} - ${model.provider}` : modelName;
 }
@@ -43,7 +43,7 @@ function findAssistCandidates(content: string) {
     .slice(0, 6);
 }
 
-function buildDiffPreview(originalText: string, proposedText: string): DiffEntry[] {
+export function buildDiffPreview(originalText: string, proposedText: string): DiffEntry[] {
   const original = originalText.split("\n");
   const proposed = proposedText.split("\n");
   const table = Array.from({ length: original.length + 1 }, () => new Uint32Array(proposed.length + 1));
