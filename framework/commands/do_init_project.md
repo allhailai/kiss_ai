@@ -40,6 +40,7 @@ If the user asks about alternate source or output organization, use the relevant
    - `human_input_requirements.md`
    - `human_output_requirements.md`
    - `human_open_questions.md`
+   - `human_design_identity.md`
    - `.harness-state.json`
    - `change_logs/change_logs.md`
    - `change_logs/annotation_change_logs.md`
@@ -57,6 +58,7 @@ If the user asks about alternate source or output organization, use the relevant
    - required files exist
    - required folders exist
    - `change_logs/change_logs.md`, `change_logs/annotation_change_logs.md`, `change_logs/human_attention_queue.md`, and `change_logs/summaries/` exist
+   - `human_design_identity.md` exists
    - no root-level `change_logs.md` or `change_annotation_logs.md` exists
    - `../_kiss_ai/framework/commands/do_all_rebuild.md` is reachable from the project root, or `KISS_AI_FRAMEWORK_ROOT` points to a reachable central framework
    - `.cursor/rules/` exists with the template ownership rule (restore from `_kiss_ai/framework/templates/project_template/.cursor/rules/` if an older template copy omitted it)

@@ -15,13 +15,15 @@
     "goal": "human_goal_requirements.md",
     "input": "human_input_requirements.md",
     "output": "human_output_requirements.md",
-    "open_questions": "human_open_questions.md"
+    "open_questions": "human_open_questions.md",
+    "design_identity": "human_design_identity.md"
   },
   "paths": {
     "inputs_human": "inputs_human/",
     "inputs_ai": "inputs_ai/",
     "outputs_ai": "outputs_ai/",
     "wiki": "outputs_ai/wiki/",
+    "human_design_identity": "human_design_identity.md",
     "human_open_questions": "human_open_questions.md",
     "change_logs": "change_logs/",
     "build_summaries": "change_logs/summaries/",

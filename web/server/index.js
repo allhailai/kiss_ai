@@ -365,6 +365,7 @@ async function initializeHarness(projectRoot, { name, slug }) {
     inputs_ai: "inputs_ai/",
     outputs_ai: "outputs_ai/",
     wiki: "outputs_ai/wiki/",
+    human_design_identity: "human_design_identity.md",
     human_open_questions: "human_open_questions.md",
     change_logs: "change_logs/",
     build_summaries: "change_logs/summaries/",

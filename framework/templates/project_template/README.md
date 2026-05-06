@@ -8,9 +8,10 @@ This research project was created from the `kiss_ai` project template.
 1. Fill in `human_goal_requirements.md` in plain language.
 2. Fill in `human_input_requirements.md` in plain language.
 3. Fill in `human_output_requirements.md` in plain language.
-4. Use `human_open_questions.md` to answer questions that need human review.
-5. Put human-owned context, notes, files, and source lists in `inputs_human/`.
-6. From this project root, ask the agent to run `../_kiss_ai/framework/commands/do_all_rebuild.md`.
+4. Optionally adjust `human_design_identity.md` to customize this project's UI identity.
+5. Use `human_open_questions.md` to answer questions that need human review.
+6. Put human-owned context, notes, files, and source lists in `inputs_human/`.
+7. From this project root, ask the agent to run `../_kiss_ai/framework/commands/do_all_rebuild.md`.
 
 ## Cursor API Key For UI Rebuilds
 
@@ -54,6 +55,7 @@ Do not commit `web/.env`. Prefer Keychain for longer-lived storage and use `.env
 - `human_input_requirements.md`
 - `human_output_requirements.md`
 - `human_open_questions.md`
+- `human_design_identity.md`
 - `inputs_human/` — notes, source lists, uploads, and durable context
 
 ### AI-managed (generated or processed by the agent)
