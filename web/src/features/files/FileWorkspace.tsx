@@ -1,8 +1,12 @@
-import type { FileContent, FileDiff, ProjectFile } from "../../api";
+import type { FileContent, FileDiff, ProjectFile, RebuildModel } from "../../api";
 import { countDeletedLines, countDiffRangeLines } from "../../domain/diffs";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
+import { AiAssistPanel } from "./AiAssistPanel";
 
 export function FileWorkspace({
+  projectSlug,
+  models,
+  selectedModelId,
   title,
   explainer,
   selected,
@@ -10,11 +14,15 @@ export function FileWorkspace({
   draft,
   projectFiles,
   onDraft,
+  onModelChange,
   onNotice,
   onOpenFile,
   onRevert,
   onSave,
 }: {
+  projectSlug: string;
+  models: RebuildModel[];
+  selectedModelId: string;
   title: string;
   explainer?: string;
   selected: FileContent | null;
@@ -22,6 +30,7 @@ export function FileWorkspace({
   draft: string;
   projectFiles: ProjectFile[];
   onDraft: (value: string) => void;
+  onModelChange: (modelId: string) => void;
   onNotice: (message: string) => void;
   onOpenFile: (path: string) => void;
   onRevert: () => void;
@@ -34,11 +43,15 @@ export function FileWorkspace({
         {explainer ? <p>{explainer}</p> : null}
       </header>
       <EditorPane
+        projectSlug={projectSlug}
+        models={models}
+        selectedModelId={selectedModelId}
         selected={selected}
         selectedDiff={selectedDiff}
         draft={draft}
         projectFiles={projectFiles}
         onDraft={onDraft}
+        onModelChange={onModelChange}
         onNotice={onNotice}
         onOpenFile={onOpenFile}
         onRevert={onRevert}
@@ -49,21 +62,29 @@ export function FileWorkspace({
 }
 
 function EditorPane({
+  projectSlug,
+  models,
+  selectedModelId,
   selected,
   selectedDiff,
   draft,
   projectFiles,
   onDraft,
+  onModelChange,
   onNotice,
   onOpenFile,
   onRevert,
   onSave,
 }: {
+  projectSlug: string;
+  models: RebuildModel[];
+  selectedModelId: string;
   selected: FileContent | null;
   selectedDiff: FileDiff | null;
   draft: string;
   projectFiles: ProjectFile[];
   onDraft: (value: string) => void;
+  onModelChange: (modelId: string) => void;
   onNotice: (message: string) => void;
   onOpenFile: (path: string) => void;
   onRevert: () => void;
@@ -122,9 +143,15 @@ function EditorPane({
       ) : null}
 
       <div className="editor-meta">
-        <span>
-          Loaded {draft.length.toLocaleString()} characters across {draft.split("\n").length.toLocaleString()} lines.
-        </span>
+        <AiAssistPanel
+          projectSlug={projectSlug}
+          models={models}
+          selectedModelId={selectedModelId}
+          selected={selected}
+          onModelChange={onModelChange}
+          onApplyDraft={onDraft}
+          onNotice={onNotice}
+        />
         <span className="editor-diff-legend" aria-label="Editor diff highlight legend">
           <span className="editor-diff-key editor-diff-key-unsaved">Unsaved edits</span>
           <span className="editor-diff-key editor-diff-key-saved">{savedDiffLabel}</span>

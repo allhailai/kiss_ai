@@ -112,6 +112,9 @@ export function App() {
         ) : null}
         {fileWorkspace ? (
           <FileWorkspace
+            projectSlug={workspace.selectedProjectSlug}
+            models={workspace.rebuildModels}
+            selectedModelId={workspace.selectedRebuildModelId}
             title={fileWorkspace.title}
             explainer={fileWorkspace.explainer}
             selected={workspace.selected}
@@ -119,6 +122,7 @@ export function App() {
             draft={workspace.draft}
             projectFiles={workspace.projectFiles}
             onDraft={workspace.setDraft}
+            onModelChange={workspace.setSelectedRebuildModelId}
             onNotice={workspace.setNotice}
             onOpenFile={workspace.openProjectFile}
             onRevert={() => void workspace.revertSelected()}

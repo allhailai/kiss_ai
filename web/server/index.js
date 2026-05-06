@@ -7,7 +7,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import YAML from "yaml";
 import { createRebuildStore } from "./agentRuns.js";
-import { runCursorAgent } from "./agentRuntimes/cursorSdk.js";
+import { runCursorAgent, runCursorAgentText } from "./agentRuntimes/cursorSdk.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(__dirname, "..");
@@ -16,6 +16,8 @@ const PORT = Number(process.env.KISS_AI_UI_PORT ?? 8787);
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_SEARCH_RESULTS = 25;
 const MAX_AGGREGATE_LOG_SECTIONS = 8;
+const MAX_AI_ASSIST_FULL_CONTENT_BYTES = 80 * 1024;
+const MAX_AI_ASSIST_CONTEXT_BYTES = 18 * 1024;
 const REBUILD_STATE_DIR = path.join(WEB_ROOT, ".runtime", "rebuild");
 const FRAMEWORK_ROOT = path.resolve(process.env.KISS_AI_FRAMEWORK_ROOT ?? path.join(PROJECTS_ROOT, "_kiss_ai", "framework"));
 const warnedCursorKeyMessages = new Set();
@@ -84,6 +86,10 @@ async function readProjectHarness(projectRoot) {
 
 function hashStableValue(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
+}
+
+function hashText(value) {
+  return createHash("sha256").update(String(value)).digest("hex");
 }
 
 function normalizeHumanAttentionItem(item) {
@@ -570,6 +576,391 @@ function parseMarkdownSections(markdown) {
       content: markdown.slice(start, end).trim(),
     };
   });
+}
+
+function trimForPrompt(value, maxBytes = MAX_AI_ASSIST_CONTEXT_BYTES) {
+  const text = String(value ?? "");
+  if (Buffer.byteLength(text, "utf8") <= maxBytes) return text;
+
+  return `${text.slice(0, maxBytes)}\n\n[Truncated for prompt size.]`;
+}
+
+function lineNumberForIndex(content, index) {
+  return content.slice(0, Math.max(0, index)).split("\n").length;
+}
+
+function extractAiAssistCandidate(content, annotation) {
+  const explicit = String(annotation ?? "").trim();
+  if (explicit) return explicit;
+
+  const candidate = content
+    .split("\n")
+    .find((line) => /\b(TODO|AI Assist|FIXME|TBD)\b|^\s*[-*]\s+\[[ ?]\]/i.test(line));
+  return candidate?.trim() ?? "";
+}
+
+function getAiAssistFileContext(content, annotation) {
+  if (Buffer.byteLength(content, "utf8") <= MAX_AI_ASSIST_FULL_CONTENT_BYTES) {
+    return {
+      mode: "full",
+      content,
+      surroundingSections: parseMarkdownSections(content).map(({ title }) => title),
+    };
+  }
+
+  const candidate = extractAiAssistCandidate(content, annotation);
+  const candidateIndex = candidate ? content.toLowerCase().indexOf(candidate.toLowerCase()) : -1;
+  const candidateLine = candidateIndex >= 0 ? lineNumberForIndex(content, candidateIndex) : 1;
+  const lines = content.split("\n");
+  const startLine = Math.max(1, candidateLine - 80);
+  const endLine = Math.min(lines.length, candidateLine + 120);
+  const excerpt = lines.slice(startLine - 1, endLine).join("\n");
+
+  return {
+    mode: "excerpt",
+    content: trimForPrompt(excerpt, MAX_AI_ASSIST_FULL_CONTENT_BYTES),
+    surroundingSections: parseMarkdownSections(content)
+      .filter((section) => section.content.includes(candidate) || section.content.length < MAX_AI_ASSIST_CONTEXT_BYTES)
+      .slice(0, 8)
+      .map(({ title }) => title),
+    excerptLineRange: { from: startLine, to: endLine },
+  };
+}
+
+async function readOptionalProjectText(projectRoot, relativePath, maxBytes = MAX_AI_ASSIST_CONTEXT_BYTES) {
+  try {
+    const file = await readTextFile(projectRoot, relativePath);
+    return trimForPrompt(file.content, maxBytes);
+  } catch {
+    return "";
+  }
+}
+
+async function createAiAssistContext(project, meta, currentContent, annotation) {
+  const harness = await readProjectHarness(project.path);
+  const frameworkReadme = await fs.readFile(path.join(FRAMEWORK_ROOT, "README.md"), "utf8").catch(() => "");
+  const rootReadme = await fs.readFile(path.join(path.dirname(FRAMEWORK_ROOT), "README.md"), "utf8").catch(() => "");
+
+  return {
+    project: {
+      slug: project.slug,
+      name: displayProjectName(harness.project_name ?? project.name, harness.project_slug ?? project.slug),
+      root: project.path,
+      setupStatus: harness.setup?.status ?? "unknown",
+      lastRunAt: harness.last_run_at ?? null,
+    },
+    framework: {
+      root: FRAMEWORK_ROOT,
+      overview: trimForPrompt(rootReadme, 8000),
+      readme: trimForPrompt(frameworkReadme, 10000),
+      invariants: [
+        "Requirement files are the source of truth.",
+        "inputs_human/ is human-owned.",
+        "inputs_ai/ and outputs_ai/ are AI-managed.",
+        "Human edits in AI-managed paths are annotations, not durable source-of-truth changes.",
+        "Generated outputs must be reproducible from requirements and inputs.",
+      ],
+    },
+    requirements: {
+      goal: await readOptionalProjectText(project.path, "human_goal_requirements.md"),
+      inputs: await readOptionalProjectText(project.path, "human_input_requirements.md"),
+      outputs: await readOptionalProjectText(project.path, "human_output_requirements.md"),
+      openQuestions: await readOptionalProjectText(project.path, "human_open_questions.md"),
+    },
+    currentFile: {
+      path: meta.path,
+      kind: meta.kind,
+      editable: meta.editable,
+      annotation: meta.annotation,
+      contentHash: hashText(currentContent),
+      ...getAiAssistFileContext(currentContent, annotation),
+    },
+  };
+}
+
+function requireAiAssistRequest(projectRoot, body) {
+  const filePath = String(body?.path ?? "").trim();
+  const annotation = String(body?.annotation ?? "").trim();
+  const feedback = String(body?.feedback ?? "").trim();
+  const modelId = String(body?.modelId ?? "").trim();
+  const meta = classifyPath(projectRoot, filePath);
+
+  if (!filePath) throw new Error("AI Assist requires a file path.");
+  if (!/^human_[^/]+\.md$/i.test(meta.path) || meta.kind !== "human") {
+    throw new Error("AI Assist currently supports human-owned requirement files only.");
+  }
+  if (!meta.editable) throw new Error("AI Assist requires an editable file.");
+  if (!annotation && !feedback) throw new Error("AI Assist requires an annotation, selection, instruction, or refinement note.");
+
+  return {
+    meta,
+    annotation,
+    feedback,
+    modelId,
+    previousProposal: body?.previousProposal && typeof body.previousProposal === "object" ? body.previousProposal : null,
+  };
+}
+
+function createAiAssistPrompt({ project, context, annotation, feedback, previousProposal }) {
+  const payload = {
+    projectRoot: project.path,
+    frameworkRoot: FRAMEWORK_ROOT,
+    currentFilePath: context.currentFile.path,
+    annotation,
+    ephemeralFeedback: feedback || null,
+    previousProposal: previousProposal
+      ? {
+          summary: previousProposal.summary ?? "",
+          proposedContent: previousProposal.proposedContent ?? "",
+          affectedSections: previousProposal.affectedSections ?? [],
+        }
+      : null,
+    context,
+  };
+
+  return [
+    "Produce an AI Assist proposal for this kiss_ai project file.",
+    "",
+    `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_ai_assist.md")} exactly.`,
+    "This is a proposal-only web-triggered run. Do not edit files, write logs, update state, or run modifying commands.",
+    "Return only one AI Assist proposal using the tagged output contract from do_ai_assist.md.",
+    "Do not wrap the response in Markdown fences. Do not add prose before or after the tagged proposal.",
+    "The response must start with `<ai_assist_proposal>` and end with `</ai_assist_proposal>`.",
+    "Put the complete replacement Markdown for the current file inside the <proposedContent> tag.",
+    "",
+    "Request payload:",
+    JSON.stringify(payload, null, 2),
+  ].join("\n");
+}
+
+function firstTagContent(text, tagName) {
+  const pattern = new RegExp(`<${tagName}>\\s*([\\s\\S]*?)\\s*<\\/${tagName}>`, "i");
+  return text.match(pattern)?.[1]?.trim() ?? "";
+}
+
+function parseTaggedList(value) {
+  return value
+    .split("\n")
+    .map((line) => line.replace(/^\s*[-*]\s*/, "").trim())
+    .filter(Boolean);
+}
+
+function extractTaggedAiAssistProposal(rawText) {
+  const text = String(rawText ?? "").trim();
+  const wrapper = firstTagContent(text, "ai_assist_proposal");
+  const source = wrapper || text;
+  const proposedContent = firstTagContent(source, "proposedContent");
+
+  if (!proposedContent) {
+    throw new Error("AI Assist did not return tagged proposal content.");
+  }
+
+  return {
+    summary: firstTagContent(source, "summary") || "AI Assist proposal generated.",
+    rationale: firstTagContent(source, "rationale"),
+    affectedSections: parseTaggedList(firstTagContent(source, "affectedSections")),
+    proposedContent,
+    risks: parseTaggedList(firstTagContent(source, "risks")),
+    questionsOrAssumptions: parseTaggedList(firstTagContent(source, "questionsOrAssumptions")),
+  };
+}
+
+function findBalancedJsonCandidates(text) {
+  const candidates = [];
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (character === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (character === "\"") {
+      inString = true;
+      continue;
+    }
+
+    if (character === "{") {
+      if (depth === 0) start = index;
+      depth += 1;
+    } else if (character === "}" && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && start >= 0) {
+        candidates.push(text.slice(start, index + 1));
+        start = -1;
+      }
+    }
+  }
+
+  return candidates;
+}
+
+function extractJsonObject(rawText, errorMessage = "AI Assist did not return valid proposal JSON.") {
+  const text = String(rawText ?? "").trim();
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced?.[1]?.trim() ?? text;
+
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    for (const jsonCandidate of findBalancedJsonCandidates(candidate)) {
+      try {
+        return JSON.parse(jsonCandidate);
+      } catch {
+        // Try the next balanced candidate.
+      }
+    }
+    throw new Error(errorMessage);
+  }
+}
+
+function createAiAssistRepairPrompt({ rawText, fallbackContent }) {
+  const repairPayload = {
+    malformedResponse: trimForPrompt(rawText, 180000),
+    fallbackContent,
+  };
+
+  return [
+    "Repair this AI Assist response into the tagged AI Assist proposal format.",
+    "Return only the tagged proposal. Do not include Markdown fences, prose, comments, or trailing text.",
+    "The response must start with `<ai_assist_proposal>` and end with `</ai_assist_proposal>`.",
+    "If the malformed response does not contain usable proposed content, use fallbackContent as proposedContent and explain the issue in risks.",
+    "",
+    "Required format:",
+    "<ai_assist_proposal>",
+    "<summary>Short human-readable summary.</summary>",
+    "<rationale>Why this change fits.</rationale>",
+    "<affectedSections>",
+    "- Section name",
+    "</affectedSections>",
+    "<proposedContent>",
+    "Full replacement Markdown content for the current file.",
+    "</proposedContent>",
+    "<risks>",
+    "- Risk or ambiguity",
+    "</risks>",
+    "<questionsOrAssumptions>",
+    "- Assumption or question",
+    "</questionsOrAssumptions>",
+    "</ai_assist_proposal>",
+    "",
+    "Repair payload:",
+    JSON.stringify(repairPayload, null, 2),
+  ].join("\n");
+}
+
+async function parseOrRepairAiAssistProposal({ project, apiKey, modelId, rawText, fallbackContent }) {
+  try {
+    return extractTaggedAiAssistProposal(rawText);
+  } catch {
+    // Older or stubborn models may still return JSON; keep that path supported.
+  }
+
+  try {
+    return extractJsonObject(rawText);
+  } catch (parseError) {
+    const repairPrompt = createAiAssistRepairPrompt({ rawText, fallbackContent });
+    const repairedText = await runCursorAgentText({ project, apiKey, modelId, prompt: repairPrompt });
+
+    try {
+      return extractTaggedAiAssistProposal(repairedText);
+    } catch {
+      // Fall through to legacy JSON repair parsing below.
+    }
+
+    try {
+      return extractJsonObject(repairedText, "AI Assist did not return a valid proposal after a repair attempt.");
+    } catch (repairError) {
+      const preview = trimForPrompt(rawText || repairedText, 1200);
+      console.warn(`[kiss_ai UI warning] AI Assist proposal parse failed. Raw response preview:\n${preview}`);
+      throw repairError instanceof Error ? repairError : parseError;
+    }
+  }
+}
+
+function normalizeAiAssistProposal(value, fallbackContent) {
+  const source = value && typeof value === "object" ? value : {};
+  const proposedContent = typeof source.proposedContent === "string" ? source.proposedContent : fallbackContent;
+
+  if (Buffer.byteLength(proposedContent, "utf8") > MAX_FILE_BYTES) {
+    throw new Error("AI Assist proposed content is too large for the editor.");
+  }
+
+  return {
+    summary: String(source.summary ?? "AI Assist proposal generated.").trim(),
+    rationale: String(source.rationale ?? "").trim(),
+    affectedSections: Array.isArray(source.affectedSections) ? source.affectedSections.map(String).filter(Boolean) : [],
+    proposedContent,
+    risks: Array.isArray(source.risks) ? source.risks.map(String).filter(Boolean) : [],
+    questionsOrAssumptions: Array.isArray(source.questionsOrAssumptions) ? source.questionsOrAssumptions.map(String).filter(Boolean) : [],
+  };
+}
+
+async function runAiAssistProposal(project, body) {
+  const request = requireAiAssistRequest(project.path, body);
+  const file = await readTextFile(project.path, request.meta.path);
+  const contentHash = hashText(file.content);
+
+  if (body?.contentHash && String(body.contentHash) !== contentHash) {
+    throw new Error("The saved file changed before AI Assist could start. Reload the file and try again.");
+  }
+
+  const cursorApiKey = await resolveCursorApiKey();
+  if (!cursorApiKey.available) {
+    throw new Error("No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. AI Assist is unavailable from the UI.");
+  }
+
+  const models = await listCursorModels(cursorApiKey.apiKey);
+  if (!models.length) {
+    throw new Error("No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.");
+  }
+
+  const context = await createAiAssistContext(project, request.meta, file.content, request.annotation);
+  const prompt = createAiAssistPrompt({
+    project,
+    context,
+    annotation: request.annotation,
+    feedback: request.feedback,
+    previousProposal: request.previousProposal,
+  });
+  const modelId = pickRebuildModelId(models, request.modelId);
+  const rawText = await runCursorAgentText({ project, apiKey: cursorApiKey.apiKey, modelId, prompt });
+  const proposal = normalizeAiAssistProposal(
+    await parseOrRepairAiAssistProposal({
+      project,
+      apiKey: cursorApiKey.apiKey,
+      modelId,
+      rawText,
+      fallbackContent: file.content,
+    }),
+    file.content,
+  );
+  const afterFile = await readTextFile(project.path, request.meta.path);
+
+  if (afterFile.content !== file.content) {
+    const { absolute } = projectPath(project.path, request.meta.path);
+    await fs.writeFile(absolute, file.content, "utf8");
+    throw new Error("AI Assist attempted to edit the file directly. The original file was restored; try again with a narrower instruction.");
+  }
+
+  return {
+    ...proposal,
+    filePath: request.meta.path,
+    contentHash,
+    modelId,
+    generatedAt: new Date().toISOString(),
+  };
 }
 
 function excerptMarkdownSections(markdown, maxSections) {
@@ -1548,6 +1939,22 @@ app.put("/api/projects/:projectSlug/file", async (request, response, next) => {
 app.post("/api/projects/:projectSlug/file/revert", async (request, response, next) => {
   try {
     response.json(await restoreFileFromHead(request.project.path, String(request.body.path ?? "")));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/projects/:projectSlug/ai-assist/propose", async (request, response, next) => {
+  try {
+    response.json(await runAiAssistProposal(request.project, request.body));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/projects/:projectSlug/ai-assist/refine", async (request, response, next) => {
+  try {
+    response.json(await runAiAssistProposal(request.project, request.body));
   } catch (error) {
     next(error);
   }

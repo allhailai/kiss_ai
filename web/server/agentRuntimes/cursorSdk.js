@@ -60,3 +60,25 @@ export async function runCursorAgent({ project, apiKey, modelId, prompt, onEvent
     }
   }
 }
+
+export async function runCursorAgentText({ project, apiKey, modelId, prompt, onEvent }) {
+  let text = "";
+
+  await runCursorAgent({
+    project,
+    apiKey,
+    modelId,
+    prompt,
+    onEvent: async (event) => {
+      if (event.type === "assistant_delta" && event.text) {
+        text += event.text;
+      }
+
+      if (onEvent) {
+        await onEvent(event);
+      }
+    },
+  });
+
+  return text.trim();
+}

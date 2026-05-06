@@ -209,6 +209,28 @@ export type DesignState = {
   };
 };
 
+export type AiAssistProposal = {
+  filePath: string;
+  contentHash: string;
+  modelId: string;
+  generatedAt: string;
+  summary: string;
+  rationale: string;
+  affectedSections: string[];
+  proposedContent: string;
+  risks: string[];
+  questionsOrAssumptions: string[];
+};
+
+export type AiAssistRequest = {
+  modelId: string;
+  path: string;
+  annotation: string;
+  contentHash?: string;
+  feedback?: string;
+  previousProposal?: AiAssistProposal;
+};
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     headers: {
@@ -257,6 +279,16 @@ export const api = {
     request<FileContent>(`${projectBase(projectSlug)}/file`, {
       method: "PUT",
       body: JSON.stringify({ path, content }),
+    }),
+  aiAssistPropose: (projectSlug: string, body: AiAssistRequest) =>
+    request<AiAssistProposal>(`${projectBase(projectSlug)}/ai-assist/propose`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  aiAssistRefine: (projectSlug: string, body: AiAssistRequest) =>
+    request<AiAssistProposal>(`${projectBase(projectSlug)}/ai-assist/refine`, {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
   revertFile: (projectSlug: string, path: string) =>
     request<FileContent>(`${projectBase(projectSlug)}/file/revert`, {

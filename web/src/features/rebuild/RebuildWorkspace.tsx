@@ -125,7 +125,7 @@ export function RebuildWorkspace({
           Current state: <strong>{rebuild?.status ?? "idle"}</strong>
         </p>
         <label className="rebuild-model-field">
-          <span>Cursor model</span>
+          <span>AI Model</span>
           <select
             disabled={Boolean(rebuild?.running) || !status?.cursorApiKeyAvailable || !models.length}
             onChange={(event) => onModelChange(event.target.value)}

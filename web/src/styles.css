@@ -799,6 +799,11 @@ button:disabled {
   overflow: hidden;
 }
 
+.markdown-editor-shell {
+  grid-row: 4;
+  min-height: 0;
+}
+
 .design-editor-pane {
   grid-template-rows: auto auto minmax(0, 1fr);
 }
@@ -918,19 +923,21 @@ button:disabled {
 .editor-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   padding: 10px 18px;
   border-bottom: 1px solid var(--color-border);
   color: var(--color-secondary);
   font-size: 0.82rem;
+  flex-wrap: wrap;
 }
 
 .editor-diff-legend {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px;
+  margin-left: auto;
 }
 
 .editor-diff-key {
@@ -1112,6 +1119,265 @@ button:disabled {
   background: color-mix(in srgb, var(--color-annotation) 10%, white);
   color: var(--color-primary);
   line-height: 1.5;
+}
+
+.ai-assist-panel {
+  margin-right: 4px;
+}
+
+.ai-assist-panel.open {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  max-height: min(620px, calc(100vh - 260px));
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 34%, var(--color-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-accent) 9%, white);
+  overscroll-behavior: contain;
+}
+
+.ai-assist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.ai-assist-header h3 {
+  margin: 4px 0 0;
+  font-size: 1rem;
+}
+
+.ai-assist-trigger,
+.ai-assist-actions button {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--color-accent);
+  color: white;
+  font-weight: 800;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.ai-assist-actions .editor-secondary-button {
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 22%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 10%, white);
+  color: color-mix(in srgb, var(--color-secondary) 64%, var(--color-primary));
+}
+
+.ai-assist-body {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.ai-assist-body p {
+  margin: 0;
+  color: var(--color-secondary);
+  line-height: 1.5;
+}
+
+.ai-assist-candidates,
+.ai-assist-model-field,
+.ai-assist-field,
+.ai-assist-proposal {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-assist-model-field {
+  grid-template-columns: auto minmax(220px, 294px) auto;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 4px;
+  max-width: 520px;
+}
+
+.ai-assist-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ai-assist-model-field span,
+.ai-assist-model-field small {
+  color: var(--color-secondary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ai-assist-model-field small {
+  white-space: nowrap;
+}
+
+.ai-assist-model-field select {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: white;
+  color: var(--color-primary);
+  padding: 6px 9px;
+  font-size: 0.88rem;
+}
+
+.ai-assist-candidate {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-accent) 7%, white);
+  color: var(--color-primary);
+  text-align: left;
+}
+
+.ai-assist-candidate:hover,
+.ai-assist-candidate:focus-visible {
+  border-color: var(--color-accent);
+}
+
+.ai-assist-field span {
+  color: var(--color-secondary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ai-assist-field textarea {
+  width: 100%;
+  height: auto;
+  min-height: 86px;
+  resize: vertical;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  outline: 2px solid transparent;
+  background: white;
+  color: var(--color-primary);
+  padding: 10px 12px;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 0.94rem;
+  line-height: 1.5;
+}
+
+.ai-assist-feedback-field textarea {
+  min-height: 68px;
+}
+
+.ai-assist-field textarea:focus {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+  outline-color: color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+
+.ai-assist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ai-assist-proposal {
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 34%, var(--color-border));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-accent) 7%, white);
+}
+
+.ai-assist-proposal .section-heading {
+  align-items: flex-start;
+}
+
+.ai-assist-proposal .section-heading strong {
+  color: var(--color-secondary);
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+
+.ai-assist-applied {
+  padding: 10px 12px;
+  border-left: 4px solid var(--color-success);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-success) 9%, white);
+  color: var(--color-primary);
+}
+
+.ai-assist-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ai-assist-chip-list span {
+  padding: 6px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: white;
+  color: var(--color-secondary);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.ai-assist-diff-preview {
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #101820;
+  color: #f7f5f2;
+  font-size: 0.82rem;
+}
+
+.ai-assist-diff-line {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 8px;
+  padding: 2px 10px;
+  white-space: pre-wrap;
+}
+
+.ai-assist-diff-line.added {
+  background: rgba(60, 143, 93, 0.32);
+}
+
+.ai-assist-diff-line.removed {
+  background: rgba(181, 82, 58, 0.3);
+}
+
+.ai-assist-diff-line span {
+  color: rgba(255, 255, 255, 0.7);
+  user-select: none;
+}
+
+.ai-assist-diff-line code {
+  overflow-wrap: anywhere;
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.ai-assist-review-notes {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border-left: 4px solid var(--color-warning);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-warning) 9%, white);
+}
+
+.ai-assist-review-notes summary {
+  color: var(--color-primary);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.ai-assist-review-notes strong {
+  display: block;
+  margin: 6px 0;
+  color: var(--color-primary);
 }
 
 .warning-callout {
