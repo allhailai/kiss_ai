@@ -13,7 +13,6 @@ import { FileTreeNav } from "./FileTreeNav";
 const humanInputPrefix = "inputs_human/";
 const aiInputPrefix = "inputs_ai/";
 const outputPrefix = "outputs_ai/";
-const wikiPrefix = "outputs_ai/wiki/";
 
 export function SimplifiedNavigator({
   currentView,
@@ -41,14 +40,6 @@ export function SimplifiedNavigator({
   const humanInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(humanInputPrefix)), [projectFiles]);
   const aiInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(aiInputPrefix)), [projectFiles]);
   const outputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(outputPrefix)), [projectFiles]);
-  const wikiFiles = useMemo(
-    () =>
-      outputFiles
-        .filter((file) => file.path.startsWith(wikiPrefix))
-        .map((file) => ({ ...file, name: file.name.replace(/^wiki\//, "") })),
-    [outputFiles],
-  );
-  const otherOutputFiles = useMemo(() => outputFiles.filter((file) => !file.path.startsWith(wikiPrefix)), [outputFiles]);
 
   useEffect(() => {
     setExpandedSections((current) => {
@@ -72,11 +63,6 @@ export function SimplifiedNavigator({
 
       return next;
     });
-  }
-
-  function openFirstFileOrView(view: View, files: ProjectFile[]) {
-    const firstFile = files[0];
-    onOpenView(view, firstFile?.path ?? null);
   }
 
   return (
@@ -182,41 +168,13 @@ export function SimplifiedNavigator({
     }
 
     return (
-      <>
-        <button
-          className={currentView === "outputs" && !selectedPath ? "simple-nav-item active" : "simple-nav-item"}
-          onClick={() => onOpenView("outputs")}
-          type="button"
-        >
-          <span>Results</span>
-          <small>{outputPrefix}</small>
-        </button>
-
-        <button
-          className={selectedPath?.startsWith(wikiPrefix) ? "simple-nav-item active" : "simple-nav-item"}
-          onClick={() => openFirstFileOrView("outputs", wikiFiles)}
-          type="button"
-        >
-          <span>Wiki</span>
-          <small>{wikiPrefix}</small>
-        </button>
-        <FileTreeBlock
-          emptyLabel="No wiki Markdown files yet."
-          files={wikiFiles}
-          loading={loading && currentView === "outputs"}
-          onOpenFile={onOpenFile}
-          selectedPath={selectedPath}
-        />
-
-        <div className="simple-nav-subheading">Other results</div>
-        <FileTreeBlock
-          emptyLabel="No other generated Markdown files yet."
-          files={otherOutputFiles}
-          loading={loading && currentView === "outputs"}
-          onOpenFile={onOpenFile}
-          selectedPath={selectedPath}
-        />
-      </>
+      <FileTreeBlock
+        emptyLabel="No generated Markdown files yet."
+        files={outputFiles}
+        loading={loading && currentView === "outputs"}
+        onOpenFile={onOpenFile}
+        selectedPath={selectedPath}
+      />
     );
   }
 }

@@ -61,20 +61,15 @@ export function App() {
   return (
     <main className="app-shell" style={themeStyle}>
       <GlobalFileSearch
+        projectName={workspace.status?.projectName ?? workspace.selectedProject.name}
         projectSlug={workspace.selectedProjectSlug}
         onOpenFile={workspace.openProjectFile}
+        onOpenProjectHome={() => navigateTo("rebuild")}
         onSwitchProject={workspace.clearSelectedProject}
       />
       <ToastViewport toasts={workspace.toasts} onDismiss={workspace.dismissToast} />
 
       <aside className="sidebar">
-        <div className="brand">
-          <span className="eyebrow">kiss_ai lab</span>
-          <button className="home-link" onClick={() => navigateTo("rebuild")}>
-            {workspace.status?.projectName ?? workspace.selectedProject.name}
-          </button>
-        </div>
-
         <SimplifiedNavigator
           currentView={workspace.view}
           loading={workspace.loading}

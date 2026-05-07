@@ -3,12 +3,16 @@ import { api, type ProjectFile } from "../../api";
 import { fileBasename, humanizePathSegment } from "../../domain/files";
 
 export function GlobalFileSearch({
+  projectName,
   projectSlug,
   onOpenFile,
+  onOpenProjectHome,
   onSwitchProject,
 }: {
+  projectName: string;
   projectSlug: string;
   onOpenFile: (path: string) => void;
+  onOpenProjectHome: () => void;
   onSwitchProject: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -97,6 +101,9 @@ export function GlobalFileSearch({
 
   return (
     <header className="global-topbar">
+      <button className="project-header-title" onClick={onOpenProjectHome} type="button">
+        {projectName}
+      </button>
       <div className="global-search" role="search">
         <label className="global-search-label" htmlFor="global-file-search">
           Search files
