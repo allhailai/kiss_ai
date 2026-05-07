@@ -6,13 +6,11 @@ export function Dashboard({
   design,
   onOpenAnnotations,
   onOpenDesign,
-  onRefresh,
 }: {
   status: ProjectStatus | null;
   design: DesignState | null;
   onOpenAnnotations: () => void;
   onOpenDesign: () => void;
-  onRefresh: () => void;
 }) {
   return (
     <div className="panel-stack">
@@ -38,7 +36,6 @@ export function Dashboard({
       <section className="content-card">
         <div className="section-heading">
           <h3>Runtime readiness</h3>
-          <button onClick={onRefresh}>Refresh</button>
         </div>
         <p>
           Cursor SDK rebuilds are{" "}

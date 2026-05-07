@@ -79,7 +79,6 @@ export function RebuildWorkspace({
   onModelChange,
   onStart,
   onResolve,
-  onRefresh,
 }: {
   status: ProjectStatus | null;
   rebuild: RebuildState | null;
@@ -88,7 +87,6 @@ export function RebuildWorkspace({
   onModelChange: (modelId: string) => void;
   onStart: () => void;
   onResolve: (request: { itemId: string; resolutionOptionId?: string; manualPrompt?: string }) => void;
-  onRefresh: () => void;
 }) {
   const [manualItemId, setManualItemId] = useState<string | null>(null);
   const [manualPrompt, setManualPrompt] = useState("");
@@ -119,7 +117,6 @@ export function RebuildWorkspace({
       <section className="content-card">
         <div className="section-heading">
           <h3>Runner status</h3>
-          <button onClick={onRefresh}>Refresh</button>
         </div>
         <p>
           Current state: <strong>{rebuild?.status ?? "idle"}</strong>

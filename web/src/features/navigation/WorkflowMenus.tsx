@@ -132,7 +132,11 @@ export function SimplifiedNavigator({
       return (
         <>
           <button
-            className={currentView === "inputs" && !selectedPath ? "simple-nav-item active" : "simple-nav-item"}
+            className={
+              currentView === "inputs" && !selectedPath
+                ? "simple-nav-item simple-nav-subheader active"
+                : "simple-nav-item simple-nav-subheader"
+            }
             onClick={() => onOpenView("inputs")}
             type="button"
           >
@@ -148,7 +152,11 @@ export function SimplifiedNavigator({
           />
 
           <button
-            className={currentView === "annotations" && !selectedPath ? "simple-nav-item active" : "simple-nav-item"}
+            className={
+              currentView === "annotations" && !selectedPath
+                ? "simple-nav-item simple-nav-subheader active"
+                : "simple-nav-item simple-nav-subheader"
+            }
             onClick={() => onOpenView("annotations")}
             type="button"
           >

@@ -44,7 +44,6 @@ export function App() {
           creatingProject={workspace.creatingProject}
           error={workspace.projectsError}
           onCreateProject={workspace.createProject}
-          onRefresh={() => void workspace.refreshProjects()}
           onSelect={workspace.selectProject}
           projects={workspace.projects}
           projectsRoot={workspace.projectsRoot}
@@ -88,11 +87,6 @@ export function App() {
             buildLog={workspace.buildLog}
             status={workspace.status}
             rebuild={workspace.rebuild}
-            onRefresh={() => {
-              void workspace.refreshBuildLog();
-              void workspace.refreshStatus();
-              void workspace.refreshRebuild();
-            }}
             onSelectSummary={(summaryPath, sectionId) => void workspace.refreshBuildLog(summaryPath, sectionId)}
           />
         ) : null}
@@ -102,7 +96,6 @@ export function App() {
             design={workspace.design}
             onOpenAnnotations={() => navigateTo("annotations")}
             onOpenDesign={() => navigateTo("design")}
-            onRefresh={() => void workspace.refreshStatus()}
           />
         ) : null}
         {fileWorkspace ? (
@@ -145,11 +138,6 @@ export function App() {
             onModelChange={workspace.setSelectedRebuildModelId}
             onStart={() => void workspace.startRebuild()}
             onResolve={(request) => void workspace.resolveHumanAttention(request)}
-            onRefresh={() => {
-              void workspace.refreshRebuild();
-              void workspace.refreshStatus();
-              void workspace.refreshRebuildModels();
-            }}
           />
         ) : null}
         {autoUpdateOpen && selectedAutoUpdatePath ? (

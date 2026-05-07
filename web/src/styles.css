@@ -263,8 +263,6 @@ button:disabled {
   justify-content: space-between;
   gap: 6px;
   padding: 6px 8px;
-  border: 1px solid transparent;
-  border-radius: 10px;
   background: transparent;
   color: var(--color-primary);
   text-align: left;
@@ -306,8 +304,8 @@ button:disabled {
 
 .nav-section.active .nav-section-trigger,
 .nav-section-trigger:hover {
-  border-color: color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
   background: color-mix(in srgb, var(--color-accent) 8%, white);
+  color: var(--color-accent);
 }
 
 .nav-section-body {
@@ -329,6 +327,25 @@ button:disabled {
   font-size: 0.9rem;
   line-height: 1.18;
   text-align: left;
+}
+
+.simple-nav-subheader {
+  margin-top: 4px;
+  padding: 6px 0 4px;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-secondary) 22%, var(--color-border));
+  background: transparent;
+}
+
+.simple-nav-subheader span {
+  font-weight: 800;
+}
+
+.simple-nav-item.simple-nav-subheader.active,
+.simple-nav-item.simple-nav-subheader:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 46%, var(--color-border));
+  background: transparent;
 }
 
 .simple-nav-item.active,
@@ -577,6 +594,7 @@ button:disabled {
   grid-row: 2;
   grid-column: 2;
   min-width: 0;
+  min-height: 0;
   padding: 24px;
 }
 
@@ -879,7 +897,8 @@ button:disabled {
 }
 
 .document-workspace {
-  height: calc(100vh - 64px);
+  height: 100%;
+  min-height: calc(100vh - 112px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;

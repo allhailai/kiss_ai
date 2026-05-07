@@ -16,7 +16,6 @@ export function ProjectPicker({
   projects,
   projectsRoot,
   onCreateProject,
-  onRefresh,
   onSelect,
 }: {
   creatingProject: boolean;
@@ -24,7 +23,6 @@ export function ProjectPicker({
   projects: ProjectSummary[];
   projectsRoot: string;
   onCreateProject: (name: string, slug?: string) => Promise<void>;
-  onRefresh: () => void;
   onSelect: (projectSlug: string) => void;
 }) {
   const [projectName, setProjectName] = useState("");
@@ -108,9 +106,6 @@ export function ProjectPicker({
 
       <div className="section-heading">
         <h2>Available projects</h2>
-        <button onClick={onRefresh} type="button">
-          Refresh
-        </button>
       </div>
 
       {error ? (

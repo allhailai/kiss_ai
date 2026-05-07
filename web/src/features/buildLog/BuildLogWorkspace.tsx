@@ -92,13 +92,11 @@ export function BuildLogWorkspace({
   buildLog,
   status,
   rebuild,
-  onRefresh,
   onSelectSummary,
 }: {
   buildLog: BuildLogState | null;
   status: ProjectStatus | null;
   rebuild: RebuildState | null;
-  onRefresh: () => void;
   onSelectSummary: (summaryPath: string, sectionId?: string | null) => void;
 }) {
   const selectedSummary = buildLog?.selectedSummary ?? null;
@@ -146,9 +144,6 @@ export function BuildLogWorkspace({
             <h3>{selectedSummary ? "Selected Build Summary" : "Latest Build Summary"}</h3>
             {visibleSummary ? <p>{visibleSummary.path}</p> : null}
           </div>
-          <button onClick={onRefresh} type="button">
-            Refresh
-          </button>
         </div>
         <MarkdownBlock content={visibleSummary?.content ?? ""} />
       </section>
