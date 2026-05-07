@@ -71,6 +71,19 @@ function optionLabel(option: ResolutionOption) {
   return `${option.recommended ? "Recommended: " : ""}${option.label || option.id}`;
 }
 
+function CopyableValue({ value }: { value: string }) {
+  const copyValue = () => {
+    void navigator.clipboard?.writeText(value);
+  };
+
+  return (
+    <span className="copyable-value">
+      <code>{value}</code>
+      <button aria-label={`Copy ${value}`} onClick={copyValue} title={`Copy ${value}`} type="button" />
+    </span>
+  );
+}
+
 export function RebuildWorkspace({
   status,
   rebuild,
@@ -114,51 +127,62 @@ export function RebuildWorkspace({
         <p>The backend starts one local Cursor SDK agent from the project root and asks it to follow the project rebuild command.</p>
       </header>
 
-      <section className="content-card">
-        <div className="section-heading">
+      <section className="content-card rebuild-status-card">
+        <div className="section-heading rebuild-status-heading">
           <h3>Runner status</h3>
-        </div>
-        <p>
-          Current state: <strong>{rebuild?.status ?? "idle"}</strong>
-        </p>
-        <label className="rebuild-model-field">
-          <span>AI Model</span>
-          <select
-            disabled={Boolean(rebuild?.running) || !status?.cursorApiKeyAvailable || !models.length}
-            onChange={(event) => onModelChange(event.target.value)}
-            value={selectedModelId}
-          >
-            {models.length ? (
-              modelTierOrder.map((tier) => {
-                const tierModels = models
-                  .filter((model) => model.tier === tier)
-                  .sort((left, right) =>
-                    (left.displayName || left.id).localeCompare(right.displayName || right.id, undefined, { sensitivity: "base" }),
-                  );
-                if (!tierModels.length) return null;
-
-                return (
-                  <optgroup key={tier} label={modelTierLabels[tier]}>
-                    {tierModels.map((model) => (
-                      <option key={model.id} value={model.id}>
-                        {formatModelLabel(model)}
-                      </option>
-                    ))}
-                  </optgroup>
-                );
-              })
-            ) : (
-              <option value="">No models loaded</option>
-            )}
-          </select>
-        </label>
-        {selectedModel ? (
-          <p className="rebuild-model-note">
-            Selected model: <strong>{formatModelLabel(selectedModel)}</strong> · {modelTierLabels[selectedModel.tier]}
-            {selectedModel.description ? ` - ${selectedModel.description}` : ""}
+          <p>
+            Current state: <strong>{rebuild?.status ?? "idle"}</strong>
           </p>
-        ) : null}
-        <p>{rebuild?.message ?? "No rebuild state loaded."}</p>
+        </div>
+
+        <div className="rebuild-status-controls">
+          <label className="rebuild-model-field">
+            <span>AI Model</span>
+            <select
+              disabled={Boolean(rebuild?.running) || !status?.cursorApiKeyAvailable || !models.length}
+              onChange={(event) => onModelChange(event.target.value)}
+              value={selectedModelId}
+            >
+              {models.length ? (
+                modelTierOrder.map((tier) => {
+                  const tierModels = models
+                    .filter((model) => model.tier === tier)
+                    .sort((left, right) =>
+                      (left.displayName || left.id).localeCompare(right.displayName || right.id, undefined, { sensitivity: "base" }),
+                    );
+                  if (!tierModels.length) return null;
+
+                  return (
+                    <optgroup key={tier} label={modelTierLabels[tier]}>
+                      {tierModels.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {formatModelLabel(model)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })
+              ) : (
+                <option value="">No models loaded</option>
+              )}
+            </select>
+          </label>
+
+          <button disabled={startDisabled} onClick={onStart}>
+            {rebuild?.running ? "Rebuild Running" : "Start Rebuild"}
+          </button>
+        </div>
+
+        <div className="rebuild-status-copy">
+          {selectedModel ? (
+            <p className="rebuild-model-note">
+              <strong>{formatModelLabel(selectedModel)}</strong> · {modelTierLabels[selectedModel.tier]}
+              {selectedModel.description ? ` - ${selectedModel.description}` : ""}
+            </p>
+          ) : null}
+          <p>{rebuild?.message ?? "No rebuild state loaded."}</p>
+        </div>
+
         {rebuild?.status === "finished_with_attention" || status?.humanAttentionCount ? (
           <div className="warning-callout">
             <strong>Human attention needed</strong>
@@ -245,9 +269,6 @@ export function RebuildWorkspace({
             ) : null}
           </div>
         ) : null}
-        <button disabled={startDisabled} onClick={onStart}>
-          {rebuild?.running ? "Rebuild Running" : "Start Rebuild"}
-        </button>
         {!status?.cursorApiKeyAvailable ? (
           <p className="lint-warning">
             Add a Cursor API key using `CURSOR_API_KEY`, `web/.env`, or macOS Keychain item `cursor_api_key` to enable
@@ -270,20 +291,12 @@ export function RebuildWorkspace({
         ) : null}
       </section>
 
-      <section className="content-card">
+      <section className="content-card rebuild-runner-card">
         <h3>Runner details</h3>
         <div className="rebuild-runner-grid">
           <div>
             <span>Status</span>
             <strong>{rebuild?.status ?? "idle"}</strong>
-          </div>
-          <div>
-            <span>Cursor SDK agent</span>
-            <strong>{rebuild?.agentId ?? "Not created yet"}</strong>
-          </div>
-          <div>
-            <span>Run ID</span>
-            <strong>{rebuild?.runId ?? "Not started yet"}</strong>
           </div>
           <div>
             <span>Model</span>
@@ -301,15 +314,20 @@ export function RebuildWorkspace({
             <span>Last update</span>
             <strong>{formatLocalDateTime(latestLogTimestamp)}</strong>
           </div>
-          <div>
-            <span>Project binding</span>
-            <strong>One persisted runner state per project</strong>
-          </div>
         </div>
-        <p className="rebuild-runner-note">
-          Starting rebuilds in different projects creates separate Cursor SDK agents. This page shows the agent and run IDs tied to
-          the selected project.
+
+        <p className="rebuild-technical-details">
+          <span>
+            Project binding: <CopyableValue value="One persisted runner state per project" />
+          </span>
+          <span>
+            Run ID: <CopyableValue value={rebuild?.runId ?? "Not started yet"} />
+          </span>
+          <span>
+            Cursor SDK agent: <CopyableValue value={rebuild?.agentId ?? "Not created yet"} />
+          </span>
         </p>
+
         <div className="rebuild-latest-log">
           <span>Latest runner message</span>
           <p>{getLatestLogText(latestLogEntry)}</p>

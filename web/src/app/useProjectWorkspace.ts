@@ -101,7 +101,9 @@ export function useProjectWorkspace() {
   }, [requireSelectedProjectSlug]);
 
   const refreshRebuild = useCallback(async () => {
-    setRebuild(await api.rebuildState(requireSelectedProjectSlug()));
+    const next = await api.rebuildState(requireSelectedProjectSlug());
+    setRebuild(next);
+    return next;
   }, [requireSelectedProjectSlug]);
 
   const refreshRebuildModels = useCallback(async () => {
@@ -153,12 +155,13 @@ export function useProjectWorkspace() {
         setSelected(null);
         setSelectedDiff(null);
         setDraft("");
+        await refreshProjectFiles();
         setNotice(error instanceof Error ? error.message : "Could not open the selected file.");
       } finally {
         setLoading(false);
       }
     },
-    [requireSelectedProjectSlug, setNotice],
+    [refreshProjectFiles, requireSelectedProjectSlug, setNotice],
   );
 
   const applyRoute = useCallback(
@@ -416,12 +419,19 @@ export function useProjectWorkspace() {
     if (!rebuild?.running) return;
 
     const interval = window.setInterval(() => {
-      void refreshRebuild();
-      void refreshStatus();
+      void (async () => {
+        const next = await refreshRebuild();
+        void refreshStatus();
+
+        if (!next.running && ["finished", "finished_with_attention", "error", "blocked", "interrupted"].includes(next.status)) {
+          void refreshBuildLog();
+          void refreshProjectFiles();
+        }
+      })();
     }, 2500);
 
     return () => window.clearInterval(interval);
-  }, [rebuild?.running, refreshRebuild, refreshStatus]);
+  }, [rebuild?.running, refreshBuildLog, refreshProjectFiles, refreshRebuild, refreshStatus]);
 
   useEffect(() => {
     if (!selectedProjectSlug || !rebuild?.running || typeof EventSource === "undefined") return;
@@ -439,6 +449,7 @@ export function useProjectWorkspace() {
           if (!next.running && ["finished", "finished_with_attention", "error", "blocked", "interrupted"].includes(next.status)) {
             void refreshStatus();
             void refreshBuildLog();
+          void refreshProjectFiles();
           }
         }
       } catch {
@@ -453,7 +464,7 @@ export function useProjectWorkspace() {
     };
 
     return () => eventSource.close();
-  }, [rebuild?.running, refreshBuildLog, refreshStatus, selectedProjectSlug]);
+  }, [rebuild?.running, refreshBuildLog, refreshProjectFiles, refreshStatus, selectedProjectSlug]);
 
   return {
     view,

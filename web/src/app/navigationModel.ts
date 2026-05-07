@@ -15,10 +15,10 @@ export type SimplifiedNavSection = {
 };
 
 export const simplifiedNavSections: SimplifiedNavSection[] = [
-  { id: "define", label: "(1) Define the requirements" },
-  { id: "build", label: "(2) Build the project" },
-  { id: "source-data", label: "(3) Source data view" },
-  { id: "results", label: "(4) Information built" },
+  { id: "define", label: "1) Define the requirements" },
+  { id: "build", label: "2) Build the project" },
+  { id: "source-data", label: "3) Source data view" },
+  { id: "results", label: "4) Information built" },
 ];
 
 export const requirementNavLeaves: SimplifiedNavLeaf[] = [
