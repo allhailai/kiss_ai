@@ -28,12 +28,11 @@ export function ProjectPicker({
   onSelect: (projectSlug: string) => void;
 }) {
   const [projectName, setProjectName] = useState("");
-  const [projectSlug, setProjectSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
   const [createError, setCreateError] = useState("");
   const derivedSlug = useMemo(() => slugifyProjectName(projectName), [projectName]);
-  const selectedSlug = slugTouched ? projectSlug.trim() : derivedSlug;
+  const selectedSlug = derivedSlug;
   const slugIsValid = !selectedSlug || /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(selectedSlug);
+  const projectNameIsTaken = projects.some((project) => project.slug === selectedSlug);
   const canCreate = Boolean(projectName.trim() && selectedSlug && slugIsValid && !creatingProject);
 
   const submitProject = async (event: FormEvent<HTMLFormElement>) => {
@@ -50,11 +49,15 @@ export function ProjectPicker({
       return;
     }
 
+    if (projectNameIsTaken) {
+      setCreateError("That project name is taken. Please use another one.");
+      return;
+    }
+
     try {
       await onCreateProject(projectName.trim(), selectedSlug);
       setProjectName("");
-      setProjectSlug("");
-      setSlugTouched(false);
+      setCreateError("");
     } catch (submitError) {
       setCreateError(submitError instanceof Error ? submitError.message : "Could not create the project.");
     }
@@ -63,27 +66,23 @@ export function ProjectPicker({
   return (
     <section className="project-picker">
       <div className="project-picker-header">
-        <span className="eyebrow">kiss_ai projects</span>
-        <h1>Select a project</h1>
-        <p>Choose an existing project under the projects folder to open the same workspace tools used by this lab.</p>
+        <h1>Projects</h1>
         {projectsRoot ? <code>{projectsRoot}</code> : null}
       </div>
 
       <form className="project-create-panel" onSubmit={submitProject}>
         <div>
           <span className="eyebrow">new project</span>
-          <h2>Build a new project</h2>
-          <p>Create a sibling project from the shared template, initialize Git, and open it in this workspace.</p>
         </div>
 
-        <label>
-          Project name
+        <label className="project-name-field">
+          <span>Project Name:</span>
           <input
             autoComplete="off"
             disabled={creatingProject}
             onChange={(event) => {
               setProjectName(event.target.value);
-              if (!slugTouched) setProjectSlug(slugifyProjectName(event.target.value));
+              setCreateError("");
             }}
             placeholder="Clinical Protocol Review"
             required
@@ -92,29 +91,14 @@ export function ProjectPicker({
           />
         </label>
 
-        <label>
-          Folder name
-          <input
-            autoComplete="off"
-            disabled={creatingProject}
-            onChange={(event) => {
-              setSlugTouched(true);
-              setProjectSlug(event.target.value);
-            }}
-            placeholder="clinical_protocol_review"
-            type="text"
-            value={selectedSlug}
-          />
-        </label>
+        <div className="project-create-actions">
+          <button disabled={!canCreate} type="submit">
+            {creatingProject ? "Building..." : "Build"}
+          </button>
+        </div>
 
         {!slugIsValid ? <p className="field-error">Use only letters, numbers, underscores, or hyphens.</p> : null}
         {createError ? <p className="field-error">{createError}</p> : null}
-
-        <div className="project-create-actions">
-          <button disabled={!canCreate} type="submit">
-            {creatingProject ? "Building project..." : "Build new project"}
-          </button>
-        </div>
       </form>
 
       <div className="section-heading">

@@ -169,7 +169,7 @@ button:disabled {
   grid-column: 1;
   border-right: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-surface) 92%, var(--color-background));
-  padding: 22px;
+  padding: 10px 12px;
   min-height: 0;
   overflow: auto;
 }
@@ -242,13 +242,13 @@ button:disabled {
 
 .simple-nav {
   display: grid;
-  gap: 12px;
+  gap: 5px;
 }
 
 .nav-section {
   display: grid;
-  gap: 8px;
-  padding-bottom: 12px;
+  gap: 4px;
+  padding-bottom: 5px;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -261,10 +261,10 @@ button:disabled {
   display: flex;
   align-items: start;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px;
+  gap: 6px;
+  padding: 6px 8px;
   border: 1px solid transparent;
-  border-radius: 14px;
+  border-radius: 10px;
   background: transparent;
   color: var(--color-primary);
   text-align: left;
@@ -286,13 +286,13 @@ button:disabled {
 .simple-nav-item small,
 .simple-nav-state {
   color: var(--color-secondary);
-  font-size: 0.78rem;
-  line-height: 1.35;
+  font-size: 0.72rem;
+  line-height: 1.2;
 }
 
 .nav-section-trigger b {
   color: var(--color-secondary);
-  font-size: 1rem;
+  font-size: 0.95rem;
   line-height: 1;
 }
 
@@ -304,21 +304,22 @@ button:disabled {
 
 .nav-section-body {
   display: grid;
-  gap: 7px;
-  padding-left: 12px;
+  gap: 2px;
+  padding-left: 8px;
   border-left: 2px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
 }
 
 .simple-nav-item {
   width: 100%;
   display: grid;
-  gap: 4px;
-  padding: 10px 12px;
+  gap: 2px;
+  padding: 4px 6px;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: 9px;
   background: var(--color-surface);
   color: var(--color-primary);
-  line-height: 1.25;
+  font-size: 0.9rem;
+  line-height: 1.18;
   text-align: left;
 }
 
@@ -330,11 +331,11 @@ button:disabled {
 
 .simple-nav-children {
   display: grid;
-  gap: 6px;
+  gap: 2px;
 }
 
 .simple-nav-child {
-  padding: 9px 11px;
+  padding: 4px 6px;
 }
 
 .simple-nav-subheading {
@@ -348,7 +349,8 @@ button:disabled {
 
 .simple-nav-state {
   margin: 0;
-  padding: 8px 10px;
+  font-size: 0.86rem;
+  padding: 4px 6px;
 }
 
 .context-nav {
@@ -517,7 +519,7 @@ button:disabled {
 .file-tree-node,
 .file-tree-children {
   display: grid;
-  gap: 4px;
+  gap: 1px;
   min-width: 0;
 }
 
@@ -527,12 +529,13 @@ button:disabled {
   display: grid;
   grid-template-columns: 0.75rem minmax(0, 1fr);
   align-items: start;
-  gap: 5px;
-  padding: 8px 10px 8px calc(8px + (var(--tree-depth, 0) * 8px));
+  gap: 4px;
+  padding: 3px 5px 3px calc(5px + (var(--tree-depth, 0) * 5px));
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   color: var(--color-primary);
+  font-size: 0.86rem;
   text-align: left;
 }
 
@@ -543,7 +546,7 @@ button:disabled {
 
 .file-tree-file {
   background: var(--color-surface);
-  line-height: 1.25;
+  line-height: 1.18;
 }
 
 .file-tree-label {
@@ -1826,63 +1829,51 @@ button:disabled {
 
 .project-picker-shell {
   display: block;
-  padding: clamp(24px, 5vw, 72px);
+  padding: 18px 24px;
 }
 
 .project-picker {
-  width: min(980px, 100%);
+  width: min(1100px, 100%);
   margin: 0 auto;
   display: grid;
-  gap: 24px;
+  gap: 14px;
 }
 
 .project-picker-header {
-  display: grid;
-  gap: 10px;
-  padding: 28px;
-  border: 1px solid var(--color-border);
-  border-radius: 24px;
-  background: var(--color-surface);
-  box-shadow: 0 20px 50px rgba(23, 32, 42, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 34px;
 }
 
 .project-picker-header h1 {
   margin: 0;
-  font-size: clamp(2rem, 5vw, 4rem);
-  line-height: 1;
-}
-
-.project-picker-header p {
-  max-width: 680px;
-  margin: 0;
-  color: var(--color-secondary);
-  line-height: 1.6;
+  font-size: 1.4rem;
+  line-height: 1.1;
 }
 
 .project-picker-header code {
-  width: fit-content;
+  width: auto;
   max-width: 100%;
   overflow-wrap: anywhere;
-  padding: 6px 8px;
+  padding: 4px 7px;
   border-radius: 8px;
   background: color-mix(in srgb, var(--color-background) 80%, white);
   color: var(--color-secondary);
+  font-size: 0.78rem;
 }
 
 .project-create-panel {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(180px, 260px) minmax(180px, 260px) auto;
-  align-items: end;
-  gap: 14px;
-  padding: 20px;
+  grid-template-columns: auto minmax(280px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
   border: 1px solid var(--color-border);
-  border-radius: 20px;
+  border-radius: 14px;
   background: color-mix(in srgb, var(--color-surface) 86%, var(--color-background));
-  box-shadow: 0 12px 32px rgba(23, 32, 42, 0.06);
-}
-
-.project-create-panel h2 {
-  margin: 4px 0 6px;
+  box-shadow: 0 8px 20px rgba(23, 32, 42, 0.05);
 }
 
 .project-create-panel p {
@@ -1893,20 +1884,28 @@ button:disabled {
 
 .project-create-panel label {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   color: var(--color-secondary);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
+.project-name-field {
+  grid-template-columns: auto minmax(220px, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  align-self: center;
+  text-transform: none;
+}
+
 .project-create-panel input {
   width: 100%;
   min-width: 0;
-  padding: 11px 12px;
+  padding: 8px 10px;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: 10px;
   outline: 2px solid transparent;
   background: white;
   color: var(--color-primary);
@@ -1924,39 +1923,44 @@ button:disabled {
 }
 
 .project-create-actions button {
-  min-height: 42px;
+  min-height: 34px;
   white-space: nowrap;
-  padding: 11px 14px;
-  border-radius: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
   background: var(--color-accent);
   color: white;
   font-weight: 800;
 }
 
 .field-error {
-  grid-column: 2 / -1;
+  grid-column: 1 / -1;
   color: #9f2d20 !important;
   font-weight: 700;
+  text-align: center;
 }
 
 .project-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .project-card {
-  min-height: 170px;
+  min-height: 0;
   display: grid;
   align-content: start;
-  gap: 8px;
-  padding: 18px;
+  gap: 0;
+  padding: 12px;
   border: 1px solid var(--color-border);
-  border-radius: 18px;
+  border-radius: 14px;
   background: var(--color-surface);
   color: var(--color-primary);
   text-align: left;
-  box-shadow: 0 10px 28px rgba(23, 32, 42, 0.06);
+  box-shadow: 0 8px 18px rgba(23, 32, 42, 0.05);
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    transform 200ms ease;
 }
 
 .project-card:hover,
@@ -1964,16 +1968,42 @@ button:disabled {
   border-color: color-mix(in srgb, var(--color-accent) 48%, var(--color-border));
   outline: 2px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
   outline-offset: 2px;
+  box-shadow: 0 12px 24px rgba(23, 32, 42, 0.08);
 }
 
 .project-card strong {
-  font-size: 1.2rem;
+  font-size: 1rem;
+  margin-top: 5px;
 }
 
-.project-card span:not(.eyebrow),
-.project-card small {
+.project-card span:not(.eyebrow) {
   color: var(--color-secondary);
+  font-size: 0.72rem;
+  line-height: 1.2;
+  margin-top: 5px;
   overflow-wrap: anywhere;
+}
+
+.project-card small {
+  color: color-mix(in srgb, var(--color-secondary) 72%, transparent);
+  font-size: 0.62rem;
+  line-height: 1.15;
+  margin-top: 0;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  transition:
+    margin-top 200ms ease,
+    max-height 200ms ease,
+    opacity 200ms ease;
+}
+
+.project-card:hover small,
+.project-card:focus-visible small {
+  margin-top: 5px;
+  max-height: 5rem;
+  opacity: 1;
 }
 
 @media (max-width: 980px) {
