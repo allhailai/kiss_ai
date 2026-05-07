@@ -39,7 +39,7 @@ function findAssistCandidates(content: string) {
   return content
     .split("\n")
     .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
-    .filter(({ line }) => /\b(TODO|AI Assist|FIXME|TBD)\b|^\s*[-*]\s+\[[ ?]\]/i.test(line))
+    .filter(({ line }) => /\b(TODO|AI (File )?Assist|FIXME|TBD)\b|^\s*[-*]\s+\[[ ?]\]/i.test(line))
     .slice(0, 6);
 }
 
@@ -184,7 +184,7 @@ export function AiAssistPanel({
       setFeedback("");
       setOpen(true);
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : "AI Assist could not generate a proposal.");
+      onNotice(error instanceof Error ? error.message : "AI File Assist could not generate a proposal.");
     } finally {
       setLoading(false);
     }
@@ -193,14 +193,14 @@ export function AiAssistPanel({
   const applyProposal = () => {
     if (!proposal) return;
     if (staleProposal) {
-      onNotice("The saved file changed after this proposal was generated. Refresh AI Assist before applying.");
+      onNotice("The saved file changed after this proposal was generated. Refresh AI File Assist before applying.");
       return;
     }
 
     onApplyDraft(proposal.proposedContent);
     setApplied(true);
     setOpen(false);
-    onNotice("AI Assist applied the proposal to the unsaved editor draft. Review and save when ready.");
+    onNotice("AI File Assist applied the proposal to the unsaved editor draft. Review and save when ready.");
   };
 
   const cancelAssist = () => {
@@ -215,19 +215,19 @@ export function AiAssistPanel({
       <div className="ai-assist-header">
         {open ? (
           <div>
-            <span className="eyebrow">AI Assist</span>
+            <span className="eyebrow">AI File Assist</span>
             <h3>Expand notes into requirement edits</h3>
           </div>
         ) : null}
         <button className="ai-assist-trigger" onClick={() => setOpen((isOpen) => !isOpen)} type="button">
-          {open ? "Collapse" : "AI Assist"}
+          {open ? "Collapse" : "AI File Assist"}
         </button>
       </div>
 
       {open ? (
         <div className="ai-assist-body">
           <p>
-            Ask AI Assist to reason across this requirement file. It will propose changes first; Apply only updates the unsaved editor draft.
+            Ask AI File Assist to reason across this requirement file. It will propose changes first; Apply only updates the unsaved editor draft.
           </p>
 
           <label className="ai-assist-field ai-assist-feedback-field">
@@ -236,8 +236,8 @@ export function AiAssistPanel({
               onChange={(event) => setFeedback(event.target.value)}
               placeholder={
                 proposal
-                  ? "Tell AI Assist what to adjust, then regenerate the proposal. This feedback is not saved."
-                  : "Optional. Tell AI Assist what to focus on. Leave blank to expand on the annotations and file."
+                  ? "Tell AI File Assist what to adjust, then regenerate the proposal. This feedback is not saved."
+                  : "Optional. Tell AI File Assist what to focus on. Leave blank to expand on the annotations and file."
               }
               value={feedback}
             />
@@ -282,7 +282,7 @@ export function AiAssistPanel({
                 </div>
               ) : null}
 
-              <div className="ai-assist-diff-preview" aria-label="AI Assist proposal diff preview">
+              <div className="ai-assist-diff-preview" aria-label="AI File Assist proposal diff preview">
                 {previewEntries.map((entry, index) => (
                   <div className={`ai-assist-diff-line ${entry.type}`} key={`${index}-${entry.type}`}>
                     <span>{entry.type === "added" ? "+" : entry.type === "removed" ? "-" : " "}</span>

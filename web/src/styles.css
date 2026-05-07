@@ -175,6 +175,7 @@ button:disabled {
   font-size: 1.8rem;
   font-weight: 800;
   text-align: left;
+  overflow-wrap: anywhere;
 }
 
 .home-link:hover {
@@ -240,6 +241,117 @@ button:disabled {
 .nav-item.active span,
 .nav-item:hover span {
   color: rgba(255, 255, 255, 0.76);
+}
+
+.simple-nav {
+  display: grid;
+  gap: 12px;
+}
+
+.nav-section {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.nav-section:last-child {
+  border-bottom: 0;
+}
+
+.nav-section-trigger {
+  width: 100%;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--color-primary);
+  text-align: left;
+}
+
+.nav-section-trigger span,
+.simple-nav-item span {
+  min-width: 0;
+}
+
+.nav-section-trigger strong,
+.nav-section-trigger small,
+.simple-nav-item span,
+.simple-nav-item small {
+  display: block;
+}
+
+.nav-section-trigger small,
+.simple-nav-item small,
+.simple-nav-state {
+  color: var(--color-secondary);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.nav-section-trigger b {
+  color: var(--color-secondary);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.nav-section.active .nav-section-trigger,
+.nav-section-trigger:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 8%, white);
+}
+
+.nav-section-body {
+  display: grid;
+  gap: 7px;
+}
+
+.simple-nav-item {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  line-height: 1.25;
+  text-align: left;
+}
+
+.simple-nav-item.active,
+.simple-nav-item:hover {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, white);
+}
+
+.simple-nav-children {
+  display: grid;
+  gap: 6px;
+  padding-left: 12px;
+  border-left: 2px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
+}
+
+.simple-nav-child {
+  padding: 9px 11px;
+}
+
+.simple-nav-subheading {
+  margin-top: 4px;
+  color: var(--color-secondary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.simple-nav-state {
+  margin: 0;
+  padding: 8px 10px;
 }
 
 .context-nav {

@@ -127,7 +127,7 @@ export function RequirementsAutoUpdateModal({
       setProposal(response.proposals);
       setPhase("review");
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : "AI Auto Update could not generate a proposal.");
+      onNotice(error instanceof Error ? error.message : "Align Files with AI could not generate a proposal.");
     } finally {
       setLoading(false);
     }
@@ -147,10 +147,10 @@ export function RequirementsAutoUpdateModal({
       });
       const writtenPaths = response.files.map((file) => file.path).filter(isRequirementAutoUpdatePath);
       await onAccepted(writtenPaths);
-      onNotice(`AI Auto Update wrote ${writtenPaths.length.toLocaleString()} requirement file${writtenPaths.length === 1 ? "" : "s"}.`);
+      onNotice(`Align Files with AI wrote ${writtenPaths.length.toLocaleString()} requirement file${writtenPaths.length === 1 ? "" : "s"}.`);
       onClose();
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : "AI Auto Update could not accept the proposal.");
+      onNotice(error instanceof Error ? error.message : "Align Files with AI could not accept the proposal.");
     } finally {
       setAccepting(false);
     }
@@ -161,7 +161,7 @@ export function RequirementsAutoUpdateModal({
       <section aria-labelledby="requirements-auto-update-title" aria-modal="true" className="requirements-auto-update-modal" role="dialog">
         <header className="requirements-auto-update-header">
           <div>
-            <span className="eyebrow">AI Auto Update</span>
+            <span className="eyebrow">Align Files with AI</span>
             <h2 id="requirements-auto-update-title">{phase === "review" ? "Review And Accept" : "Generate Proposal"}</h2>
             <p>
               Source of recent intent: <strong>{sourcePath}</strong>
@@ -174,7 +174,7 @@ export function RequirementsAutoUpdateModal({
 
         <div className="requirements-auto-update-body">
           {hasUnsavedSourceChanges ? (
-            <div className="warning-callout">The open source file has unsaved editor changes. AI Auto Update reads the saved file content.</div>
+            <div className="warning-callout">The open source file has unsaved editor changes. Align Files with AI reads the saved file content.</div>
           ) : null}
 
           <div className="requirements-auto-update-files">
@@ -281,7 +281,7 @@ export function RequirementsAutoUpdateModal({
                       </div>
                     ) : null}
 
-                    <div className="ai-assist-diff-preview" aria-label={`AI Auto Update proposal diff preview for ${item.filePath}`}>
+                    <div className="ai-assist-diff-preview" aria-label={`Align Files with AI proposal diff preview for ${item.filePath}`}>
                       {previewEntries.map((entry, index) => (
                         <div className={`ai-assist-diff-line ${entry.type}`} key={`${index}-${entry.type}`}>
                           <span>{entry.type === "added" ? "+" : entry.type === "removed" ? "-" : " "}</span>

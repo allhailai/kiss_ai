@@ -7,7 +7,7 @@ import { Dashboard } from "../features/dashboard/Dashboard";
 import { DesignWorkspace } from "../features/design/DesignWorkspace";
 import { FileWorkspace } from "../features/files/FileWorkspace";
 import { isRequirementAutoUpdatePath, RequirementsAutoUpdateModal } from "../features/files/RequirementsAutoUpdateModal";
-import { ContextualNavigator, MainWorkflowMenu } from "../features/navigation/WorkflowMenus";
+import { SimplifiedNavigator } from "../features/navigation/WorkflowMenus";
 import { ProjectPicker } from "../features/projectPicker/ProjectPicker";
 import { RebuildWorkspace } from "../features/rebuild/RebuildWorkspace";
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
@@ -70,27 +70,21 @@ export function App() {
       <aside className="sidebar">
         <div className="brand">
           <span className="eyebrow">kiss_ai lab</span>
-          <button className="home-link" onClick={() => navigateTo("build-log")}>
+          <button className="home-link" onClick={() => navigateTo("rebuild")}>
             {workspace.status?.projectName ?? workspace.selectedProject.name}
           </button>
         </div>
 
-        {workspace.view === "build-log" || workspace.view === "dashboard" ? (
-          <MainWorkflowMenu currentView={workspace.view} onOpen={(nextView) => navigateTo(nextView)} />
-        ) : (
-          <ContextualNavigator
-            currentView={workspace.view}
-            files={workspace.files}
-            loading={workspace.loading}
-            menuOpen={workspace.workflowMenuOpen}
-            selectedPath={workspace.selected?.path ?? null}
-            showAiAutoUpdate={Boolean(selectedAutoUpdatePath)}
-            onToggleMenu={() => workspace.setWorkflowMenuOpen((isOpen) => !isOpen)}
-            onAiAutoUpdate={() => setAutoUpdateOpen(true)}
-            onOpenView={(nextView) => navigateTo(nextView)}
-            onSelectFile={(path) => navigateTo(workspace.view, path)}
-          />
-        )}
+        <SimplifiedNavigator
+          currentView={workspace.view}
+          loading={workspace.loading}
+          projectFiles={workspace.projectFiles}
+          selectedPath={workspace.selected?.path ?? null}
+          showAiAutoUpdate={Boolean(selectedAutoUpdatePath)}
+          onAiAutoUpdate={() => setAutoUpdateOpen(true)}
+          onOpenFile={workspace.openProjectFile}
+          onOpenView={(nextView, filePath) => navigateTo(nextView, filePath)}
+        />
       </aside>
 
       <section className="workspace">

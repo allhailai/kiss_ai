@@ -1,118 +1,253 @@
-import { requirementsExplainer, views, workflowMenuViews, type View } from "../../app/views";
+import { useEffect, useMemo, useState } from "react";
+import {
+  openQuestionsNavLeaf,
+  requirementNavLeaves,
+  sectionForView,
+  simplifiedNavSections,
+  type SimplifiedNavSectionId,
+} from "../../app/navigationModel";
+import { type View } from "../../app/views";
 import type { ProjectFile } from "../../api";
-import { humanizePathSegment } from "../../domain/files";
 import { FileTreeNav } from "./FileTreeNav";
 
-export function MainWorkflowMenu({
-  currentView,
-  onOpen,
-}: {
-  currentView: View;
-  onOpen: (view: View) => void;
-}) {
-  return (
-    <nav className="nav-list" aria-label="Main workflows">
-      {workflowMenuViews.map((item) => (
-        <button className={item.id === currentView ? "nav-item active" : "nav-item"} key={item.id} onClick={() => onOpen(item.id)}>
-          <strong>{item.label}</strong>
-          <span>{item.description}</span>
-        </button>
-      ))}
-    </nav>
-  );
-}
+const humanInputPrefix = "inputs_human/";
+const aiInputPrefix = "inputs_ai/";
+const outputPrefix = "outputs_ai/";
+const wikiPrefix = "outputs_ai/wiki/";
 
-export function ContextualNavigator({
+export function SimplifiedNavigator({
   currentView,
-  files,
+  projectFiles,
   loading,
-  menuOpen,
   selectedPath,
   showAiAutoUpdate,
   onAiAutoUpdate,
-  onToggleMenu,
   onOpenView,
-  onSelectFile,
+  onOpenFile,
 }: {
   currentView: View;
-  files: ProjectFile[];
+  projectFiles: ProjectFile[];
   loading: boolean;
-  menuOpen: boolean;
   selectedPath: string | null;
   showAiAutoUpdate?: boolean;
   onAiAutoUpdate?: () => void;
-  onToggleMenu: () => void;
-  onOpenView: (view: View) => void;
-  onSelectFile: (path: string) => void;
+  onOpenView: (view: View, path?: string | null) => void;
+  onOpenFile: (path: string) => void;
 }) {
-  const current = views.find((item) => item.id === currentView) ?? views[0];
-  const showLocalFiles = ["requirements", "inputs", "outputs", "annotations", "design"].includes(currentView);
-  const showFileTree = currentView === "inputs" || currentView === "outputs" || currentView === "annotations";
+  const activeSection = sectionForView(currentView);
+  const [expandedSections, setExpandedSections] = useState<Set<SimplifiedNavSectionId>>(
+    () => new Set(simplifiedNavSections.map((section) => section.id)),
+  );
+  const humanInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(humanInputPrefix)), [projectFiles]);
+  const aiInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(aiInputPrefix)), [projectFiles]);
+  const outputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(outputPrefix)), [projectFiles]);
+  const wikiFiles = useMemo(
+    () =>
+      outputFiles
+        .filter((file) => file.path.startsWith(wikiPrefix))
+        .map((file) => ({ ...file, name: file.name.replace(/^wiki\//, "") })),
+    [outputFiles],
+  );
+  const otherOutputFiles = useMemo(() => outputFiles.filter((file) => !file.path.startsWith(wikiPrefix)), [outputFiles]);
+
+  useEffect(() => {
+    setExpandedSections((current) => {
+      if (current.has(activeSection)) return current;
+
+      const next = new Set(current);
+      next.add(activeSection);
+      return next;
+    });
+  }, [activeSection]);
+
+  function toggleSection(sectionId: SimplifiedNavSectionId) {
+    setExpandedSections((current) => {
+      const next = new Set(current);
+
+      if (next.has(sectionId)) {
+        next.delete(sectionId);
+      } else {
+        next.add(sectionId);
+      }
+
+      return next;
+    });
+  }
+
+  function openFirstFileOrView(view: View, files: ProjectFile[]) {
+    const firstFile = files[0];
+    onOpenView(view, firstFile?.path ?? null);
+  }
 
   return (
-    <div className="context-nav">
-      <div className="workflow-switcher">
-        <button className="workflow-trigger" onClick={onToggleMenu} aria-expanded={menuOpen}>
-          <span>
-            <strong>{current.label}</strong>
-            <em>{current.description}</em>
-          </span>
-          <b>⌄</b>
-        </button>
+    <nav className="simple-nav" aria-label="Project workflow">
+      {simplifiedNavSections.map((section) => {
+        const isExpanded = expandedSections.has(section.id);
+        const isActiveSection = activeSection === section.id;
+        const isBuildSection = section.id === "build";
 
-        {menuOpen ? (
-          <nav className="workflow-menu" aria-label="Switch workflow">
-            {workflowMenuViews.map((item) => (
+        return (
+          <section className={isActiveSection ? "nav-section active" : "nav-section"} key={section.id}>
+            <button
+              className="nav-section-trigger"
+              onClick={() => (isBuildSection ? onOpenView("rebuild") : toggleSection(section.id))}
+              type="button"
+              aria-expanded={isBuildSection ? undefined : isExpanded}
+            >
+              <span>
+                <strong>{section.label}</strong>
+                <small>{section.summary}</small>
+              </span>
+              {isBuildSection ? null : <b aria-hidden="true">{isExpanded ? "-" : "+"}</b>}
+            </button>
+
+            {!isBuildSection && isExpanded ? <div className="nav-section-body">{renderSectionBody(section.id)}</div> : null}
+          </section>
+        );
+      })}
+    </nav>
+  );
+
+  function renderSectionBody(sectionId: SimplifiedNavSectionId) {
+    if (sectionId === "define") {
+      return (
+        <>
+          <div className="simple-nav-children">
+            {requirementNavLeaves.map((leaf) => (
               <button
-                className={item.id === currentView ? "workflow-option active" : "workflow-option"}
-                key={item.id}
-                onClick={() => onOpenView(item.id)}
+                className={selectedPath === leaf.path ? "simple-nav-item simple-nav-child active" : "simple-nav-item simple-nav-child"}
+                key={leaf.id}
+                onClick={() => onOpenView(leaf.view, leaf.path)}
+                type="button"
               >
-                <strong>{item.label}</strong>
-                <span>{item.description}</span>
+                <DefineNavLabel label={leaf.label} />
               </button>
             ))}
-          </nav>
-        ) : null}
-      </div>
-
-      {showLocalFiles ? (
-        <nav className="local-nav" aria-label={`${current.label} items`}>
-          <span className="eyebrow">{files.length} items</span>
-          {loading ? <p>Loading...</p> : null}
-          {files.length === 0 && !loading ? <p>No Markdown files found for this workflow yet.</p> : null}
-          {showFileTree ? (
-            <FileTreeNav files={files} selectedPath={selectedPath} onSelectFile={onSelectFile} />
-          ) : (
-            files.map((file) => {
-              const visibleName = humanizePathSegment(file.name);
-
-              return (
-                <button
-                  className={["local-nav-item", selectedPath === file.path ? "active" : ""].filter(Boolean).join(" ")}
-                  key={file.path}
-                  onClick={() => onSelectFile(file.path)}
-                  title={file.path}
-                >
-                  <span>{visibleName}</span>
-                </button>
-              );
-            })
-          )}
+            <button
+              className={
+                selectedPath === openQuestionsNavLeaf.path ? "simple-nav-item simple-nav-child active" : "simple-nav-item simple-nav-child"
+              }
+              onClick={() => onOpenView(openQuestionsNavLeaf.view, openQuestionsNavLeaf.path)}
+              type="button"
+            >
+              <DefineNavLabel label={openQuestionsNavLeaf.label} />
+            </button>
+          </div>
           {showAiAutoUpdate ? (
             <button className="local-nav-action" onClick={onAiAutoUpdate} type="button">
-              <strong>AI Auto Update</strong>
-              <span>Propagate concepts across root requirements</span>
+              <strong>Align Files with AI</strong>
+              <span>Use AI to keep related files consistent</span>
             </button>
           ) : null}
-          {currentView === "requirements" ? <p className="local-nav-note">{requirementsExplainer}</p> : null}
-        </nav>
-      ) : (
-        <div className="local-nav-empty">
-          <span className="eyebrow">{current.label}</span>
-          <p>This workflow uses the main workspace and does not need a file list yet.</p>
-        </div>
-      )}
-    </div>
+        </>
+      );
+    }
+
+    if (sectionId === "source-data") {
+      return (
+        <>
+          <button
+            className={currentView === "inputs" && !selectedPath ? "simple-nav-item active" : "simple-nav-item"}
+            onClick={() => onOpenView("inputs")}
+            type="button"
+          >
+            <span>Human acquired</span>
+            <small>{humanInputPrefix}</small>
+          </button>
+          <FileTreeBlock
+            emptyLabel="No human-acquired Markdown files yet."
+            files={humanInputFiles}
+            loading={loading && currentView === "inputs"}
+            onOpenFile={onOpenFile}
+            selectedPath={selectedPath}
+          />
+
+          <button
+            className={currentView === "annotations" && !selectedPath ? "simple-nav-item active" : "simple-nav-item"}
+            onClick={() => onOpenView("annotations")}
+            type="button"
+          >
+            <span>AI acquired</span>
+            <small>{aiInputPrefix}</small>
+          </button>
+          <FileTreeBlock
+            emptyLabel="No AI-acquired Markdown files yet."
+            files={aiInputFiles}
+            loading={loading && currentView === "annotations"}
+            onOpenFile={onOpenFile}
+            selectedPath={selectedPath}
+          />
+        </>
+      );
+    }
+
+    return (
+      <>
+        <button
+          className={currentView === "outputs" && !selectedPath ? "simple-nav-item active" : "simple-nav-item"}
+          onClick={() => onOpenView("outputs")}
+          type="button"
+        >
+          <span>Results</span>
+          <small>{outputPrefix}</small>
+        </button>
+
+        <button
+          className={selectedPath?.startsWith(wikiPrefix) ? "simple-nav-item active" : "simple-nav-item"}
+          onClick={() => openFirstFileOrView("outputs", wikiFiles)}
+          type="button"
+        >
+          <span>Wiki</span>
+          <small>{wikiPrefix}</small>
+        </button>
+        <FileTreeBlock
+          emptyLabel="No wiki Markdown files yet."
+          files={wikiFiles}
+          loading={loading && currentView === "outputs"}
+          onOpenFile={onOpenFile}
+          selectedPath={selectedPath}
+        />
+
+        <div className="simple-nav-subheading">Other results</div>
+        <FileTreeBlock
+          emptyLabel="No other generated Markdown files yet."
+          files={otherOutputFiles}
+          loading={loading && currentView === "outputs"}
+          onOpenFile={onOpenFile}
+          selectedPath={selectedPath}
+        />
+      </>
+    );
+  }
+}
+
+function FileTreeBlock({
+  emptyLabel,
+  files,
+  loading,
+  selectedPath,
+  onOpenFile,
+}: {
+  emptyLabel: string;
+  files: ProjectFile[];
+  loading: boolean;
+  selectedPath: string | null;
+  onOpenFile: (path: string) => void;
+}) {
+  if (loading) return <p className="simple-nav-state">Loading...</p>;
+  if (files.length === 0) return <p className="simple-nav-state">{emptyLabel}</p>;
+
+  return <FileTreeNav files={files} selectedPath={selectedPath} onSelectFile={onOpenFile} />;
+}
+
+function DefineNavLabel({ label }: { label: string }) {
+  const [prefix, emphasized] = label.split(/:\s+/, 2);
+
+  if (!emphasized) return <span>{label}</span>;
+
+  return (
+    <span>
+      {prefix}: <strong>{emphasized}</strong>
+    </span>
   );
 }

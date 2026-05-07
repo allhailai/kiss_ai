@@ -39,7 +39,6 @@ export function useProjectWorkspace() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [loading, setLoading] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
-  const [workflowMenuOpen, setWorkflowMenuOpen] = useState(false);
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.slug === selectedProjectSlug) ?? null,
@@ -168,7 +167,6 @@ export function useProjectWorkspace() {
 
       const nextView = route.view;
       setView(nextView);
-      setWorkflowMenuOpen(false);
       setNotice("");
       setSelected(null);
       setSelectedDiff(null);
@@ -239,7 +237,7 @@ export function useProjectWorkspace() {
   const selectProject = useCallback((projectSlug: string) => {
     setSelectedProjectSlug(projectSlug);
     window.localStorage.setItem(selectedProjectStorageKey, projectSlug);
-    window.location.hash = buildRouteHash(projectSlug, "build-log");
+    window.location.hash = buildRouteHash(projectSlug, "rebuild");
   }, []);
 
   const clearSelectedProject = useCallback(() => {
@@ -478,10 +476,8 @@ export function useProjectWorkspace() {
     toasts,
     loading,
     creatingProject,
-    workflowMenuOpen,
     setDraft,
     setSelectedRebuildModelId,
-    setWorkflowMenuOpen,
     dismissToast,
     refreshProjects,
     refreshStatus,
