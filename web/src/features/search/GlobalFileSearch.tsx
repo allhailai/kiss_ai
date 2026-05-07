@@ -153,7 +153,7 @@ export function GlobalFileSearch({
         </div>
       </div>
       <button className="project-switch-button" onClick={onSwitchProject} type="button">
-        Switch project
+        Projects
       </button>
     </header>
   );

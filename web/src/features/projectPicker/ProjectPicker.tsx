@@ -32,8 +32,10 @@ export function ProjectPicker({
   const derivedSlug = useMemo(() => slugifyProjectName(projectName), [projectName]);
   const selectedSlug = derivedSlug;
   const slugIsValid = !selectedSlug || /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(selectedSlug);
-  const projectNameIsTaken = projects.some((project) => project.slug === selectedSlug);
-  const canCreate = Boolean(projectName.trim() && selectedSlug && slugIsValid && !creatingProject);
+  const projectNameIsTaken = Boolean(selectedSlug && projects.some((project) => project.slug === selectedSlug));
+  const liveCreateError = projectNameIsTaken ? "That project name is taken. Please use another one." : "";
+  const visibleCreateError = liveCreateError || createError;
+  const canCreate = Boolean(projectName.trim() && selectedSlug && slugIsValid && !projectNameIsTaken && !creatingProject);
 
   const submitProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -75,7 +77,7 @@ export function ProjectPicker({
           <span className="eyebrow">new project</span>
         </div>
 
-        <label className="project-name-field">
+        <label className={projectNameIsTaken ? "project-name-field has-error" : "project-name-field"}>
           <span>Project Name:</span>
           <input
             autoComplete="off"
@@ -96,10 +98,13 @@ export function ProjectPicker({
             {creatingProject ? "Building..." : "Build"}
           </button>
         </div>
-
-        {!slugIsValid ? <p className="field-error">Use only letters, numbers, underscores, or hyphens.</p> : null}
-        {createError ? <p className="field-error">{createError}</p> : null}
       </form>
+      {!slugIsValid || visibleCreateError ? (
+        <div className="project-create-error" role="alert">
+          {!slugIsValid ? <p>Use only letters, numbers, underscores, or hyphens.</p> : null}
+          {visibleCreateError ? <p>{visibleCreateError}</p> : null}
+        </div>
+      ) : null}
 
       <div className="section-heading">
         <h2>Available projects</h2>

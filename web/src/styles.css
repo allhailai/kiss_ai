@@ -275,11 +275,19 @@ button:disabled {
   min-width: 0;
 }
 
-.nav-section-trigger strong,
-.nav-section-trigger small,
+.nav-section-label,
 .simple-nav-item span,
 .simple-nav-item small {
   display: block;
+}
+
+.nav-section-label strong,
+.nav-section-label small {
+  display: inline;
+}
+
+.nav-section-label strong {
+  margin-right: 0.35rem;
 }
 
 .nav-section-trigger small,
@@ -1917,6 +1925,12 @@ button:disabled {
   outline-color: color-mix(in srgb, var(--color-accent) 22%, transparent);
 }
 
+.project-name-field.has-error input,
+.project-name-field.has-error input:focus {
+  border-color: #9f2d20;
+  outline-color: color-mix(in srgb, #9f2d20 18%, transparent);
+}
+
 .project-create-actions {
   display: flex;
   justify-content: flex-end;
@@ -1932,11 +1946,20 @@ button:disabled {
   font-weight: 800;
 }
 
-.field-error {
-  grid-column: 1 / -1;
-  color: #9f2d20 !important;
+.project-create-error {
+  margin-top: -6px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 34%, var(--color-border));
+  border-left: 4px solid var(--color-warning);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-warning) 10%, white);
+  color: #9f2d20;
   font-weight: 700;
   text-align: center;
+}
+
+.project-create-error p {
+  margin: 0;
 }
 
 .project-card-grid {
@@ -2023,10 +2046,6 @@ button:disabled {
 
   .project-create-panel {
     grid-template-columns: 1fr;
-  }
-
-  .field-error {
-    grid-column: 1;
   }
 
   .sidebar {

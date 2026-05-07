@@ -12,14 +12,13 @@ export type SimplifiedNavLeaf = {
 export type SimplifiedNavSection = {
   id: SimplifiedNavSectionId;
   label: string;
-  summary: string;
 };
 
 export const simplifiedNavSections: SimplifiedNavSection[] = [
-  { id: "define", label: "(1) Define", summary: "Goals, sources, output shape, and questions" },
-  { id: "build", label: "(2) Build", summary: "Run the project loop" },
-  { id: "source-data", label: "(3) Source Data", summary: "Human and AI acquired material" },
-  { id: "results", label: "(4) Results", summary: "Wiki and generated outputs" },
+  { id: "define", label: "(1) Define the requirements" },
+  { id: "build", label: "(2) Build the project" },
+  { id: "source-data", label: "(3) Source data view" },
+  { id: "results", label: "(4) Information built" },
 ];
 
 export const requirementNavLeaves: SimplifiedNavLeaf[] = [

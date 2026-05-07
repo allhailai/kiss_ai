@@ -80,9 +80,8 @@ export function SimplifiedNavigator({
               type="button"
               aria-expanded={isBuildSection ? undefined : isExpanded}
             >
-              <span>
+              <span className="nav-section-label">
                 <strong>{section.label}</strong>
-                <small>{section.summary}</small>
               </span>
               {isBuildSection ? null : <b aria-hidden="true">{isExpanded ? "-" : "+"}</b>}
             </button>
