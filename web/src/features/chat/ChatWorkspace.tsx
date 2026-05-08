@@ -72,6 +72,8 @@ function isNearScrollBottom(element: HTMLElement) {
   return element.scrollHeight - element.scrollTop - element.clientHeight < 120;
 }
 
+const CHAT_COMPOSER_MAX_ROWS = 8;
+
 export function ChatWorkspace({
   projectSlug,
   models,
@@ -97,6 +99,7 @@ export function ChatWorkspace({
   const [contextRefs, setContextRefs] = useState<ChatContextRef[]>([]);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const threadRef = useRef<HTMLDivElement | null>(null);
+  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const shouldStickToLatestRef = useRef(true);
   const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
   const contextFiles = useMemo(() => projectFiles.filter(isChatContextFile), [projectFiles]);
@@ -150,6 +153,22 @@ export function ChatWorkspace({
     return conversation;
   };
 
+  const resizeComposer = (textarea = composerTextareaRef.current) => {
+    if (!textarea) return;
+
+    textarea.style.height = "auto";
+    const styles = window.getComputedStyle(textarea);
+    const lineHeight = Number.parseFloat(styles.lineHeight) || 20;
+    const paddingY = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom);
+    const borderY = Number.parseFloat(styles.borderTopWidth) + Number.parseFloat(styles.borderBottomWidth);
+    const maxHeight = Math.ceil(lineHeight * CHAT_COMPOSER_MAX_ROWS + paddingY + borderY);
+    const contentHeight = textarea.scrollHeight + borderY;
+    const nextHeight = Math.min(contentHeight, maxHeight);
+
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
+  };
+
   const sendMessage = async () => {
     const content = messageDraft.trim();
     if (!content || sending) return;
@@ -172,8 +191,13 @@ export function ChatWorkspace({
     }
   };
 
+  const handleComposerChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMessageDraft(event.currentTarget.value);
+    resizeComposer(event.currentTarget);
+  };
+
   const handleComposerKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key !== "Enter" || !event.metaKey) return;
+    if (event.key !== "Enter" || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
     void sendMessage();
   };
@@ -273,6 +297,10 @@ export function ChatWorkspace({
     }
   }, [activeConversation?.messages.length, activeConversation?.messages.at(-1)?.content.length]);
 
+  useEffect(() => {
+    resizeComposer();
+  }, [messageDraft]);
+
   return (
     <div className="chat-workspace">
       <section className="chat-layout">
@@ -354,9 +382,10 @@ export function ChatWorkspace({
           >
             <textarea
               disabled={sending}
+              ref={composerTextareaRef}
               onKeyDown={handleComposerKeyDown}
-              onChange={(event) => setMessageDraft(event.target.value)}
-              placeholder="Ask about this project... SuperKey+Enter to send"
+              onChange={handleComposerChange}
+              placeholder="Ask about this project... Enter to send, Shift+Enter for a new line"
               value={messageDraft}
             />
             <div className="chat-composer-meta">

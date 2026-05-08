@@ -506,7 +506,8 @@ button:disabled {
 .chat-message-content {
   display: grid;
   gap: 6px;
-  line-height: 1.45;
+  font-size: 0.9rem;
+  line-height: 1.42;
 }
 
 .chat-message-content p {
@@ -560,9 +561,9 @@ button:disabled {
 }
 
 .chat-composer textarea {
-  min-height: 76px;
-  max-height: 190px;
-  resize: vertical;
+  min-height: 44px;
+  resize: none;
+  overflow-y: hidden;
   padding: 10px 12px;
   line-height: 1.45;
 }
@@ -618,6 +619,7 @@ button:disabled {
   min-width: 0;
   display: grid;
   gap: 6px;
+  font-size: 0.9rem;
   overflow-wrap: anywhere;
 }
 
@@ -1270,8 +1272,8 @@ button:disabled {
 
 .content-card .chat-message-content p {
   color: var(--color-primary);
-  font-size: 0.96rem;
-  line-height: 1.5;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .content-card .chat-message-assistant,
