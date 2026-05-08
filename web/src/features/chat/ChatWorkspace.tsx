@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { ChatContextRef, ChatConversationEvent, ChatMessage, Conversation, ConversationSummary, ProjectFile, RebuildModel } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { formatModelLabel, modelTierLabels, modelTierOrder } from "../../domain/modelLabels";
@@ -45,14 +47,25 @@ function applyStreamingDelta(conversation: Conversation, messageId: string, delt
   return { ...conversation, messages, updatedAt };
 }
 
-function renderMessageContent(content: string) {
-  const paragraphs = content
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
+const chatMarkdownComponents: Components = {
+  a({ children, href, ...props }) {
+    return (
+      <a href={href} rel="noopener noreferrer" target="_blank" {...props}>
+        {children}
+      </a>
+    );
+  },
+};
 
-  if (!paragraphs.length) return <p>No content recorded.</p>;
-  return paragraphs.map((paragraph, index) => <p key={`${index}-${paragraph.slice(0, 24)}`}>{paragraph}</p>);
+function renderMessageContent(content: string) {
+  if (!content.trim()) return <p>No content recorded.</p>;
+  return (
+    <div className="chat-markdown">
+      <ReactMarkdown components={chatMarkdownComponents} remarkPlugins={[remarkGfm]} skipHtml>
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
 function isNearScrollBottom(element: HTMLElement) {
@@ -157,6 +170,12 @@ export function ChatWorkspace({
       onNotice(error instanceof Error ? error.message : "Could not send the chat message.");
       setSending(false);
     }
+  };
+
+  const handleComposerKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter" || !event.metaKey) return;
+    event.preventDefault();
+    void sendMessage();
   };
 
   const addContextRef = () => {
@@ -335,8 +354,9 @@ export function ChatWorkspace({
           >
             <textarea
               disabled={sending}
+              onKeyDown={handleComposerKeyDown}
               onChange={(event) => setMessageDraft(event.target.value)}
-              placeholder="Ask about this project..."
+              placeholder="Ask about this project... SuperKey+Enter to send"
               value={messageDraft}
             />
             <div className="chat-composer-meta">
