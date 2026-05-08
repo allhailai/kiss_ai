@@ -2,6 +2,8 @@ import type {
   AiAssistProposal,
   AiAssistRequest,
   BuildLogState,
+  Conversation,
+  ConversationsResponse,
   CreateProjectRequest,
   DeleteHumanInputResponse,
   DesignState,
@@ -18,6 +20,8 @@ import type {
   RequirementsAutoUpdateProposeRequest,
   RequirementsAutoUpdateProposeResponse,
   ResolveHumanAttentionRequest,
+  SendChatMessageRequest,
+  UpdateConversationRequest,
   TreeResponse,
   UploadHumanInputsResponse,
 } from "../contracts/api";
@@ -64,6 +68,26 @@ export const api = {
     }),
   rebuildModels: () => request<RebuildModelsResponse>("/api/cursor/models"),
   status: (projectSlug: string) => request<ProjectStatus>(`${projectBase(projectSlug)}/status`),
+  conversations: (projectSlug: string) => request<ConversationsResponse>(`${projectBase(projectSlug)}/conversations`),
+  createConversation: (projectSlug: string, body: { modelId?: string; title?: string }) =>
+    request<Conversation>(`${projectBase(projectSlug)}/conversations`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  conversation: (projectSlug: string, conversationId: string) =>
+    request<Conversation>(`${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}`),
+  updateConversation: (projectSlug: string, conversationId: string, body: UpdateConversationRequest) =>
+    request<Conversation>(`${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  sendChatMessage: (projectSlug: string, conversationId: string, body: SendChatMessageRequest) =>
+    request<Conversation>(`${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/messages`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  conversationEventsUrl: (projectSlug: string, conversationId: string) =>
+    `${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/events`,
   buildLog: (projectSlug: string, tabId?: string | null, path?: string | null, sectionId?: string | null) => {
     const params = new URLSearchParams();
     if (tabId) params.set("tab", tabId);

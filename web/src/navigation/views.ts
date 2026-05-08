@@ -1,7 +1,7 @@
 import type { ProjectFile } from "../contracts/api";
 import { designIdentityFilePath, isDesignIdentityPath, projectPathPrefixes } from "../domain/projectPaths";
 
-export type View = "build-log" | "dashboard" | "requirements" | "inputs" | "outputs" | "annotations" | "design" | "rebuild";
+export type View = "build-log" | "chat" | "dashboard" | "requirements" | "inputs" | "outputs" | "annotations" | "design" | "rebuild";
 
 export type RouteState = {
   projectSlug: string | null;
@@ -11,6 +11,7 @@ export type RouteState = {
 
 export const views: Array<{ id: View; label: string; description: string }> = [
   { id: "build-log", label: "Build Log", description: "Latest rebuild summary and history" },
+  { id: "chat", label: "Chat", description: "Project-local agent conversations" },
   { id: "requirements", label: "Requirements", description: "Human-owned source of truth" },
   { id: "annotations", label: "AI Input Files", description: `AI-managed files under ${projectPathPrefixes.aiInput}` },
   { id: "inputs", label: "Human Input Files", description: "Human source material" },

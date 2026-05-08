@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   buildLogNavLeaf,
+  chatNavLeaf,
   openQuestionsNavLeaf,
   requirementNavLeaves,
   sectionForView,
@@ -71,14 +72,23 @@ export function SimplifiedNavigator({
         const isExpanded = expandedSections.has(section.id);
         const isActiveSection = activeSection === section.id;
         const isBuildSection = section.id === "build";
+        const isChatSection = section.id === "chat";
         const isBuildLogSection = section.id === "build-log";
-        const isDirectViewSection = isBuildLogSection || isBuildSection;
+        const isDirectViewSection = isBuildLogSection || isChatSection || isBuildSection;
 
         return (
           <section className={isActiveSection ? "nav-section active" : "nav-section"} key={section.id}>
             <button
               className="nav-section-trigger"
-              onClick={() => (isBuildLogSection ? onOpenView(buildLogNavLeaf.view) : isBuildSection ? onOpenView("rebuild") : toggleSection(section.id))}
+              onClick={() =>
+                isBuildLogSection
+                  ? onOpenView(buildLogNavLeaf.view)
+                  : isChatSection
+                    ? onOpenView(chatNavLeaf.view)
+                    : isBuildSection
+                      ? onOpenView("rebuild")
+                      : toggleSection(section.id)
+              }
               type="button"
               aria-expanded={isDirectViewSection ? undefined : isExpanded}
             >

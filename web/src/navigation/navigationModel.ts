@@ -1,6 +1,6 @@
 import type { View } from "./views";
 
-export type SimplifiedNavSectionId = "build-log" | "define" | "build" | "source-data" | "results";
+export type SimplifiedNavSectionId = "build-log" | "chat" | "define" | "build" | "source-data" | "results";
 
 export type SimplifiedNavLeaf = {
   id: string;
@@ -16,6 +16,7 @@ export type SimplifiedNavSection = {
 
 export const simplifiedNavSections: SimplifiedNavSection[] = [
   { id: "build-log", label: "Build Log" },
+  { id: "chat", label: "Chat" },
   { id: "define", label: "1) Define the requirements" },
   { id: "build", label: "2) Build the project" },
   { id: "source-data", label: "3) Source data view" },
@@ -47,8 +48,15 @@ export const buildLogNavLeaf: SimplifiedNavLeaf = {
   view: "build-log",
 };
 
+export const chatNavLeaf: SimplifiedNavLeaf = {
+  id: "chat",
+  label: "Chat",
+  view: "chat",
+};
+
 export function sectionForView(view: View): SimplifiedNavSectionId {
   if (view === "build-log") return "build-log";
+  if (view === "chat") return "chat";
   if (view === "requirements" || view === "design") return "define";
   if (view === "inputs" || view === "annotations") return "source-data";
   if (view === "outputs") return "results";

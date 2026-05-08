@@ -10,6 +10,8 @@ import { listen } from "./adapters/listen.js";
 import { registerApiRoutes } from "./routes/apiRoutes.js";
 import { createAgentJobService } from "./services/agentJobs.js";
 import { createAiFlowService } from "./services/aiFlows.js";
+import { createChatAgentService } from "./services/chatAgent.js";
+import { createConversationService } from "./services/conversations.js";
 import { createCursorModelService } from "./services/cursorModels.js";
 import { createDesignIdentityService } from "./services/designIdentity.js";
 import { apiErrorHandler, httpError } from "./services/httpErrors.js";
@@ -231,6 +233,35 @@ const { listCursorModels, pickRebuildModelId, resolveCursorApiKey } = createCurs
 });
 
 const { lintDesignIdentity, parseDesignIdentity } = createDesignIdentityService();
+
+const {
+  appendMessage: appendConversationMessage,
+  createConversation,
+  listConversations,
+  notifyConversation,
+  readConversation,
+  subscribeToConversation,
+  updateConversation,
+  writeConversation,
+} = createConversationService({
+  httpError,
+  projectPath,
+});
+
+const { sendChatMessage } = createChatAgentService({
+  appendMessage: appendConversationMessage,
+  displayProjectName,
+  httpError,
+  listCursorModels,
+  notifyConversation,
+  pickRebuildModelId,
+  readConversation,
+  readProjectHarness,
+  readTextFile,
+  resolveCursorApiKey,
+  runCursorAgent,
+  writeConversation,
+});
 
 const { startHumanAttentionResolution, startRebuild } = createAgentJobService({
   FRAMEWORK_ROOT,
@@ -1060,6 +1091,7 @@ registerApiRoutes(app, {
   attachProject,
   buildLogTabState,
   createProjectFromTemplate,
+  createConversation,
   deleteHumanInputFile,
   discoverProjects,
   displayProjectName,
@@ -1071,12 +1103,14 @@ registerApiRoutes(app, {
   httpError,
   lintDesignIdentity,
   listBuildSummaries,
+  listConversations,
   listCursorModels,
   listMarkdownFiles,
   listProjectFiles,
   parseDesignIdentity,
   pickRebuildModelId,
   readAggregateBuildLogExcerpt,
+  readConversation,
   readProjectJson,
   readTextFile,
   resolveCursorApiKey,
@@ -1084,12 +1118,15 @@ registerApiRoutes(app, {
   runAiAssistProposal,
   runRequirementsAutoUpdateProposal,
   searchFiles,
+  sendChatMessage,
   startHumanAttentionResolution,
   startRebuild,
+  subscribeToConversation,
   subscribeToRebuild,
   summaryContentItem,
   summaryListItem,
   treeRoots,
+  updateConversation,
   uploadHumanInputFiles,
   writeTextFile,
 });

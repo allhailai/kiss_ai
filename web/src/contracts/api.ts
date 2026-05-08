@@ -179,6 +179,101 @@ export type RebuildModelsResponse = {
   source: string | null;
 };
 
+export type ChatMessageRole = "user" | "assistant" | "system";
+
+export type ChatMessageStatus = "complete" | "streaming" | "error";
+
+export type ChatContextRef = {
+  path: string;
+  label?: string;
+  kind?: ProjectFile["kind"];
+};
+
+export type ChatMessage = {
+  id: string;
+  role: ChatMessageRole;
+  content: string;
+  createdAt: string;
+  updatedAt?: string | null;
+  modelId?: string | null;
+  status: ChatMessageStatus;
+  context?: {
+    fileRefs?: ChatContextRef[];
+  };
+  metadata?: Record<string, unknown>;
+};
+
+export type ConversationSummary = {
+  id: string;
+  file: string;
+  title: string;
+  summary: string;
+  modelId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+  archived: boolean;
+};
+
+export type ConversationsResponse = {
+  conversations: ConversationSummary[];
+};
+
+export type Conversation = {
+  version: number;
+  id: string;
+  projectSlug: string;
+  title: string;
+  summary: string;
+  createdAt: string;
+  updatedAt: string;
+  defaultModelId: string | null;
+  messages: ChatMessage[];
+};
+
+export type CreateConversationRequest = {
+  modelId?: string;
+  title?: string;
+};
+
+export type UpdateConversationRequest = {
+  title?: string;
+  summary?: string;
+  archived?: boolean;
+};
+
+export type SendChatMessageRequest = {
+  modelId: string;
+  content: string;
+  context?: {
+    fileRefs?: ChatContextRef[];
+  };
+};
+
+export type ChatConversationEvent =
+  | {
+      type: "snapshot";
+      conversation: Conversation;
+    }
+  | {
+      type: "message_delta";
+      conversationId: string;
+      messageId: string;
+      delta: string;
+      updatedAt: string;
+    }
+  | {
+      type: "message_complete";
+      conversation: Conversation;
+      message: ChatMessage;
+    }
+  | {
+      type: "error";
+      conversationId: string;
+      message: string;
+      updatedAt: string;
+    };
+
 export type BuildLogFileSection = {
   id: string;
   title: string;

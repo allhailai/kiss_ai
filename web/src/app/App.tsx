@@ -4,6 +4,7 @@ import { buildThemeStyle } from "./theme";
 import { useProjectWorkspace } from "./useProjectWorkspace";
 import { type View } from "../navigation/views";
 import { BuildLogWorkspace } from "../features/buildLog/BuildLogWorkspace";
+import { ChatWorkspace } from "../features/chat/ChatWorkspace";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { DesignWorkspace } from "../features/design/DesignWorkspace";
 import { FileWorkspace } from "../features/files/FileWorkspace";
@@ -112,6 +113,16 @@ export function App() {
             design={workspace.design}
             onOpenAnnotations={() => navigateTo("annotations")}
             onOpenDesign={() => navigateTo("design")}
+          />
+        ) : null}
+        {workspace.view === "chat" ? (
+          <ChatWorkspace
+            projectSlug={workspace.selectedProjectSlug}
+            models={workspace.rebuildModels}
+            selectedModelId={workspace.selectedRebuildModelId}
+            projectFiles={workspace.projectFiles}
+            onModelChange={workspace.setSelectedRebuildModelId}
+            onNotice={workspace.setNotice}
           />
         ) : null}
         {fileWorkspace ? (
