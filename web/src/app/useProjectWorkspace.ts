@@ -71,8 +71,8 @@ export function useProjectWorkspace() {
   }, [requireSelectedProjectSlug]);
 
   const refreshBuildLog = useCallback(
-    async (summaryPath?: string | null, sectionId?: string | null) => {
-      setBuildLog(await api.buildLog(requireSelectedProjectSlug(), summaryPath, sectionId));
+    async (tabId?: string | null, path?: string | null, sectionId?: string | null) => {
+      setBuildLog(await api.buildLog(requireSelectedProjectSlug(), tabId, path, sectionId));
     },
     [requireSelectedProjectSlug],
   );

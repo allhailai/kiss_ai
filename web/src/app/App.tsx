@@ -35,6 +35,7 @@ const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: str
 export function App() {
   const workspace = useProjectWorkspace();
   const [autoUpdateOpen, setAutoUpdateOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const themeStyle = useMemo(() => buildThemeStyle(workspace.design), [workspace.design]);
 
   if (!workspace.selectedProjectSlug || !workspace.selectedProject) {
@@ -59,7 +60,7 @@ export function App() {
     workspace.selected?.path && isRequirementAutoUpdatePath(workspace.selected.path) ? workspace.selected.path : null;
 
   return (
-    <main className="app-shell" style={themeStyle}>
+    <main className={sidebarCollapsed ? "app-shell sidebar-collapsed" : "app-shell"} style={themeStyle}>
       <GlobalFileSearch
         projectName={workspace.status?.projectName ?? workspace.selectedProject.name}
         projectSlug={workspace.selectedProjectSlug}
@@ -69,17 +70,30 @@ export function App() {
       />
       <ToastViewport toasts={workspace.toasts} onDismiss={workspace.dismissToast} />
 
-      <aside className="sidebar">
-        <SimplifiedNavigator
-          currentView={workspace.view}
-          loading={workspace.loading}
-          projectFiles={workspace.projectFiles}
-          selectedPath={workspace.selected?.path ?? null}
-          showAiAutoUpdate={Boolean(selectedAutoUpdatePath)}
-          onAiAutoUpdate={() => setAutoUpdateOpen(true)}
-          onOpenFile={workspace.openProjectFile}
-          onOpenView={(nextView, filePath) => navigateTo(nextView, filePath)}
-        />
+      <aside className="sidebar" aria-label="Project navigation">
+        <button
+          className="sidebar-toggle"
+          type="button"
+          aria-expanded={!sidebarCollapsed}
+          aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
+          title={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
+          onClick={() => setSidebarCollapsed((current) => !current)}
+        >
+          <span aria-hidden="true">{sidebarCollapsed ? ">" : "<"}</span>
+          <span className="sidebar-toggle-label">{sidebarCollapsed ? "Expand" : "Collapse"}</span>
+        </button>
+        {!sidebarCollapsed ? (
+          <SimplifiedNavigator
+            currentView={workspace.view}
+            loading={workspace.loading}
+            projectFiles={workspace.projectFiles}
+            selectedPath={workspace.selected?.path ?? null}
+            showAiAutoUpdate={Boolean(selectedAutoUpdatePath)}
+            onAiAutoUpdate={() => setAutoUpdateOpen(true)}
+            onOpenFile={workspace.openProjectFile}
+            onOpenView={(nextView, filePath) => navigateTo(nextView, filePath)}
+          />
+        ) : null}
       </aside>
 
       <section className="workspace">
@@ -88,7 +102,7 @@ export function App() {
             buildLog={workspace.buildLog}
             status={workspace.status}
             rebuild={workspace.rebuild}
-            onSelectSummary={(summaryPath, sectionId) => void workspace.refreshBuildLog(summaryPath, sectionId)}
+            onSelectLog={(tabId, path, sectionId) => void workspace.refreshBuildLog(tabId, path, sectionId)}
           />
         ) : null}
         {workspace.view === "dashboard" ? (

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { BuildLogState, DesignState, ProjectFile, ProjectStatus, ProjectSummary, RebuildModel } from "../../contracts/api";
+import type { BuildLogState, DesignState, ProjectFile, ProjectStatus, ProjectSummary, RebuildModel, RebuildState } from "../../contracts/api";
 import { designProjectFile, selectedProjectStorageKey } from "../../navigation/views";
 
 type UseSelectedProjectLifecycleOptions = {

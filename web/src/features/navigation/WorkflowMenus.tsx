@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  buildLogNavLeaf,
   openQuestionsNavLeaf,
   requirementNavLeaves,
   sectionForView,
@@ -68,22 +69,24 @@ export function SimplifiedNavigator({
         const isExpanded = expandedSections.has(section.id);
         const isActiveSection = activeSection === section.id;
         const isBuildSection = section.id === "build";
+        const isBuildLogSection = section.id === "build-log";
+        const isDirectViewSection = isBuildLogSection || isBuildSection;
 
         return (
           <section className={isActiveSection ? "nav-section active" : "nav-section"} key={section.id}>
             <button
               className="nav-section-trigger"
-              onClick={() => (isBuildSection ? onOpenView("rebuild") : toggleSection(section.id))}
+              onClick={() => (isBuildLogSection ? onOpenView(buildLogNavLeaf.view) : isBuildSection ? onOpenView("rebuild") : toggleSection(section.id))}
               type="button"
-              aria-expanded={isBuildSection ? undefined : isExpanded}
+              aria-expanded={isDirectViewSection ? undefined : isExpanded}
             >
               <span className="nav-section-label">
                 <strong>{section.label}</strong>
               </span>
-              {isBuildSection ? null : <b aria-hidden="true">{isExpanded ? "-" : "+"}</b>}
+              {isDirectViewSection ? null : <b aria-hidden="true">{isExpanded ? "-" : "+"}</b>}
             </button>
 
-            {!isBuildSection && isExpanded ? <div className="nav-section-body">{renderSectionBody(section.id)}</div> : null}
+            {!isDirectViewSection && isExpanded ? <div className="nav-section-body">{renderSectionBody(section.id)}</div> : null}
           </section>
         );
       })}

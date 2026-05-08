@@ -50,9 +50,10 @@ export const api = {
     }),
   rebuildModels: () => request<RebuildModelsResponse>("/api/cursor/models"),
   status: (projectSlug: string) => request<ProjectStatus>(`${projectBase(projectSlug)}/status`),
-  buildLog: (projectSlug: string, summaryPath?: string | null, sectionId?: string | null) => {
+  buildLog: (projectSlug: string, tabId?: string | null, path?: string | null, sectionId?: string | null) => {
     const params = new URLSearchParams();
-    if (summaryPath) params.set("summary", summaryPath);
+    if (tabId) params.set("tab", tabId);
+    if (path) params.set("path", path);
     if (sectionId) params.set("section", sectionId);
     const query = params.toString();
 

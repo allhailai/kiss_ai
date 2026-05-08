@@ -170,29 +170,36 @@ export type RebuildModelsResponse = {
   source: string | null;
 };
 
-export type BuildSummarySection = {
+export type BuildLogFileSection = {
   id: string;
   title: string;
 };
 
-export type BuildSummary = {
+export type BuildLogFileOption = {
   path: string;
   name: string;
   title: string;
   modifiedAt: string;
-  sections: BuildSummarySection[];
+  sections: BuildLogFileSection[];
 };
 
-export type BuildSummaryContent = BuildSummary & {
+export type BuildLogFileContent = BuildLogFileOption & {
   selectedSectionId: string | null;
   content: string;
 };
 
+export type BuildLogTab = {
+  id: string;
+  label: string;
+  emptyMessage: string;
+  files: BuildLogFileOption[];
+  selectedFile: BuildLogFileContent | null;
+};
+
 export type BuildLogState = {
-  latestSummary: BuildSummaryContent | null;
-  selectedSummary: BuildSummaryContent | null;
-  summaries: BuildSummary[];
-  aggregateLogExcerpt: string;
+  activeTabId: string;
+  selectedLog: BuildLogFileContent | null;
+  tabs: BuildLogTab[];
 };
 
 export type DesignState = {

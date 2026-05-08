@@ -10,15 +10,14 @@ export function registerApiRoutes(app, deps) {
     getRebuildState,
     gitFileDiff,
     gitStatus,
+    buildLogTabState,
     humanFiles,
     httpError,
     lintDesignIdentity,
-    listBuildSummaries,
     listCursorModels,
     listMarkdownFiles,
     parseDesignIdentity,
     pickRebuildModelId,
-    readAggregateBuildLogExcerpt,
     readProjectJson,
     readTextFile,
     resolveCursorApiKey,
@@ -29,8 +28,6 @@ export function registerApiRoutes(app, deps) {
     startHumanAttentionResolution,
     startRebuild,
     subscribeToRebuild,
-    summaryContentItem,
-    summaryListItem,
     treeRoots,
     writeTextFile,
   } = deps;
@@ -120,18 +117,11 @@ export function registerApiRoutes(app, deps) {
 
   app.get("/api/projects/:projectSlug/build-log", async (request, response, next) => {
     try {
-      const summaries = await listBuildSummaries(request.project.path);
-      const latestSummary = summaries[0] ? summaryContentItem(summaries[0]) : null;
-      const requestedSummaryPath = String(request.query.summary ?? "");
+      const requestedTabId = String(request.query.tab ?? "");
+      const requestedPath = String(request.query.path ?? request.query.summary ?? "");
       const requestedSectionId = String(request.query.section ?? "");
-      const requestedSummary = requestedSummaryPath ? summaries.find((summary) => summary.path === requestedSummaryPath) : null;
 
-      response.json({
-        latestSummary,
-        selectedSummary: requestedSummary ? summaryContentItem(requestedSummary, requestedSectionId || null) : null,
-        summaries: summaries.map(summaryListItem),
-        aggregateLogExcerpt: await readAggregateBuildLogExcerpt(request.project.path),
-      });
+      response.json(await buildLogTabState(request.project.path, requestedTabId, requestedPath, requestedSectionId));
     } catch (error) {
       next(error);
     }
