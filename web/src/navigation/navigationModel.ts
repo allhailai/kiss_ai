@@ -19,7 +19,7 @@ export const simplifiedNavSections: SimplifiedNavSection[] = [
   { id: "define", label: "1) Define the requirements" },
   { id: "build", label: "2) Build the project" },
   { id: "source-data", label: "3) Source data view" },
-  { id: "results", label: "4) Information built" },
+  { id: "results", label: "4) Outputs Built" },
 ];
 
 export const requirementNavLeaves: SimplifiedNavLeaf[] = [
