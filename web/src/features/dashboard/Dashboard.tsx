@@ -1,4 +1,4 @@
-import type { DesignState, ProjectStatus } from "../../api";
+import type { DesignState, ProjectStatus } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
 
 export function Dashboard({

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import type { ProjectSummary } from "../../api";
+import type { ProjectSummary } from "../../contracts/api";
 
 function slugifyProjectName(name: string) {
   return name

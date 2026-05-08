@@ -1,4 +1,4 @@
-import type { FileContent, FileDiff, ProjectFile, RebuildModel } from "../../api";
+import type { FileContent, FileDiff, ProjectFile, RebuildModel } from "../../contracts/api";
 import { countDeletedLines, countDiffRangeLines } from "../../domain/diffs";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
 import { AiAssistPanel } from "./AiAssistPanel";

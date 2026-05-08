@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import type { DesignState, FileContent, FileDiff } from "../../api";
+import type { DesignState, FileContent, FileDiff } from "../../contracts/api";
 import { countDeletedLines, countDiffRangeLines } from "../../domain/diffs";
+import { designIdentityFilePath } from "../../domain/projectPaths";
 import {
   asRecord,
   asString,
@@ -96,7 +97,7 @@ export function DesignWorkspace({
       <div className="design-workspace">
         <section className="editor-pane empty">
           <h2>Select the design identity file</h2>
-          <p>Choose `human_design_identity.md` from the left panel to edit project design tokens.</p>
+          <p>Choose `{designIdentityFilePath}` from the left panel to edit project design tokens.</p>
         </section>
       </div>
     );
@@ -153,7 +154,7 @@ export function DesignWorkspace({
             <div className="editor-toolbar">
               <div>
                 <span className="eyebrow">Structured DESIGN.md-compatible file</span>
-                <h2>{selected?.path ?? "human_design_identity.md"}</h2>
+                <h2>{selected?.path ?? designIdentityFilePath}</h2>
               </div>
               <div className="editor-toolbar-actions">
                 {hasSavedDiff ? (

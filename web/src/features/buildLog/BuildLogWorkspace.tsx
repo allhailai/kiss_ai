@@ -1,4 +1,4 @@
-import type { BuildLogState, BuildSummary, ProjectStatus, RebuildState } from "../../api";
+import type { BuildLogState, BuildSummary, ProjectStatus, RebuildState } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
 
 function attentionItemText(item: unknown) {

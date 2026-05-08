@@ -1,6 +1,6 @@
 import { RangeSetBuilder, type Extension } from "@codemirror/state";
 import { Decoration, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
-import type { ProjectFile } from "../api";
+import type { ProjectFile } from "../contracts/api";
 import {
   linkResolutionClass,
   linkResolutionTitle,

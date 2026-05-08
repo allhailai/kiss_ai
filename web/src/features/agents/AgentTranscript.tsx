@@ -1,4 +1,4 @@
-import type { AgentRunEvent } from "../../api";
+import type { AgentRunEvent } from "../../contracts/api";
 
 function formatLocalTime(value: string) {
   const date = new Date(value);

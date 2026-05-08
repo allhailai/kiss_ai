@@ -1,4 +1,4 @@
-import type { ProjectFile } from "../api";
+import type { ProjectFile } from "../contracts/api";
 
 export type FileTreeNode =
   | {

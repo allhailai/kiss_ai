@@ -1,4 +1,4 @@
-import { type Toast } from "../../app/toast";
+import { type Toast } from "../../shared/toast";
 
 export function ToastViewport({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
   if (!toasts.length) return null;

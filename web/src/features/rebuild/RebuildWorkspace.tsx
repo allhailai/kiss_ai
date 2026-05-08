@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { HumanAttentionItem, ProjectStatus, RebuildModel, RebuildState, ResolutionAttempt, ResolutionOption } from "../../api";
+import type { HumanAttentionItem, ProjectStatus, RebuildModel, RebuildState, ResolutionAttempt, ResolutionOption } from "../../contracts/api";
 import { AgentTranscript } from "../agents/AgentTranscript";
 
 const modelTierLabels: Record<RebuildModel["tier"], string> = {

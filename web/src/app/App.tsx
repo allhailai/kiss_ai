@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
+import { projectPathPrefixes } from "../domain/projectPaths";
 import { buildThemeStyle } from "./theme";
 import { useProjectWorkspace } from "./useProjectWorkspace";
-import { type View } from "./views";
+import { type View } from "../navigation/views";
 import { BuildLogWorkspace } from "../features/buildLog/BuildLogWorkspace";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { DesignWorkspace } from "../features/design/DesignWorkspace";
@@ -19,15 +20,15 @@ const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: str
   },
   inputs: {
     title: "Human Inputs",
-    explainer: "Human source material belongs under inputs_human/. Upload support comes later; this lab currently browses and edits Markdown.",
+    explainer: `Human source material belongs under ${projectPathPrefixes.humanInput}. Upload support comes later; this lab currently browses and edits Markdown.`,
   },
   outputs: {
     title: "Outputs",
-    explainer: "Generated outputs can be reviewed and edited here. Saves write directly to outputs_ai/.",
+    explainer: `Generated outputs can be reviewed and edited here. Saves write directly to ${projectPathPrefixes.output}.`,
   },
   annotations: {
     title: "Annotation Workspace",
-    explainer: "Files under inputs_ai/ are AI-managed. Human edits here are intentionally visualized as annotations and detected through Git diff.",
+    explainer: `Files under ${projectPathPrefixes.aiInput} are AI-managed. Human edits here are intentionally visualized as annotations and detected through Git diff.`,
   },
 };
 

@@ -1,21 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { api } from "../data/apiClient";
 import {
-  api,
   type BuildLogState,
   type DesignState,
-  type FileContent,
-  type FileDiff,
   type ProjectFile,
   type ProjectStatus,
   type ProjectSummary,
   type RebuildModel,
   type RebuildState,
   type ResolveHumanAttentionRequest,
-} from "../api";
+} from "../contracts/api";
 import { uniqueFiles } from "../domain/files";
-import { buildRouteHash, parseRouteHash } from "./routes";
-import { type Toast } from "./toast";
-import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type RouteState, type View } from "./views";
+import { designIdentityFilePath } from "../domain/projectPaths";
+import { resolveEffectiveRebuildModelId } from "../domain/rebuild";
+import { buildRouteHash } from "../navigation/routes";
+import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type RouteState, type View } from "../navigation/views";
+import { useRebuildSync } from "./hooks/useRebuildSync";
+import { useRouteSync } from "./hooks/useRouteSync";
+import { useSelectedFile } from "./hooks/useSelectedFile";
+import { useSelectedProjectLifecycle } from "./hooks/useSelectedProjectLifecycle";
+import { useToasts } from "./hooks/useToasts";
 
 export function useProjectWorkspace() {
   const [view, setView] = useState<View>("build-log");
@@ -33,37 +37,14 @@ export function useProjectWorkspace() {
   const [design, setDesign] = useState<DesignState | null>(null);
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([designProjectFile]);
-  const [selected, setSelected] = useState<FileContent | null>(null);
-  const [selectedDiff, setSelectedDiff] = useState<FileDiff | null>(null);
-  const [draft, setDraft] = useState("");
-  const [toasts, setToasts] = useState<Toast[]>([]);
   const [loading, setLoading] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
+  const { toasts, setNotice, dismissToast } = useToasts();
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.slug === selectedProjectSlug) ?? null,
     [projects, selectedProjectSlug],
   );
-
-  const setNotice = useCallback((message: string) => {
-    const trimmedMessage = message.trim();
-
-    if (!trimmedMessage) {
-      setToasts([]);
-      return;
-    }
-
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setToasts((current) => [...current.slice(-2), { id, message: trimmedMessage }]);
-
-    window.setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 6000);
-  }, []);
-
-  const dismissToast = useCallback((id: string) => {
-    setToasts((current) => current.filter((toast) => toast.id !== id));
-  }, []);
 
   const requireSelectedProjectSlug = useCallback(() => {
     if (!selectedProjectSlug) {
@@ -140,29 +121,14 @@ export function useProjectWorkspace() {
     [requireSelectedProjectSlug],
   );
 
-  const selectFile = useCallback(
-    async (path: string) => {
-      const projectSlug = requireSelectedProjectSlug();
-      setLoading(true);
-      setNotice("");
-      try {
-        const file = await api.file(projectSlug, path);
-        const diff = await api.fileDiff(projectSlug, path);
-        setSelected(file);
-        setSelectedDiff(diff);
-        setDraft(file.content);
-      } catch (error) {
-        setSelected(null);
-        setSelectedDiff(null);
-        setDraft("");
-        await refreshProjectFiles();
-        setNotice(error instanceof Error ? error.message : "Could not open the selected file.");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [refreshProjectFiles, requireSelectedProjectSlug, setNotice],
-  );
+  const { selected, selectedDiff, draft, setDraft, clearSelectedFile, selectFile, saveSelected, refreshSelectedFile, revertSelected } = useSelectedFile({
+    requireSelectedProjectSlug,
+    refreshDesign,
+    refreshProjectFiles,
+    refreshStatus,
+    setLoading,
+    setNotice,
+  });
 
   const applyRoute = useCallback(
     async (route: RouteState) => {
@@ -171,9 +137,7 @@ export function useProjectWorkspace() {
       const nextView = route.view;
       setView(nextView);
       setNotice("");
-      setSelected(null);
-      setSelectedDiff(null);
-      setDraft("");
+      clearSelectedFile();
 
       if (nextView === "requirements") {
         await loadTree("requirements");
@@ -182,20 +146,21 @@ export function useProjectWorkspace() {
       } else if (nextView === "outputs") {
         await loadTree("outputs");
       } else if (nextView === "annotations") {
-        setFiles((await api.tree(route.projectSlug, "inputs-ai")).files);
+        await loadTree("inputs-ai");
       } else {
         setFiles([]);
       }
 
-      if (nextView === "design") {
+      if (nextView === "dashboard") {
+        await refreshDesign();
+      } else if (nextView === "design") {
         setFiles([designProjectFile]);
         await refreshDesign();
-        await selectFile(route.filePath ?? "human_design_identity.md");
+        await selectFile(route.filePath ?? designIdentityFilePath);
       }
 
       if (nextView === "rebuild") {
         await refreshRebuild();
-        await refreshRebuildModels();
       }
 
       if (nextView === "build-log") {
@@ -206,22 +171,19 @@ export function useProjectWorkspace() {
         await selectFile(route.filePath);
       }
     },
-    [loadTree, refreshBuildLog, refreshDesign, refreshRebuild, refreshRebuildModels, selectFile, selectedProjectSlug, setNotice],
+    [
+      clearSelectedFile,
+      loadTree,
+      refreshBuildLog,
+      refreshDesign,
+      refreshRebuild,
+      selectFile,
+      selectedProjectSlug,
+      setNotice,
+    ],
   );
 
-  const navigateTo = useCallback(
-    (nextView: View, filePath?: string | null) => {
-      const nextHash = buildRouteHash(selectedProjectSlug, nextView, filePath);
-
-      if (window.location.hash === nextHash) {
-        void applyRoute({ projectSlug: selectedProjectSlug, view: nextView, filePath: filePath ?? null });
-        return;
-      }
-
-      window.location.hash = nextHash;
-    },
-    [applyRoute, selectedProjectSlug],
-  );
+  const { navigateTo } = useRouteSync({ applyRoute, selectedProjectSlug, setSelectedProjectSlug });
 
   const openProjectFile = useCallback(
     (path: string) => {
@@ -268,59 +230,9 @@ export function useProjectWorkspace() {
     [refreshProjects, selectProject, setNotice],
   );
 
-  const saveSelected = useCallback(async () => {
-    if (!selected) return;
-    const projectSlug = requireSelectedProjectSlug();
-
-    const saved = await api.saveFile(projectSlug, selected.path, draft);
-    const diff = await api.fileDiff(projectSlug, saved.path);
-    setSelected(saved);
-    setSelectedDiff(diff);
-    setDraft(saved.content);
-
-    if (saved.path === "human_design_identity.md") {
-      await refreshDesign();
-    }
-
-    await refreshStatus();
-  }, [draft, refreshDesign, refreshStatus, requireSelectedProjectSlug, selected]);
-
-  const refreshSelectedFile = useCallback(async () => {
-    if (!selected) return;
-    const projectSlug = requireSelectedProjectSlug();
-    const file = await api.file(projectSlug, selected.path);
-    const diff = await api.fileDiff(projectSlug, file.path);
-    setSelected(file);
-    setSelectedDiff(diff);
-    setDraft(file.content);
-
-    if (file.path === "human_design_identity.md") {
-      await refreshDesign();
-    }
-
-    await refreshStatus();
-  }, [refreshDesign, refreshStatus, requireSelectedProjectSlug, selected]);
-
-  const revertSelected = useCallback(async () => {
-    if (!selected) return;
-    const projectSlug = requireSelectedProjectSlug();
-
-    const reverted = await api.revertFile(projectSlug, selected.path);
-    const diff = await api.fileDiff(projectSlug, reverted.path);
-    setSelected(reverted);
-    setSelectedDiff(diff);
-    setDraft(reverted.content);
-
-    if (reverted.path === "human_design_identity.md") {
-      await refreshDesign();
-    }
-
-    await refreshStatus();
-  }, [refreshDesign, refreshStatus, requireSelectedProjectSlug, selected]);
-
   const startRebuild = useCallback(async () => {
     setNotice("");
-    const next = await api.startRebuild(requireSelectedProjectSlug(), selectedRebuildModelId || rebuildModels[0]?.id || "default");
+    const next = await api.startRebuild(requireSelectedProjectSlug(), resolveEffectiveRebuildModelId(selectedRebuildModelId, rebuildModels));
     setRebuild(next);
 
     if (next.status === "blocked") {
@@ -333,7 +245,7 @@ export function useProjectWorkspace() {
       setNotice("");
       const next = await api.resolveHumanAttention(requireSelectedProjectSlug(), {
         ...request,
-        modelId: selectedRebuildModelId || rebuildModels[0]?.id || "default",
+        modelId: resolveEffectiveRebuildModelId(selectedRebuildModelId, rebuildModels),
       });
       setRebuild(next);
 
@@ -348,123 +260,34 @@ export function useProjectWorkspace() {
     void refreshProjects();
   }, [refreshProjects]);
 
-  useEffect(() => {
-    if (!selectedProjectSlug) {
-      window.localStorage.removeItem(selectedProjectStorageKey);
-      setStatus(null);
-      setBuildLog(null);
-      setRebuild(null);
-      setRebuildModels([]);
-      setSelectedRebuildModelId("");
-      setDesign(null);
-      setFiles([]);
-      setProjectFiles([designProjectFile]);
-      setSelected(null);
-      setSelectedDiff(null);
-      setDraft("");
-      return;
-    }
+  useSelectedProjectLifecycle({
+    clearSelectedFile,
+    projects,
+    refreshProjectFiles,
+    refreshRebuildModels,
+    refreshStatus,
+    selectedProjectSlug,
+    setBuildLog,
+    setDesign,
+    setFiles,
+    setNotice,
+    setProjectFiles,
+    setRebuild,
+    setRebuildModels,
+    setSelectedProjectSlug,
+    setSelectedRebuildModelId,
+    setStatus,
+  });
 
-    window.localStorage.setItem(selectedProjectStorageKey, selectedProjectSlug);
-    void refreshStatus();
-    void refreshDesign();
-    void refreshRebuild();
-    void refreshRebuildModels();
-    void refreshProjectFiles();
-  }, [refreshDesign, refreshProjectFiles, refreshRebuild, refreshRebuildModels, refreshStatus, selectedProjectSlug]);
-
-  useEffect(() => {
-    if (!projects.length || !selectedProjectSlug) return;
-    if (projects.some((project) => project.slug === selectedProjectSlug)) return;
-
-    setSelectedProjectSlug(null);
-    window.history.replaceState(null, "", "#/projects");
-    setNotice("The previously selected project is no longer available.");
-  }, [projects, selectedProjectSlug, setNotice]);
-
-  useEffect(() => {
-    const syncRoute = () => {
-      const route = parseRouteHash(window.location.hash);
-      const routeProjectSlug = route.projectSlug ?? selectedProjectSlug;
-
-      if (!routeProjectSlug) {
-        if (window.location.hash !== "#/projects") {
-          window.history.replaceState(null, "", "#/projects");
-        }
-        return;
-      }
-
-      if (route.projectSlug !== routeProjectSlug) {
-        const normalized = buildRouteHash(routeProjectSlug, route.view, route.filePath);
-        if (window.location.hash !== normalized) {
-          window.history.replaceState(null, "", normalized);
-        }
-      }
-
-      if (selectedProjectSlug !== routeProjectSlug) {
-        setSelectedProjectSlug(routeProjectSlug);
-        return;
-      }
-
-      void applyRoute({ ...route, projectSlug: routeProjectSlug });
-    };
-
-    syncRoute();
-    window.addEventListener("hashchange", syncRoute);
-
-    return () => window.removeEventListener("hashchange", syncRoute);
-  }, [applyRoute, selectedProjectSlug]);
-
-  useEffect(() => {
-    if (!rebuild?.running) return;
-
-    const interval = window.setInterval(() => {
-      void (async () => {
-        const next = await refreshRebuild();
-        void refreshStatus();
-
-        if (!next.running && ["finished", "finished_with_attention", "error", "blocked", "interrupted"].includes(next.status)) {
-          void refreshBuildLog();
-          void refreshProjectFiles();
-        }
-      })();
-    }, 2500);
-
-    return () => window.clearInterval(interval);
-  }, [rebuild?.running, refreshBuildLog, refreshProjectFiles, refreshRebuild, refreshStatus]);
-
-  useEffect(() => {
-    if (!selectedProjectSlug || !rebuild?.running || typeof EventSource === "undefined") return;
-
-    const eventSource = new EventSource(api.rebuildEventsUrl(selectedProjectSlug));
-    const syncRebuild = (event: MessageEvent<string>) => {
-      try {
-        const payload = JSON.parse(event.data) as unknown;
-        const next =
-          payload && typeof payload === "object" && "state" in payload
-            ? (payload as { state?: RebuildState }).state
-            : (payload as RebuildState);
-        if (next) {
-          setRebuild(next);
-          if (!next.running && ["finished", "finished_with_attention", "error", "blocked", "interrupted"].includes(next.status)) {
-            void refreshStatus();
-            void refreshBuildLog();
-          void refreshProjectFiles();
-          }
-        }
-      } catch {
-        // Polling remains the fallback if the live event payload cannot be parsed.
-      }
-    };
-
-    eventSource.addEventListener("snapshot", syncRebuild);
-    eventSource.addEventListener("event", syncRebuild);
-    eventSource.onerror = () => {
-      eventSource.close();
-    };
-
-    return () => eventSource.close();
-  }, [rebuild?.running, refreshBuildLog, refreshProjectFiles, refreshStatus, selectedProjectSlug]);
+  useRebuildSync({
+    rebuild,
+    refreshBuildLog,
+    refreshProjectFiles,
+    refreshRebuild,
+    refreshStatus,
+    selectedProjectSlug,
+    setRebuild,
+  });
 
   return {
     view,

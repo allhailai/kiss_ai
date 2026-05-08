@@ -5,14 +5,11 @@ import {
   sectionForView,
   simplifiedNavSections,
   type SimplifiedNavSectionId,
-} from "../../app/navigationModel";
-import { type View } from "../../app/views";
-import type { ProjectFile } from "../../api";
+} from "../../navigation/navigationModel";
+import { projectPathPrefixes } from "../../domain/projectPaths";
+import { type View } from "../../navigation/views";
+import type { ProjectFile } from "../../contracts/api";
 import { FileTreeNav } from "./FileTreeNav";
-
-const humanInputPrefix = "inputs_human/";
-const aiInputPrefix = "inputs_ai/";
-const outputPrefix = "outputs_ai/";
 
 export function SimplifiedNavigator({
   currentView,
@@ -37,9 +34,9 @@ export function SimplifiedNavigator({
   const [expandedSections, setExpandedSections] = useState<Set<SimplifiedNavSectionId>>(
     () => new Set(simplifiedNavSections.map((section) => section.id)),
   );
-  const humanInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(humanInputPrefix)), [projectFiles]);
-  const aiInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(aiInputPrefix)), [projectFiles]);
-  const outputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(outputPrefix)), [projectFiles]);
+  const humanInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.humanInput)), [projectFiles]);
+  const aiInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.aiInput)), [projectFiles]);
+  const outputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.output)), [projectFiles]);
 
   useEffect(() => {
     setExpandedSections((current) => {
@@ -141,7 +138,7 @@ export function SimplifiedNavigator({
             type="button"
           >
             <span>Human acquired</span>
-            <small>{humanInputPrefix}</small>
+            <small>{projectPathPrefixes.humanInput}</small>
           </button>
           <FileTreeBlock
             emptyLabel="No human-acquired Markdown files yet."
@@ -161,7 +158,7 @@ export function SimplifiedNavigator({
             type="button"
           >
             <span>AI acquired</span>
-            <small>{aiInputPrefix}</small>
+            <small>{projectPathPrefixes.aiInput}</small>
           </button>
           <FileTreeBlock
             emptyLabel="No AI-acquired Markdown files yet."

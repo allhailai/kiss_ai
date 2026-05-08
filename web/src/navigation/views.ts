@@ -1,4 +1,5 @@
-import type { ProjectFile } from "../api";
+import type { ProjectFile } from "../contracts/api";
+import { designIdentityFilePath, isDesignIdentityPath, projectPathPrefixes } from "../domain/projectPaths";
 
 export type View = "build-log" | "dashboard" | "requirements" | "inputs" | "outputs" | "annotations" | "design" | "rebuild";
 
@@ -11,7 +12,7 @@ export type RouteState = {
 export const views: Array<{ id: View; label: string; description: string }> = [
   { id: "build-log", label: "Build Log", description: "Latest rebuild summary and history" },
   { id: "requirements", label: "Requirements", description: "Human-owned source of truth" },
-  { id: "annotations", label: "AI Input Files", description: "AI-managed files under inputs_ai/" },
+  { id: "annotations", label: "AI Input Files", description: `AI-managed files under ${projectPathPrefixes.aiInput}` },
   { id: "inputs", label: "Human Input Files", description: "Human source material" },
   { id: "outputs", label: "Outputs", description: "Generated research and reports" },
   { id: "design", label: "Design", description: "Project visual identity" },
@@ -25,8 +26,8 @@ export const fileBackedViews = new Set<View>(["requirements", "inputs", "outputs
 export const defaultRoute: RouteState = { projectSlug: null, view: "rebuild", filePath: null };
 export const selectedProjectStorageKey = "kiss_ai.selectedProject";
 export const designProjectFile: ProjectFile = {
-  path: "human_design_identity.md",
-  name: "human_design_identity.md",
+  path: designIdentityFilePath,
+  name: designIdentityFilePath,
   kind: "design",
   editable: true,
   annotation: false,
@@ -35,10 +36,10 @@ export const requirementsExplainer =
   "These files are the source of truth for the project. Saving here directly changes human-owned project intent.";
 
 export function viewForProjectPath(path: string): View | null {
-  if (path === "human_design_identity.md") return "design";
+  if (isDesignIdentityPath(path)) return "design";
   if (path.startsWith("human_")) return "requirements";
-  if (path.startsWith("inputs_human/")) return "inputs";
-  if (path.startsWith("inputs_ai/")) return "annotations";
-  if (path.startsWith("outputs_ai/")) return "outputs";
+  if (path.startsWith(projectPathPrefixes.humanInput)) return "inputs";
+  if (path.startsWith(projectPathPrefixes.aiInput)) return "annotations";
+  if (path.startsWith(projectPathPrefixes.output)) return "outputs";
   return null;
 }

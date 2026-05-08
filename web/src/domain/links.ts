@@ -1,5 +1,6 @@
-import type { ProjectFile } from "../api";
+import type { ProjectFile } from "../contracts/api";
 import { fileBasename } from "./files";
+import { projectPathRoots } from "./projectPaths";
 
 export type WikiLinkResolution =
   | { status: "resolved"; file: ProjectFile }
@@ -9,8 +10,6 @@ export type WikiLinkResolution =
 
 export const wikiLinkPattern = /\[\[([^\]\n]+)\]\]/g;
 export const markdownLinkPattern = /\[([^\]\n]+)\]\(([^)\n]+)\)/g;
-
-const projectPathRoots = ["inputs_human/", "inputs_ai/", "outputs_ai/", "change_logs/"];
 
 function normalizeWikiTarget(rawTarget: string) {
   const withoutAlias = rawTarget.split("|")[0]?.trim() ?? "";

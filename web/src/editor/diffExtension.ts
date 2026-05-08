@@ -1,6 +1,6 @@
 import { type Extension } from "@codemirror/state";
 import { Decoration, ViewPlugin, WidgetType, type DecorationSet, type EditorView, type ViewUpdate } from "@codemirror/view";
-import type { FileDiff } from "../api";
+import type { FileDiff } from "../contracts/api";
 import type { DiffKind, EditorDiff, EditorDiffDeletion, EditorDiffRange } from "../domain/diffs";
 
 class DiffDeletionWidget extends WidgetType {

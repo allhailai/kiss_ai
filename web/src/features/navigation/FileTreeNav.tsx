@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import type { ProjectFile } from "../../api";
+import type { ProjectFile } from "../../contracts/api";
 import { buildFileTree, getAncestorDirectoryKeys, humanizePathSegment, type FileTreeNode } from "../../domain/files";
 
 export function FileTreeNav({

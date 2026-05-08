@@ -1,30 +1,161 @@
+We need to drastically simplify the left navigation into 2 main menus that we should place below the project name in the top left navigation bar:
+
+
+
+
+
+
 - Double pass inputs
   - Verify each input_file is beefy
   - remove dead input files & flatten the directory structure
 
-- Each time a user does a project "Rebuild", we need to build a summary report of what changed.
-  - These reports should be written to a directory: {project}/change_logs/summaries/
-  - Each build summary file should be formatted with YYYY_MM_DD_build.md
 
-- Global Level
-  - Executive summary of what has changed, terse, punchy section explaining what changed.
-  - Followed by bullet points of salient conceptual and informational changes (if any)
 
-- Inputs Level
-  - Human Inputs (if any)
-    - Executive summary of what has changed, terse, punchy section explaining what changed.
-    - Followed by bullet points of salient conceptual and informational changes (if any) with brief explanation of changes
-      - Links to files changed related to each concept
-  - AI Inputs (if any)
-    - Executive summary of what has changed, terse, punchy section explaining what changed.
-    - Followed by bullet points of salient conceptual and informational changes (if any) with brief explanation of changes
-      - Links to files changed related to each concept
 
-- Outputs Level
-    - Executive summary of what has changed, terse, punchy section explaining what changed.
-    - Followed by bullet points of salient conceptual and informational changes (if any) with brief explanation of changes
-      - Links to files changed related to each concept
+-----------------------------------------------------
+-- Small: -------------------------------------------
+-----------------------------------------------------
+- Revert files at a line level
+- Need to add some sort of a running indicator on the Rebuild screen.
+- Could we also put something in the persistent header that indicates the project is rebuilding?
+-
 
+-----------------------------------------------------
+-- Large: -------------------------------------------
+-----------------------------------------------------
+
+- Curated Outputs
+  - Webpages
+  - PDFs
+  - PPT
+
+- AnnotationFlow: Gitflow
+  - Requirement files & all other files are annotations only
+    - annotations can be scoped by the user to specific things
+    - Can queueu annotations so that teams can work together
+      - Annotations are FIFO -> agent -> modify files
+      - Annotations are just FIFO applied to the scope (default:all)
+      - Agents can synthesize (merge them) annotation into scoped contexts
+
+- Goals, Inputs, Outputs => JSON:Topics+Concepts
+  - Allows apply all or to a specifc
+
+----------
+Fun ------
+----------
+
+- Soul file
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+-- OLD PROMPTS
+
+
+  -----------------------------------------------------------------------------------------------------
+  - Each time a user does a project "Rebuild", we need to build a summary report of what changed.
+    - These reports should be written to a directory: {project}/change_logs/summaries/
+    - Each build summary file should be formatted with YYYY_MM_DD_build.md
+
+  These summaries are not about technical details like what files or types of data has changed but rather a summary of the project information has changed - this should act as a summary review of what was done to the projects information.
+  - Global Level
+    - Executive summary of what project information and concepts has changed, terse, punchy section explaining what changed. T
+    - Followed by bullet points of salient conceptual and informational changes (if any)
+
+  - Inputs Level
+    - Human Inputs (if any)
+      - Executive summary of what has changed, terse, punchy section explaining what changed.
+      - Followed by bullet points of salient conceptual and informational changes (if any) with brief explanation of changes
+        - Links to files changed related to each concept
+    - AI Inputs (if any)
+      - Executive summary of what has changed, terse, punchy section explaining what changed.
+      - Followed by bullet points of salient conceptual and informational changes (if any) with brief explanation of changes
+        - Links to files changed related to each concept
+
+  - Outputs Level
+      - Executive summary of what has changed, terse, punchy section explaining what changed.
+      - Followed by bullet points of salient conceptual and informational changes (if any) with brief explanation of changes
+        - Links to files changed related to each concept
+  ------------------------------------------------------------------------------------------------
+  We need to adjust the kiss_ai rebuild summary behavior so build summaries are executive, project-information-oriented summaries, not technical file-change reports.
+
+  Repo root:
+  - /opt/all_hail_ai/kiss_ai_projects/_kiss_ai
+
+  Relevant context:
+  - Feature notes are in /opt/all_hail_ai/kiss_ai_projects/_kiss_ai/feature_ideas.md lines 5-28.
+  - Rebuild summaries are written to each project at:
+    - {project}/change_logs/summaries/YYYY_MM_DD_build.md
+  - Aggregate logs are at:
+    - {project}/change_logs/change_logs.md
+  - Human attention queue is at:
+    - {project}/change_logs/human_attention_queue.md
+
+  Problem:
+  The current build summary style is too technical. For example, it says things like:
+  - Updated source inventory, data refresh log, and source category coverage.
+  - Rebuilt wiki pages, directed outputs, dated reports, dependency maps, coverage reviews, and stale-output records.
+
+  That is not the purpose of this feature.
+
+  Goal:
+  Rework the rebuild summary prompt/instructions so each build summary gives the user a quick executive overview of what changed in the project’s information, concepts, conclusions, assumptions, risks, and user-relevant outputs.
+
+  The summary should answer:
+  - What changed in the project’s understanding?
+  - What new or updated information matters to the user?
+  - What conclusions, caveats, risks, or decisions changed?
+  - What should the user pay attention to next?
+
+  It should not primarily answer:
+  - Which files changed?
+  - Which internal inventories or ledgers were updated?
+  - Which wiki pages were rebuilt?
+  - Which technical artifacts were regenerated?
+
+  Technical details may be surfaced only when they matter to the user, especially:
+  - Human attention required
+  - Errors or blocked work
+  - Material caveats or source limitations
+  - Important rebuild integrity issues
+  - Anything that changes confidence in the outputs
+
+  Desired summary structure:
+  - Global Level
+    - A terse executive summary of what project information/concepts changed.
+    - Bullet points for salient conceptual or informational changes.
+  - Inputs Level
+    - Human Inputs, if any:
+      - What changed in human-provided context, requirements, assumptions, or constraints.
+      - Bullets with brief explanations and links only where useful.
+    - AI Inputs, if any:
+      - What new evidence, source context, caveats, or information changed.
+      - Bullets should describe the meaning of the information, not just the files updated.
+  - Outputs Level
+    - What user-facing outputs, conclusions, recommendations, reports, or decision-support material changed.
+    - Focus on content changes and implications, not regenerated file lists.
+  - Human Attention Required
+    - Include when present.
+    - Make the required action clear and non-technical where possible.
+
+  Example of bad style:
+  “Rebuilt wiki pages: macro current snapshot, oil and Hormuz, monitoring indicators, and wiki index. Rebuilt directed outputs: macro snapshot, scenario register, risk map...”
+
+  Better style:
+  “The project’s market-risk picture was refreshed for May 4. Oil/Hormuz risk, gold strength, Treasury-yield context, and Fed-policy expectations were updated, but several same-day official data points remain unavailable. The resulting outputs now emphasize capital-preservation caveats and source-confidence limits more clearly.”
+
+  Task:
+  1. Inspect the current framework command/prompt that writes rebuild summaries. Likely files include:
+     - framework/commands/do_write_rebuild_summary.md
+     - framework/commands/do_all_rebuild.md
+     - any templates or playbooks that mention build summaries
+  2. Update the summary-writing instructions so future summaries follow the executive project-information style above.
+  3. Keep existing file paths and naming conventions unchanged.
+  4. Preserve human-attention/error reporting, but make it user-facing.
+  5. Do not over-engineer. Prefer editing the existing prompt/instructions.
+  6. Run appropriate validation after edits.
+  7. Do not commit unless explicitly asked.
+  ------------------------------------------------------------------------------------------------
 
 
 !!!
@@ -79,14 +210,15 @@ Requirements:
    - read lints for edited files
 
 Files to inspect first:
-- `web/src/app/routes.ts`
-- `web/src/app/views.ts`
+- `web/src/navigation/routes.ts`
+- `web/src/navigation/views.ts`
 - `web/src/app/App.tsx`
 - `web/src/app/useProjectWorkspace.ts`
 - `web/src/features/navigation/WorkflowMenus.tsx`
 - `web/src/features/projectPicker/ProjectPicker.tsx`
 - `web/server/index.js`
-- `web/src/api.ts`
+- `web/src/contracts/api.ts`
+- `web/src/data/apiClient.ts`
 - Existing rebuild UI in `web/src/features/rebuild/RebuildWorkspace.tsx`
 
 Do not commit changes unless explicitly asked.
@@ -142,7 +274,8 @@ Implementation guidance:
 - Inspect current web rebuild runtime in:
   - `web/server/index.js`
   - `web/server/agentRuns.js`
-  - `web/src/api.ts`
+  - `web/src/contracts/api.ts`
+  - `web/src/data/apiClient.ts`
   - `web/src/features/rebuild/RebuildWorkspace.tsx`
 - Add backend endpoints as needed, likely something like:
   - `POST /api/projects/:projectSlug/human-attention/:itemId/resolve`
@@ -166,34 +299,3 @@ Implementation guidance:
   - read lints for edited files
 
 Do not commit changes unless explicitly asked.
-
------------------------------------------------------
--- Small: -------------------------------------------
------------------------------------------------------
-- Revert files at a line level
-
------------------------------------------------------
--- Large: -------------------------------------------
------------------------------------------------------
-
-- Curated Outputs
-  - Webpages
-  - PDFs
-  - PPT
-
-- AnnotationFlow: Gitflow
-  - Requirement files & all other files are annotations only
-    - annotations can be scoped by the user to specific things
-    - Can queueu annotations so that teams can work together
-      - Annotations are FIFO -> agent -> modify files
-      - Annotations are just FIFO applied to the scope (default:all)
-      - Agents can synthesize (merge them) annotation into scoped contexts
-
-- Goals, Inputs, Outputs => JSON:Topics+Concepts
-  - Allows apply all or to a specifc
-
-----------
-Fun ------
-----------
-
-- Soul file

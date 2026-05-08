@@ -6,24 +6,25 @@ This directory is organized so AI agents can add features without growing a sing
 
 ```text
 src/
-  app/        App shell, routing, view/file policy, theme mapping, workspace orchestration
+  app/        App shell, theme mapping, and workspace orchestration
+  contracts/  Shared API request/response shapes
+  data/       Backend API transport helpers
   domain/     Pure helpers for files, links, diffs, design identity parsing, formatting
   editor/     CodeMirror React wrapper and editor extensions
   features/   User-facing workflow components
-  api.ts      Backend API types and transport helpers
+  navigation/ Route, view, and navigation models
+  shared/     App-neutral shared UI types
 ```
 
 ## App Layer
 
-`main.tsx` imports the real app shell from `app/App.tsx`.
+`main.tsx` imports the app shell from `app/App.tsx`.
 
 `app/App.tsx` composes the shell, sidebar, and active workflow. It should read like the map of the UI. Keep data loading, route application, saving, reverting, rebuild polling, and project selection in `app/useProjectWorkspace.ts`.
 
-`app/views.ts` owns view ids, route-backed view metadata, local storage keys, and file-path-to-view policy. Route hash behavior belongs in `app/routes.ts`.
+`navigation/views.ts` owns view ids, route-backed view metadata, local storage keys, and file-path-to-view policy. Route hash behavior belongs in `navigation/routes.ts`.
 
-`App.tsx` at the source root is only a compatibility export.
-
-App-owned state shapes belong in `app/`. For example, toast state is typed in `app/toast.ts`, while `features/toast/` owns the rendering component.
+App-owned orchestration belongs in `app/`. Shared UI types such as toast state live under `shared/`, while `features/toast/` owns rendering.
 
 ## Domain Layer
 
@@ -35,7 +36,7 @@ Use `domain/` for deterministic helpers that can be understood and tested withou
 - `formatters.ts`: date and display formatting helpers.
 - `links.ts`: wiki/markdown link resolution and display helpers.
 
-Domain modules should not import React, components, hooks, CodeMirror widgets, or app view types. They may import API contract types from `api.ts`.
+Domain modules should not import React, components, hooks, CodeMirror widgets, app view types, or transport clients. They may import API contract types from `contracts/api.ts`.
 
 ## Editor Layer
 
@@ -48,13 +49,13 @@ Use `editor/` for CodeMirror-specific behavior:
 - `markdownTableExtension.ts`: table editing extension public API.
 - `markdownTableExtension.css`: table interaction styling, including handles, selection, active cells, and context menus.
 
-Editor modules may import domain helpers and API types. They should receive app behavior through callbacks rather than importing workflow components.
+Editor modules may import domain helpers and API contract types. They should receive app behavior through callbacks rather than importing workflow components or transport clients.
 
 ## Feature Layer
 
-Use `features/<feature>/` for workflow UI. A feature component can own local UI state, but app-wide state and API orchestration should stay in `useProjectWorkspace.ts`. Feature-local API calls are acceptable for isolated interactions, such as debounced search, when the result does not become shared workspace state.
+Use `features/<feature>/` for workflow UI. A feature component can own local UI state, but app-wide state and API orchestration should stay in `useProjectWorkspace.ts` and focused hooks under `app/hooks/`. Feature-local API calls are acceptable for isolated interactions, such as debounced search, when the result does not become shared workspace state.
 
-`features/navigation/` is shell-adjacent UI: it may consume app view metadata, but it should not own route parsing, local storage behavior, or data loading.
+`features/navigation/` is shell-adjacent UI: it may consume `navigation/` metadata, but it should not import from `app/`, own route parsing, local storage behavior, or data loading.
 
 Current features:
 
@@ -69,8 +70,8 @@ Current features:
 
 ## Adding A New Workflow
 
-1. Add the view id and label in `app/views.ts`.
-2. Add route/data loading behavior in `app/useProjectWorkspace.ts`.
+1. Add the view id and label in `navigation/views.ts`.
+2. Add route/data loading behavior in `app/useProjectWorkspace.ts` or a focused hook under `app/hooks/`.
 3. Add the root component under `features/<feature>/`.
 4. Compose the feature in `app/App.tsx`.
 5. Run `npm run check` from `web/`.

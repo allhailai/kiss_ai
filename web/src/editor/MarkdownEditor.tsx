@@ -3,7 +3,7 @@ import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language"
 import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 import { useMemo } from "react";
-import type { FileDiff, ProjectFile } from "../api";
+import type { FileDiff, ProjectFile } from "../contracts/api";
 import { buildLineDiff } from "../domain/diffs";
 import { buildEditorDiffExtension } from "./diffExtension";
 import { buildMarkdownTableExtension } from "./markdownTableExtension";

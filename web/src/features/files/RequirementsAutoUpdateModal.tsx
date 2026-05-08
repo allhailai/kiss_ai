@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  api,
   type FileContent,
   type RebuildModel,
   type RequirementAutoUpdatePath,
   type RequirementsAutoUpdateProposal,
-} from "../../api";
+} from "../../contracts/api";
+import { api } from "../../data/apiClient";
+import { buildDiffPreview } from "../../domain/diffPreview";
 import { buildLineDiff, countDeletedLines, countDiffRangeLines } from "../../domain/diffs";
-import { buildDiffPreview, formatModelLabel, modelTierLabels, modelTierOrder } from "./AiAssistPanel";
+import { formatModelLabel, modelTierLabels, modelTierOrder } from "../../domain/modelLabels";
 
 const requirementAutoUpdatePaths: RequirementAutoUpdatePath[] = [
   "human_goal_requirements.md",

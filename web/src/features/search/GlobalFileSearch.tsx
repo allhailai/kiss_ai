@@ -1,5 +1,6 @@
 import { useEffect, useState, type KeyboardEvent } from "react";
-import { api, type ProjectFile } from "../../api";
+import type { ProjectFile } from "../../contracts/api";
+import { api } from "../../data/apiClient";
 import { fileBasename, humanizePathSegment } from "../../domain/files";
 
 export function GlobalFileSearch({

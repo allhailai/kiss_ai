@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { DesignState } from "../api";
+import type { DesignState } from "../contracts/api";
 
 export function buildThemeStyle(design: DesignState | null): CSSProperties {
   const colors = design?.parsed.colors ?? {};

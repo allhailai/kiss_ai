@@ -9,22 +9,24 @@ Use these boundaries when changing `_kiss_ai/web/**`.
 
 ## Core rule
 
-`web/src/App.tsx` is a compatibility export only. `web/src/main.tsx` imports the real app shell from `web/src/app/App.tsx`, which may compose feature roots but should remain a composition map rather than a feature implementation file.
+`web/src/main.tsx` imports the app shell from `web/src/app/App.tsx`, which may compose feature roots but should remain a composition map rather than a feature implementation file.
 
 ## Where code belongs
 
-- App-wide routing, view metadata, file-to-view policy, theme mapping, and workspace orchestration belong in `web/src/app/`.
+- App shell behavior, theme mapping, and workspace orchestration belong in `web/src/app/`.
+- Route parsing, view metadata, navigation models, and file-to-view policy belong in `web/src/navigation/`.
+- API contract types belong in `web/src/contracts/api.ts`; transport helpers belong in `web/src/data/apiClient.ts`.
+- Shared app-neutral UI types belong in `web/src/shared/`.
 - Reusable project logic belongs in `web/src/domain/`. Domain modules must not import React, app modules, editor modules, or feature components.
 - CodeMirror wrappers, widgets, extensions, and editor-specific styles belong in `web/src/editor/`. Editor modules may import domain helpers and API types, but not app feature components.
-- User-facing workflows belong in `web/src/features/<feature>/` with one exported root component per workflow. Feature-local API calls are acceptable for isolated interactions, but shared workspace data loading stays in `web/src/app/useProjectWorkspace.ts`. App-owned state shapes, such as toast data, belong in `web/src/app/`; feature components render them.
-- API contract types and transport helpers belong in `web/src/api.ts`. Touch this file only when the backend API contract changes.
+- User-facing workflows belong in `web/src/features/<feature>/` with one exported root component per workflow. Feature-local API calls are acceptable for isolated interactions, but shared workspace data loading stays in `web/src/app/useProjectWorkspace.ts`. App-owned state belongs in `web/src/app/`; feature components render it.
 - Styles should follow durable ownership. Shared shell styles can stay central; editor-specific styles belong beside editor code; feature-specific styles should be split only when they have clear ownership.
 
 ## Development directives
 
-- Do not add new feature logic to either `web/src/App.tsx` or `web/src/app/App.tsx`; composing feature root components in `web/src/app/App.tsx` is expected.
-- For a new workflow, add a folder under `web/src/features/`, add view metadata in `web/src/app/views.ts`, and route/load behavior in `web/src/app/useProjectWorkspace.ts`.
-- Treat `web/src/features/navigation/` as shell-adjacent UI: it may consume app view metadata, but must not own route parsing, local storage behavior, or data loading.
+- Do not add new feature logic to `web/src/app/App.tsx`; composing feature root components there is expected.
+- For a new workflow, add a folder under `web/src/features/`, add view metadata in `web/src/navigation/views.ts`, and route/load behavior in `web/src/app/useProjectWorkspace.ts` or a focused hook under `web/src/app/hooks/`.
+- Treat `web/src/features/navigation/` as shell-adjacent UI: it may consume navigation metadata, but must not own route parsing, local storage behavior, or data loading.
 - Keep public module APIs narrow. Export root components, hooks, and pure helpers intentionally.
 - Avoid barrel files until repeated imports prove they reduce friction.
 - Preserve route hash formats and `kiss_ai.selectedProject` local storage behavior unless explicitly asked to migrate them.

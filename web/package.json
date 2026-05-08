@@ -8,7 +8,8 @@
     "dev:server": "node --watch server/index.js",
     "dev:client": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit && npm run check:boundaries",
+    "check:boundaries": "node scripts/check-boundaries.js"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.0",
