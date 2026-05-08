@@ -188,15 +188,68 @@ export function useProjectWorkspace() {
   const openProjectFile = useCallback(
     (path: string) => {
       const nextView = viewForProjectPath(path);
+      const projectFile = projectFiles.find((file) => file.path === path);
 
       if (!nextView) {
         setNotice("This link points to a file that is not available in the lab UI yet.");
         return;
       }
 
+      if (projectFile?.previewable === false) {
+        setNotice(`${path} is saved in the project, but this file type cannot be previewed in the lab UI.`);
+        navigateTo(nextView);
+        return;
+      }
+
       navigateTo(nextView, path);
     },
-    [navigateTo, setNotice],
+    [navigateTo, projectFiles, setNotice],
+  );
+
+  const uploadHumanInputFiles = useCallback(
+    async (files: File[]) => {
+      if (!files.length) return;
+
+      setLoading(true);
+      setNotice("");
+      try {
+        const response = await api.uploadHumanInputs(requireSelectedProjectSlug(), files);
+        await refreshProjectFiles();
+        if (view === "inputs") await loadTree("human");
+        setNotice(
+          `Uploaded ${response.files.length.toLocaleString()} file${response.files.length === 1 ? "" : "s"} to inputs_human/.`,
+        );
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : "Could not upload files.");
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loadTree, refreshProjectFiles, requireSelectedProjectSlug, setLoading, setNotice, view],
+  );
+
+  const deleteHumanInputFile = useCallback(
+    async (path: string) => {
+      const confirmed = window.confirm(`Delete ${path} from inputs_human/? This cannot be undone.`);
+      if (!confirmed) return;
+
+      setLoading(true);
+      setNotice("");
+      try {
+        const response = await api.deleteHumanInput(requireSelectedProjectSlug(), path);
+        if (selected?.path === response.path) clearSelectedFile();
+        await refreshProjectFiles();
+        if (view === "inputs") await loadTree("human");
+        setNotice(`Deleted ${response.path}.`);
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : "Could not delete the file.");
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [clearSelectedFile, loadTree, refreshProjectFiles, requireSelectedProjectSlug, selected?.path, setLoading, setNotice, view],
   );
 
   const selectProject = useCallback((projectSlug: string) => {
@@ -321,6 +374,8 @@ export function useProjectWorkspace() {
     refreshRebuildModels,
     navigateTo,
     openProjectFile,
+    uploadHumanInputFiles,
+    deleteHumanInputFile,
     selectProject,
     clearSelectedProject,
     createProject,

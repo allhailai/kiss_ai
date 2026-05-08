@@ -3,6 +3,7 @@ import type {
   AiAssistRequest,
   BuildLogState,
   CreateProjectRequest,
+  DeleteHumanInputResponse,
   DesignState,
   FileContent,
   FileDiff,
@@ -18,6 +19,7 @@ import type {
   RequirementsAutoUpdateProposeResponse,
   ResolveHumanAttentionRequest,
   TreeResponse,
+  UploadHumanInputsResponse,
 } from "../contracts/api";
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -41,6 +43,18 @@ function projectBase(projectSlug: string) {
   return `/api/projects/${encodeURIComponent(projectSlug)}`;
 }
 
+function fileToBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      resolve(result.includes(",") ? result.split(",")[1] : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error(`Could not read ${file.name}.`));
+    reader.readAsDataURL(file);
+  });
+}
+
 export const api = {
   projects: () => request<ProjectListResponse>("/api/projects"),
   createProject: (body: CreateProjectRequest) =>
@@ -60,6 +74,25 @@ export const api = {
     return request<BuildLogState>(`${projectBase(projectSlug)}/build-log${query ? `?${query}` : ""}`);
   },
   tree: (projectSlug: string, section: string) => request<TreeResponse>(`${projectBase(projectSlug)}/tree/${section}`),
+  uploadHumanInputs: async (projectSlug: string, files: File[]) =>
+    request<UploadHumanInputsResponse>(`${projectBase(projectSlug)}/inputs-human/upload`, {
+      method: "POST",
+      body: JSON.stringify({
+        files: await Promise.all(
+          files.map(async (file) => ({
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            contentBase64: await fileToBase64(file),
+          })),
+        ),
+      }),
+    }),
+  deleteHumanInput: (projectSlug: string, path: string) =>
+    request<DeleteHumanInputResponse>(`${projectBase(projectSlug)}/inputs-human/file`, {
+      method: "DELETE",
+      body: JSON.stringify({ path }),
+    }),
   searchFiles: (projectSlug: string, query: string) =>
     request<FileSearchResponse>(`${projectBase(projectSlug)}/search/files?q=${encodeURIComponent(query)}`),
   file: (projectSlug: string, path: string) => request<FileContent>(`${projectBase(projectSlug)}/file?path=${encodeURIComponent(path)}`),

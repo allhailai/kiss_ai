@@ -5,10 +5,12 @@ import { buildFileTree, getAncestorDirectoryKeys, humanizePathSegment, type File
 export function FileTreeNav({
   files,
   selectedPath,
+  onDeleteFile,
   onSelectFile,
 }: {
   files: ProjectFile[];
   selectedPath: string | null;
+  onDeleteFile?: (path: string) => void;
   onSelectFile: (path: string) => void;
 }) {
   const tree = useMemo(() => buildFileTree(files), [files]);
@@ -57,6 +59,7 @@ export function FileTreeNav({
           expandedDirectories={expandedDirectories}
           key={node.key}
           node={node}
+          onDeleteFile={onDeleteFile}
           onSelectFile={onSelectFile}
           onToggleDirectory={toggleDirectory}
           selectedPath={selectedPath}
@@ -71,6 +74,7 @@ function FileTreeNodeRow({
   depth,
   expandedDirectories,
   selectedPath,
+  onDeleteFile,
   onSelectFile,
   onToggleDirectory,
 }: {
@@ -78,6 +82,7 @@ function FileTreeNodeRow({
   depth: number;
   expandedDirectories: Set<string>;
   selectedPath: string | null;
+  onDeleteFile?: (path: string) => void;
   onSelectFile: (path: string) => void;
   onToggleDirectory: (directoryKey: string) => void;
 }) {
@@ -109,6 +114,7 @@ function FileTreeNodeRow({
                 expandedDirectories={expandedDirectories}
                 key={child.key}
                 node={child}
+                onDeleteFile={onDeleteFile}
                 onSelectFile={onSelectFile}
                 onToggleDirectory={onToggleDirectory}
                 selectedPath={selectedPath}
@@ -120,16 +126,49 @@ function FileTreeNodeRow({
     );
   }
 
+  const className = [
+    "file-tree-row",
+    "file-tree-file",
+    selectedPath === node.file.path ? "active" : "",
+    node.file.previewable === false ? "not-previewable" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const fileLabel = (
+    <>
+      <span className="file-tree-toggle" aria-hidden="true" />
+      <span className="file-tree-label">{humanizePathSegment(node.name)}</span>
+      {node.file.previewable === false ? <small>file</small> : null}
+    </>
+  );
+
+  if (onDeleteFile) {
+    return (
+      <div className={`${className} with-actions`} role="treeitem" style={depthStyle} title={node.file.path}>
+        <button className="file-tree-open-button" onClick={() => onSelectFile(node.file.path)} type="button">
+          {fileLabel}
+        </button>
+        <button
+          className="file-tree-delete-button"
+          onClick={() => onDeleteFile(node.file.path)}
+          title={`Delete ${node.file.path}`}
+          type="button"
+        >
+          Delete
+        </button>
+      </div>
+    );
+  }
+
   return (
     <button
-      className={selectedPath === node.file.path ? "file-tree-row file-tree-file active" : "file-tree-row file-tree-file"}
+      className={className}
       onClick={() => onSelectFile(node.file.path)}
       role="treeitem"
       style={depthStyle}
-      title={node.file.path}
+      title={node.file.previewable === false ? `${node.file.path} (saved, no preview)` : node.file.path}
     >
-      <span className="file-tree-toggle" aria-hidden="true" />
-      <span className="file-tree-label">{humanizePathSegment(node.name)}</span>
+      {fileLabel}
     </button>
   );
 }

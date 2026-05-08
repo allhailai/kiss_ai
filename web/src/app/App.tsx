@@ -20,7 +20,7 @@ const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: str
   },
   inputs: {
     title: "Human Inputs",
-    explainer: `Human source material belongs under ${projectPathPrefixes.humanInput}. Upload support comes later; this lab currently browses and edits Markdown.`,
+    explainer: `Human source material belongs under ${projectPathPrefixes.humanInput}. Drop files here to add source material to the project.`,
   },
   outputs: {
     title: "Outputs",
@@ -90,6 +90,7 @@ export function App() {
             selectedPath={workspace.selected?.path ?? null}
             showAiAutoUpdate={Boolean(selectedAutoUpdatePath)}
             onAiAutoUpdate={() => setAutoUpdateOpen(true)}
+            onDeleteHumanInputFile={(path) => void workspace.deleteHumanInputFile(path)}
             onOpenFile={workspace.openProjectFile}
             onOpenView={(nextView, filePath) => navigateTo(nextView, filePath)}
           />
@@ -128,6 +129,7 @@ export function App() {
             onModelChange={workspace.setSelectedRebuildModelId}
             onNotice={workspace.setNotice}
             onOpenFile={workspace.openProjectFile}
+            onUploadFiles={workspace.view === "inputs" ? workspace.uploadHumanInputFiles : undefined}
             onRevert={() => void workspace.revertSelected()}
             onSave={() => void workspace.saveSelected()}
           />

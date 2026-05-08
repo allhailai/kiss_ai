@@ -11,11 +11,13 @@ export function registerApiRoutes(app, deps) {
     gitFileDiff,
     gitStatus,
     buildLogTabState,
+    deleteHumanInputFile,
     humanFiles,
     httpError,
     lintDesignIdentity,
     listCursorModels,
     listMarkdownFiles,
+    listProjectFiles,
     parseDesignIdentity,
     pickRebuildModelId,
     readProjectJson,
@@ -29,6 +31,7 @@ export function registerApiRoutes(app, deps) {
     startRebuild,
     subscribeToRebuild,
     treeRoots,
+    uploadHumanInputFiles,
     writeTextFile,
   } = deps;
 
@@ -149,8 +152,24 @@ export function registerApiRoutes(app, deps) {
       if (!config) throw httpError("Unknown tree section.", 404, "unknown_tree_section");
 
       response.json({
-        files: await listMarkdownFiles(project.path, config.root, config.kind, config.editable, config.annotation),
+        files: section === "human" ? await listProjectFiles(project.path, config.root) : await listMarkdownFiles(project.path, config.root, config.kind, config.editable, config.annotation),
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/inputs-human/upload", async (request, response, next) => {
+    try {
+      response.status(201).json(await uploadHumanInputFiles(request.project.path, request.body.files));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/projects/:projectSlug/inputs-human/file", async (request, response, next) => {
+    try {
+      response.json(await deleteHumanInputFile(request.project.path, String(request.body.path ?? "")));
     } catch (error) {
       next(error);
     }

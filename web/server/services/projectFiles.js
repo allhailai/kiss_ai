@@ -5,14 +5,53 @@ import path from "node:path";
 export function createProjectFileService({
   WEB_ROOT,
   MAX_FILE_BYTES,
+  MAX_UPLOAD_BYTES,
   MAX_SEARCH_RESULTS,
   humanFiles,
   hashText,
   humanizePathSegment,
   httpError,
 }) {
+  const previewableExtensions = new Set([
+    ".css",
+    ".csv",
+    ".html",
+    ".js",
+    ".json",
+    ".md",
+    ".txt",
+    ".ts",
+    ".tsx",
+    ".tsv",
+    ".xml",
+    ".yaml",
+    ".yml",
+  ]);
+
   function isPathInsideRoot(root, candidate) {
     return candidate === root || candidate.startsWith(`${root}${path.sep}`);
+  }
+
+  function isPreviewablePath(relativePath) {
+    return previewableExtensions.has(path.extname(relativePath).toLowerCase());
+  }
+
+  function isHiddenProjectPath(relativePath) {
+    return relativePath.split("/").some((segment) => segment.startsWith("."));
+  }
+
+  function projectFileItem(projectRoot, rootRelative, relative, meta, stat) {
+    const previewable = isPreviewablePath(relative);
+
+    return {
+      path: meta.path,
+      name: relative.replace(`${rootRelative}/`, ""),
+      kind: meta.kind,
+      editable: meta.editable && previewable,
+      annotation: meta.annotation,
+      modifiedAt: stat.mtime.toISOString(),
+      previewable,
+    };
   }
 
   async function fileExists(absolutePath) {
@@ -56,7 +95,7 @@ export function createProjectFileService({
     }
 
     if (normalized.startsWith("inputs_human/")) {
-      return { path: normalized, kind: "human", editable: true, annotation: false };
+      return { path: normalized, kind: "human", editable: true, annotation: false, previewable: isPreviewablePath(normalized) };
     }
 
     if (normalized.startsWith("change_logs/")) {
@@ -80,6 +119,10 @@ export function createProjectFileService({
     const { absolute } = projectPath(projectRoot, meta.path);
     const stat = await fs.stat(absolute);
 
+    if (meta.previewable === false) {
+      throw httpError("This file type is saved in the project but cannot be previewed in the lab UI.", 415, "file_not_previewable");
+    }
+
     if (stat.size > MAX_FILE_BYTES) {
       throw httpError("File is too large to open in the lab UI.", 413, "file_too_large");
     }
@@ -100,6 +143,10 @@ export function createProjectFileService({
       throw httpError("This file is read-only in the lab UI.", 403, "file_read_only");
     }
 
+    if (meta.previewable === false) {
+      throw httpError("This file type is saved in the project but cannot be edited in the lab UI.", 415, "file_not_previewable");
+    }
+
     const { absolute } = projectPath(projectRoot, meta.path);
     await fs.writeFile(absolute, content, "utf8");
     return readTextFile(projectRoot, meta.path);
@@ -113,7 +160,7 @@ export function createProjectFileService({
       const entries = await fs.readdir(currentAbsolute, { withFileTypes: true });
 
       for (const entry of entries) {
-        if (entry.name === ".git" || entry.name === "node_modules") continue;
+        if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
 
         const absolute = path.join(currentAbsolute, entry.name);
         const relative = path.relative(projectRoot, absolute).replaceAll(path.sep, "/");
@@ -133,6 +180,7 @@ export function createProjectFileService({
           editable,
           annotation,
           modifiedAt: stat.mtime.toISOString(),
+          previewable: true,
         });
       }
     }
@@ -144,6 +192,121 @@ export function createProjectFileService({
     }
 
     return files.sort((a, b) => a.path.localeCompare(b.path));
+  }
+
+  async function listProjectFiles(projectRoot, rootRelative) {
+    const root = projectPath(projectRoot, rootRelative);
+    const files = [];
+
+    async function walk(currentAbsolute) {
+      const entries = await fs.readdir(currentAbsolute, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+
+        const absolute = path.join(currentAbsolute, entry.name);
+        const relative = path.relative(projectRoot, absolute).replaceAll(path.sep, "/");
+
+        if (entry.isDirectory()) {
+          await walk(absolute);
+          continue;
+        }
+
+        if (isHiddenProjectPath(relative)) continue;
+
+        const meta = classifyPath(projectRoot, relative);
+        const stat = await fs.stat(absolute);
+        files.push(projectFileItem(projectRoot, root.relative, relative, meta, stat));
+      }
+    }
+
+    try {
+      await walk(root.absolute);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+
+    return files.sort((a, b) => a.path.localeCompare(b.path));
+  }
+
+  function safeUploadFileName(rawName) {
+    const baseName = path.basename(String(rawName ?? "").replaceAll("\\", "/")).trim();
+    const safeName = baseName.replace(/[\x00-\x1f<>:"|?*]/g, "_");
+
+    if (!safeName || safeName === "." || safeName === "..") {
+      throw httpError("Uploaded files need a valid filename.", 400, "invalid_upload_filename");
+    }
+
+    return safeName;
+  }
+
+  async function uploadHumanInputFiles(projectRoot, rawFiles) {
+    const files = Array.isArray(rawFiles) ? rawFiles : [];
+
+    if (!files.length) {
+      throw httpError("Upload requires at least one file.", 400, "upload_empty");
+    }
+
+    const uploaded = [];
+
+    for (const rawFile of files) {
+      const name = safeUploadFileName(rawFile?.name);
+      const contentBase64 = typeof rawFile?.contentBase64 === "string" ? rawFile.contentBase64 : "";
+      const buffer = Buffer.from(contentBase64, "base64");
+
+      if (!contentBase64 || buffer.length === 0) {
+        throw httpError(`Uploaded file ${name} is empty or invalid.`, 400, "invalid_upload_content");
+      }
+
+      if (buffer.length > MAX_UPLOAD_BYTES) {
+        throw httpError(`Uploaded file ${name} is too large.`, 413, "upload_too_large");
+      }
+
+      const { absolute, relative } = projectPath(projectRoot, `inputs_human/${name}`);
+      await fs.mkdir(path.dirname(absolute), { recursive: true });
+      await fs.writeFile(absolute, buffer);
+
+      const meta = classifyPath(projectRoot, relative);
+      const stat = await fs.stat(absolute);
+      uploaded.push(projectFileItem(projectRoot, "inputs_human", relative, meta, stat));
+    }
+
+    return { files: uploaded };
+  }
+
+  async function pruneEmptyDirectories(rootAbsolute, currentAbsolute) {
+    if (currentAbsolute === rootAbsolute || !isPathInsideRoot(rootAbsolute, currentAbsolute)) return;
+
+    const entries = await fs.readdir(currentAbsolute);
+    if (entries.length > 0) return;
+
+    await fs.rmdir(currentAbsolute);
+    await pruneEmptyDirectories(rootAbsolute, path.dirname(currentAbsolute));
+  }
+
+  async function deleteHumanInputFile(projectRoot, relativePath) {
+    const meta = classifyPath(projectRoot, relativePath);
+
+    if (!meta.path.startsWith("inputs_human/")) {
+      throw httpError("Only human input files can be deleted here.", 403, "delete_not_allowed");
+    }
+
+    if (isHiddenProjectPath(meta.path)) {
+      throw httpError("Hidden project files cannot be managed in the lab UI.", 403, "hidden_file");
+    }
+
+    const { absolute } = projectPath(projectRoot, meta.path);
+    const stat = await fs.stat(absolute);
+
+    if (!stat.isFile()) {
+      throw httpError("Only files can be deleted here.", 400, "delete_not_file");
+    }
+
+    await fs.unlink(absolute);
+    const inputRoot = projectPath(projectRoot, "inputs_human");
+    await pruneEmptyDirectories(inputRoot.absolute, path.dirname(absolute));
+
+    return { path: meta.path };
   }
 
   async function readSearchAllowedPaths() {
@@ -177,10 +340,11 @@ export function createProjectFileService({
       const entries = await fs.readdir(currentAbsolute, { withFileTypes: true });
 
       for (const entry of entries) {
-        if (entry.name === ".git" || entry.name === "node_modules") continue;
+        if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
 
         const absolute = path.join(currentAbsolute, entry.name);
         const relative = path.relative(projectRoot, absolute).replaceAll(path.sep, "/");
+        if (isHiddenProjectPath(relative)) continue;
 
         if (entry.isDirectory()) {
           await walk(absolute);
@@ -217,6 +381,7 @@ export function createProjectFileService({
     const files = [];
 
     for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue;
       if (!entry.isFile() || !fileMatchesPattern(entry.name, pattern)) continue;
 
       const meta = classifyPath(projectRoot, entry.name);
@@ -325,6 +490,10 @@ export function createProjectFileService({
       throw httpError("This file is read-only in the lab UI.", 403, "file_read_only");
     }
 
+    if (meta.previewable === false) {
+      throw httpError("This file type is saved in the project but cannot be restored in the lab UI.", 415, "file_not_previewable");
+    }
+
     await new Promise((resolve, reject) => {
       execFile("git", ["restore", "--source=HEAD", "--staged", "--worktree", "--", meta.path], { cwd: projectRoot }, (error) => {
         if (error) {
@@ -341,16 +510,19 @@ export function createProjectFileService({
 
   return {
     classifyPath,
+    deleteHumanInputFile,
     fileExists,
     gitFileDiff,
     gitStatus,
     isPathInsideRoot,
     listMarkdownFiles,
+    listProjectFiles,
     projectPath,
     readProjectJson,
     readTextFile,
     restoreFileFromHead,
     searchFiles,
+    uploadHumanInputFiles,
     writeTextFile,
   };
 }

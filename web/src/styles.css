@@ -628,8 +628,68 @@ button:disabled {
   line-height: 1.18;
 }
 
+.file-tree-file.with-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 2px calc(5px + (var(--tree-depth, 0) * 5px));
+}
+
+.file-tree-open-button {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 0.75rem minmax(0, 1fr);
+  align-items: start;
+  gap: 4px;
+  padding: 1px 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.file-tree-file.not-previewable .file-tree-open-button {
+  grid-template-columns: 0.75rem minmax(0, 1fr) auto;
+}
+
+.file-tree-delete-button {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-secondary);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.file-tree-delete-button:hover,
+.file-tree-delete-button:focus-visible {
+  background: color-mix(in srgb, #b42318 12%, white);
+  color: #b42318;
+}
+
+.file-tree-file.not-previewable {
+  grid-template-columns: 0.75rem minmax(0, 1fr) auto;
+  color: var(--color-secondary);
+}
+
+.file-tree-file.not-previewable small {
+  align-self: center;
+  color: var(--color-secondary);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .file-tree-label {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   overflow-wrap: anywhere;
 }
 
@@ -1085,6 +1145,10 @@ button:disabled {
   gap: 14px;
 }
 
+.document-workspace.has-upload-dropzone {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
 .document-header {
   display: flex;
   align-items: baseline;
@@ -1099,6 +1163,43 @@ button:disabled {
   color: var(--color-secondary);
   line-height: 1.5;
   text-align: right;
+}
+
+.human-input-dropzone {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 2px dashed color-mix(in srgb, var(--color-accent) 48%, var(--color-border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+}
+
+.human-input-dropzone.active {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface));
+}
+
+.human-input-dropzone strong {
+  color: var(--color-primary);
+}
+
+.human-input-dropzone p {
+  margin: 4px 0 0;
+  color: var(--color-secondary);
+}
+
+.human-input-dropzone button {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--color-accent);
+  color: white;
+  font-weight: 800;
+}
+
+.human-input-dropzone input {
+  display: none;
 }
 
 .file-list,

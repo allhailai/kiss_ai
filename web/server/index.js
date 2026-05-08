@@ -21,6 +21,7 @@ const WEB_ROOT = path.resolve(__dirname, "..");
 const PROJECTS_ROOT = path.resolve(process.env.KISS_AI_PROJECTS_ROOT ?? path.resolve(WEB_ROOT, "..", ".."));
 const PORT = Number(process.env.KISS_AI_UI_PORT ?? 8787);
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const MAX_SEARCH_RESULTS = 25;
 const MAX_AGGREGATE_LOG_SECTIONS = 8;
 const MAX_AI_ASSIST_FULL_CONTENT_BYTES = 80 * 1024;
@@ -80,7 +81,7 @@ const treeRoots = new Map([
 ]);
 
 const app = express();
-app.use(express.json({ limit: "4mb" }));
+app.use(express.json({ limit: "60mb" }));
 
 const rebuildStore = createRebuildStore({ stateDir: REBUILD_STATE_DIR, projectSlugPattern });
 const {
@@ -185,20 +186,24 @@ function displayProjectName(projectName, projectSlug) {
 
 const {
   classifyPath,
+  deleteHumanInputFile,
   fileExists,
   gitFileDiff,
   gitStatus,
   isPathInsideRoot,
   listMarkdownFiles,
+  listProjectFiles,
   projectPath,
   readProjectJson,
   readTextFile,
   restoreFileFromHead,
   searchFiles,
+  uploadHumanInputFiles,
   writeTextFile,
 } = createProjectFileService({
   WEB_ROOT,
   MAX_FILE_BYTES,
+  MAX_UPLOAD_BYTES,
   MAX_SEARCH_RESULTS,
   humanFiles,
   hashText,
@@ -1055,6 +1060,7 @@ registerApiRoutes(app, {
   attachProject,
   buildLogTabState,
   createProjectFromTemplate,
+  deleteHumanInputFile,
   discoverProjects,
   displayProjectName,
   getHumanAttentionItems,
@@ -1067,6 +1073,7 @@ registerApiRoutes(app, {
   listBuildSummaries,
   listCursorModels,
   listMarkdownFiles,
+  listProjectFiles,
   parseDesignIdentity,
   pickRebuildModelId,
   readAggregateBuildLogExcerpt,
@@ -1083,6 +1090,7 @@ registerApiRoutes(app, {
   summaryContentItem,
   summaryListItem,
   treeRoots,
+  uploadHumanInputFiles,
   writeTextFile,
 });
 

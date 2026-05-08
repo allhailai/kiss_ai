@@ -19,6 +19,7 @@ export function SimplifiedNavigator({
   selectedPath,
   showAiAutoUpdate,
   onAiAutoUpdate,
+  onDeleteHumanInputFile,
   onOpenView,
   onOpenFile,
 }: {
@@ -28,6 +29,7 @@ export function SimplifiedNavigator({
   selectedPath: string | null;
   showAiAutoUpdate?: boolean;
   onAiAutoUpdate?: () => void;
+  onDeleteHumanInputFile?: (path: string) => void;
   onOpenView: (view: View, path?: string | null) => void;
   onOpenFile: (path: string) => void;
 }) {
@@ -144,9 +146,10 @@ export function SimplifiedNavigator({
             <small>{projectPathPrefixes.humanInput}</small>
           </button>
           <FileTreeBlock
-            emptyLabel="No human-acquired Markdown files yet."
+            emptyLabel="No human-acquired files yet."
             files={humanInputFiles}
             loading={loading && currentView === "inputs"}
+            onDeleteFile={onDeleteHumanInputFile}
             onOpenFile={onOpenFile}
             selectedPath={selectedPath}
           />
@@ -191,18 +194,20 @@ function FileTreeBlock({
   files,
   loading,
   selectedPath,
+  onDeleteFile,
   onOpenFile,
 }: {
   emptyLabel: string;
   files: ProjectFile[];
   loading: boolean;
   selectedPath: string | null;
+  onDeleteFile?: (path: string) => void;
   onOpenFile: (path: string) => void;
 }) {
   if (loading) return <p className="simple-nav-state">Loading...</p>;
   if (files.length === 0) return <p className="simple-nav-state">{emptyLabel}</p>;
 
-  return <FileTreeNav files={files} selectedPath={selectedPath} onSelectFile={onOpenFile} />;
+  return <FileTreeNav files={files} selectedPath={selectedPath} onDeleteFile={onDeleteFile} onSelectFile={onOpenFile} />;
 }
 
 function DefineNavLabel({ label }: { label: string }) {

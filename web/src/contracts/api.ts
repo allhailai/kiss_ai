@@ -90,6 +90,7 @@ export type ProjectFile = {
   editable: boolean;
   annotation: boolean;
   modifiedAt?: string | null;
+  previewable?: boolean;
 };
 
 export type FileContent = {
@@ -119,6 +120,14 @@ export type FileDiff = {
 
 export type TreeResponse = {
   files: ProjectFile[];
+};
+
+export type UploadHumanInputsResponse = {
+  files: ProjectFile[];
+};
+
+export type DeleteHumanInputResponse = {
+  path: string;
 };
 
 export type FileSearchResponse = {

@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import type { FileContent, FileDiff, ProjectFile, RebuildModel } from "../../contracts/api";
 import { countDeletedLines, countDiffRangeLines } from "../../domain/diffs";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
@@ -17,6 +18,7 @@ export function FileWorkspace({
   onModelChange,
   onNotice,
   onOpenFile,
+  onUploadFiles,
   onRevert,
   onSave,
 }: {
@@ -33,15 +35,17 @@ export function FileWorkspace({
   onModelChange: (modelId: string) => void;
   onNotice: (message: string) => void;
   onOpenFile: (path: string) => void;
+  onUploadFiles?: (files: File[]) => Promise<void>;
   onRevert: () => void;
   onSave: () => void;
 }) {
   return (
-    <div className="document-workspace">
+    <div className={onUploadFiles ? "document-workspace has-upload-dropzone" : "document-workspace"}>
       <header className="document-header">
         <span className="eyebrow">{title}</span>
         {explainer ? <p>{explainer}</p> : null}
       </header>
+      {onUploadFiles ? <HumanInputDropzone onUploadFiles={onUploadFiles} onNotice={onNotice} /> : null}
       <EditorPane
         projectSlug={projectSlug}
         models={models}
@@ -58,6 +62,85 @@ export function FileWorkspace({
         onSave={onSave}
       />
     </div>
+  );
+}
+
+function HumanInputDropzone({
+  onUploadFiles,
+  onNotice,
+}: {
+  onUploadFiles: (files: File[]) => Promise<void>;
+  onNotice: (message: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const dragDepthRef = useRef(0);
+  const [dragActive, setDragActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  async function uploadFiles(fileList: FileList | File[]) {
+    const files = Array.from(fileList);
+    if (!files.length) return;
+
+    setUploading(true);
+    try {
+      await onUploadFiles(files);
+    } catch {
+      // The parent upload handler owns the user-facing error notice.
+    } finally {
+      setUploading(false);
+      dragDepthRef.current = 0;
+      setDragActive(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  return (
+    <section
+      className={dragActive ? "human-input-dropzone active" : "human-input-dropzone"}
+      onDragEnter={(event) => {
+        event.preventDefault();
+        dragDepthRef.current += 1;
+        setDragActive(true);
+      }}
+      onDragLeave={(event) => {
+        event.preventDefault();
+        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+        if (dragDepthRef.current === 0) setDragActive(false);
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        dragDepthRef.current = 0;
+        setDragActive(false);
+        void uploadFiles(event.dataTransfer.files);
+      }}
+    >
+      <div>
+        <strong>{uploading ? "Uploading files..." : "Drop files into Human Inputs"}</strong>
+        <p>Files are saved directly to inputs_human/ for this project. Any file type is accepted.</p>
+      </div>
+      <button
+        onClick={() => inputRef.current?.click()}
+        type="button"
+        disabled={uploading}
+      >
+        Choose Files
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        onChange={(event) => {
+          if (!event.target.files) {
+            onNotice("No files selected.");
+            return;
+          }
+          void uploadFiles(event.target.files);
+        }}
+      />
+    </section>
   );
 }
 
