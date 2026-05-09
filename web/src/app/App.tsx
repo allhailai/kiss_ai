@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { projectPathPrefixes } from "../domain/projectPaths";
 import { buildThemeStyle } from "./theme";
 import { useProjectWorkspace } from "./useProjectWorkspace";
 import { RightPanelSurface } from "./RightPanelSurface";
 import { useRightPanelSurface } from "./hooks/useRightPanelSurface";
+import { panelWidthContextKey, useRightPanelWidth } from "./hooks/useRightPanelWidth";
 import { type View } from "../navigation/views";
 import { BuildLogWorkspace } from "../features/buildLog/BuildLogWorkspace";
 import { ProjectChatConversationHistory, ProjectChatPanel, useProjectChat } from "../features/chat/ChatWorkspace";
@@ -46,6 +47,20 @@ export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const projectChatVisitKeyRef = useRef<string | null>(null);
   const themeStyle = useMemo(() => buildThemeStyle(workspace.design), [workspace.design]);
+  const rightPanelWidth = useRightPanelWidth({
+    panelKind: rightPanelSurface.rightPanel?.kind ?? null,
+    replaceRouteContext: workspace.replaceRouteContext,
+    routeContext: workspace.routeContext,
+    view: workspace.view,
+  });
+  const appStyle = useMemo(
+    () =>
+      ({
+        ...themeStyle,
+        "--right-panel-width": rightPanelWidth.cssValue,
+      }) as CSSProperties,
+    [rightPanelWidth.cssValue, themeStyle],
+  );
   const projectChat = useProjectChat({
     projectSlug: workspace.selectedProjectSlug,
     selectedModelId: workspace.selectedRebuildModelId,
@@ -56,10 +71,17 @@ export function App() {
   const openProjectChatPanel = () => {
     setProjectChatPanelDismissed(false);
     rightPanelSurface.openPanel(projectChatPanel);
+    if (workspace.view === "chat" && !workspace.routeContext[panelWidthContextKey]) {
+      workspace.replaceRouteContext({ [panelWidthContextKey]: "55%" });
+    }
   };
   const selectProjectChatConversation = (conversationId: string) => {
     openProjectChatPanel();
-    navigateTo("chat", null, { conversation: conversationId });
+    navigateTo("chat", null, {
+      ...workspace.routeContext,
+      conversation: conversationId,
+      [panelWidthContextKey]: workspace.routeContext[panelWidthContextKey] || "55%",
+    });
   };
 
   useEffect(() => {
@@ -72,14 +94,14 @@ export function App() {
     if (projectChatVisitKeyRef.current !== workspace.selectedProjectSlug) {
       projectChatVisitKeyRef.current = workspace.selectedProjectSlug;
       if (projectChatPanelDismissed) setProjectChatPanelDismissed(false);
-      rightPanelSurface.openPanel(projectChatPanel);
+      openProjectChatPanel();
       return;
     }
 
     if (!projectChatPanelDismissed && !rightPanelSurface.rightPanel) {
-      rightPanelSurface.openPanel(projectChatPanel);
+      openProjectChatPanel();
     }
-  }, [projectChatPanelDismissed, rightPanelSurface.openPanel, rightPanelSurface.rightPanel, workspace.selectedProjectSlug, workspace.view]);
+  }, [projectChatPanelDismissed, rightPanelSurface.rightPanel, workspace.routeContext, workspace.selectedProjectSlug, workspace.view]);
 
   useEffect(() => {
     if (workspace.view !== "chat") return;
@@ -93,7 +115,7 @@ export function App() {
 
   if (!workspace.selectedProjectSlug || !workspace.selectedProject) {
     return (
-      <main className="app-shell project-picker-shell" style={themeStyle}>
+      <main className="app-shell project-picker-shell" style={appStyle}>
         <ToastViewport toasts={workspace.toasts} onDismiss={workspace.dismissToast} />
         <ProjectPicker
           creatingProject={workspace.creatingProject}
@@ -120,7 +142,7 @@ export function App() {
     rightPanelSurface.closePanel();
   };
   return (
-    <main className={appShellClassName} style={themeStyle}>
+    <main className={appShellClassName} style={appStyle}>
       <GlobalFileSearch
         projectName={workspace.status?.projectName ?? workspace.selectedProject.name}
         projectSlug={workspace.selectedProjectSlug}
@@ -250,7 +272,22 @@ export function App() {
         ) : null}
       </section>
       {rightPanelSurface.rightPanel ? (
-        <RightPanelSurface onClose={handleRightPanelClose} panel={rightPanelSurface.rightPanel}>
+        <RightPanelSurface
+          onClose={handleRightPanelClose}
+          panel={rightPanelSurface.rightPanel}
+          resize={
+            rightPanelWidth.isResizable
+              ? {
+                  maxWidthPx: rightPanelWidth.maxWidthPx,
+                  minWidthPx: rightPanelWidth.minWidthPx,
+                  onCommit: () => rightPanelWidth.commitWidth(),
+                  onKeyboardResize: rightPanelWidth.resizeByKeyboard,
+                  onResize: rightPanelWidth.resizeFromClientX,
+                  widthPx: rightPanelWidth.widthPx,
+                }
+              : undefined
+          }
+        >
           {rightPanelSurface.rightPanel.kind === "agent-chat" ? (
             <RightPanelAgentChat
               models={workspace.rebuildModels}

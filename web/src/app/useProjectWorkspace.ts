@@ -12,7 +12,7 @@ import {
 import { uniqueFiles } from "../domain/files";
 import { designIdentityFilePath } from "../domain/projectPaths";
 import { resolveEffectiveRebuildModelId } from "../domain/rebuild";
-import { buildRouteHash } from "../navigation/routes";
+import { buildRouteHash, parseRouteHash } from "../navigation/routes";
 import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type RouteState, type View } from "../navigation/views";
 import { useRebuildSync } from "./hooks/useRebuildSync";
 import { useModelSelection } from "./hooks/useModelSelection";
@@ -182,6 +182,32 @@ export function useProjectWorkspace() {
   );
 
   const { navigateTo } = useRouteSync({ applyRoute, selectedProjectSlug, setSelectedProjectSlug });
+
+  const replaceRouteContext = useCallback(
+    (patch: Record<string, string | null | undefined>) => {
+      if (!selectedProjectSlug) return;
+
+      setRouteContext((current) => {
+        const currentRoute = parseRouteHash(window.location.hash);
+        const nextContext = { ...currentRoute.context, ...current };
+        for (const [key, value] of Object.entries(patch)) {
+          if (value) {
+            nextContext[key] = value;
+          } else {
+            delete nextContext[key];
+          }
+        }
+
+        const nextHash = buildRouteHash(selectedProjectSlug, currentRoute.view || view, currentRoute.filePath, nextContext);
+        if (window.location.hash !== nextHash) {
+          window.history.replaceState(null, "", nextHash);
+        }
+
+        return nextContext;
+      });
+    },
+    [selectedProjectSlug, view],
+  );
 
   const openProjectFile = useCallback(
     (path: string) => {
@@ -371,6 +397,7 @@ export function useProjectWorkspace() {
     refreshRebuild,
     refreshRebuildModels,
     navigateTo,
+    replaceRouteContext,
     openProjectFile,
     uploadHumanInputFiles,
     deleteHumanInputFile,
