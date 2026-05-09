@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatContextRef, ChatMessage, Conversation, ConversationSummary, ProjectFile, RebuildModel } from "../../contracts/api";
 import { api } from "../../data/apiClient";
+import { errorMessage } from "../../domain/errors";
 import { ChatComposer } from "./ChatComposer";
 import { ChatThread } from "./ChatThread";
 import { formatChatDateTime } from "./chatRendering";
@@ -13,8 +14,6 @@ function isChatContextFile(file: ProjectFile) {
 function isNearScrollBottom(element: HTMLElement) {
   return element.scrollHeight - element.scrollTop - element.clientHeight < 120;
 }
-
-const CHAT_COMPOSER_MAX_ROWS = 8;
 
 export function ChatWorkspace({
   projectSlug,
@@ -74,7 +73,7 @@ export function ChatWorkspace({
       setContextRefs([]);
       cancelEditingMessage();
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : "Could not open the conversation.");
+      onNotice(errorMessage(error, "Could not open the conversation."));
     } finally {
       setLoading(false);
     }
@@ -90,7 +89,7 @@ export function ChatWorkspace({
       cancelEditingMessage();
       await refreshConversations();
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : "Could not create a conversation.");
+      onNotice(errorMessage(error, "Could not create a conversation."));
     } finally {
       setLoading(false);
     }
@@ -102,22 +101,6 @@ export function ChatWorkspace({
     setActiveConversation(conversation);
     await refreshConversations();
     return conversation;
-  };
-
-  const resizeComposer = (textarea = composerTextareaRef.current) => {
-    if (!textarea) return;
-
-    textarea.style.height = "auto";
-    const styles = window.getComputedStyle(textarea);
-    const lineHeight = Number.parseFloat(styles.lineHeight) || 20;
-    const paddingY = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom);
-    const borderY = Number.parseFloat(styles.borderTopWidth) + Number.parseFloat(styles.borderBottomWidth);
-    const maxHeight = Math.ceil(lineHeight * CHAT_COMPOSER_MAX_ROWS + paddingY + borderY);
-    const contentHeight = textarea.scrollHeight + borderY;
-    const nextHeight = Math.min(contentHeight, maxHeight);
-
-    textarea.style.height = `${nextHeight}px`;
-    textarea.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
   };
 
   const sendMessage = async () => {
@@ -137,7 +120,7 @@ export function ChatWorkspace({
       setActiveConversation(next);
       await refreshConversations();
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : "Could not send the chat message.");
+      onNotice(errorMessage(error, "Could not send the chat message."));
       setSending(false);
     }
   };
@@ -172,14 +155,13 @@ export function ChatWorkspace({
       setEditDraft("");
       await refreshConversations();
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : "Could not edit the chat message.");
+      onNotice(errorMessage(error, "Could not edit the chat message."));
       setSending(false);
     }
   };
 
   const handleComposerChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessageDraft(event.currentTarget.value);
-    resizeComposer(event.currentTarget);
   };
 
   const addContextRef = () => {
@@ -219,7 +201,7 @@ export function ChatWorkspace({
           setActiveConversation(await api.conversation(projectSlug, nextConversations[0].id));
         }
       } catch (error) {
-        onNotice(error instanceof Error ? error.message : "Could not load conversations.");
+        onNotice(errorMessage(error, "Could not load conversations."));
       } finally {
         setLoading(false);
       }
@@ -249,10 +231,6 @@ export function ChatWorkspace({
       setShowJumpToLatest(true);
     }
   }, [activeConversation?.messages.length, activeConversation?.messages.at(-1)?.content.length]);
-
-  useEffect(() => {
-    resizeComposer();
-  }, [messageDraft]);
 
   return (
     <div className="chat-workspace">

@@ -1,3 +1,5 @@
+import { openSseStream } from "../utils/sse.js";
+
 export function registerRebuildRoutes(app, {
   getRebuildState,
   startHumanAttentionResolution,
@@ -14,27 +16,13 @@ export function registerRebuildRoutes(app, {
 
   app.get("/api/projects/:projectSlug/rebuild/events", async (request, response, next) => {
     try {
-      response.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-      });
-      response.flushHeaders?.();
-
-      const send = (eventName, payload) => {
-        response.write(`event: ${eventName}\n`);
-        response.write(`data: ${JSON.stringify(payload)}\n\n`);
-      };
+      const stream = openSseStream(request, response);
       const unsubscribe = subscribeToRebuild(request.project.slug, ({ state, event }) => {
-        send("event", { state, event });
+        stream.send("event", { state, event });
       });
 
-      send("snapshot", await getRebuildState(request.project.slug));
-
-      request.on("close", () => {
-        unsubscribe();
-        response.end();
-      });
+      stream.send("snapshot", await getRebuildState(request.project.slug));
+      stream.closeWith(unsubscribe);
     } catch (error) {
       next(error);
     }

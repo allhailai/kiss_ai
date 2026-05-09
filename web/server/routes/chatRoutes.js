@@ -1,3 +1,5 @@
+import { openSseStream } from "../utils/sse.js";
+
 export function registerChatRoutes(app, { editChatMessage, listConversations, createConversation, readConversation, sendChatMessage, subscribeToConversation, updateConversation }) {
   app.get("/api/projects/:projectSlug/conversations", async (request, response, next) => {
     try {
@@ -49,30 +51,16 @@ export function registerChatRoutes(app, { editChatMessage, listConversations, cr
 
   app.get("/api/projects/:projectSlug/conversations/:conversationId/events", async (request, response, next) => {
     try {
-      response.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-      });
-      response.flushHeaders?.();
-
-      const send = (eventName, payload) => {
-        response.write(`event: ${eventName}\n`);
-        response.write(`data: ${JSON.stringify(payload)}\n\n`);
-      };
+      const stream = openSseStream(request, response);
       const unsubscribe = subscribeToConversation(request.project.slug, request.params.conversationId, (event) => {
-        send(event.type === "error" ? "chat_error" : event.type, event);
+        stream.send(event.type === "error" ? "chat_error" : event.type, event);
       });
 
-      send("snapshot", {
+      stream.send("snapshot", {
         type: "snapshot",
         conversation: await readConversation(request.project, request.params.conversationId),
       });
-
-      request.on("close", () => {
-        unsubscribe();
-        response.end();
-      });
+      stream.closeWith(unsubscribe);
     } catch (error) {
       next(error);
     }

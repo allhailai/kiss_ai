@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { AgentCapability, AgentSession, ProjectFile, RebuildModel } from "../../contracts/api";
 import { api } from "../../data/apiClient";
+import { errorMessage } from "../../domain/errors";
 import { ChatComposer } from "../chat/ChatComposer";
 import { ChatThread } from "../chat/ChatThread";
 
@@ -41,7 +42,7 @@ export function RightPanelAgentChat({
       } catch (error) {
         if (!cancelled) {
           setCapabilities([]);
-          setCapabilityError(error instanceof Error ? error.message : "Could not load agent capabilities.");
+          setCapabilityError(errorMessage(error, "Could not load agent capabilities."));
         }
       }
     })();
@@ -61,7 +62,7 @@ export function RightPanelAgentChat({
       setSession(await api.sendAgentSessionMessage(projectSlug, { content, modelId: selectedModelId || undefined }));
       setDraft("");
     } catch (error) {
-      setCapabilityError(error instanceof Error ? error.message : "Could not send the agent message.");
+      setCapabilityError(errorMessage(error, "Could not send the agent message."));
     } finally {
       setSending(false);
     }
@@ -88,11 +89,8 @@ export function RightPanelAgentChat({
         disabled={sending}
         draft={draft}
         models={models}
-        onAddContextRef={() => undefined}
         onChangeDraft={(event) => setDraft(event.currentTarget.value)}
         onModelChange={onModelChange}
-        onRemoveContextRef={() => undefined}
-        onSelectedContextPathChange={() => undefined}
         onSubmit={() => void sendMessage()}
         placeholder="Ask the side-panel agent..."
         selectedContextPath=""

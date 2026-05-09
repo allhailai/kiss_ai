@@ -1,9 +1,27 @@
-import type { ChangeEvent, KeyboardEvent, RefObject } from "react";
+import { useEffect, type ChangeEvent, type KeyboardEvent, type RefObject } from "react";
 import type { ChatContextRef, ProjectFile, RebuildModel } from "../../contracts/api";
 import { formatModelLabel, modelTierLabels, modelTierOrder } from "../../domain/modelLabels";
 
+const composerMaxRows = 8;
+
 function contextLabel(ref: ChatContextRef) {
   return ref.label || ref.path;
+}
+
+function resizeComposer(textarea: HTMLTextAreaElement | null) {
+  if (!textarea) return;
+
+  textarea.style.height = "auto";
+  const styles = window.getComputedStyle(textarea);
+  const lineHeight = Number.parseFloat(styles.lineHeight) || 20;
+  const paddingY = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom);
+  const borderY = Number.parseFloat(styles.borderTopWidth) + Number.parseFloat(styles.borderBottomWidth);
+  const maxHeight = Math.ceil(lineHeight * composerMaxRows + paddingY + borderY);
+  const contentHeight = textarea.scrollHeight + borderY;
+  const nextHeight = Math.min(contentHeight, maxHeight);
+
+  textarea.style.height = `${nextHeight}px`;
+  textarea.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
 }
 
 export function ChatComposer({
@@ -12,11 +30,11 @@ export function ChatComposer({
   disabled,
   draft,
   models,
-  onAddContextRef,
+  onAddContextRef = () => undefined,
   onChangeDraft,
   onModelChange,
-  onRemoveContextRef,
-  onSelectedContextPathChange,
+  onRemoveContextRef = () => undefined,
+  onSelectedContextPathChange = () => undefined,
   onSubmit,
   placeholder = "Ask about this project... Enter to send, Shift+Enter for a new line",
   selectedContextPath,
@@ -30,11 +48,11 @@ export function ChatComposer({
   disabled: boolean;
   draft: string;
   models: RebuildModel[];
-  onAddContextRef: () => void;
+  onAddContextRef?: () => void;
   onChangeDraft: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   onModelChange: (modelId: string) => void;
-  onRemoveContextRef: (path: string) => void;
-  onSelectedContextPathChange: (path: string) => void;
+  onRemoveContextRef?: (path: string) => void;
+  onSelectedContextPathChange?: (path: string) => void;
   onSubmit: () => void;
   placeholder?: string;
   selectedContextPath: string;
@@ -44,6 +62,10 @@ export function ChatComposer({
   textareaRef: RefObject<HTMLTextAreaElement | null>;
 }) {
   const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
+
+  useEffect(() => {
+    resizeComposer(textareaRef.current);
+  }, [draft, textareaRef]);
 
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Enter" || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey || event.nativeEvent.isComposing) return;

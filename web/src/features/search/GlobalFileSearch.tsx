@@ -1,6 +1,7 @@
 import { useEffect, useState, type KeyboardEvent } from "react";
 import type { ProjectFile } from "../../contracts/api";
 import { api } from "../../data/apiClient";
+import { errorMessage } from "../../domain/errors";
 import { fileBasename, humanizePathSegment } from "../../domain/files";
 
 export function GlobalFileSearch({
@@ -50,7 +51,7 @@ export function GlobalFileSearch({
           if (cancelled) return;
           setResults([]);
           setActiveResultIndex(-1);
-          setError(searchError instanceof Error ? searchError.message : "Could not search project files.");
+          setError(errorMessage(searchError, "Could not search project paths."));
         })
         .finally(() => {
           if (!cancelled) {

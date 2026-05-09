@@ -1,11 +1,10 @@
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { formatLocalDateTime } from "../../domain/formatters";
 
 export function formatChatDateTime(value: string | null | undefined) {
   if (!value) return "Not recorded";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  return formatLocalDateTime(value);
 }
 
 const chatMarkdownComponents: Components = {

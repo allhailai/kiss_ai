@@ -87,38 +87,39 @@ async function readOptionalProjectText(readTextFile, projectRoot, relativePath, 
 }
 
 async function readContextFiles({ project, readTextFile, fileRefs }) {
-  const files = [];
-
-  for (const ref of fileRefs) {
+  return await Promise.all(fileRefs.map(async (ref) => {
     try {
       const file = await readTextFile(project.path, ref.path);
       if (!/^human_[^/]+\.md$/i.test(file.path) && !file.path.startsWith("inputs_human/") && !file.path.startsWith("inputs_ai/") && !file.path.startsWith("outputs_ai/")) {
-        files.push({
+        return {
           path: ref.path,
           error: "This path is outside the chat context allowlist.",
-        });
-        continue;
+        };
       }
 
-      files.push({
+      return {
         path: file.path,
         kind: file.kind,
         contentHash: file.contentHash,
         content: trimForPrompt(file.content),
-      });
+      };
     } catch (error) {
-      files.push({
+      return {
         path: ref.path,
         error: error instanceof Error ? error.message : "Could not read file context.",
-      });
+      };
     }
-  }
-
-  return files;
+  }));
 }
 
 async function createChatPrompt({ project, conversation, readTextFile, displayProjectName, readProjectHarness }) {
-  const harness = await readProjectHarness(project.path);
+  const [harness, goal, inputs, outputs, openQuestions] = await Promise.all([
+    readProjectHarness(project.path),
+    readOptionalProjectText(readTextFile, project.path, "human_goal_requirements.md"),
+    readOptionalProjectText(readTextFile, project.path, "human_input_requirements.md"),
+    readOptionalProjectText(readTextFile, project.path, "human_output_requirements.md"),
+    readOptionalProjectText(readTextFile, project.path, "human_open_questions.md"),
+  ]);
   const fileRefs = conversation.messages.flatMap((message) => message.context?.fileRefs ?? []);
   const uniqueFileRefs = [...new Map(fileRefs.map((ref) => [ref.path, ref])).values()].slice(-20);
   const contextFiles = await readContextFiles({ project, readTextFile, fileRefs: uniqueFileRefs });
@@ -134,10 +135,10 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
       lastRunAt: harness.last_run_at ?? null,
     },
     requirements: {
-      goal: await readOptionalProjectText(readTextFile, project.path, "human_goal_requirements.md"),
-      inputs: await readOptionalProjectText(readTextFile, project.path, "human_input_requirements.md"),
-      outputs: await readOptionalProjectText(readTextFile, project.path, "human_output_requirements.md"),
-      openQuestions: await readOptionalProjectText(readTextFile, project.path, "human_open_questions.md"),
+      goal,
+      inputs,
+      outputs,
+      openQuestions,
     },
     conversation: {
       id: conversation.id,
@@ -195,7 +196,7 @@ export function createChatAgentService({
 
   function startAssistantGeneration({ project, conversationId, key, conversationWithUser, assistantMessageId, cursorApiKey, modelId }) {
     void (async () => {
-      let assistantText = "";
+      const assistantTextChunks = [];
       try {
         const prompt = await createChatPrompt({
           project,
@@ -212,7 +213,7 @@ export function createChatAgentService({
           prompt,
           onEvent: async (event) => {
             if (event.type !== "assistant_delta" || !event.text) return;
-            assistantText += event.text;
+            assistantTextChunks.push(event.text);
             notifyConversation(project.slug, conversationId, {
               type: "message_delta",
               conversationId,
@@ -223,6 +224,7 @@ export function createChatAgentService({
           },
         });
 
+        const assistantText = assistantTextChunks.join("");
         const finalConversation = await appendMessage(project, conversationId, {
           id: assistantMessageId,
           role: "assistant",

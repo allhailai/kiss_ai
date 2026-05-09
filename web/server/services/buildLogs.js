@@ -61,9 +61,8 @@ export function createBuildLogService({
   }
 
   async function readBuildLogFile(projectRoot, relativePath, fallbackTitle) {
-    const file = await readTextFile(projectRoot, relativePath);
-    const { absolute } = projectPath(projectRoot, file.path);
-    const stat = await fs.stat(absolute);
+    const { absolute } = projectPath(projectRoot, relativePath);
+    const [file, stat] = await Promise.all([readTextFile(projectRoot, relativePath), fs.stat(absolute)]);
     const name = path.basename(file.path);
     const sections = parseMarkdownSections(file.content);
 
@@ -97,26 +96,25 @@ export function createBuildLogService({
       return [];
     }
 
-    const summaries = [];
+    const summaries = await Promise.all(
+      entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+        .map(async (entry) => {
+          const relativePath = `change_logs/summaries/${entry.name}`;
+          const { absolute } = projectPath(projectRoot, relativePath);
+          const [file, stat] = await Promise.all([readTextFile(projectRoot, relativePath), fs.stat(absolute)]);
+          const sections = parseMarkdownSections(file.content);
 
-    for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
-
-      const relativePath = `change_logs/summaries/${entry.name}`;
-      const file = await readTextFile(projectRoot, relativePath);
-      const { absolute } = projectPath(projectRoot, file.path);
-      const stat = await fs.stat(absolute);
-      const sections = parseMarkdownSections(file.content);
-
-      summaries.push({
-        path: file.path,
-        name: entry.name,
-        title: markdownHeadingTitle(file.content, humanizePathSegment(entry.name)),
-        modifiedAt: stat.mtime.toISOString(),
-        sections,
-        content: file.content,
-      });
-    }
+          return {
+            path: file.path,
+            name: entry.name,
+            title: markdownHeadingTitle(file.content, humanizePathSegment(entry.name)),
+            modifiedAt: stat.mtime.toISOString(),
+            sections,
+            content: file.content,
+          };
+        }),
+    );
 
     return summaries.sort((left, right) => {
       const nameOrder = right.name.localeCompare(left.name);
