@@ -426,6 +426,7 @@ button:disabled {
   gap: 8px;
   padding: 12px;
   overscroll-behavior: contain;
+  overflow-anchor: none;
 }
 
 .chat-main .chat-jump-latest {
@@ -503,6 +504,29 @@ button:disabled {
   font-size: 0.76rem;
 }
 
+.chat-message-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-message-edit-button {
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.chat-message-edit-button:hover,
+.chat-message-edit-button:focus-visible {
+  border-color: color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
+  color: var(--color-accent);
+  outline: none;
+}
+
 .chat-message-content {
   display: grid;
   gap: 6px;
@@ -513,6 +537,46 @@ button:disabled {
 .chat-message-content p {
   margin: 0;
   white-space: pre-wrap;
+}
+
+.chat-message-edit-form {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-message-edit-textarea {
+  min-height: 96px;
+  resize: vertical;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: color-mix(in srgb, white 84%, var(--color-surface));
+  color: var(--color-primary);
+  font: inherit;
+  line-height: 1.45;
+}
+
+.chat-message-edit-textarea:focus {
+  border-color: color-mix(in srgb, var(--color-accent) 54%, var(--color-border));
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.chat-message-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.chat-message-edit-actions button {
+  padding: 6px 10px;
+  border-radius: 9px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.chat-message-edit-actions button[type="submit"] {
+  background: var(--color-accent);
+  color: white;
 }
 
 .chat-message-context,

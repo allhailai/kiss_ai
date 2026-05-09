@@ -250,6 +250,11 @@ export type SendChatMessageRequest = {
   };
 };
 
+export type EditChatMessageRequest = {
+  modelId?: string;
+  content: string;
+};
+
 export type ChatConversationEvent =
   | {
       type: "snapshot";

@@ -95,12 +95,15 @@ export function ChatWorkspace({
   const [messageDraft, setMessageDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
   const [selectedContextPath, setSelectedContextPath] = useState("");
   const [contextRefs, setContextRefs] = useState<ChatContextRef[]>([]);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const threadRef = useRef<HTMLDivElement | null>(null);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const shouldStickToLatestRef = useRef(true);
+  const forceScrollToLatestRef = useRef(false);
   const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
   const contextFiles = useMemo(() => projectFiles.filter(isChatContextFile), [projectFiles]);
   const filteredConversations = useMemo(() => {
@@ -123,6 +126,7 @@ export function ChatWorkspace({
     try {
       setActiveConversation(await api.conversation(projectSlug, conversationId));
       setContextRefs([]);
+      cancelEditingMessage();
     } catch (error) {
       onNotice(error instanceof Error ? error.message : "Could not open the conversation.");
     } finally {
@@ -137,6 +141,7 @@ export function ChatWorkspace({
       const conversation = await api.createConversation(projectSlug, { modelId: selectedModelId });
       setActiveConversation(conversation);
       setContextRefs([]);
+      cancelEditingMessage();
       await refreshConversations();
     } catch (error) {
       onNotice(error instanceof Error ? error.message : "Could not create a conversation.");
@@ -191,6 +196,41 @@ export function ChatWorkspace({
     }
   };
 
+  const startEditingMessage = (message: ChatMessage) => {
+    if (sending || message.role !== "user") return;
+    setEditingMessageId(message.id);
+    setEditDraft(message.content);
+    onNotice("");
+  };
+
+  const cancelEditingMessage = () => {
+    setEditingMessageId(null);
+    setEditDraft("");
+  };
+
+  const saveEditedMessage = async (message: ChatMessage) => {
+    const content = editDraft.trim();
+    if (!activeConversation || !content || sending || message.role !== "user") return;
+
+    setSending(true);
+    onNotice("");
+    try {
+      const next = await api.editChatMessage(projectSlug, activeConversation.id, message.id, {
+        modelId: selectedModelId || undefined,
+        content,
+      });
+      forceScrollToLatestRef.current = true;
+      shouldStickToLatestRef.current = true;
+      setActiveConversation(next);
+      setEditingMessageId(null);
+      setEditDraft("");
+      await refreshConversations();
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : "Could not edit the chat message.");
+      setSending(false);
+    }
+  };
+
   const handleComposerChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessageDraft(event.currentTarget.value);
     resizeComposer(event.currentTarget);
@@ -203,6 +243,7 @@ export function ChatWorkspace({
   };
 
   const addContextRef = () => {
+    if (sending) return;
     const file = contextFiles.find((candidate) => candidate.path === selectedContextPath);
     if (!file || contextRefs.some((ref) => ref.path === file.path)) return;
     setContextRefs((current) => [...current, { path: file.path, label: file.name, kind: file.kind }]);
@@ -229,6 +270,7 @@ export function ChatWorkspace({
     setActiveConversation(null);
     setConversations([]);
     setContextRefs([]);
+    cancelEditingMessage();
     void (async () => {
       setLoading(true);
       try {
@@ -252,7 +294,13 @@ export function ChatWorkspace({
       try {
         const payload = JSON.parse(event.data) as ChatConversationEvent;
         if (payload.type === "snapshot") {
-          setActiveConversation(payload.conversation);
+          setActiveConversation((current) => {
+            if (current?.id === payload.conversation.id && payload.conversation.messages.length < current.messages.length) {
+              forceScrollToLatestRef.current = true;
+              shouldStickToLatestRef.current = true;
+            }
+            return payload.conversation;
+          });
           void refreshConversations();
         } else if (payload.type === "message_delta") {
           setActiveConversation((current) =>
@@ -290,7 +338,8 @@ export function ChatWorkspace({
 
   useEffect(() => {
     if (!activeConversation?.messages.length) return;
-    if (shouldStickToLatestRef.current) {
+    if (forceScrollToLatestRef.current || shouldStickToLatestRef.current) {
+      forceScrollToLatestRef.current = false;
       window.requestAnimationFrame(() => scrollToLatest("auto"));
     } else {
       setShowJumpToLatest(true);
@@ -310,7 +359,7 @@ export function ChatWorkspace({
               <h3>Conversations</h3>
               <p>{conversations.length.toLocaleString()} saved conversation{conversations.length === 1 ? "" : "s"}</p>
             </div>
-            <button disabled={loading} onClick={() => void createConversation()} type="button">
+            <button disabled={loading || sending} onClick={() => void createConversation()} type="button">
               New
             </button>
           </div>
@@ -326,6 +375,7 @@ export function ChatWorkspace({
               filteredConversations.map((conversation) => (
                 <button
                   className={activeConversation?.id === conversation.id ? "chat-conversation-item active" : "chat-conversation-item"}
+                  disabled={sending}
                   key={conversation.id}
                   onClick={() => void openConversation(conversation.id)}
                   type="button"
@@ -350,7 +400,7 @@ export function ChatWorkspace({
               <span>Project Chat</span>
               <strong>{activeConversation?.title || "New conversation"}</strong>
             </div>
-            <button disabled={loading} onClick={() => void createConversation()} type="button">
+            <button disabled={loading || sending} onClick={() => void createConversation()} type="button">
               New Conversation
             </button>
           </div>
@@ -358,7 +408,19 @@ export function ChatWorkspace({
           <div className="chat-thread-shell">
             <div className="chat-thread" aria-live="polite" onScroll={handleThreadScroll} ref={threadRef}>
               {activeConversation?.messages.length ? (
-                activeConversation.messages.map((message) => <ChatMessageBubble key={message.id} message={message} />)
+                activeConversation.messages.map((message) => (
+                  <ChatMessageBubble
+                    disabled={sending}
+                    editDraft={editDraft}
+                    isEditing={editingMessageId === message.id}
+                    key={message.id}
+                    message={message}
+                    onCancelEdit={cancelEditingMessage}
+                    onEditDraftChange={setEditDraft}
+                    onSaveEdit={saveEditedMessage}
+                    onStartEdit={startEditingMessage}
+                  />
+                ))
               ) : (
                 <div className="chat-thread-empty">
                   <h3>{loading ? "Loading conversation..." : "Start a project conversation"}</h3>
@@ -408,6 +470,7 @@ export function ChatWorkspace({
                 <div className="chat-context-controls">
                   <select
                     aria-label="Add file context"
+                    disabled={sending}
                     onChange={(event) => setSelectedContextPath(event.target.value)}
                     value={selectedContextPath}
                   >
@@ -418,7 +481,7 @@ export function ChatWorkspace({
                       </option>
                     ))}
                   </select>
-                  <button disabled={!selectedContextPath} onClick={addContextRef} type="button">
+                  <button disabled={sending || !selectedContextPath} onClick={addContextRef} type="button">
                     Add
                   </button>
                 </div>
@@ -464,14 +527,72 @@ export function ChatWorkspace({
   );
 }
 
-function ChatMessageBubble({ message }: { message: ChatMessage }) {
+function ChatMessageBubble({
+  disabled,
+  editDraft,
+  isEditing,
+  message,
+  onCancelEdit,
+  onEditDraftChange,
+  onSaveEdit,
+  onStartEdit,
+}: {
+  disabled: boolean;
+  editDraft: string;
+  isEditing: boolean;
+  message: ChatMessage;
+  onCancelEdit: () => void;
+  onEditDraftChange: (value: string) => void;
+  onSaveEdit: (message: ChatMessage) => void;
+  onStartEdit: (message: ChatMessage) => void;
+}) {
+  const canEdit = message.role === "user";
+
   return (
     <article className={`chat-message chat-message-${message.role} chat-message-${message.status}`}>
       <header>
         <strong>{message.role === "assistant" ? "Agent" : message.role === "system" ? "System" : "You"}</strong>
-        <span>{formatLocalDateTime(message.updatedAt ?? message.createdAt)}</span>
+        <div className="chat-message-actions">
+          <span>{formatLocalDateTime(message.updatedAt ?? message.createdAt)}</span>
+          {canEdit ? (
+            <button
+              className="chat-message-edit-button"
+              disabled={disabled || isEditing}
+              onClick={() => onStartEdit(message)}
+              type="button"
+            >
+              Edit
+            </button>
+          ) : null}
+        </div>
       </header>
-      <div className="chat-message-content">{renderMessageContent(message.content)}</div>
+      {isEditing ? (
+        <form
+          className="chat-message-edit-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSaveEdit(message);
+          }}
+        >
+          <textarea
+            aria-label="Edit message"
+            className="chat-message-edit-textarea"
+            disabled={disabled}
+            onChange={(event) => onEditDraftChange(event.currentTarget.value)}
+            value={editDraft}
+          />
+          <div className="chat-message-edit-actions">
+            <button disabled={disabled} onClick={onCancelEdit} type="button">
+              Cancel
+            </button>
+            <button disabled={disabled || !editDraft.trim()} type="submit">
+              {disabled ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="chat-message-content">{renderMessageContent(message.content)}</div>
+      )}
       {message.context?.fileRefs?.length ? (
         <div className="chat-message-context">
           {message.context.fileRefs.map((ref) => (

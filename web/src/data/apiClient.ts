@@ -7,6 +7,7 @@ import type {
   CreateProjectRequest,
   DeleteHumanInputResponse,
   DesignState,
+  EditChatMessageRequest,
   FileContent,
   FileDiff,
   FileSearchResponse,
@@ -86,6 +87,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  editChatMessage: (projectSlug: string, conversationId: string, messageId: string, body: EditChatMessageRequest) =>
+    request<Conversation>(
+      `${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/edit`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+    ),
   conversationEventsUrl: (projectSlug: string, conversationId: string) =>
     `${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/events`,
   buildLog: (projectSlug: string, tabId?: string | null, path?: string | null, sectionId?: string | null) => {

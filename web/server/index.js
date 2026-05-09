@@ -237,6 +237,7 @@ const { lintDesignIdentity, parseDesignIdentity } = createDesignIdentityService(
 const {
   appendMessage: appendConversationMessage,
   createConversation,
+  editUserMessage,
   listConversations,
   notifyConversation,
   readConversation,
@@ -248,9 +249,10 @@ const {
   projectPath,
 });
 
-const { sendChatMessage } = createChatAgentService({
+const { editChatMessage, sendChatMessage } = createChatAgentService({
   appendMessage: appendConversationMessage,
   displayProjectName,
+  editUserMessage,
   httpError,
   listCursorModels,
   notifyConversation,
@@ -1118,6 +1120,7 @@ registerApiRoutes(app, {
   runAiAssistProposal,
   runRequirementsAutoUpdateProposal,
   searchFiles,
+  editChatMessage,
   sendChatMessage,
   startHumanAttentionResolution,
   startRebuild,

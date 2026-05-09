@@ -48,6 +48,21 @@ function requireSendRequest(body, httpError) {
   };
 }
 
+function requireEditRequest(body, httpError) {
+  const modelId = String(body?.modelId ?? "").trim();
+  const content = String(body?.content ?? "").trim();
+
+  if (!content) throw httpError("Chat requires a message.");
+  if (Buffer.byteLength(content, "utf8") > maxUserMessageBytes) {
+    throw httpError("Chat message is too large.", 413, "chat_message_too_large");
+  }
+
+  return {
+    modelId: modelId || undefined,
+    content,
+  };
+}
+
 function conversationSummaryText(conversation) {
   return conversation.summary ? `Conversation summary: ${conversation.summary}` : "Conversation summary: not generated yet.";
 }
@@ -160,6 +175,7 @@ function summarizeAssistantText(text) {
 export function createChatAgentService({
   appendMessage,
   displayProjectName,
+  editUserMessage,
   httpError,
   listCursorModels,
   notifyConversation,
@@ -177,40 +193,7 @@ export function createChatAgentService({
     return `${project.slug}:${conversationId}`;
   }
 
-  async function sendChatMessage(project, conversationId, body) {
-    const request = requireSendRequest(body, httpError);
-    const key = activeChatKey(project, conversationId);
-
-    if (activeChats.has(key)) {
-      throw httpError("This conversation already has a message in progress.", 409, "chat_already_running");
-    }
-
-    const cursorApiKey = await resolveCursorApiKey();
-    if (!cursorApiKey.available) {
-      throw httpError("No Cursor API key found. Chat is unavailable from the UI.", 503, "cursor_api_key_unavailable");
-    }
-
-    const models = await listCursorModels(cursorApiKey.apiKey);
-    if (!models.length) {
-      throw httpError("No Cursor models are available for chat.", 503, "cursor_models_unavailable");
-    }
-
-    const modelId = pickRebuildModelId(models, request.modelId);
-    activeChats.add(key);
-
-    const userMessage = {
-      id: createMessageId(),
-      role: "user",
-      content: request.content,
-      createdAt: nowIso(),
-      modelId: null,
-      status: "complete",
-      context: request.context,
-    };
-    const assistantMessageId = createMessageId();
-    const conversationWithUser = await appendMessage(project, conversationId, userMessage);
-    notifyConversation(project.slug, conversationId, { type: "snapshot", conversation: conversationWithUser });
-
+  function startAssistantGeneration({ project, conversationId, key, conversationWithUser, assistantMessageId, cursorApiKey, modelId }) {
     void (async () => {
       let assistantText = "";
       try {
@@ -292,9 +275,73 @@ export function createChatAgentService({
         activeChats.delete(key);
       }
     })();
-
-    return conversationWithUser;
   }
 
-  return { sendChatMessage };
+  async function prepareChatRun(project, conversationId, requestedModelId) {
+    const key = activeChatKey(project, conversationId);
+
+    if (activeChats.has(key)) {
+      throw httpError("This conversation already has a message in progress.", 409, "chat_already_running");
+    }
+
+    const cursorApiKey = await resolveCursorApiKey();
+    if (!cursorApiKey.available) {
+      throw httpError("No Cursor API key found. Chat is unavailable from the UI.", 503, "cursor_api_key_unavailable");
+    }
+
+    const models = await listCursorModels(cursorApiKey.apiKey);
+    if (!models.length) {
+      throw httpError("No Cursor models are available for chat.", 503, "cursor_models_unavailable");
+    }
+
+    const modelId = pickRebuildModelId(models, requestedModelId);
+    activeChats.add(key);
+    return { cursorApiKey, key, modelId };
+  }
+
+  async function sendChatMessage(project, conversationId, body) {
+    const request = requireSendRequest(body, httpError);
+    const { cursorApiKey, key, modelId } = await prepareChatRun(project, conversationId, request.modelId);
+
+    const userMessage = {
+      id: createMessageId(),
+      role: "user",
+      content: request.content,
+      createdAt: nowIso(),
+      modelId: null,
+      status: "complete",
+      context: request.context,
+    };
+    const assistantMessageId = createMessageId();
+
+    try {
+      const conversationWithUser = await appendMessage(project, conversationId, userMessage);
+      notifyConversation(project.slug, conversationId, { type: "snapshot", conversation: conversationWithUser });
+      startAssistantGeneration({ project, conversationId, key, conversationWithUser, assistantMessageId, cursorApiKey, modelId });
+
+      return conversationWithUser;
+    } catch (error) {
+      activeChats.delete(key);
+      throw error;
+    }
+  }
+
+  async function editChatMessage(project, conversationId, messageId, body) {
+    const request = requireEditRequest(body, httpError);
+    const { cursorApiKey, key, modelId } = await prepareChatRun(project, conversationId, request.modelId);
+    const assistantMessageId = createMessageId();
+
+    try {
+      const conversationWithUser = await editUserMessage(project, conversationId, messageId, request.content);
+      notifyConversation(project.slug, conversationId, { type: "snapshot", conversation: conversationWithUser });
+      startAssistantGeneration({ project, conversationId, key, conversationWithUser, assistantMessageId, cursorApiKey, modelId });
+
+      return conversationWithUser;
+    } catch (error) {
+      activeChats.delete(key);
+      throw error;
+    }
+  }
+
+  return { editChatMessage, sendChatMessage };
 }

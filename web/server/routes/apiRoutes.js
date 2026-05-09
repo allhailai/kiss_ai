@@ -7,6 +7,7 @@ export function registerApiRoutes(app, deps) {
     createConversation,
     discoverProjects,
     displayProjectName,
+    editChatMessage,
     getHumanAttentionItems,
     getRebuildState,
     gitFileDiff,
@@ -123,6 +124,14 @@ export function registerApiRoutes(app, deps) {
   app.post("/api/projects/:projectSlug/conversations/:conversationId/messages", async (request, response, next) => {
     try {
       response.json(await sendChatMessage(request.project, request.params.conversationId, request.body));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/conversations/:conversationId/messages/:messageId/edit", async (request, response, next) => {
+    try {
+      response.json(await editChatMessage(request.project, request.params.conversationId, request.params.messageId, request.body));
     } catch (error) {
       next(error);
     }

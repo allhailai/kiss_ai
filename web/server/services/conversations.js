@@ -322,9 +322,59 @@ export function createConversationService({ httpError, projectPath }) {
     return await writeConversation(project, next);
   }
 
+  async function editUserMessage(project, conversationId, messageId, content) {
+    const conversation = await readConversation(project, conversationId);
+    const targetMessageId = String(messageId ?? "").trim();
+    const targetIndex = conversation.messages.findIndex((message) => message.id === targetMessageId);
+
+    if (targetIndex < 0) {
+      throw httpError("Chat message not found.", 404, "chat_message_not_found");
+    }
+
+    const existingMessage = conversation.messages[targetIndex];
+    if (existingMessage.role !== "user") {
+      throw httpError("Only user messages can be edited.", 400, "chat_message_not_editable");
+    }
+
+    const nextContent = trimText(content, maxMessageContentBytes);
+    if (!nextContent) {
+      throw httpError("Chat requires a message.", 400, "chat_message_required");
+    }
+    if (Buffer.byteLength(nextContent, "utf8") > maxMessageContentBytes) {
+      throw httpError("Chat message is too large.", 413, "chat_message_too_large");
+    }
+
+    const firstUserIndex = conversation.messages.findIndex((candidate) => candidate.role === "user");
+    const previousAutoTitle = firstUserIndex >= 0 ? titleFromContent(conversation.messages[firstUserIndex].content) : "New conversation";
+    const updatedAt = nowIso();
+    const editedMessage = normalizeMessage(
+      {
+        ...existingMessage,
+        content: nextContent,
+        updatedAt,
+        status: "complete",
+      },
+      existingMessage,
+    );
+    const title =
+      targetIndex === firstUserIndex && (conversation.title === "New conversation" || conversation.title === previousAutoTitle)
+        ? titleFromContent(nextContent)
+        : conversation.title;
+    const next = {
+      ...conversation,
+      title,
+      summary: "",
+      updatedAt,
+      messages: [...conversation.messages.slice(0, targetIndex), editedMessage],
+    };
+
+    return await writeConversation(project, next);
+  }
+
   return {
     appendMessage,
     createConversation,
+    editUserMessage,
     listConversations,
     notifyConversation: notify,
     readConversation,
