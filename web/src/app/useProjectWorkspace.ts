@@ -23,6 +23,7 @@ import { useToasts } from "./hooks/useToasts";
 
 export function useProjectWorkspace() {
   const [view, setView] = useState<View>("build-log");
+  const [routeContext, setRouteContext] = useState<Record<string, string>>({});
   const [projectsRoot, setProjectsRoot] = useState("");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [selectedProjectSlug, setSelectedProjectSlug] = useState<string | null>(() =>
@@ -132,6 +133,7 @@ export function useProjectWorkspace() {
 
       const nextView = route.view;
       setView(nextView);
+      setRouteContext(route.context);
       setNotice("");
       clearSelectedFile();
 
@@ -339,6 +341,7 @@ export function useProjectWorkspace() {
 
   return {
     view,
+    routeContext,
     projectsRoot,
     projects,
     selectedProjectSlug,

@@ -13,7 +13,7 @@ export function RightPanelSurface({
   panel: NonNullable<RightPanelState>;
 }) {
   return (
-    <aside className="right-panel-surface" aria-label={panel.title}>
+    <aside className={`right-panel-surface right-panel-${panel.kind}`} aria-label={panel.title}>
       <header className="right-panel-header">
         <div>
           <span>Panel</span>

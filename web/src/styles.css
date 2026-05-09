@@ -56,6 +56,14 @@ button:disabled {
   grid-template-columns: 52px minmax(0, 1fr) minmax(320px, 420px);
 }
 
+.app-shell.chat-view.right-panel-project-chat {
+  grid-template-columns: 300px minmax(0, 1fr) minmax(360px, 520px);
+}
+
+.app-shell.sidebar-collapsed.chat-view.right-panel-project-chat {
+  grid-template-columns: 52px minmax(0, 1fr) minmax(360px, 520px);
+}
+
 .global-topbar {
   position: sticky;
   top: 0;
@@ -240,6 +248,15 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
   gap: 12px;
+}
+
+.chat-history-workspace {
+  height: clamp(640px, calc(100vh - 112px), 1040px);
+  min-height: 0;
+}
+
+.chat-history-workspace .chat-sidebar {
+  height: 100%;
 }
 
 .chat-sidebar,
@@ -1338,6 +1355,16 @@ button:disabled {
   min-height: 0;
   overflow: auto;
   padding: 12px;
+}
+
+.right-panel-surface.right-panel-project-chat .right-panel-body {
+  overflow: hidden;
+  display: grid;
+}
+
+.right-panel-surface.right-panel-project-chat .chat-main {
+  height: 100%;
+  min-height: 0;
 }
 
 .right-panel-open-button {

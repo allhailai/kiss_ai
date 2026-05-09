@@ -1,10 +1,12 @@
 import { defaultRoute, fileBackedViews, type RouteState, type View, viewIds } from "./views";
 
 export function parseRouteHash(hash: string): RouteState {
-  const route = hash.replace(/^#\/?/, "");
+  const [routePart, queryPart = ""] = hash.replace(/^#\/?/, "").split("?");
+  const route = routePart;
   const [firstSegment, secondSegment, thirdSegment, ...remainingParts] = route.split("/");
   const isProjectRoute = firstSegment === "p" && Boolean(secondSegment);
   let projectSlug: string | null = null;
+  const context = Object.fromEntries(new URLSearchParams(queryPart).entries());
 
   try {
     projectSlug = isProjectRoute ? decodeURIComponent(secondSegment) : null;
@@ -16,31 +18,34 @@ export function parseRouteHash(hash: string): RouteState {
   const filePathParts = isProjectRoute ? remainingParts : [secondSegment, thirdSegment, ...remainingParts].filter(Boolean);
 
   if (!viewCandidate || !viewIds.has(viewCandidate as View)) {
-    return { ...defaultRoute, projectSlug };
+    return { ...defaultRoute, projectSlug, context };
   }
 
   const view = viewCandidate as View;
   const rawFilePath = filePathParts.join("/");
 
   if (!fileBackedViews.has(view) || !rawFilePath) {
-    return { projectSlug, view, filePath: null };
+    return { projectSlug, view, filePath: null, context };
   }
 
   try {
-    return { projectSlug, view, filePath: decodeURIComponent(rawFilePath) };
+    return { projectSlug, view, filePath: decodeURIComponent(rawFilePath), context };
   } catch {
-    return { projectSlug, view, filePath: null };
+    return { projectSlug, view, filePath: null, context };
   }
 }
 
-export function buildRouteHash(projectSlug: string | null, view: View, filePath?: string | null) {
+export function buildRouteHash(projectSlug: string | null, view: View, filePath?: string | null, context: Record<string, string> = {}) {
   if (!projectSlug) return "#/projects";
 
   const base = `#/p/${encodeURIComponent(projectSlug)}/${view}`;
+  const route = filePath && fileBackedViews.has(view) ? `${base}/${encodeURIComponent(filePath)}` : base;
+  const routeContext = new URLSearchParams();
 
-  if (filePath && fileBackedViews.has(view)) {
-    return `${base}/${encodeURIComponent(filePath)}`;
+  for (const [key, value] of Object.entries(context)) {
+    if (value) routeContext.set(key, value);
   }
 
-  return base;
+  const query = routeContext.toString();
+  return query ? `${route}?${query}` : route;
 }

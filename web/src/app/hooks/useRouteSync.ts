@@ -10,11 +10,11 @@ type UseRouteSyncOptions = {
 
 export function useRouteSync({ applyRoute, selectedProjectSlug, setSelectedProjectSlug }: UseRouteSyncOptions) {
   const navigateTo = useCallback(
-    (nextView: View, filePath?: string | null) => {
-      const nextHash = buildRouteHash(selectedProjectSlug, nextView, filePath);
+    (nextView: View, filePath?: string | null, context: Record<string, string> = {}) => {
+      const nextHash = buildRouteHash(selectedProjectSlug, nextView, filePath, context);
 
       if (window.location.hash === nextHash) {
-        void applyRoute({ projectSlug: selectedProjectSlug, view: nextView, filePath: filePath ?? null });
+        void applyRoute({ projectSlug: selectedProjectSlug, view: nextView, filePath: filePath ?? null, context });
         return;
       }
 
@@ -36,7 +36,7 @@ export function useRouteSync({ applyRoute, selectedProjectSlug, setSelectedProje
       }
 
       if (route.projectSlug !== routeProjectSlug) {
-        const normalized = buildRouteHash(routeProjectSlug, route.view, route.filePath);
+        const normalized = buildRouteHash(routeProjectSlug, route.view, route.filePath, route.context);
         if (window.location.hash !== normalized) {
           window.history.replaceState(null, "", normalized);
         }

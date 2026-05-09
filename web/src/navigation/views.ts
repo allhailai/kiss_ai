@@ -7,6 +7,7 @@ export type RouteState = {
   projectSlug: string | null;
   view: View;
   filePath: string | null;
+  context: Record<string, string>;
 };
 
 export const views: Array<{ id: View; label: string; description: string }> = [
@@ -24,7 +25,7 @@ export const views: Array<{ id: View; label: string; description: string }> = [
 export const workflowMenuViews = views.filter((item) => item.id !== "design");
 export const viewIds = new Set<View>(views.map((item) => item.id));
 export const fileBackedViews = new Set<View>(["requirements", "inputs", "outputs", "annotations", "design"]);
-export const defaultRoute: RouteState = { projectSlug: null, view: "rebuild", filePath: null };
+export const defaultRoute: RouteState = { projectSlug: null, view: "rebuild", filePath: null, context: {} };
 export const selectedProjectStorageKey = "kiss_ai.selectedProject";
 export const designProjectFile: ProjectFile = {
   path: designIdentityFilePath,

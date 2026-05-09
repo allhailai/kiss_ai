@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { projectPathPrefixes } from "../domain/projectPaths";
 import { buildThemeStyle } from "./theme";
 import { useProjectWorkspace } from "./useProjectWorkspace";
@@ -6,7 +6,7 @@ import { RightPanelSurface } from "./RightPanelSurface";
 import { useRightPanelSurface } from "./hooks/useRightPanelSurface";
 import { type View } from "../navigation/views";
 import { BuildLogWorkspace } from "../features/buildLog/BuildLogWorkspace";
-import { ChatWorkspace } from "../features/chat/ChatWorkspace";
+import { ProjectChatConversationHistory, ProjectChatPanel, useProjectChat } from "../features/chat/ChatWorkspace";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { DesignWorkspace } from "../features/design/DesignWorkspace";
 import { FileWorkspace } from "../features/files/FileWorkspace";
@@ -36,12 +36,60 @@ const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: str
   },
 };
 
+const projectChatPanel = { kind: "project-chat", title: "Project Chat" } as const;
+
 export function App() {
   const workspace = useProjectWorkspace();
   const rightPanelSurface = useRightPanelSurface();
   const [autoUpdateOpen, setAutoUpdateOpen] = useState(false);
+  const [projectChatPanelDismissed, setProjectChatPanelDismissed] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const projectChatVisitKeyRef = useRef<string | null>(null);
   const themeStyle = useMemo(() => buildThemeStyle(workspace.design), [workspace.design]);
+  const projectChat = useProjectChat({
+    projectSlug: workspace.selectedProjectSlug,
+    selectedModelId: workspace.selectedRebuildModelId,
+    projectFiles: workspace.projectFiles,
+    onNotice: workspace.setNotice,
+  });
+  const navigateTo = (view: View, filePath?: string | null, context?: Record<string, string>) => workspace.navigateTo(view, filePath, context);
+  const openProjectChatPanel = () => {
+    setProjectChatPanelDismissed(false);
+    rightPanelSurface.openPanel(projectChatPanel);
+  };
+  const selectProjectChatConversation = (conversationId: string) => {
+    openProjectChatPanel();
+    navigateTo("chat", null, { conversation: conversationId });
+  };
+
+  useEffect(() => {
+    if (!workspace.selectedProjectSlug || workspace.view !== "chat") {
+      projectChatVisitKeyRef.current = null;
+      if (projectChatPanelDismissed) setProjectChatPanelDismissed(false);
+      return;
+    }
+
+    if (projectChatVisitKeyRef.current !== workspace.selectedProjectSlug) {
+      projectChatVisitKeyRef.current = workspace.selectedProjectSlug;
+      if (projectChatPanelDismissed) setProjectChatPanelDismissed(false);
+      rightPanelSurface.openPanel(projectChatPanel);
+      return;
+    }
+
+    if (!projectChatPanelDismissed && !rightPanelSurface.rightPanel) {
+      rightPanelSurface.openPanel(projectChatPanel);
+    }
+  }, [projectChatPanelDismissed, rightPanelSurface.openPanel, rightPanelSurface.rightPanel, workspace.selectedProjectSlug, workspace.view]);
+
+  useEffect(() => {
+    if (workspace.view !== "chat") return;
+
+    const conversationId = workspace.routeContext.conversation;
+    if (!conversationId || projectChat.activeConversation?.id === conversationId) return;
+
+    openProjectChatPanel();
+    void projectChat.openConversation(conversationId);
+  }, [projectChat.activeConversation?.id, workspace.routeContext.conversation, workspace.view]);
 
   if (!workspace.selectedProjectSlug || !workspace.selectedProject) {
     return (
@@ -59,13 +107,20 @@ export function App() {
     );
   }
 
-  const navigateTo = (view: View, filePath?: string | null) => workspace.navigateTo(view, filePath);
   const fileWorkspace = fileWorkspaceByView[workspace.view];
   const selectedAutoUpdatePath =
     workspace.selected?.path && isRequirementAutoUpdatePath(workspace.selected.path) ? workspace.selected.path : null;
-
+  const appShellClassName = `${sidebarCollapsed ? "app-shell sidebar-collapsed" : "app-shell"}${workspace.view === "chat" ? " chat-view" : ""}${
+    rightPanelSurface.rightPanel ? ` right-panel-open right-panel-${rightPanelSurface.rightPanel.kind}` : ""
+  }`;
+  const handleRightPanelClose = () => {
+    if (workspace.view === "chat" && rightPanelSurface.rightPanel?.kind === "project-chat") {
+      setProjectChatPanelDismissed(true);
+    }
+    rightPanelSurface.closePanel();
+  };
   return (
-    <main className={`${sidebarCollapsed ? "app-shell sidebar-collapsed" : "app-shell"}${rightPanelSurface.rightPanel ? " right-panel-open" : ""}`} style={themeStyle}>
+    <main className={appShellClassName} style={themeStyle}>
       <GlobalFileSearch
         projectName={workspace.status?.projectName ?? workspace.selectedProject.name}
         projectSlug={workspace.selectedProjectSlug}
@@ -127,14 +182,9 @@ export function App() {
           />
         ) : null}
         {workspace.view === "chat" ? (
-          <ChatWorkspace
-            projectSlug={workspace.selectedProjectSlug}
-            models={workspace.rebuildModels}
-            selectedModelId={workspace.selectedRebuildModelId}
-            projectFiles={workspace.projectFiles}
-            onModelChange={workspace.setSelectedRebuildModelId}
-            onNotice={workspace.setNotice}
-          />
+          <div className="chat-history-workspace">
+            <ProjectChatConversationHistory chat={projectChat} onSelectConversation={selectProjectChatConversation} />
+          </div>
         ) : null}
         {fileWorkspace ? (
           <FileWorkspace
@@ -200,7 +250,7 @@ export function App() {
         ) : null}
       </section>
       {rightPanelSurface.rightPanel ? (
-        <RightPanelSurface onClose={rightPanelSurface.closePanel} panel={rightPanelSurface.rightPanel}>
+        <RightPanelSurface onClose={handleRightPanelClose} panel={rightPanelSurface.rightPanel}>
           {rightPanelSurface.rightPanel.kind === "agent-chat" ? (
             <RightPanelAgentChat
               models={workspace.rebuildModels}
@@ -208,6 +258,13 @@ export function App() {
               projectFiles={workspace.projectFiles}
               projectSlug={workspace.selectedProjectSlug}
               selectedModelId={workspace.selectedRebuildModelId}
+            />
+          ) : rightPanelSurface.rightPanel.kind === "project-chat" ? (
+            <ProjectChatPanel
+              chat={projectChat}
+              models={workspace.rebuildModels}
+              selectedModelId={workspace.selectedRebuildModelId}
+              onModelChange={workspace.setSelectedRebuildModelId}
             />
           ) : (
             <p className="chat-empty-state">This reusable panel surface is ready for contextual project tools.</p>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import type { ChatContextRef, ChatMessage, Conversation, ConversationSummary, ProjectFile, RebuildModel } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { errorMessage } from "../../domain/errors";
@@ -15,19 +15,17 @@ function isNearScrollBottom(element: HTMLElement) {
   return element.scrollHeight - element.scrollTop - element.clientHeight < 120;
 }
 
-export function ChatWorkspace({
+export type ProjectChatController = ReturnType<typeof useProjectChat>;
+
+export function useProjectChat({
   projectSlug,
-  models,
   selectedModelId,
   projectFiles,
-  onModelChange,
   onNotice,
 }: {
-  projectSlug: string;
-  models: RebuildModel[];
+  projectSlug: string | null;
   selectedModelId: string;
   projectFiles: ProjectFile[];
-  onModelChange: (modelId: string) => void;
   onNotice: (message: string) => void;
 }) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -55,6 +53,7 @@ export function ChatWorkspace({
   }, [conversationFilter, conversations]);
 
   const refreshConversations = useCallback(async () => {
+    if (!projectSlug) return [];
     const response = await api.conversations(projectSlug);
     setConversations(response.conversations);
     return response.conversations;
@@ -66,6 +65,7 @@ export function ChatWorkspace({
   }, []);
 
   const openConversation = async (conversationId: string) => {
+    if (!projectSlug) return;
     setLoading(true);
     onNotice("");
     try {
@@ -80,6 +80,7 @@ export function ChatWorkspace({
   };
 
   const createConversation = async () => {
+    if (!projectSlug) return;
     setLoading(true);
     onNotice("");
     try {
@@ -97,6 +98,7 @@ export function ChatWorkspace({
 
   const ensureConversation = async () => {
     if (activeConversation) return activeConversation;
+    if (!projectSlug) throw new Error("Select a project first.");
     const conversation = await api.createConversation(projectSlug, { modelId: selectedModelId });
     setActiveConversation(conversation);
     await refreshConversations();
@@ -104,6 +106,7 @@ export function ChatWorkspace({
   };
 
   const sendMessage = async () => {
+    if (!projectSlug) return;
     const content = messageDraft.trim();
     if (!content || sending) return;
 
@@ -160,7 +163,7 @@ export function ChatWorkspace({
     }
   };
 
-  const handleComposerChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleComposerChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     setMessageDraft(event.currentTarget.value);
   };
 
@@ -189,6 +192,16 @@ export function ChatWorkspace({
   };
 
   useEffect(() => {
+    if (!projectSlug) {
+      setActiveConversation(null);
+      setConversations([]);
+      setContextRefs([]);
+      cancelEditingMessage();
+      setLoading(false);
+      setSending(false);
+      return;
+    }
+
     setActiveConversation(null);
     setConversations([]);
     setContextRefs([]);
@@ -232,95 +245,178 @@ export function ChatWorkspace({
     }
   }, [activeConversation?.messages.length, activeConversation?.messages.at(-1)?.content.length]);
 
+  return {
+    activeConversation,
+    addContextRef,
+    cancelEditingMessage,
+    contextFiles,
+    contextRefs,
+    conversationFilter,
+    conversations,
+    createConversation,
+    editDraft,
+    editingMessageId,
+    filteredConversations,
+    handleComposerChange,
+    handleThreadScroll,
+    loading,
+    messageDraft,
+    openConversation,
+    saveEditedMessage,
+    scrollToLatest,
+    selectedContextPath,
+    sending,
+    setContextRefs,
+    setConversationFilter,
+    setEditDraft,
+    setSelectedContextPath,
+    showJumpToLatest,
+    startEditingMessage,
+    threadRef,
+    composerTextareaRef,
+    sendMessage,
+  };
+}
+
+export function ProjectChatConversationHistory({
+  chat,
+  onSelectConversation,
+}: {
+  chat: ProjectChatController;
+  onSelectConversation?: (conversationId: string) => void;
+}) {
+  return (
+    <aside className="content-card chat-sidebar">
+      <div className="section-heading">
+        <div>
+          <h3>Conversations</h3>
+          <p>{chat.conversations.length.toLocaleString()} saved conversation{chat.conversations.length === 1 ? "" : "s"}</p>
+        </div>
+        <button disabled={chat.loading || chat.sending} onClick={() => void chat.createConversation()} type="button">
+          New
+        </button>
+      </div>
+      <input
+        aria-label="Filter conversations"
+        className="chat-filter"
+        onChange={(event) => chat.setConversationFilter(event.target.value)}
+        placeholder="Search conversations"
+        value={chat.conversationFilter}
+      />
+      <div className="chat-conversation-list">
+        {chat.filteredConversations.length ? (
+          chat.filteredConversations.map((conversation) => (
+            <button
+              className={chat.activeConversation?.id === conversation.id ? "chat-conversation-item active" : "chat-conversation-item"}
+              disabled={chat.sending}
+              key={conversation.id}
+              onClick={() => {
+                if (onSelectConversation) {
+                  onSelectConversation(conversation.id);
+                } else {
+                  void chat.openConversation(conversation.id);
+                }
+              }}
+              type="button"
+            >
+              <strong>{conversation.title}</strong>
+              <span>{conversation.summary || "No summary yet."}</span>
+              <small>
+                {formatChatDateTime(conversation.updatedAt)} · {conversation.messageCount} message
+                {conversation.messageCount === 1 ? "" : "s"}
+              </small>
+            </button>
+          ))
+        ) : (
+          <p className="chat-empty-state">No conversations match this filter.</p>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+export function ProjectChatPanel({
+  chat,
+  models,
+  selectedModelId,
+  onModelChange,
+}: {
+  chat: ProjectChatController;
+  models: RebuildModel[];
+  selectedModelId: string;
+  onModelChange: (modelId: string) => void;
+}) {
+  return (
+    <section className="content-card chat-main">
+      <div className="chat-topbar">
+        <div>
+          <span>Project Chat</span>
+          <strong>{chat.activeConversation?.title || "New conversation"}</strong>
+        </div>
+        <button disabled={chat.loading || chat.sending} onClick={() => void chat.createConversation()} type="button">
+          New Conversation
+        </button>
+      </div>
+
+      <ChatThread
+        disabled={chat.sending}
+        editDraft={chat.editDraft}
+        editingMessageId={chat.editingMessageId}
+        emptyDescription="Ask a question, attach relevant project files as context, or create a new conversation to clear prior chat history."
+        emptyTitle={chat.loading ? "Loading conversation..." : "Start a project conversation"}
+        messages={chat.activeConversation?.messages ?? []}
+        onCancelEdit={chat.cancelEditingMessage}
+        onEditDraftChange={chat.setEditDraft}
+        onJumpToLatest={() => chat.scrollToLatest()}
+        onSaveEdit={chat.saveEditedMessage}
+        onScroll={chat.handleThreadScroll}
+        onStartEdit={chat.startEditingMessage}
+        showJumpToLatest={chat.showJumpToLatest}
+        threadRef={chat.threadRef}
+      />
+
+      <ChatComposer
+        contextFiles={chat.contextFiles}
+        contextRefs={chat.contextRefs}
+        disabled={chat.sending}
+        draft={chat.messageDraft}
+        models={models}
+        onAddContextRef={chat.addContextRef}
+        onChangeDraft={chat.handleComposerChange}
+        onModelChange={onModelChange}
+        onRemoveContextRef={(path) => chat.setContextRefs((current) => current.filter((candidate) => candidate.path !== path))}
+        onSelectedContextPathChange={chat.setSelectedContextPath}
+        onSubmit={() => void chat.sendMessage()}
+        selectedContextPath={chat.selectedContextPath}
+        selectedModelId={selectedModelId}
+        textareaRef={chat.composerTextareaRef}
+      />
+    </section>
+  );
+}
+
+export function ChatWorkspace({
+  projectSlug,
+  models,
+  selectedModelId,
+  projectFiles,
+  onModelChange,
+  onNotice,
+}: {
+  projectSlug: string;
+  models: RebuildModel[];
+  selectedModelId: string;
+  projectFiles: ProjectFile[];
+  onModelChange: (modelId: string) => void;
+  onNotice: (message: string) => void;
+}) {
+  const chat = useProjectChat({ projectSlug, selectedModelId, projectFiles, onNotice });
+
   return (
     <div className="chat-workspace">
       <section className="chat-layout">
-        <aside className="content-card chat-sidebar">
-          <div className="section-heading">
-            <div>
-              <h3>Conversations</h3>
-              <p>{conversations.length.toLocaleString()} saved conversation{conversations.length === 1 ? "" : "s"}</p>
-            </div>
-            <button disabled={loading || sending} onClick={() => void createConversation()} type="button">
-              New
-            </button>
-          </div>
-          <input
-            aria-label="Filter conversations"
-            className="chat-filter"
-            onChange={(event) => setConversationFilter(event.target.value)}
-            placeholder="Search conversations"
-            value={conversationFilter}
-          />
-          <div className="chat-conversation-list">
-            {filteredConversations.length ? (
-              filteredConversations.map((conversation) => (
-                <button
-                  className={activeConversation?.id === conversation.id ? "chat-conversation-item active" : "chat-conversation-item"}
-                  disabled={sending}
-                  key={conversation.id}
-                  onClick={() => void openConversation(conversation.id)}
-                  type="button"
-                >
-                  <strong>{conversation.title}</strong>
-                  <span>{conversation.summary || "No summary yet."}</span>
-                  <small>
-                    {formatChatDateTime(conversation.updatedAt)} · {conversation.messageCount} message
-                    {conversation.messageCount === 1 ? "" : "s"}
-                  </small>
-                </button>
-              ))
-            ) : (
-              <p className="chat-empty-state">No conversations match this filter.</p>
-            )}
-          </div>
-        </aside>
-
-        <section className="content-card chat-main">
-          <div className="chat-topbar">
-            <div>
-              <span>Project Chat</span>
-              <strong>{activeConversation?.title || "New conversation"}</strong>
-            </div>
-            <button disabled={loading || sending} onClick={() => void createConversation()} type="button">
-              New Conversation
-            </button>
-          </div>
-
-          <ChatThread
-            disabled={sending}
-            editDraft={editDraft}
-            editingMessageId={editingMessageId}
-            emptyDescription="Ask a question, attach relevant project files as context, or create a new conversation to clear prior chat history."
-            emptyTitle={loading ? "Loading conversation..." : "Start a project conversation"}
-            messages={activeConversation?.messages ?? []}
-            onCancelEdit={cancelEditingMessage}
-            onEditDraftChange={setEditDraft}
-            onJumpToLatest={() => scrollToLatest()}
-            onSaveEdit={saveEditedMessage}
-            onScroll={handleThreadScroll}
-            onStartEdit={startEditingMessage}
-            showJumpToLatest={showJumpToLatest}
-            threadRef={threadRef}
-          />
-
-          <ChatComposer
-            contextFiles={contextFiles}
-            contextRefs={contextRefs}
-            disabled={sending}
-            draft={messageDraft}
-            models={models}
-            onAddContextRef={addContextRef}
-            onChangeDraft={handleComposerChange}
-            onModelChange={onModelChange}
-            onRemoveContextRef={(path) => setContextRefs((current) => current.filter((candidate) => candidate.path !== path))}
-            onSelectedContextPathChange={setSelectedContextPath}
-            onSubmit={() => void sendMessage()}
-            selectedContextPath={selectedContextPath}
-            selectedModelId={selectedModelId}
-            textareaRef={composerTextareaRef}
-          />
-        </section>
+        <ProjectChatConversationHistory chat={chat} />
+        <ProjectChatPanel chat={chat} models={models} selectedModelId={selectedModelId} onModelChange={onModelChange} />
       </section>
     </div>
   );
