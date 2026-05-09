@@ -144,14 +144,6 @@ function normalizeIndex(value) {
 export function createConversationService({ httpError, projectPath }) {
   const subscribers = new Map();
 
-  function conversationRoot(projectRoot) {
-    return projectPath(projectRoot, "conversations");
-  }
-
-  function indexPath(projectRoot) {
-    return projectPath(projectRoot, "conversations/conversations.json");
-  }
-
   function requireConversationId(conversationId) {
     const id = String(conversationId ?? "").trim();
     if (!conversationIdPattern.test(id)) {

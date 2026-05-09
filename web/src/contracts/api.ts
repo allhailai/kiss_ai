@@ -1,3 +1,14 @@
+export type {
+  AgentCapabilitiesResponse,
+  AgentCapability,
+  AgentCapabilityRisk,
+  AgentSession,
+  AgentSessionMessage,
+  AgentToolCall,
+  AgentToolCallStatus,
+  SendAgentSessionMessageRequest,
+} from "./agents";
+
 export type ResolutionOption = {
   id: string;
   attentionItemId?: string;

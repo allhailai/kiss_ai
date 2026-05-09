@@ -1,9 +1,10 @@
 import { useEffect } from "react";
-import type { BuildLogState, DesignState, ProjectFile, ProjectStatus, ProjectSummary, RebuildModel, RebuildState } from "../../contracts/api";
+import type { BuildLogState, DesignState, ProjectFile, ProjectStatus, ProjectSummary, RebuildState } from "../../contracts/api";
 import { designProjectFile, selectedProjectStorageKey } from "../../navigation/views";
 
 type UseSelectedProjectLifecycleOptions = {
   clearSelectedFile: () => void;
+  clearRebuildModels: () => void;
   projects: ProjectSummary[];
   refreshProjectFiles: () => Promise<void>;
   refreshRebuildModels: () => Promise<void>;
@@ -15,14 +16,13 @@ type UseSelectedProjectLifecycleOptions = {
   setNotice: (message: string) => void;
   setProjectFiles: (files: ProjectFile[]) => void;
   setRebuild: (rebuild: RebuildState | null) => void;
-  setRebuildModels: (models: RebuildModel[]) => void;
   setSelectedProjectSlug: (projectSlug: string | null) => void;
-  setSelectedRebuildModelId: (modelId: string) => void;
   setStatus: (status: ProjectStatus | null) => void;
 };
 
 export function useSelectedProjectLifecycle({
   clearSelectedFile,
+  clearRebuildModels,
   projects,
   refreshProjectFiles,
   refreshRebuildModels,
@@ -34,9 +34,7 @@ export function useSelectedProjectLifecycle({
   setNotice,
   setProjectFiles,
   setRebuild,
-  setRebuildModels,
   setSelectedProjectSlug,
-  setSelectedRebuildModelId,
   setStatus,
 }: UseSelectedProjectLifecycleOptions) {
   useEffect(() => {
@@ -45,8 +43,7 @@ export function useSelectedProjectLifecycle({
       setStatus(null);
       setBuildLog(null);
       setRebuild(null);
-      setRebuildModels([]);
-      setSelectedRebuildModelId("");
+      clearRebuildModels();
       setDesign(null);
       setFiles([]);
       setProjectFiles([designProjectFile]);
@@ -60,6 +57,7 @@ export function useSelectedProjectLifecycle({
     void refreshProjectFiles();
   }, [
     clearSelectedFile,
+    clearRebuildModels,
     refreshProjectFiles,
     refreshRebuildModels,
     refreshStatus,
@@ -69,8 +67,6 @@ export function useSelectedProjectLifecycle({
     setFiles,
     setProjectFiles,
     setRebuild,
-    setRebuildModels,
-    setSelectedRebuildModelId,
     setStatus,
   ]);
 

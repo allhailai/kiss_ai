@@ -16,6 +16,8 @@ export function createAgentJobService({
   runCursorAgent,
   setRebuildState,
 }) {
+  const startLocks = new Map();
+
   async function appendRunLog(projectSlug, message) {
     await appendRunEvent(projectSlug, {
       type: "system",
@@ -138,6 +140,43 @@ export function createAgentJobService({
     requestedModelId,
     runKind,
     attentionContext = null,
+    startMessage,
+    noApiKeyMessage,
+    noModelsMessage,
+    jobName,
+    prompt,
+  }) {
+    const existingStart = startLocks.get(project.slug);
+    if (existingStart) {
+      await existingStart.catch(() => undefined);
+      return await getRebuildState(project.slug);
+    }
+
+    const startPromise = startAgentJobUnlocked({
+      project,
+      requestedModelId,
+      runKind,
+      attentionContext,
+      startMessage,
+      noApiKeyMessage,
+      noModelsMessage,
+      jobName,
+      prompt,
+    });
+    startLocks.set(project.slug, startPromise);
+
+    try {
+      return await startPromise;
+    } finally {
+      startLocks.delete(project.slug);
+    }
+  }
+
+  async function startAgentJobUnlocked({
+    project,
+    requestedModelId,
+    runKind,
+    attentionContext,
     startMessage,
     noApiKeyMessage,
     noModelsMessage,

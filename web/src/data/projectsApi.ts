@@ -1,0 +1,22 @@
+import type { BuildLogState, CreateProjectRequest, ProjectListResponse, ProjectStatus, ProjectSummary, RebuildModelsResponse } from "../contracts/api";
+import { projectBase, request } from "./request";
+
+export const projectsApi = {
+  projects: () => request<ProjectListResponse>("/api/projects"),
+  createProject: (body: CreateProjectRequest) =>
+    request<ProjectSummary>("/api/projects", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  rebuildModels: () => request<RebuildModelsResponse>("/api/cursor/models"),
+  status: (projectSlug: string) => request<ProjectStatus>(`${projectBase(projectSlug)}/status`),
+  buildLog: (projectSlug: string, tabId?: string | null, path?: string | null, sectionId?: string | null) => {
+    const params = new URLSearchParams();
+    if (tabId) params.set("tab", tabId);
+    if (path) params.set("path", path);
+    if (sectionId) params.set("section", sectionId);
+    const query = params.toString();
+
+    return request<BuildLogState>(`${projectBase(projectSlug)}/build-log${query ? `?${query}` : ""}`);
+  },
+};

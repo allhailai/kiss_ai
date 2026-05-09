@@ -6,7 +6,6 @@ import {
   type ProjectFile,
   type ProjectStatus,
   type ProjectSummary,
-  type RebuildModel,
   type RebuildState,
   type ResolveHumanAttentionRequest,
 } from "../contracts/api";
@@ -16,6 +15,7 @@ import { resolveEffectiveRebuildModelId } from "../domain/rebuild";
 import { buildRouteHash } from "../navigation/routes";
 import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type RouteState, type View } from "../navigation/views";
 import { useRebuildSync } from "./hooks/useRebuildSync";
+import { useModelSelection } from "./hooks/useModelSelection";
 import { useRouteSync } from "./hooks/useRouteSync";
 import { useSelectedFile } from "./hooks/useSelectedFile";
 import { useSelectedProjectLifecycle } from "./hooks/useSelectedProjectLifecycle";
@@ -32,14 +32,19 @@ export function useProjectWorkspace() {
   const [status, setStatus] = useState<ProjectStatus | null>(null);
   const [buildLog, setBuildLog] = useState<BuildLogState | null>(null);
   const [rebuild, setRebuild] = useState<RebuildState | null>(null);
-  const [rebuildModels, setRebuildModels] = useState<RebuildModel[]>([]);
-  const [selectedRebuildModelId, setSelectedRebuildModelId] = useState("");
   const [design, setDesign] = useState<DesignState | null>(null);
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([designProjectFile]);
   const [loading, setLoading] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
   const { toasts, setNotice, dismissToast } = useToasts();
+  const {
+    clearRebuildModels,
+    rebuildModels,
+    refreshRebuildModels,
+    selectedRebuildModelId,
+    setSelectedRebuildModelId,
+  } = useModelSelection();
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.slug === selectedProjectSlug) ?? null,
@@ -86,15 +91,6 @@ export function useProjectWorkspace() {
     setRebuild(next);
     return next;
   }, [requireSelectedProjectSlug]);
-
-  const refreshRebuildModels = useCallback(async () => {
-    const response = await api.rebuildModels();
-    setRebuildModels(response.models);
-    setSelectedRebuildModelId((current) => {
-      if (current && response.models.some((model) => model.id === current)) return current;
-      return response.defaultModelId ?? response.models[0]?.id ?? "";
-    });
-  }, []);
 
   const refreshProjectFiles = useCallback(async () => {
     const projectSlug = requireSelectedProjectSlug();
@@ -326,9 +322,8 @@ export function useProjectWorkspace() {
     setNotice,
     setProjectFiles,
     setRebuild,
-    setRebuildModels,
     setSelectedProjectSlug,
-    setSelectedRebuildModelId,
+    clearRebuildModels,
     setStatus,
   });
 

@@ -39,7 +39,7 @@ export function GlobalFileSearch({
 
     const timeoutId = window.setTimeout(() => {
       api
-        .searchFiles(projectSlug, trimmedQuery)
+        .searchPathFiles(projectSlug, trimmedQuery)
         .then((response) => {
           if (cancelled) return;
           setResults(response.files);
@@ -107,7 +107,7 @@ export function GlobalFileSearch({
       </button>
       <div className="global-search" role="search">
         <label className="global-search-label" htmlFor="global-file-search">
-          Search files
+          Search file paths
         </label>
         <div className="global-search-field">
           <input
@@ -122,7 +122,7 @@ export function GlobalFileSearch({
             }}
             onFocus={() => setIsOpen(true)}
             onKeyDown={handleSearchKeyDown}
-            placeholder="Search inputs, outputs, and human files..."
+            placeholder="Search paths in inputs, outputs, and human files..."
             type="search"
             value={query}
           />
@@ -130,7 +130,7 @@ export function GlobalFileSearch({
             <div className="global-search-results" role="listbox">
               {loading ? <p className="global-search-state">Searching...</p> : null}
               {!loading && error ? <p className="global-search-state">{error}</p> : null}
-              {!loading && !error && results.length === 0 ? <p className="global-search-state">No matching files found.</p> : null}
+              {!loading && !error && results.length === 0 ? <p className="global-search-state">No matching paths found.</p> : null}
               {!loading && !error
                 ? results.map((file, index) => (
                     <button

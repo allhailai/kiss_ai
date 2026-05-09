@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { projectPathPrefixes } from "../domain/projectPaths";
 import { buildThemeStyle } from "./theme";
 import { useProjectWorkspace } from "./useProjectWorkspace";
+import { RightPanelSurface } from "./RightPanelSurface";
+import { useRightPanelSurface } from "./hooks/useRightPanelSurface";
 import { type View } from "../navigation/views";
 import { BuildLogWorkspace } from "../features/buildLog/BuildLogWorkspace";
 import { ChatWorkspace } from "../features/chat/ChatWorkspace";
@@ -14,6 +16,7 @@ import { ProjectPicker } from "../features/projectPicker/ProjectPicker";
 import { RebuildWorkspace } from "../features/rebuild/RebuildWorkspace";
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
+import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
 
 const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: string }>> = {
   requirements: {
@@ -35,6 +38,7 @@ const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: str
 
 export function App() {
   const workspace = useProjectWorkspace();
+  const rightPanelSurface = useRightPanelSurface();
   const [autoUpdateOpen, setAutoUpdateOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const themeStyle = useMemo(() => buildThemeStyle(workspace.design), [workspace.design]);
@@ -61,7 +65,7 @@ export function App() {
     workspace.selected?.path && isRequirementAutoUpdatePath(workspace.selected.path) ? workspace.selected.path : null;
 
   return (
-    <main className={sidebarCollapsed ? "app-shell sidebar-collapsed" : "app-shell"} style={themeStyle}>
+    <main className={`${sidebarCollapsed ? "app-shell sidebar-collapsed" : "app-shell"}${rightPanelSurface.rightPanel ? " right-panel-open" : ""}`} style={themeStyle}>
       <GlobalFileSearch
         projectName={workspace.status?.projectName ?? workspace.selectedProject.name}
         projectSlug={workspace.selectedProjectSlug}
@@ -69,6 +73,13 @@ export function App() {
         onOpenProjectHome={() => navigateTo("rebuild")}
         onSwitchProject={workspace.clearSelectedProject}
       />
+      <button
+        className="right-panel-open-button"
+        onClick={() => rightPanelSurface.togglePanel({ kind: "agent-chat", title: "Agent Chat" })}
+        type="button"
+      >
+        Agent
+      </button>
       <ToastViewport toasts={workspace.toasts} onDismiss={workspace.dismissToast} />
 
       <aside className="sidebar" aria-label="Project navigation">
@@ -188,6 +199,21 @@ export function App() {
           />
         ) : null}
       </section>
+      {rightPanelSurface.rightPanel ? (
+        <RightPanelSurface onClose={rightPanelSurface.closePanel} panel={rightPanelSurface.rightPanel}>
+          {rightPanelSurface.rightPanel.kind === "agent-chat" ? (
+            <RightPanelAgentChat
+              models={workspace.rebuildModels}
+              onModelChange={workspace.setSelectedRebuildModelId}
+              projectFiles={workspace.projectFiles}
+              projectSlug={workspace.selectedProjectSlug}
+              selectedModelId={workspace.selectedRebuildModelId}
+            />
+          ) : (
+            <p className="chat-empty-state">This reusable panel surface is ready for contextual project tools.</p>
+          )}
+        </RightPanelSurface>
+      ) : null}
     </main>
   );
 }

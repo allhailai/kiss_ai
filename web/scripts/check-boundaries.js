@@ -11,7 +11,7 @@ const importPattern = /from\s+["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']\s*
 const srcRules = [
   {
     from: "contracts",
-    test: () => true,
+    test: (specifier) => !specifier.startsWith("./") && !specifier.startsWith("../contracts/"),
     message: "contract modules must not import implementation modules",
   },
   {

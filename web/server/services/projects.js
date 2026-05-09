@@ -56,19 +56,53 @@ export function createProjectService({
     return projects.sort((left, right) => left.name.localeCompare(right.name));
   }
 
+  async function readProjectSummary(projectSlug) {
+    const projectsRootReal = await fs.realpath(PROJECTS_ROOT);
+    const projectRoot = path.join(projectsRootReal, projectSlug);
+    const projectRootReal = await fs.realpath(projectRoot);
+
+    if (!isPathInsideRoot(projectsRootReal, projectRootReal)) {
+      throw httpError("Project path escapes the configured projects root.", 403, "project_path_escape");
+    }
+
+    const stat = await fs.stat(projectRootReal);
+    if (!stat.isDirectory()) {
+      throw httpError("Project was not found under the configured projects root.", 404, "project_not_found");
+    }
+
+    const signals = await Promise.all([
+      fileExists(path.join(projectRootReal, ".git")),
+      fileExists(path.join(projectRootReal, ".harness-state.json")),
+      fileExists(path.join(projectRootReal, "human_goal_requirements.md")),
+      fileExists(path.join(projectRootReal, "inputs_human")),
+      fileExists(path.join(projectRootReal, "outputs_ai")),
+    ]);
+
+    if (!isProjectSignalPresent(signals)) {
+      throw httpError("Project was not found under the configured projects root.", 404, "project_not_found");
+    }
+
+    const harness = await readProjectHarness(projectRootReal);
+    return {
+      slug: projectSlug,
+      name: displayProjectName(harness.project_name, harness.project_slug ?? projectSlug),
+      path: projectRootReal,
+      setupStatus: harness.setup?.status ?? "unknown",
+      modifiedAt: stat.mtime.toISOString(),
+    };
+  }
+
   async function resolveProject(projectSlug) {
     if (!projectSlugPattern.test(projectSlug)) {
       throw httpError("Invalid project slug.", 400, "invalid_project_slug");
     }
 
-    const projects = await discoverProjects();
-    const project = projects.find((candidate) => candidate.slug === projectSlug);
-
-    if (!project) {
+    try {
+      return await readProjectSummary(projectSlug);
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
       throw httpError("Project was not found under the configured projects root.", 404, "project_not_found");
     }
-
-    return project;
   }
 
   async function attachProject(request, _response, next) {
