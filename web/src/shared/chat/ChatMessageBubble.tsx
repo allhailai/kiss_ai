@@ -1,7 +1,8 @@
+import { memo } from "react";
 import type { ChatMessage } from "../../contracts/api";
 import { formatChatDateTime, renderMessageContent } from "./chatRendering";
 
-export function ChatMessageBubble({
+function ChatMessageBubbleComponent({
   disabled,
   editDraft,
   editable = true,
@@ -84,3 +85,5 @@ export function ChatMessageBubble({
     </article>
   );
 }
+
+export const ChatMessageBubble = memo(ChatMessageBubbleComponent);

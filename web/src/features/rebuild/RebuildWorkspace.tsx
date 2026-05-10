@@ -1,28 +1,10 @@
 import { useState } from "react";
 import type { HumanAttentionItem, ProjectStatus, RebuildModel, RebuildState, ResolutionAttempt, ResolutionOption } from "../../contracts/api";
-import { AgentTranscript } from "../agents/AgentTranscript";
-
-const modelTierLabels: Record<RebuildModel["tier"], string> = {
-  medium: "Medium ($$)",
-  high: "High / Extra High ($$$)",
-  small: "Small ($)",
-};
-
-const modelTierOrder: RebuildModel["tier"][] = ["medium", "high", "small"];
-
-function formatLocalDateTime(value: string | null | undefined) {
-  if (!value) return "Not recorded";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleString();
-}
-
-function formatModelLabel(model: RebuildModel) {
-  const modelName = model.displayName || model.id;
-  return model.provider ? `${modelName} - ${model.provider}` : modelName;
-}
+import { formatLocalDateTime } from "../../domain/formatters";
+import { formatModelLabel, modelTierLabels } from "../../domain/modelLabels";
+import { humanAttentionQueuePath } from "../../domain/projectPaths";
+import { AgentTranscript } from "../../shared/agents/AgentTranscript";
+import { ModelSelect } from "../../shared/ModelSelect";
 
 function formatRunDuration(rebuild: RebuildState | null) {
   if (!rebuild?.startedAt) return "Not started";
@@ -136,37 +118,15 @@ export function RebuildWorkspace({
         </div>
 
         <div className="rebuild-status-controls">
-          <label className="rebuild-model-field">
-            <span>AI Model</span>
-            <select
-              disabled={Boolean(rebuild?.running) || !status?.cursorApiKeyAvailable || !models.length}
-              onChange={(event) => onModelChange(event.target.value)}
-              value={selectedModelId}
-            >
-              {models.length ? (
-                modelTierOrder.map((tier) => {
-                  const tierModels = models
-                    .filter((model) => model.tier === tier)
-                    .sort((left, right) =>
-                      (left.displayName || left.id).localeCompare(right.displayName || right.id, undefined, { sensitivity: "base" }),
-                    );
-                  if (!tierModels.length) return null;
-
-                  return (
-                    <optgroup key={tier} label={modelTierLabels[tier]}>
-                      {tierModels.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {formatModelLabel(model)}
-                        </option>
-                      ))}
-                    </optgroup>
-                  );
-                })
-              ) : (
-                <option value="">No models loaded</option>
-              )}
-            </select>
-          </label>
+          <ModelSelect
+            className="rebuild-model-field"
+            disabled={Boolean(rebuild?.running) || !status?.cursorApiKeyAvailable}
+            label="AI Model"
+            models={models}
+            onModelChange={onModelChange}
+            selectedModelId={selectedModelId}
+            showTierNote={false}
+          />
 
           <button disabled={startDisabled} onClick={onStart}>
             {rebuild?.running ? "Rebuild Running" : "Start Rebuild"}
@@ -188,7 +148,7 @@ export function RebuildWorkspace({
             <strong>Human attention needed</strong>
             <p>
               The rebuild can finish without stopping for questions. Review {status?.humanAttentionCount ?? 0} item
-              {(status?.humanAttentionCount ?? 0) === 1 ? "" : "s"} in `change_logs/human_attention_queue.md`.
+              {(status?.humanAttentionCount ?? 0) === 1 ? "" : "s"} in `{humanAttentionQueuePath}`.
             </p>
             {attentionItems.length ? (
               <div className="attention-resolution-list">
@@ -304,7 +264,7 @@ export function RebuildWorkspace({
           </div>
           <div>
             <span>Started</span>
-            <strong>{formatLocalDateTime(rebuild?.startedAt)}</strong>
+            <strong>{formatLocalDateTime(rebuild?.startedAt, "Not recorded")}</strong>
           </div>
           <div>
             <span>{rebuild?.running ? "Elapsed" : "Duration"}</span>
@@ -312,7 +272,7 @@ export function RebuildWorkspace({
           </div>
           <div>
             <span>Last update</span>
-            <strong>{formatLocalDateTime(latestLogTimestamp)}</strong>
+            <strong>{formatLocalDateTime(latestLogTimestamp, "Not recorded")}</strong>
           </div>
         </div>
 

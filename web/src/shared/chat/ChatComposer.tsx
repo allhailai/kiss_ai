@@ -1,6 +1,6 @@
 import { useEffect, type ChangeEvent, type KeyboardEvent, type RefObject } from "react";
 import type { ChatContextRef, ProjectFile, RebuildModel } from "../../contracts/api";
-import { formatModelLabel, modelTierLabels, modelTierOrder } from "../../domain/modelLabels";
+import { ModelSelect } from "../ModelSelect";
 
 const composerMaxRows = 8;
 
@@ -61,8 +61,6 @@ export function ChatComposer({
   submitLabel?: string;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
 }) {
-  const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
-
   useEffect(() => {
     resizeComposer(textareaRef.current);
   }, [draft, textareaRef]);
@@ -128,34 +126,15 @@ export function ChatComposer({
           </div>
         ) : null}
         <div className="chat-composer-actions">
-          <label className="chat-model-field">
-            <span>Model</span>
-            <select disabled={disabled || !models.length} onChange={(event) => onModelChange(event.target.value)} value={selectedModelId}>
-              {models.length ? (
-                modelTierOrder.map((tier) => {
-                  const tierModels = models
-                    .filter((model) => model.tier === tier)
-                    .sort((left, right) =>
-                      (left.displayName || left.id).localeCompare(right.displayName || right.id, undefined, { sensitivity: "base" }),
-                    );
-                  if (!tierModels.length) return null;
-
-                  return (
-                    <optgroup key={tier} label={modelTierLabels[tier]}>
-                      {tierModels.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {formatModelLabel(model)}
-                        </option>
-                      ))}
-                    </optgroup>
-                  );
-                })
-              ) : (
-                <option value="">No models loaded</option>
-              )}
-            </select>
-          </label>
-          {selectedModel ? <span className="chat-model-note">{modelTierLabels[selectedModel.tier]}</span> : null}
+          <ModelSelect
+            className="chat-model-field"
+            disabled={disabled}
+            label="Model"
+            models={models}
+            noteClassName="chat-model-note"
+            onModelChange={onModelChange}
+            selectedModelId={selectedModelId}
+          />
           <button disabled={disabled || !draft.trim() || !selectedModelId} type="submit">
             {disabled ? "Sending..." : submitLabel}
           </button>

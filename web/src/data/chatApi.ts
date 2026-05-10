@@ -28,6 +28,6 @@ export const chatApi = {
         body: JSON.stringify(body),
       },
     ),
-  conversationEventsUrl: (projectSlug: string, conversationId: string) =>
-    `${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/events`,
+  openConversationEventSource: (projectSlug: string, conversationId: string) =>
+    new EventSource(`${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/events`),
 };

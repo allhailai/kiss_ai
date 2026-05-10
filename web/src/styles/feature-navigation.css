@@ -1,0 +1,302 @@
+.page-header h2,
+.file-list h2,
+.editor-toolbar h2 {
+  margin: 6px 0 0;
+  line-height: 1.1;
+}
+
+.project-switch-button {
+  min-width: 0;
+  justify-self: end;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, white 50%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-secondary) 50%, transparent);
+  color: white;
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.project-switch-button:hover {
+  background: var(--color-secondary);
+  border-color: white;
+  color: white;
+}
+
+.eyebrow {
+  color: var(--color-secondary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.simple-nav {
+  align-self: start;
+  align-content: start;
+  display: grid;
+  gap: 5px;
+}
+
+.nav-section {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.nav-section:last-child {
+  border-bottom: 0;
+}
+
+.nav-section-trigger {
+  width: 100%;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--color-background) 42%, var(--color-border));
+  color: var(--color-primary);
+  text-align: left;
+}
+
+.nav-section-trigger span,
+.simple-nav-item span {
+  min-width: 0;
+}
+
+.nav-section-label,
+.simple-nav-item span,
+.simple-nav-item small {
+  display: block;
+}
+
+.nav-section-label strong,
+.nav-section-label small {
+  display: inline;
+}
+
+.nav-section-label strong {
+  margin-right: 0.35rem;
+}
+
+.nav-section-trigger small,
+.simple-nav-item small,
+.simple-nav-state {
+  color: var(--color-secondary);
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.nav-section-trigger b {
+  color: var(--color-secondary);
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.nav-section.active .nav-section-trigger,
+.nav-section-trigger:hover {
+  background: color-mix(in srgb, var(--color-accent) 18%, var(--color-surface));
+  color: var(--color-accent);
+}
+
+.nav-section-body {
+  display: grid;
+  gap: 2px;
+  padding-left: 8px;
+  border-left: 2px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
+}
+
+.simple-nav-item {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 4px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 0.9rem;
+  line-height: 1.18;
+  text-align: left;
+}
+
+.simple-nav-subheader {
+  margin-top: 4px;
+  padding: 6px 0 4px;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-secondary) 22%, var(--color-border));
+  background: transparent;
+}
+
+.simple-nav-subheader span {
+  font-weight: 800;
+}
+
+.simple-nav-item.simple-nav-subheader.active,
+.simple-nav-item.simple-nav-subheader:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 46%, var(--color-border));
+  background: transparent;
+}
+
+.simple-nav-item.active,
+.simple-nav-item:hover {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, white);
+}
+
+.simple-nav-children {
+  display: grid;
+  gap: 2px;
+}
+
+.simple-nav-child {
+  padding: 4px 6px;
+}
+
+.simple-nav-state {
+  margin: 0;
+  font-size: 0.86rem;
+  padding: 4px 6px;
+}
+
+.local-nav-action {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--color-accent);
+  color: white;
+  text-align: left;
+}
+
+.local-nav-action span {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.local-nav-action:hover {
+  background: color-mix(in srgb, var(--color-accent) 88%, var(--color-primary));
+}
+
+.file-tree {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.file-tree-node,
+.file-tree-children {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.file-tree-row {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 0.75rem minmax(0, 1fr);
+  align-items: start;
+  gap: 4px;
+  padding: 3px 5px 3px calc(5px + (var(--tree-depth, 0) * 5px));
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 0.86rem;
+  text-align: left;
+}
+
+.file-tree-directory {
+  font-weight: 800;
+  align-items: center;
+}
+
+.file-tree-file {
+  background: var(--color-surface);
+  line-height: 1.18;
+}
+
+.file-tree-file.with-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 2px calc(5px + (var(--tree-depth, 0) * 5px));
+}
+
+.file-tree-open-button {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 0.75rem minmax(0, 1fr);
+  align-items: start;
+  gap: 4px;
+  padding: 1px 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.file-tree-file.not-previewable .file-tree-open-button {
+  grid-template-columns: 0.75rem minmax(0, 1fr) auto;
+}
+
+.file-tree-delete-button {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-secondary);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.file-tree-delete-button:hover,
+.file-tree-delete-button:focus-visible {
+  background: color-mix(in srgb, var(--color-danger) 12%, white);
+  color: var(--color-danger);
+}
+
+.file-tree-file.not-previewable {
+  grid-template-columns: 0.75rem minmax(0, 1fr) auto;
+  color: var(--color-secondary);
+}
+
+.file-tree-file.not-previewable small {
+  align-self: center;
+  color: var(--color-secondary);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.file-tree-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+
+.file-tree-toggle {
+  color: var(--color-secondary);
+  text-align: center;
+}
+
+.file-tree-row.active,
+.file-tree-row:hover {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, white);
+}

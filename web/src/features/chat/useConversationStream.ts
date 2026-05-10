@@ -1,4 +1,4 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import type { ChatConversationEvent, Conversation } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 
@@ -46,14 +46,36 @@ export function useConversationStream({
   setActiveConversation: Dispatch<SetStateAction<Conversation | null>>;
   setSending: Dispatch<SetStateAction<boolean>>;
 }) {
+  const pendingDeltasRef = useRef<Array<Extract<ChatConversationEvent, { type: "message_delta" }>>>([]);
+  const deltaFrameRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!projectSlug || !conversationId || typeof EventSource === "undefined") return;
 
-    const eventSource = new EventSource(api.conversationEventsUrl(projectSlug, conversationId));
+    const eventSource = api.openConversationEventSource(projectSlug, conversationId);
+    const flushDeltas = () => {
+      deltaFrameRef.current = null;
+      const deltas = pendingDeltasRef.current;
+      pendingDeltasRef.current = [];
+      if (!deltas.length) return;
+
+      setActiveConversation((current) => {
+        let next = current;
+        for (const payload of deltas) {
+          next =
+            next && next.id === payload.conversationId
+              ? applyStreamingDelta(next, payload.messageId, payload.delta, payload.updatedAt)
+              : next;
+        }
+        return next;
+      });
+    };
+
     const handleEvent = (event: MessageEvent<string>) => {
       try {
         const payload = JSON.parse(event.data) as ChatConversationEvent;
         if (payload.type === "snapshot") {
+          pendingDeltasRef.current = [];
           setActiveConversation((current) => {
             if (current?.id === payload.conversation.id && payload.conversation.messages.length < current.messages.length) {
               onConversationTruncated();
@@ -62,12 +84,12 @@ export function useConversationStream({
           });
           void refreshConversations();
         } else if (payload.type === "message_delta") {
-          setActiveConversation((current) =>
-            current && current.id === payload.conversationId
-              ? applyStreamingDelta(current, payload.messageId, payload.delta, payload.updatedAt)
-              : current,
-          );
+          pendingDeltasRef.current.push(payload);
+          if (deltaFrameRef.current === null) {
+            deltaFrameRef.current = window.requestAnimationFrame(flushDeltas);
+          }
         } else if (payload.type === "message_complete") {
+          flushDeltas();
           setActiveConversation(payload.conversation);
           setSending(false);
           void refreshConversations();
@@ -88,6 +110,13 @@ export function useConversationStream({
       eventSource.close();
     };
 
-    return () => eventSource.close();
+    return () => {
+      eventSource.close();
+      pendingDeltasRef.current = [];
+      if (deltaFrameRef.current !== null) {
+        window.cancelAnimationFrame(deltaFrameRef.current);
+        deltaFrameRef.current = null;
+      }
+    };
   }, [conversationId, onConversationTruncated, onNotice, projectSlug, refreshConversations, setActiveConversation, setSending]);
 }

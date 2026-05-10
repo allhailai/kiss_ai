@@ -3,7 +3,7 @@ import type { AiAssistProposal, FileContent, RebuildModel } from "../../contract
 import { api } from "../../data/apiClient";
 import { buildDiffPreview } from "../../domain/diffPreview";
 import { buildLineDiff, countDeletedLines, countDiffRangeLines } from "../../domain/diffs";
-import { formatModelLabel, modelTierLabels, modelTierOrder } from "../../domain/modelLabels";
+import { ModelSelect } from "../../shared/ModelSelect";
 
 type AiAssistPanelProps = {
   projectSlug: string;
@@ -62,8 +62,6 @@ export function AiAssistPanel({
   const changedLineCount = diff ? countDiffRangeLines(diff.ranges) + countDeletedLines(diff.deletions) : 0;
   const staleProposal = Boolean(proposal && proposalBaseline && selected.content !== proposalBaseline);
   const previewEntries = proposal ? buildDiffPreview(selected.content, proposal.proposedContent) : [];
-  const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
-
   const requestProposal = async () => {
     const nextFeedback = feedback.trim();
 
@@ -224,34 +222,14 @@ export function AiAssistPanel({
           ) : null}
 
           <div className="ai-assist-controls">
-            <label className="ai-assist-model-field">
-              <span>AI Model</span>
-              <select disabled={loading || !models.length} onChange={(event) => onModelChange(event.target.value)} value={selectedModelId}>
-                {models.length ? (
-                  modelTierOrder.map((tier) => {
-                    const tierModels = models
-                      .filter((model) => model.tier === tier)
-                      .sort((left, right) =>
-                        (left.displayName || left.id).localeCompare(right.displayName || right.id, undefined, { sensitivity: "base" }),
-                      );
-                    if (!tierModels.length) return null;
-
-                    return (
-                      <optgroup key={tier} label={modelTierLabels[tier]}>
-                        {tierModels.map((model) => (
-                          <option key={model.id} value={model.id}>
-                            {formatModelLabel(model)}
-                          </option>
-                        ))}
-                      </optgroup>
-                    );
-                  })
-                ) : (
-                  <option value="">No models loaded</option>
-                )}
-              </select>
-              {selectedModel ? <small>{modelTierLabels[selectedModel.tier]}</small> : null}
-            </label>
+            <ModelSelect
+              className="ai-assist-model-field"
+              disabled={loading}
+              label="AI Model"
+              models={models}
+              onModelChange={onModelChange}
+              selectedModelId={selectedModelId}
+            />
 
             <div className="ai-assist-actions">
               <button disabled={loading || !selectedModelId || !models.length} onClick={() => void requestProposal()} type="button">

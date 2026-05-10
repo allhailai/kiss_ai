@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { AgentCapability, AgentSession, ProjectFile, RebuildModel } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { errorMessage } from "../../domain/errors";
-import { ChatComposer } from "../chat/ChatComposer";
-import { ChatThread } from "../chat/ChatThread";
+import { ChatComposer } from "../../shared/chat/ChatComposer";
+import { ChatThread } from "../../shared/chat/ChatThread";
 
 export function RightPanelAgentChat({
   models,

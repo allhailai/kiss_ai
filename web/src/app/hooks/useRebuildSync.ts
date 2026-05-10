@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { RebuildState } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { isTerminalRebuildStatus } from "../../domain/rebuild";
@@ -22,11 +22,14 @@ export function useRebuildSync({
   selectedProjectSlug,
   setRebuild,
 }: UseRebuildSyncOptions) {
+  const lastLiveEventAtRef = useRef(0);
+
   useEffect(() => {
     if (!rebuild?.running) return;
 
     const interval = window.setInterval(() => {
       void (async () => {
+        if (typeof EventSource !== "undefined" && Date.now() - lastLiveEventAtRef.current < 7500) return;
         const next = await refreshRebuild();
         void refreshStatus();
 
@@ -35,7 +38,7 @@ export function useRebuildSync({
           void refreshProjectFiles();
         }
       })();
-    }, 2500);
+    }, 5000);
 
     return () => window.clearInterval(interval);
   }, [rebuild?.running, refreshBuildLog, refreshProjectFiles, refreshRebuild, refreshStatus]);
@@ -43,9 +46,10 @@ export function useRebuildSync({
   useEffect(() => {
     if (!selectedProjectSlug || !rebuild?.running || typeof EventSource === "undefined") return;
 
-    const eventSource = new EventSource(api.rebuildEventsUrl(selectedProjectSlug));
+    const eventSource = api.openRebuildEventSource(selectedProjectSlug);
     const syncRebuild = (event: MessageEvent<string>) => {
       try {
+        lastLiveEventAtRef.current = Date.now();
         const payload = JSON.parse(event.data) as unknown;
         const next =
           payload && typeof payload === "object" && "state" in payload

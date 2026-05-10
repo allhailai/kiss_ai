@@ -3,7 +3,7 @@ import { projectBase, request } from "./request";
 
 export const rebuildApi = {
   rebuildState: (projectSlug: string) => request<RebuildState>(`${projectBase(projectSlug)}/rebuild`),
-  rebuildEventsUrl: (projectSlug: string) => `${projectBase(projectSlug)}/rebuild/events`,
+  openRebuildEventSource: (projectSlug: string) => new EventSource(`${projectBase(projectSlug)}/rebuild/events`),
   startRebuild: (projectSlug: string, modelId: string) =>
     request<RebuildState>(`${projectBase(projectSlug)}/rebuild/start`, {
       method: "POST",

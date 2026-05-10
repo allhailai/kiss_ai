@@ -1,10 +1,5 @@
 import type { AgentRunEvent } from "../../contracts/api";
-
-function formatLocalTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
-}
+import { formatLocalTime } from "../../domain/formatters";
 
 function getEventLabel(event: AgentRunEvent) {
   if (event.type === "assistant_message") return "Agent";

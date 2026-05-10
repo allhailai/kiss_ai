@@ -7,15 +7,15 @@ import {
   type ProjectStatus,
   type ProjectSummary,
   type RebuildState,
-  type ResolveHumanAttentionRequest,
 } from "../contracts/api";
 import { uniqueFiles } from "../domain/files";
-import { designIdentityFilePath } from "../domain/projectPaths";
-import { resolveEffectiveRebuildModelId } from "../domain/rebuild";
 import { buildRouteHash, parseRouteHash } from "../navigation/routes";
-import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type RouteState, type View } from "../navigation/views";
+import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type View } from "../navigation/views";
+import { useHumanInputs } from "./hooks/useHumanInputs";
 import { useRebuildSync } from "./hooks/useRebuildSync";
+import { useRebuildActions } from "./hooks/useRebuildActions";
 import { useModelSelection } from "./hooks/useModelSelection";
+import { useRouteDrivenData } from "./hooks/useRouteDrivenData";
 import { useRouteSync } from "./hooks/useRouteSync";
 import { useSelectedFile } from "./hooks/useSelectedFile";
 import { useSelectedProjectLifecycle } from "./hooks/useSelectedProjectLifecycle";
@@ -127,59 +127,19 @@ export function useProjectWorkspace() {
     setNotice,
   });
 
-  const applyRoute = useCallback(
-    async (route: RouteState) => {
-      if (!route.projectSlug || route.projectSlug !== selectedProjectSlug) return;
-
-      const nextView = route.view;
-      setView(nextView);
-      setRouteContext(route.context);
-      setNotice("");
-      clearSelectedFile();
-
-      if (nextView === "requirements") {
-        await loadTree("requirements");
-      } else if (nextView === "inputs") {
-        await loadTree("human");
-      } else if (nextView === "outputs") {
-        await loadTree("outputs");
-      } else if (nextView === "annotations") {
-        await loadTree("inputs-ai");
-      } else {
-        setFiles([]);
-      }
-
-      if (nextView === "dashboard") {
-        await refreshDesign();
-      } else if (nextView === "design") {
-        setFiles([designProjectFile]);
-        await refreshDesign();
-        await selectFile(route.filePath ?? designIdentityFilePath);
-      }
-
-      if (nextView === "rebuild") {
-        await refreshRebuild();
-      }
-
-      if (nextView === "build-log") {
-        await refreshBuildLog();
-      }
-
-      if (route.filePath && nextView !== "design") {
-        await selectFile(route.filePath);
-      }
-    },
-    [
-      clearSelectedFile,
-      loadTree,
-      refreshBuildLog,
-      refreshDesign,
-      refreshRebuild,
-      selectFile,
-      selectedProjectSlug,
-      setNotice,
-    ],
-  );
+  const applyRoute = useRouteDrivenData({
+    clearSelectedFile,
+    loadTree,
+    refreshBuildLog,
+    refreshDesign,
+    refreshRebuild,
+    selectFile,
+    selectedProjectSlug,
+    setFiles,
+    setNotice,
+    setRouteContext,
+    setView,
+  });
 
   const { navigateTo } = useRouteSync({ applyRoute, selectedProjectSlug, setSelectedProjectSlug });
 
@@ -230,51 +190,16 @@ export function useProjectWorkspace() {
     [navigateTo, projectFiles, setNotice],
   );
 
-  const uploadHumanInputFiles = useCallback(
-    async (files: File[]) => {
-      if (!files.length) return;
-
-      setLoading(true);
-      setNotice("");
-      try {
-        const response = await api.uploadHumanInputs(requireSelectedProjectSlug(), files);
-        await refreshProjectFiles();
-        if (view === "inputs") await loadTree("human");
-        setNotice(
-          `Uploaded ${response.files.length.toLocaleString()} file${response.files.length === 1 ? "" : "s"} to inputs_human/.`,
-        );
-      } catch (error) {
-        setNotice(error instanceof Error ? error.message : "Could not upload files.");
-        throw error;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [loadTree, refreshProjectFiles, requireSelectedProjectSlug, setLoading, setNotice, view],
-  );
-
-  const deleteHumanInputFile = useCallback(
-    async (path: string) => {
-      const confirmed = window.confirm(`Delete ${path} from inputs_human/? This cannot be undone.`);
-      if (!confirmed) return;
-
-      setLoading(true);
-      setNotice("");
-      try {
-        const response = await api.deleteHumanInput(requireSelectedProjectSlug(), path);
-        if (selected?.path === response.path) clearSelectedFile();
-        await refreshProjectFiles();
-        if (view === "inputs") await loadTree("human");
-        setNotice(`Deleted ${response.path}.`);
-      } catch (error) {
-        setNotice(error instanceof Error ? error.message : "Could not delete the file.");
-        throw error;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [clearSelectedFile, loadTree, refreshProjectFiles, requireSelectedProjectSlug, selected?.path, setLoading, setNotice, view],
-  );
+  const { deleteHumanInputFile, uploadHumanInputFiles } = useHumanInputs({
+    clearSelectedFile,
+    loadTree,
+    refreshProjectFiles,
+    requireSelectedProjectSlug,
+    selected,
+    setLoading,
+    setNotice,
+    view,
+  });
 
   const selectProject = useCallback((projectSlug: string) => {
     setSelectedProjectSlug(projectSlug);
@@ -307,31 +232,13 @@ export function useProjectWorkspace() {
     [refreshProjects, selectProject, setNotice],
   );
 
-  const startRebuild = useCallback(async () => {
-    setNotice("");
-    const next = await api.startRebuild(requireSelectedProjectSlug(), resolveEffectiveRebuildModelId(selectedRebuildModelId, rebuildModels));
-    setRebuild(next);
-
-    if (next.status === "blocked") {
-      setNotice(next.message);
-    }
-  }, [rebuildModels, requireSelectedProjectSlug, selectedRebuildModelId, setNotice]);
-
-  const resolveHumanAttention = useCallback(
-    async (request: Omit<ResolveHumanAttentionRequest, "modelId">) => {
-      setNotice("");
-      const next = await api.resolveHumanAttention(requireSelectedProjectSlug(), {
-        ...request,
-        modelId: resolveEffectiveRebuildModelId(selectedRebuildModelId, rebuildModels),
-      });
-      setRebuild(next);
-
-      if (next.status === "blocked" || next.status === "error") {
-        setNotice(next.message);
-      }
-    },
-    [rebuildModels, requireSelectedProjectSlug, selectedRebuildModelId, setNotice],
-  );
+  const { resolveHumanAttention, startRebuild } = useRebuildActions({
+    rebuildModels,
+    requireSelectedProjectSlug,
+    selectedRebuildModelId,
+    setNotice,
+    setRebuild,
+  });
 
   useEffect(() => {
     void refreshProjects();
@@ -365,7 +272,70 @@ export function useProjectWorkspace() {
     setRebuild,
   });
 
+  const project = {
+    clearSelectedProject,
+    createProject,
+    creatingProject,
+    projects,
+    projectsError,
+    projectsRoot,
+    refreshProjects,
+    selectProject,
+    selectedProject,
+    selectedProjectSlug,
+  };
+  const route = {
+    navigateTo,
+    openProjectFile,
+    replaceRouteContext,
+    routeContext,
+    view,
+  };
+  const fileWorkspace = {
+    deleteHumanInputFile,
+    draft,
+    files,
+    loading,
+    projectFiles,
+    refreshSelectedFile,
+    revertSelected,
+    saveSelected,
+    selected,
+    selectedDiff,
+    setDraft,
+    uploadHumanInputFiles,
+  };
+  const rebuildWorkspace = {
+    buildLog,
+    models: rebuildModels,
+    rebuild,
+    refreshBuildLog,
+    refreshRebuild,
+    refreshRebuildModels,
+    refreshStatus,
+    resolveHumanAttention,
+    selectedModelId: selectedRebuildModelId,
+    setSelectedModelId: setSelectedRebuildModelId,
+    startRebuild,
+    status,
+  };
+  const designWorkspace = {
+    design,
+    refreshDesign,
+  };
+  const toastWorkspace = {
+    dismissToast,
+    setNotice,
+    toasts,
+  };
+
   return {
+    project,
+    route,
+    fileWorkspace,
+    rebuildWorkspace,
+    designWorkspace,
+    toastWorkspace,
     view,
     routeContext,
     projectsRoot,

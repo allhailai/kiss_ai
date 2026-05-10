@@ -2,7 +2,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FileDiff, ProjectFile } from "../contracts/api";
 import { buildLineDiff } from "../domain/diffs";
 import { buildEditorDiffExtension } from "./diffExtension";
@@ -30,7 +30,12 @@ export function MarkdownEditor({
   onNotice: (message: string) => void;
   onOpenFile: (path: string) => void;
 }) {
-  const unsavedDiff = useMemo(() => buildLineDiff(baselineValue, value), [baselineValue, value]);
+  const [diffInput, setDiffInput] = useState({ baselineValue, value });
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDiffInput({ baselineValue, value }), 120);
+    return () => window.clearTimeout(timeoutId);
+  }, [baselineValue, value]);
+  const unsavedDiff = useMemo(() => buildLineDiff(diffInput.baselineValue, diffInput.value), [diffInput.baselineValue, diffInput.value]);
   const extensions = useMemo(
     () => [
       markdown(),

@@ -34,13 +34,14 @@ export function GlobalFileSearch({
       return;
     }
 
+    const controller = new AbortController();
     let cancelled = false;
     setLoading(true);
     setError("");
 
     const timeoutId = window.setTimeout(() => {
       api
-        .searchPathFiles(projectSlug, trimmedQuery)
+        .searchPathFiles(projectSlug, trimmedQuery, controller.signal)
         .then((response) => {
           if (cancelled) return;
           setResults(response.files);
@@ -49,6 +50,7 @@ export function GlobalFileSearch({
         })
         .catch((searchError) => {
           if (cancelled) return;
+          if (searchError instanceof DOMException && searchError.name === "AbortError") return;
           setResults([]);
           setActiveResultIndex(-1);
           setError(errorMessage(searchError, "Could not search project paths."));
@@ -62,6 +64,7 @@ export function GlobalFileSearch({
 
     return () => {
       cancelled = true;
+      controller.abort();
       window.clearTimeout(timeoutId);
     };
   }, [projectSlug, trimmedQuery]);

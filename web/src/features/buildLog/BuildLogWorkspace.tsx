@@ -1,5 +1,6 @@
 import type { BuildLogState, BuildLogTab, ProjectStatus, RebuildState } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
+import { humanAttentionQueuePath } from "../../domain/projectPaths";
 
 function attentionItemText(item: unknown) {
   if (!item || typeof item !== "object") return String(item);
@@ -126,7 +127,7 @@ export function BuildLogWorkspace({
         <section className="warning-callout">
           <strong>Attention Needed</strong>
           <p>
-            Review {attentionCount} item{attentionCount === 1 ? "" : "s"} in `change_logs/human_attention_queue.md`.
+            Review {attentionCount} item{attentionCount === 1 ? "" : "s"} in `{humanAttentionQueuePath}`.
           </p>
           {status?.humanAttentionItems?.length ? (
             <ul>

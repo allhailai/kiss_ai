@@ -3,8 +3,7 @@ import remarkGfm from "remark-gfm";
 import { formatLocalDateTime } from "../../domain/formatters";
 
 export function formatChatDateTime(value: string | null | undefined) {
-  if (!value) return "Not recorded";
-  return formatLocalDateTime(value);
+  return formatLocalDateTime(value, "Not recorded");
 }
 
 const chatMarkdownComponents: Components = {

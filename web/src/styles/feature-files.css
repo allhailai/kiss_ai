@@ -1,0 +1,110 @@
+.document-workspace {
+  height: 100%;
+  min-height: calc(100vh - 112px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+}
+
+.document-workspace.has-upload-dropzone {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.document-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  min-width: 0;
+}
+
+.document-header p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--color-secondary);
+  line-height: 1.5;
+  text-align: right;
+}
+
+.human-input-dropzone {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 2px dashed color-mix(in srgb, var(--color-accent) 48%, var(--color-border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+}
+
+.human-input-dropzone.active {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface));
+}
+
+.human-input-dropzone strong {
+  color: var(--color-primary);
+}
+
+.human-input-dropzone p {
+  margin: 4px 0 0;
+  color: var(--color-secondary);
+}
+
+.human-input-dropzone button {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--color-accent);
+  color: white;
+  font-weight: 800;
+}
+
+.human-input-dropzone input {
+  display: none;
+}
+
+.file-list,
+.editor-pane {
+  min-height: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+}
+
+.file-list {
+  overflow: auto;
+  padding: 18px;
+}
+
+.file-item {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: white;
+  color: var(--color-primary);
+  text-align: left;
+}
+
+.file-item span {
+  overflow-wrap: anywhere;
+}
+
+.file-item.active,
+.file-item:hover {
+  border-color: var(--color-accent);
+}
+
+.editor-pane {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.markdown-editor-shell {
+  grid-row: 4;
+  min-height: 0;
+}

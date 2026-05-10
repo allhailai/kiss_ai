@@ -1,0 +1,16 @@
+:root {
+  --color-primary: #17202a;
+  --color-secondary: #5d6d7e;
+  --color-accent: #a45c40;
+  --color-background: #f8f6f1;
+  --color-surface: #ffffff;
+  --color-border: #d8d2c4;
+  --color-annotation: #6d5bd0;
+  --color-success: #2f6f4e;
+  --color-warning: #9a6b1f;
+  --color-danger: #b42318;
+  --color-danger-strong: #9f2d20;
+  --color-console-background: #101820;
+  --color-console-text: #f7f5f2;
+  --color-icon-ink: #000000;
+}

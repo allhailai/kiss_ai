@@ -1,0 +1,198 @@
+.rebuild-status-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.rebuild-status-heading {
+  align-items: baseline;
+}
+
+.rebuild-status-heading p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.rebuild-status-heading strong {
+  color: var(--color-primary);
+}
+
+.rebuild-status-controls {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.rebuild-status-controls .rebuild-model-field {
+  margin: 0;
+  max-width: none;
+}
+
+.rebuild-status-controls button {
+  white-space: nowrap;
+}
+
+.rebuild-status-copy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.rebuild-status-copy p,
+.rebuild-status-card > .lint-warning,
+.rebuild-status-card > p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.rebuild-status-copy strong,
+.rebuild-status-card > p strong {
+  color: var(--color-primary);
+}
+
+.rebuild-model-field {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0;
+  max-width: 420px;
+}
+
+.rebuild-model-field span {
+  color: var(--color-secondary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rebuild-model-field select {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: white;
+  color: var(--color-primary);
+  padding: 10px 12px;
+}
+
+.rebuild-model-note {
+  margin-top: -6px;
+  font-size: 0.9rem;
+}
+
+.rebuild-runner-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.rebuild-runner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.rebuild-runner-grid div,
+.rebuild-latest-log {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-surface) 88%, var(--color-accent));
+  padding: 10px;
+}
+
+.rebuild-runner-grid span,
+.rebuild-latest-log span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rebuild-runner-grid strong {
+  display: block;
+  color: var(--color-primary);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.rebuild-technical-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  color: var(--color-secondary);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.copyable-value {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.copyable-value code {
+  display: inline-block;
+  max-width: 100%;
+  min-height: 22px;
+  padding: 3px 24px 3px 6px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 74%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, white 78%, var(--color-background));
+  color: var(--color-primary);
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+
+.rebuild-technical-details .copyable-value button {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 15px;
+  height: 15px;
+  opacity: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.rebuild-technical-details .copyable-value button::before,
+.rebuild-technical-details .copyable-value button::after {
+  position: absolute;
+  width: 8px;
+  height: 10px;
+  border: 1.5px solid var(--color-accent);
+  border-radius: 2px;
+  background: var(--color-surface);
+  content: "";
+}
+
+.rebuild-technical-details .copyable-value button::before {
+  top: 1px;
+  left: 2px;
+  opacity: 0.7;
+}
+
+.rebuild-technical-details .copyable-value button::after {
+  top: 4px;
+  left: 5px;
+}
+
+.copyable-value:hover button,
+.copyable-value:focus-within button {
+  opacity: 1;
+}
+
+.rebuild-latest-log p {
+  margin: 0;
+  color: var(--color-primary);
+  overflow-wrap: anywhere;
+}

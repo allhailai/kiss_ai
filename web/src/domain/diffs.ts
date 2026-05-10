@@ -15,7 +15,7 @@ export type EditorDiff = {
 
 export type DiffKind = "unsaved" | "saved";
 
-export function groupLineRanges(lineNumbers: number[]): EditorDiffRange[] {
+function groupLineRanges(lineNumbers: number[]): EditorDiffRange[] {
   const sorted = [...new Set(lineNumbers)].sort((left, right) => left - right);
   const ranges: EditorDiffRange[] = [];
 

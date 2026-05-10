@@ -10,7 +10,7 @@ export type RouteState = {
   context: Record<string, string>;
 };
 
-export const views: Array<{ id: View; label: string; description: string }> = [
+const views: Array<{ id: View; label: string; description: string }> = [
   { id: "build-log", label: "Build Log", description: "Latest rebuild summary and history" },
   { id: "chat", label: "Chat", description: "Project-local agent conversations" },
   { id: "requirements", label: "Requirements", description: "Human-owned source of truth" },
@@ -22,7 +22,6 @@ export const views: Array<{ id: View; label: string; description: string }> = [
   { id: "dashboard", label: "Tech Dashboard", description: "Project state and readiness" },
 ];
 
-export const workflowMenuViews = views.filter((item) => item.id !== "design");
 export const viewIds = new Set<View>(views.map((item) => item.id));
 export const fileBackedViews = new Set<View>(["requirements", "inputs", "outputs", "annotations", "design"]);
 export const defaultRoute: RouteState = { projectSlug: null, view: "rebuild", filePath: null, context: {} };
@@ -34,8 +33,6 @@ export const designProjectFile: ProjectFile = {
   editable: true,
   annotation: false,
 };
-export const requirementsExplainer =
-  "These files are the source of truth for the project. Saving here directly changes human-owned project intent.";
 
 export function viewForProjectPath(path: string): View | null {
   if (isDesignIdentityPath(path)) return "design";

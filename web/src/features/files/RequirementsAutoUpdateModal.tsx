@@ -8,23 +8,8 @@ import {
 import { api } from "../../data/apiClient";
 import { buildDiffPreview } from "../../domain/diffPreview";
 import { buildLineDiff, countDeletedLines, countDiffRangeLines } from "../../domain/diffs";
-import { formatModelLabel, modelTierLabels, modelTierOrder } from "../../domain/modelLabels";
-
-const requirementAutoUpdatePaths: RequirementAutoUpdatePath[] = [
-  "human_goal_requirements.md",
-  "human_input_requirements.md",
-  "human_output_requirements.md",
-];
-
-const requirementLabels: Record<RequirementAutoUpdatePath, string> = {
-  "human_goal_requirements.md": "Goal Requirements",
-  "human_input_requirements.md": "Input Requirements",
-  "human_output_requirements.md": "Output Requirements",
-};
-
-export function isRequirementAutoUpdatePath(path: string): path is RequirementAutoUpdatePath {
-  return requirementAutoUpdatePaths.includes(path as RequirementAutoUpdatePath);
-}
+import { isRequirementAutoUpdatePath, requirementAutoUpdateLabels, requirementAutoUpdatePaths } from "../../domain/projectPaths";
+import { ModelSelect } from "../../shared/ModelSelect";
 
 type RequirementsAutoUpdateModalProps = {
   projectSlug: string;
@@ -89,7 +74,6 @@ export function RequirementsAutoUpdateModal({
     };
   }, [onNotice, projectSlug, sourcePath]);
 
-  const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
   const allFilesLoaded = requirementAutoUpdatePaths.every((path) => files[path]);
   const contentHashes = useMemo(() => {
     const entries = requirementAutoUpdatePaths.map((path) => [path, files[path]?.contentHash ?? ""]);
@@ -188,7 +172,7 @@ export function RequirementsAutoUpdateModal({
                 <label className="requirements-auto-update-file" key={path}>
                   <input checked={selectedPaths.includes(path)} disabled={loading || accepting} onChange={() => toggleSelectedPath(path)} type="checkbox" />
                   <span>
-                    <strong>{requirementLabels[path]}</strong>
+                    <strong>{requirementAutoUpdateLabels[path]}</strong>
                     <small>
                       {path}
                       {path === sourcePath ? " - current source" : ""}
@@ -215,34 +199,14 @@ export function RequirementsAutoUpdateModal({
           </label>
 
           <div className="ai-assist-controls">
-            <label className="ai-assist-model-field">
-              <span>AI Model</span>
-              <select disabled={loading || accepting || !models.length} onChange={(event) => onModelChange(event.target.value)} value={selectedModelId}>
-                {models.length ? (
-                  modelTierOrder.map((tier) => {
-                    const tierModels = models
-                      .filter((model) => model.tier === tier)
-                      .sort((left, right) =>
-                        (left.displayName || left.id).localeCompare(right.displayName || right.id, undefined, { sensitivity: "base" }),
-                      );
-                    if (!tierModels.length) return null;
-
-                    return (
-                      <optgroup key={tier} label={modelTierLabels[tier]}>
-                        {tierModels.map((model) => (
-                          <option key={model.id} value={model.id}>
-                            {formatModelLabel(model)}
-                          </option>
-                        ))}
-                      </optgroup>
-                    );
-                  })
-                ) : (
-                  <option value="">No models loaded</option>
-                )}
-              </select>
-              {selectedModel ? <small>{modelTierLabels[selectedModel.tier]}</small> : null}
-            </label>
+            <ModelSelect
+              className="ai-assist-model-field"
+              disabled={loading || accepting}
+              label="AI Model"
+              models={models}
+              onModelChange={onModelChange}
+              selectedModelId={selectedModelId}
+            />
 
             <div className="ai-assist-actions">
               <button disabled={loading || accepting || !selectedModelId || !models.length} onClick={() => void generateProposal()} type="button">

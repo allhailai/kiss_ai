@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { projectPathPrefixes } from "../domain/projectPaths";
+import { isRequirementAutoUpdatePath, projectPathPrefixes } from "../domain/projectPaths";
 import { buildThemeStyle } from "./theme";
 import { useProjectWorkspace } from "./useProjectWorkspace";
 import { RightPanelSurface } from "./RightPanelSurface";
+import { RightPanelToggle } from "./RightPanelToggle";
 import { useRightPanelSurface } from "./hooks/useRightPanelSurface";
 import { panelWidthContextKey, projectChatDefaultPanelWidth, useRightPanelWidth } from "./hooks/useRightPanelWidth";
 import { type View } from "../navigation/views";
 import { BuildLogWorkspace } from "../features/buildLog/BuildLogWorkspace";
-import { ProjectChatConversationHistory, ProjectChatPanel, useProjectChat } from "../features/chat/ChatWorkspace";
+import { ProjectChatConversationHistory } from "../features/chat/ProjectChatConversationHistory";
+import { ProjectChatPanel } from "../features/chat/ProjectChatPanel";
+import { useProjectChat } from "../features/chat/useProjectChat";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { DesignWorkspace } from "../features/design/DesignWorkspace";
 import { FileWorkspace } from "../features/files/FileWorkspace";
-import { isRequirementAutoUpdatePath, RequirementsAutoUpdateModal } from "../features/files/RequirementsAutoUpdateModal";
+import { RequirementsAutoUpdateModal } from "../features/files/RequirementsAutoUpdateModal";
 import { SimplifiedNavigator } from "../features/navigation/WorkflowMenus";
 import { ProjectPicker } from "../features/projectPicker/ProjectPicker";
 import { RebuildWorkspace } from "../features/rebuild/RebuildWorkspace";
@@ -42,17 +45,18 @@ const agentChatPanel = { kind: "agent-chat", title: "Agent Chat" } as const;
 
 export function App() {
   const workspace = useProjectWorkspace();
+  const { designWorkspace, fileWorkspace, project, rebuildWorkspace, route, toastWorkspace } = workspace;
   const rightPanelSurface = useRightPanelSurface();
   const [autoUpdateOpen, setAutoUpdateOpen] = useState(false);
   const [projectChatPanelDismissed, setProjectChatPanelDismissed] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const projectChatVisitKeyRef = useRef<string | null>(null);
-  const themeStyle = useMemo(() => buildThemeStyle(workspace.design), [workspace.design]);
+  const themeStyle = useMemo(() => buildThemeStyle(designWorkspace.design), [designWorkspace.design]);
   const rightPanelWidth = useRightPanelWidth({
     panelKind: rightPanelSurface.rightPanel?.kind ?? null,
-    replaceRouteContext: workspace.replaceRouteContext,
-    routeContext: workspace.routeContext,
-    view: workspace.view,
+    replaceRouteContext: route.replaceRouteContext,
+    routeContext: route.routeContext,
+    view: route.view,
   });
   const appStyle = useMemo(
     () =>
@@ -63,25 +67,25 @@ export function App() {
     [rightPanelWidth.cssValue, themeStyle],
   );
   const projectChat = useProjectChat({
-    projectSlug: workspace.selectedProjectSlug,
-    selectedModelId: workspace.selectedRebuildModelId,
-    projectFiles: workspace.projectFiles,
-    onNotice: workspace.setNotice,
+    projectSlug: project.selectedProjectSlug,
+    selectedModelId: rebuildWorkspace.selectedModelId,
+    projectFiles: fileWorkspace.projectFiles,
+    onNotice: toastWorkspace.setNotice,
   });
-  const navigateTo = (view: View, filePath?: string | null, context?: Record<string, string>) => workspace.navigateTo(view, filePath, context);
+  const navigateTo = (view: View, filePath?: string | null, context?: Record<string, string>) => route.navigateTo(view, filePath, context);
   const openProjectChatPanel = () => {
     setProjectChatPanelDismissed(false);
     rightPanelSurface.openPanel(projectChatPanel);
-    if (workspace.view === "chat" && !workspace.routeContext[panelWidthContextKey]) {
-      workspace.replaceRouteContext({ [panelWidthContextKey]: projectChatDefaultPanelWidth });
+    if (route.view === "chat" && !route.routeContext[panelWidthContextKey]) {
+      route.replaceRouteContext({ [panelWidthContextKey]: projectChatDefaultPanelWidth });
     }
   };
   const selectProjectChatConversation = (conversationId: string) => {
     openProjectChatPanel();
     navigateTo("chat", null, {
-      ...workspace.routeContext,
+      ...route.routeContext,
       conversation: conversationId,
-      [panelWidthContextKey]: workspace.routeContext[panelWidthContextKey] || projectChatDefaultPanelWidth,
+      [panelWidthContextKey]: route.routeContext[panelWidthContextKey] || projectChatDefaultPanelWidth,
     });
   };
   const toggleAgentPanel = () => {
@@ -94,14 +98,14 @@ export function App() {
   };
 
   useEffect(() => {
-    if (!workspace.selectedProjectSlug || workspace.view !== "chat") {
+    if (!project.selectedProjectSlug || route.view !== "chat") {
       projectChatVisitKeyRef.current = null;
       if (projectChatPanelDismissed) setProjectChatPanelDismissed(false);
       return;
     }
 
-    if (projectChatVisitKeyRef.current !== workspace.selectedProjectSlug) {
-      projectChatVisitKeyRef.current = workspace.selectedProjectSlug;
+    if (projectChatVisitKeyRef.current !== project.selectedProjectSlug) {
+      projectChatVisitKeyRef.current = project.selectedProjectSlug;
       if (projectChatPanelDismissed) setProjectChatPanelDismissed(false);
       openProjectChatPanel();
       return;
@@ -110,43 +114,43 @@ export function App() {
     if (!projectChatPanelDismissed && !rightPanelSurface.rightPanel) {
       openProjectChatPanel();
     }
-  }, [projectChatPanelDismissed, rightPanelSurface.rightPanel, workspace.routeContext, workspace.selectedProjectSlug, workspace.view]);
+  }, [projectChatPanelDismissed, project.selectedProjectSlug, rightPanelSurface.rightPanel, route.routeContext, route.view]);
 
   useEffect(() => {
-    if (workspace.view !== "chat") return;
+    if (route.view !== "chat") return;
 
-    const conversationId = workspace.routeContext.conversation;
+    const conversationId = route.routeContext.conversation;
     if (!conversationId || projectChat.activeConversation?.id === conversationId) return;
 
     openProjectChatPanel();
     void projectChat.openConversation(conversationId);
-  }, [projectChat.activeConversation?.id, workspace.routeContext.conversation, workspace.view]);
+  }, [projectChat.activeConversation?.id, route.routeContext.conversation, route.view]);
 
-  if (!workspace.selectedProjectSlug || !workspace.selectedProject) {
+  if (!project.selectedProjectSlug || !project.selectedProject) {
     return (
       <main className="app-shell project-picker-shell" style={appStyle}>
-        <ToastViewport toasts={workspace.toasts} onDismiss={workspace.dismissToast} />
+        <ToastViewport toasts={toastWorkspace.toasts} onDismiss={toastWorkspace.dismissToast} />
         <ProjectPicker
-          creatingProject={workspace.creatingProject}
-          error={workspace.projectsError}
-          onCreateProject={workspace.createProject}
-          onSelect={workspace.selectProject}
-          projects={workspace.projects}
-          projectsRoot={workspace.projectsRoot}
+          creatingProject={project.creatingProject}
+          error={project.projectsError}
+          onCreateProject={project.createProject}
+          onSelect={project.selectProject}
+          projects={project.projects}
+          projectsRoot={project.projectsRoot}
         />
       </main>
     );
   }
 
-  const fileWorkspace = fileWorkspaceByView[workspace.view];
+  const fileWorkspaceConfig = fileWorkspaceByView[route.view];
   const selectedAutoUpdatePath =
-    workspace.selected?.path && isRequirementAutoUpdatePath(workspace.selected.path) ? workspace.selected.path : null;
-  const appShellClassName = `${sidebarCollapsed ? "app-shell sidebar-collapsed" : "app-shell"}${workspace.view === "chat" ? " chat-view" : ""}${
+    fileWorkspace.selected?.path && isRequirementAutoUpdatePath(fileWorkspace.selected.path) ? fileWorkspace.selected.path : null;
+  const appShellClassName = `${sidebarCollapsed ? "app-shell sidebar-collapsed" : "app-shell"}${
     rightPanelSurface.rightPanel ? ` right-panel-open right-panel-${rightPanelSurface.rightPanel.kind}` : ""
   }`;
   const isAgentPanelOpen = rightPanelSurface.rightPanel?.kind === agentChatPanel.kind;
   const handleRightPanelClose = () => {
-    if (workspace.view === "chat" && rightPanelSurface.rightPanel?.kind === "project-chat") {
+    if (route.view === "chat" && rightPanelSurface.rightPanel?.kind === "project-chat") {
       setProjectChatPanelDismissed(true);
     }
     rightPanelSurface.closePanel();
@@ -154,21 +158,14 @@ export function App() {
   return (
     <main className={appShellClassName} style={appStyle}>
       <GlobalFileSearch
-        projectName={workspace.status?.projectName ?? workspace.selectedProject.name}
-        projectSlug={workspace.selectedProjectSlug}
-        onOpenFile={workspace.openProjectFile}
+        projectName={rebuildWorkspace.status?.projectName ?? project.selectedProject.name}
+        projectSlug={project.selectedProjectSlug}
+        onOpenFile={route.openProjectFile}
         onOpenProjectHome={() => navigateTo("rebuild")}
-        onSwitchProject={workspace.clearSelectedProject}
+        onSwitchProject={project.clearSelectedProject}
       />
-      <button
-        aria-pressed={isAgentPanelOpen}
-        className={isAgentPanelOpen ? "right-panel-open-button active" : "right-panel-open-button"}
-        onClick={toggleAgentPanel}
-        type="button"
-      >
-        Agent
-      </button>
-      <ToastViewport toasts={workspace.toasts} onDismiss={workspace.dismissToast} />
+      <RightPanelToggle active={isAgentPanelOpen} label="Agent" onToggle={toggleAgentPanel} />
+      <ToastViewport toasts={toastWorkspace.toasts} onDismiss={toastWorkspace.dismissToast} />
 
       <aside className="sidebar" aria-label="Project navigation">
         <button
@@ -184,101 +181,105 @@ export function App() {
         </button>
         {!sidebarCollapsed ? (
           <SimplifiedNavigator
-            currentView={workspace.view}
-            loading={workspace.loading}
-            projectFiles={workspace.projectFiles}
-            selectedPath={workspace.selected?.path ?? null}
+            currentView={route.view}
+            loading={fileWorkspace.loading}
+            projectFiles={fileWorkspace.projectFiles}
+            selectedPath={fileWorkspace.selected?.path ?? null}
             showAiAutoUpdate={Boolean(selectedAutoUpdatePath)}
             onAiAutoUpdate={() => setAutoUpdateOpen(true)}
-            onDeleteHumanInputFile={(path) => void workspace.deleteHumanInputFile(path)}
-            onOpenFile={workspace.openProjectFile}
+            onDeleteHumanInputFile={(path) => void fileWorkspace.deleteHumanInputFile(path)}
+            onOpenFile={route.openProjectFile}
             onOpenView={(nextView, filePath) => navigateTo(nextView, filePath)}
           />
         ) : null}
       </aside>
 
       <section className="workspace">
-        {workspace.view === "build-log" ? (
+        {route.view === "build-log" ? (
           <BuildLogWorkspace
-            buildLog={workspace.buildLog}
-            status={workspace.status}
-            rebuild={workspace.rebuild}
-            onSelectLog={(tabId, path, sectionId) => void workspace.refreshBuildLog(tabId, path, sectionId)}
+            buildLog={rebuildWorkspace.buildLog}
+            status={rebuildWorkspace.status}
+            rebuild={rebuildWorkspace.rebuild}
+            onSelectLog={(tabId, path, sectionId) => void rebuildWorkspace.refreshBuildLog(tabId, path, sectionId)}
           />
         ) : null}
-        {workspace.view === "dashboard" ? (
+        {route.view === "dashboard" ? (
           <Dashboard
-            status={workspace.status}
-            design={workspace.design}
+            status={rebuildWorkspace.status}
+            design={designWorkspace.design}
             onOpenAnnotations={() => navigateTo("annotations")}
             onOpenDesign={() => navigateTo("design")}
           />
         ) : null}
-        {workspace.view === "chat" ? (
+        {route.view === "chat" ? (
           <div className="chat-history-workspace">
             <ProjectChatConversationHistory chat={projectChat} onSelectConversation={selectProjectChatConversation} />
           </div>
         ) : null}
-        {fileWorkspace ? (
+        {fileWorkspaceConfig ? (
           <FileWorkspace
-            projectSlug={workspace.selectedProjectSlug}
-            models={workspace.rebuildModels}
-            selectedModelId={workspace.selectedRebuildModelId}
-            title={fileWorkspace.title}
-            explainer={fileWorkspace.explainer}
-            selected={workspace.selected}
-            selectedDiff={workspace.selectedDiff}
-            draft={workspace.draft}
-            projectFiles={workspace.projectFiles}
-            onDraft={workspace.setDraft}
-            onModelChange={workspace.setSelectedRebuildModelId}
-            onNotice={workspace.setNotice}
-            onOpenFile={workspace.openProjectFile}
-            onUploadFiles={workspace.view === "inputs" ? workspace.uploadHumanInputFiles : undefined}
-            onRevert={() => void workspace.revertSelected()}
-            onSave={() => void workspace.saveSelected()}
+            projectSlug={project.selectedProjectSlug}
+            models={rebuildWorkspace.models}
+            selectedModelId={rebuildWorkspace.selectedModelId}
+            title={fileWorkspaceConfig.title}
+            explainer={fileWorkspaceConfig.explainer}
+            selected={fileWorkspace.selected}
+            selectedDiff={fileWorkspace.selectedDiff}
+            draft={fileWorkspace.draft}
+            projectFiles={fileWorkspace.projectFiles}
+            onDraft={fileWorkspace.setDraft}
+            onModelChange={rebuildWorkspace.setSelectedModelId}
+            onNotice={toastWorkspace.setNotice}
+            onOpenFile={route.openProjectFile}
+            onUploadFiles={route.view === "inputs" ? fileWorkspace.uploadHumanInputFiles : undefined}
+            onRevert={() => void fileWorkspace.revertSelected()}
+            onSave={() => void fileWorkspace.saveSelected()}
           />
         ) : null}
-        {workspace.view === "design" ? (
+        {route.view === "design" ? (
           <DesignWorkspace
-            design={workspace.design}
-            selected={workspace.selected}
-            selectedDiff={workspace.selectedDiff}
-            draft={workspace.draft}
-            loading={workspace.loading}
-            onDraft={workspace.setDraft}
-            onRevert={() => void workspace.revertSelected()}
-            onSave={() => void workspace.saveSelected()}
+            design={designWorkspace.design}
+            selected={fileWorkspace.selected}
+            selectedDiff={fileWorkspace.selectedDiff}
+            draft={fileWorkspace.draft}
+            loading={fileWorkspace.loading}
+            onDraft={fileWorkspace.setDraft}
+            onRevert={() => void fileWorkspace.revertSelected()}
+            onSave={() => void fileWorkspace.saveSelected()}
           />
         ) : null}
-        {workspace.view === "rebuild" ? (
+        {route.view === "rebuild" ? (
           <RebuildWorkspace
-            status={workspace.status}
-            rebuild={workspace.rebuild}
-            models={workspace.rebuildModels}
-            selectedModelId={workspace.selectedRebuildModelId}
-            onModelChange={workspace.setSelectedRebuildModelId}
-            onStart={() => void workspace.startRebuild()}
-            onResolve={(request) => void workspace.resolveHumanAttention(request)}
+            status={rebuildWorkspace.status}
+            rebuild={rebuildWorkspace.rebuild}
+            models={rebuildWorkspace.models}
+            selectedModelId={rebuildWorkspace.selectedModelId}
+            onModelChange={rebuildWorkspace.setSelectedModelId}
+            onStart={() => void rebuildWorkspace.startRebuild()}
+            onResolve={(request) => void rebuildWorkspace.resolveHumanAttention(request)}
           />
         ) : null}
         {autoUpdateOpen && selectedAutoUpdatePath ? (
           <RequirementsAutoUpdateModal
-            projectSlug={workspace.selectedProjectSlug}
-            models={workspace.rebuildModels}
-            selectedModelId={workspace.selectedRebuildModelId}
+            projectSlug={project.selectedProjectSlug}
+            models={rebuildWorkspace.models}
+            selectedModelId={rebuildWorkspace.selectedModelId}
             sourcePath={selectedAutoUpdatePath}
-            hasUnsavedSourceChanges={workspace.draft !== (workspace.selected?.content ?? "")}
+            hasUnsavedSourceChanges={fileWorkspace.draft !== (fileWorkspace.selected?.content ?? "")}
             onAccepted={async (writtenPaths) => {
-              if (workspace.selected?.path && isRequirementAutoUpdatePath(workspace.selected.path) && writtenPaths.includes(workspace.selected.path)) {
-                await workspace.refreshSelectedFile();
+              if (
+                fileWorkspace.selected?.path &&
+                isRequirementAutoUpdatePath(fileWorkspace.selected.path) &&
+                writtenPaths.includes(fileWorkspace.selected.path)
+              ) {
+                await fileWorkspace.refreshSelectedFile();
               } else {
-                await workspace.refreshStatus();
+                await rebuildWorkspace.refreshStatus();
               }
             }}
             onClose={() => setAutoUpdateOpen(false)}
-            onModelChange={workspace.setSelectedRebuildModelId}
-            onNotice={workspace.setNotice}
+            onModelChange={rebuildWorkspace.setSelectedModelId}
+            onNotice={toastWorkspace.setNotice}
           />
         ) : null}
       </section>
@@ -301,18 +302,18 @@ export function App() {
         >
           {rightPanelSurface.rightPanel.kind === "agent-chat" ? (
             <RightPanelAgentChat
-              models={workspace.rebuildModels}
-              onModelChange={workspace.setSelectedRebuildModelId}
-              projectFiles={workspace.projectFiles}
-              projectSlug={workspace.selectedProjectSlug}
-              selectedModelId={workspace.selectedRebuildModelId}
+              models={rebuildWorkspace.models}
+              onModelChange={rebuildWorkspace.setSelectedModelId}
+              projectFiles={fileWorkspace.projectFiles}
+              projectSlug={project.selectedProjectSlug}
+              selectedModelId={rebuildWorkspace.selectedModelId}
             />
           ) : (
             <ProjectChatPanel
               chat={projectChat}
-              models={workspace.rebuildModels}
-              selectedModelId={workspace.selectedRebuildModelId}
-              onModelChange={workspace.setSelectedRebuildModelId}
+              models={rebuildWorkspace.models}
+              selectedModelId={rebuildWorkspace.selectedModelId}
+              onModelChange={rebuildWorkspace.setSelectedModelId}
             />
           )}
         </RightPanelSurface>

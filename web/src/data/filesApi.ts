@@ -13,8 +13,8 @@ function fileToBase64(file: File) {
   });
 }
 
-function searchProjectFiles(projectSlug: string, query: string) {
-  return request<FileSearchResponse>(`${projectBase(projectSlug)}/search/paths?q=${encodeURIComponent(query)}`);
+function searchProjectFiles(projectSlug: string, query: string, signal?: AbortSignal) {
+  return request<FileSearchResponse>(`${projectBase(projectSlug)}/search/paths?q=${encodeURIComponent(query)}`, { signal });
 }
 
 export const filesApi = {

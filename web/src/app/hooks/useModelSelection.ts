@@ -23,7 +23,6 @@ export function useModelSelection() {
   return {
     rebuildModels,
     selectedRebuildModelId,
-    setRebuildModels,
     setSelectedRebuildModelId,
     refreshRebuildModels,
     clearRebuildModels,

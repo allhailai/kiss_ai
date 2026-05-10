@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { FileContent, FileDiff, ProjectFile, RebuildModel } from "../../contracts/api";
 import { countDeletedLines, countDiffRangeLines } from "../../domain/diffs";
+import { projectPathPrefixes } from "../../domain/projectPaths";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
 import { AiAssistPanel } from "./AiAssistPanel";
 
@@ -119,7 +120,7 @@ function HumanInputDropzone({
     >
       <div>
         <strong>{uploading ? "Uploading files..." : "Drop files into Human Inputs"}</strong>
-        <p>Files are saved directly to inputs_human/ for this project. Any file type is accepted.</p>
+        <p>Files are saved directly to {projectPathPrefixes.humanInput} for this project. Any file type is accepted.</p>
       </div>
       <button
         onClick={() => inputRef.current?.click()}
