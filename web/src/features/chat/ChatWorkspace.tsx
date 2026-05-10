@@ -292,9 +292,6 @@ export function ProjectChatConversationHistory({
           <h3>Conversations</h3>
           <p>{chat.conversations.length.toLocaleString()} saved conversation{chat.conversations.length === 1 ? "" : "s"}</p>
         </div>
-        <button disabled={chat.loading || chat.sending} onClick={() => void chat.createConversation()} type="button">
-          New
-        </button>
       </div>
       <input
         aria-label="Filter conversations"

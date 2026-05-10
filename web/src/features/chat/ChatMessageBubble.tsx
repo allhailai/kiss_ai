@@ -32,12 +32,16 @@ export function ChatMessageBubble({
           <span>{formatChatDateTime(message.updatedAt ?? message.createdAt)}</span>
           {canEdit ? (
             <button
+              aria-label="Edit message"
               className="chat-message-edit-button"
               disabled={disabled || isEditing}
               onClick={() => onStartEdit(message)}
+              title="Edit message"
               type="button"
             >
-              Edit
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M11.9 1.7a1.5 1.5 0 0 1 2.1 2.1l-8.6 8.6-2.8.7.7-2.8 8.6-8.6Zm-1 2.1 1.3 1.3 1.1-1.1a.5.5 0 0 0-.7-.7l-1.7.5ZM4.2 10.8l-.3 1 1-.3 6.5-6.5-1.2-1.2-6 7Z" />
+              </svg>
             </button>
           ) : null}
         </div>

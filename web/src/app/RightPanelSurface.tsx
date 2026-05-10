@@ -12,13 +12,11 @@ export type RightPanelResizeControls = {
 };
 
 export function RightPanelSurface({
-  actions,
   children,
   onClose,
   panel,
   resize,
 }: {
-  actions?: ReactNode;
   children: ReactNode;
   onClose: () => void;
   panel: NonNullable<RightPanelState>;
@@ -77,18 +75,9 @@ export function RightPanelSurface({
           tabIndex={resizeDisabled ? -1 : 0}
         />
       ) : null}
-      <header className="right-panel-header">
-        <div>
-          <span>Panel</span>
-          <strong>{panel.title}</strong>
-        </div>
-        <div className="right-panel-actions">
-          {actions}
-          <button onClick={onClose} type="button">
-            Close
-          </button>
-        </div>
-      </header>
+      <button aria-label="Close panel" className="right-panel-close-button" onClick={onClose} title="Close panel" type="button">
+        x
+      </button>
       <div className="right-panel-body">{children}</div>
     </aside>
   );

@@ -38,6 +38,7 @@ const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: str
 };
 
 const projectChatPanel = { kind: "project-chat", title: "Project Chat" } as const;
+const agentChatPanel = { kind: "agent-chat", title: "Agent Chat" } as const;
 
 export function App() {
   const workspace = useProjectWorkspace();
@@ -82,6 +83,14 @@ export function App() {
       conversation: conversationId,
       [panelWidthContextKey]: workspace.routeContext[panelWidthContextKey] || "55%",
     });
+  };
+  const toggleAgentPanel = () => {
+    if (rightPanelSurface.rightPanel?.kind === agentChatPanel.kind) {
+      rightPanelSurface.closePanel();
+      return;
+    }
+
+    rightPanelSurface.openPanel(agentChatPanel);
   };
 
   useEffect(() => {
@@ -135,6 +144,7 @@ export function App() {
   const appShellClassName = `${sidebarCollapsed ? "app-shell sidebar-collapsed" : "app-shell"}${workspace.view === "chat" ? " chat-view" : ""}${
     rightPanelSurface.rightPanel ? ` right-panel-open right-panel-${rightPanelSurface.rightPanel.kind}` : ""
   }`;
+  const isAgentPanelOpen = rightPanelSurface.rightPanel?.kind === agentChatPanel.kind;
   const handleRightPanelClose = () => {
     if (workspace.view === "chat" && rightPanelSurface.rightPanel?.kind === "project-chat") {
       setProjectChatPanelDismissed(true);
@@ -151,8 +161,9 @@ export function App() {
         onSwitchProject={workspace.clearSelectedProject}
       />
       <button
-        className="right-panel-open-button"
-        onClick={() => rightPanelSurface.togglePanel({ kind: "agent-chat", title: "Agent Chat" })}
+        aria-pressed={isAgentPanelOpen}
+        className={isAgentPanelOpen ? "right-panel-open-button active" : "right-panel-open-button"}
+        onClick={toggleAgentPanel}
         type="button"
       >
         Agent
