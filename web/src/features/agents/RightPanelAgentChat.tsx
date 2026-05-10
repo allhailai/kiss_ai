@@ -1,17 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-import type { AgentCapability, AgentSession, ProjectFile, RebuildModel } from "../../contracts/api";
+import type { AgentCapability, AgentContextFile, AgentContextRef, AgentSession, ProjectFile, RebuildModel } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { errorMessage } from "../../domain/errors";
 import { ChatComposer } from "../../shared/chat/ChatComposer";
 import { ChatThread } from "../../shared/chat/ChatThread";
 
+function contextFileLabel(file: AgentContextFile) {
+  return file.label || file.path;
+}
+
 export function RightPanelAgentChat({
+  activeFiles,
   models,
   onModelChange,
   projectFiles,
   projectSlug,
   selectedModelId,
 }: {
+  activeFiles: AgentContextFile[];
   models: RebuildModel[];
   onModelChange: (modelId: string) => void;
   projectFiles: ProjectFile[];
@@ -20,14 +26,18 @@ export function RightPanelAgentChat({
 }) {
   const [capabilities, setCapabilities] = useState<AgentCapability[]>([]);
   const [capabilityError, setCapabilityError] = useState("");
+  const [contextRefs, setContextRefs] = useState<AgentContextRef[]>([]);
   const [draft, setDraft] = useState("");
   const [session, setSession] = useState<AgentSession | null>(null);
+  const [selectedContextPath, setSelectedContextPath] = useState("");
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setCapabilityError("");
+    setContextRefs([]);
+    setSelectedContextPath("");
 
     void (async () => {
       try {
@@ -52,6 +62,19 @@ export function RightPanelAgentChat({
     };
   }, [projectSlug]);
 
+  const addContextRef = () => {
+    if (sending) return;
+    const file = projectFiles.find((candidate) => candidate.path === selectedContextPath);
+    if (!file || contextRefs.some((ref) => ref.path === file.path)) return;
+
+    setContextRefs((current) => [...current, { path: file.path, label: file.name, kind: file.kind, source: "manual" }]);
+    setSelectedContextPath("");
+  };
+
+  const removeContextRef = (path: string) => {
+    setContextRefs((current) => current.filter((ref) => ref.path !== path));
+  };
+
   const sendMessage = async () => {
     const content = draft.trim();
     if (!content || sending) return;
@@ -59,7 +82,13 @@ export function RightPanelAgentChat({
     setSending(true);
     setCapabilityError("");
     try {
-      setSession(await api.sendAgentSessionMessage(projectSlug, { content, modelId: selectedModelId || undefined }));
+      setSession(
+        await api.sendAgentSessionMessage(projectSlug, {
+          content,
+          modelId: selectedModelId || undefined,
+          context: activeFiles.length || contextRefs.length ? { activeFiles, fileRefs: contextRefs } : undefined,
+        }),
+      );
       setDraft("");
     } catch (error) {
       setCapabilityError(errorMessage(error, "Could not send the agent message."));
@@ -73,7 +102,7 @@ export function RightPanelAgentChat({
       <div className="right-panel-agent-thread">
         {capabilityError ? <p className="agent-event-status">Agent capabilities unavailable: {capabilityError}</p> : null}
         {!capabilityError && capabilities.length ? (
-          <p className="agent-event-status">{capabilities.length} read-only agent capabilities available.</p>
+          <p className="agent-event-status">{capabilities.filter((capability) => capability.available).length} agent capabilities available.</p>
         ) : null}
         <ChatThread
           disabled={sending}
@@ -83,19 +112,36 @@ export function RightPanelAgentChat({
           messages={session?.messages ?? []}
         />
       </div>
+      <div className="agent-active-context" aria-label="Active agent context">
+        <span className="agent-context-label">Active context</span>
+        {activeFiles.length ? (
+          <div className="agent-context-chips">
+            {activeFiles.map((file) => (
+              <code key={file.path} title={file.path}>
+                {contextFileLabel(file)}
+                {file.draftState === "unsaved" ? " (unsaved)" : ""}
+              </code>
+            ))}
+          </div>
+        ) : (
+          <p>No active file selected.</p>
+        )}
+      </div>
       <ChatComposer
         contextFiles={projectFiles}
-        contextRefs={[]}
+        contextRefs={contextRefs}
         disabled={sending}
         draft={draft}
         models={models}
+        onAddContextRef={addContextRef}
         onChangeDraft={(event) => setDraft(event.currentTarget.value)}
         onModelChange={onModelChange}
+        onRemoveContextRef={removeContextRef}
+        onSelectedContextPathChange={setSelectedContextPath}
         onSubmit={() => void sendMessage()}
         placeholder="Ask the side-panel agent..."
-        selectedContextPath=""
+        selectedContextPath={selectedContextPath}
         selectedModelId={selectedModelId}
-        showContextControls={false}
         submitLabel="Ask"
         textareaRef={textareaRef}
       />

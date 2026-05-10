@@ -151,7 +151,7 @@
   min-height: 0;
   height: 100%;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto auto;
   gap: 10px;
   overflow: hidden;
 }
@@ -163,6 +163,48 @@
   display: grid;
   align-content: start;
   gap: 8px;
+}
+
+.agent-active-context {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 0 12px;
+}
+
+.agent-context-label {
+  color: var(--color-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.agent-active-context p {
+  margin: 0;
+  color: var(--color-secondary);
+  font-size: 0.78rem;
+}
+
+.agent-context-chips {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.agent-context-chips code {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 3px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-background) 82%, white);
+  color: var(--color-secondary);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .right-panel-surface .chat-composer {

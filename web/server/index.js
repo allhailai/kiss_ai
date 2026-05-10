@@ -291,7 +291,16 @@ const { startHumanAttentionResolution, startRebuild } = createAgentJobService({
   setRebuildState,
 });
 
-const { listAgentCapabilities, readAgentSession, sendAgentSessionMessage } = createAgentCapabilityService();
+const { listAgentCapabilities, readAgentSession, sendAgentSessionMessage } = createAgentCapabilityService({
+  displayProjectName,
+  httpError,
+  listCursorModels,
+  pickRebuildModelId,
+  readProjectHarness,
+  readTextFile,
+  resolveCursorApiKey,
+  runCursorAgentText,
+});
 
 const { acceptRequirementsAutoUpdate, runAiAssistProposal, runRequirementsAutoUpdateProposal } = createAiFlowService({
   FRAMEWORK_ROOT,

@@ -21,6 +21,7 @@ import { RebuildWorkspace } from "../features/rebuild/RebuildWorkspace";
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
 import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
+import type { AgentContextFile } from "../contracts/api";
 
 const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: string }>> = {
   requirements: {
@@ -72,6 +73,23 @@ export function App() {
     projectFiles: fileWorkspace.projectFiles,
     onNotice: toastWorkspace.setNotice,
   });
+  const activeAgentFiles = useMemo<AgentContextFile[]>(() => {
+    const selected = fileWorkspace.selected;
+    if (!selected) return [];
+
+    return [
+      {
+        path: selected.path,
+        label: selected.path.split("/").at(-1) ?? selected.path,
+        kind: selected.kind,
+        editable: selected.editable,
+        annotation: selected.annotation,
+        contentHash: selected.contentHash,
+        draftState: fileWorkspace.draft !== selected.content ? "unsaved" : "saved",
+        role: "primary",
+      },
+    ];
+  }, [fileWorkspace.draft, fileWorkspace.selected]);
   const navigateTo = (view: View, filePath?: string | null, context?: Record<string, string>) => route.navigateTo(view, filePath, context);
   const openProjectChatPanel = () => {
     setProjectChatPanelDismissed(false);
@@ -302,6 +320,7 @@ export function App() {
         >
           {rightPanelSurface.rightPanel.kind === "agent-chat" ? (
             <RightPanelAgentChat
+              activeFiles={activeAgentFiles}
               models={rebuildWorkspace.models}
               onModelChange={rebuildWorkspace.setSelectedModelId}
               projectFiles={fileWorkspace.projectFiles}

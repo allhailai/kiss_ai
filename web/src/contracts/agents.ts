@@ -1,4 +1,7 @@
-export type AgentCapabilityRisk = "read" | "write" | "run";
+export type AgentCapabilityRisk = "read" | "propose" | "write" | "run";
+export type AgentContextFileKind = "human" | "ai" | "output" | "log" | "design";
+export type AgentContextDraftState = "saved" | "unsaved" | "unknown";
+export type AgentContextFileRole = "primary" | "secondary";
 
 export type AgentCapability = {
   id: string;
@@ -10,6 +13,29 @@ export type AgentCapability = {
 
 export type AgentCapabilitiesResponse = {
   capabilities: AgentCapability[];
+};
+
+export type AgentContextFile = {
+  path: string;
+  label?: string;
+  kind?: AgentContextFileKind;
+  editable?: boolean;
+  annotation?: boolean;
+  contentHash?: string;
+  draftState?: AgentContextDraftState;
+  role?: AgentContextFileRole;
+};
+
+export type AgentContextRef = {
+  path: string;
+  label?: string;
+  kind?: AgentContextFileKind;
+  source?: "active_file" | "manual";
+};
+
+export type AgentMessageContext = {
+  activeFiles?: AgentContextFile[];
+  fileRefs?: AgentContextRef[];
 };
 
 export type AgentToolCallStatus = "pending_approval" | "running" | "complete" | "failed";
@@ -43,9 +69,11 @@ export type AgentSessionMessage = {
   updatedAt: string;
   modelId: string | null;
   status: "complete" | "streaming" | "error";
+  context?: AgentMessageContext;
 };
 
 export type SendAgentSessionMessageRequest = {
   content: string;
   modelId?: string;
+  context?: AgentMessageContext;
 };

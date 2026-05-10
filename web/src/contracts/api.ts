@@ -1,7 +1,15 @@
+import type { AgentContextFile } from "./agents";
+
 export type {
   AgentCapabilitiesResponse,
   AgentCapability,
   AgentCapabilityRisk,
+  AgentContextDraftState,
+  AgentContextFile,
+  AgentContextFileKind,
+  AgentContextFileRole,
+  AgentContextRef,
+  AgentMessageContext,
   AgentSession,
   AgentSessionMessage,
   AgentToolCall,
@@ -209,6 +217,7 @@ export type ChatMessage = {
   modelId?: string | null;
   status: ChatMessageStatus;
   context?: {
+    activeFiles?: AgentContextFile[];
     fileRefs?: ChatContextRef[];
   };
   metadata?: Record<string, unknown>;

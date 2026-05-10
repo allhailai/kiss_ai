@@ -24,6 +24,12 @@ function ChatMessageBubbleComponent({
   onStartEdit: (message: ChatMessage) => void;
 }) {
   const canEdit = editable && message.role === "user";
+  const contextPaths = [
+    ...new Set([
+      ...(message.context?.activeFiles ?? []).map((file) => file.path),
+      ...(message.context?.fileRefs ?? []).map((ref) => ref.path),
+    ]),
+  ];
 
   return (
     <article className={`chat-message chat-message-${message.role} chat-message-${message.status}`}>
@@ -74,10 +80,10 @@ function ChatMessageBubbleComponent({
       ) : (
         <div className="chat-message-content">{renderMessageContent(message.content)}</div>
       )}
-      {message.context?.fileRefs?.length ? (
+      {contextPaths.length ? (
         <div className="chat-message-context">
-          {message.context.fileRefs.map((ref) => (
-            <code key={ref.path}>{ref.path}</code>
+          {contextPaths.map((contextPath) => (
+            <code key={contextPath}>{contextPath}</code>
           ))}
         </div>
       ) : null}
