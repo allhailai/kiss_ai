@@ -47,6 +47,7 @@
 
 .chat-filter,
 .chat-context-controls select,
+.chat-context-popover input,
 .chat-composer textarea,
 .chat-model-field select {
   width: 100%;
@@ -59,6 +60,7 @@
 
 .chat-filter,
 .chat-context-controls select,
+.chat-context-popover input,
 .chat-model-field select {
   padding: 7px 9px;
   font-size: 0.84rem;
@@ -66,6 +68,7 @@
 
 .chat-filter:focus,
 .chat-context-controls select:focus,
+.chat-context-popover input:focus,
 .chat-composer textarea:focus,
 .chat-model-field select:focus {
   border-color: color-mix(in srgb, var(--color-accent) 54%, var(--color-border));
@@ -379,7 +382,7 @@
 }
 
 .chat-message-context code,
-.chat-main .chat-context-chip {
+.chat-context-chip {
   border: 1px solid var(--color-border);
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-background) 82%, white);
@@ -397,13 +400,17 @@
   gap: 6px;
 }
 
-.chat-main .chat-context-chip {
+.chat-context-chip {
+  max-width: min(260px, 100%);
+  overflow: hidden;
   padding: 4px 8px;
   font-weight: 700;
   text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.chat-main .chat-context-chip span {
+.chat-context-chip span {
   margin-left: 4px;
   color: var(--color-accent);
   font-weight: 900;
@@ -412,15 +419,22 @@
 .chat-composer {
   display: grid;
   gap: 8px;
-  padding: 10px 12px 12px;
-  background: var(--color-surface);
+  margin: 10px 12px 12px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-surface) 96%, var(--color-background));
+  box-shadow: 0 12px 36px rgba(23, 32, 42, 0.1);
 }
 
 .chat-composer textarea {
-  min-height: 44px;
+  min-height: 42px;
   resize: none;
   overflow-y: hidden;
-  padding: 10px 12px;
+  padding: 9px 10px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 0.92rem;
   line-height: 1.45;
 }
 
@@ -442,12 +456,193 @@
 }
 
 .chat-context-compact {
-  flex: 1 1 auto;
+  flex: 1 1 240px;
 }
 
 .chat-composer-actions {
-  flex: 1 1 300px;
+  flex: 0 1 auto;
   justify-content: flex-end;
+}
+
+.chat-context-picker,
+.chat-model-picker {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.chat-context-trigger,
+.chat-model-trigger,
+.chat-composer-actions > button[type="submit"] {
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.chat-context-trigger,
+.chat-model-trigger {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-background) 72%, white);
+  color: var(--color-primary);
+}
+
+.chat-context-trigger span[aria-hidden="true"] {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: white;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.chat-context-trigger:hover,
+.chat-context-trigger:focus-visible,
+.chat-model-trigger:hover,
+.chat-model-trigger:focus-visible {
+  border-color: color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 8%, white);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 20%, transparent);
+  outline-offset: 2px;
+}
+
+.chat-context-popover,
+.chat-model-popover {
+  position: absolute;
+  z-index: 50;
+  bottom: calc(100% + 8px);
+  min-width: min(360px, 80vw);
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: 0 20px 54px rgba(23, 32, 42, 0.2);
+}
+
+.chat-context-popover {
+  left: 0;
+}
+
+.chat-model-popover {
+  right: 0;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(460px, 65vh);
+  overflow: auto;
+}
+
+.chat-context-results {
+  max-height: min(320px, 50vh);
+  overflow: auto;
+  display: grid;
+  gap: 4px;
+}
+
+.chat-context-result,
+.chat-model-option {
+  width: 100%;
+  display: grid;
+  gap: 3px;
+  padding: 8px 9px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-primary);
+  text-align: left;
+}
+
+.chat-context-result strong,
+.chat-model-option strong {
+  overflow: hidden;
+  font-size: 0.84rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-context-result span,
+.chat-model-option span,
+.chat-context-state {
+  color: var(--color-secondary);
+  font-size: 0.74rem;
+  line-height: 1.25;
+}
+
+.chat-context-result span {
+  overflow-wrap: anywhere;
+}
+
+.chat-context-result:hover,
+.chat-context-result:focus-visible,
+.chat-context-result.active,
+.chat-model-option:hover,
+.chat-model-option:focus-visible,
+.chat-model-option.active {
+  background: color-mix(in srgb, var(--color-accent) 9%, white);
+  outline: none;
+}
+
+.chat-context-result.active {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+
+.chat-model-option.selected {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
+}
+
+.chat-model-option.selected span::after {
+  content: "Selected";
+  margin-left: 6px;
+  color: var(--color-accent);
+  font-weight: 900;
+}
+
+.chat-context-state {
+  margin: 0;
+  padding: 9px;
+}
+
+.chat-model-trigger {
+  max-width: min(280px, 42vw);
+}
+
+.chat-model-trigger-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-model-trigger small,
+.chat-model-group p {
+  margin: 0;
+  color: var(--color-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.chat-model-trigger small {
+  text-transform: none;
+}
+
+.chat-model-trigger-chevron {
+  color: var(--color-secondary);
+  font-size: 0.72rem;
+}
+
+.chat-model-group {
+  display: grid;
+  gap: 4px;
 }
 
 .chat-model-field {
@@ -462,13 +657,10 @@
   text-transform: none;
 }
 
-.chat-main .chat-composer-actions button {
+.chat-composer-actions > button[type="submit"] {
   padding: 8px 12px;
-  border-radius: 10px;
   background: var(--color-accent);
   color: white;
-  font-size: 0.84rem;
-  font-weight: 800;
 }
 
 .chat-markdown {

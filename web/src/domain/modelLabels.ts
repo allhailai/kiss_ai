@@ -2,11 +2,11 @@ import type { RebuildModel } from "../contracts/api";
 
 export const modelTierLabels: Record<RebuildModel["tier"], string> = {
   medium: "Medium ($$)",
-  high: "High / Extra High ($$$)",
-  small: "Small ($)",
+  high: "High ($$$)",
+  small: "Low ($)",
 };
 
-export const modelTierOrder: RebuildModel["tier"][] = ["medium", "high", "small"];
+export const modelTierOrder: RebuildModel["tier"][] = ["high", "medium", "small"];
 
 export function formatModelLabel(model: RebuildModel) {
   const modelName = model.displayName || model.id;

@@ -168,9 +168,9 @@ export function useProjectChat({
     setMessageDraft(event.currentTarget.value);
   };
 
-  const addContextRef = () => {
+  const addContextRef = (path = selectedContextPath) => {
     if (sending) return;
-    const file = contextFiles.find((candidate) => candidate.path === selectedContextPath);
+    const file = contextFiles.find((candidate) => candidate.path === path);
     if (!file || contextRefs.some((ref) => ref.path === file.path)) return;
     setContextRefs((current) => [...current, { path: file.path, label: file.name, kind: file.kind }]);
     setSelectedContextPath("");

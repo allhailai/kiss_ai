@@ -62,9 +62,9 @@ export function RightPanelAgentChat({
     };
   }, [projectSlug]);
 
-  const addContextRef = () => {
+  const addContextRef = (path = selectedContextPath) => {
     if (sending) return;
-    const file = projectFiles.find((candidate) => candidate.path === selectedContextPath);
+    const file = projectFiles.find((candidate) => candidate.path === path);
     if (!file || contextRefs.some((ref) => ref.path === file.path)) return;
 
     setContextRefs((current) => [...current, { path: file.path, label: file.name, kind: file.kind, source: "manual" }]);
