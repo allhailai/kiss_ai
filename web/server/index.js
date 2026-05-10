@@ -77,8 +77,8 @@ const humanFiles = new Map([
 
 const treeRoots = new Map([
   ["human", { root: "inputs_human", kind: "human", editable: false, annotation: false }],
-  ["inputs-ai", { root: "inputs_ai", kind: "ai", editable: false, annotation: true }],
-  ["outputs", { root: "outputs_ai", kind: "output", editable: true, annotation: false }],
+  ["inputs-ai", { root: "inputs_ai", kind: "ai", editable: true, annotation: true }],
+  ["outputs", { root: "outputs_ai", kind: "output", editable: true, annotation: true }],
   ["logs", { root: "change_logs", kind: "log", editable: false, annotation: false }],
 ]);
 

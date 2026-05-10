@@ -82,6 +82,19 @@
   overflow-wrap: anywhere;
 }
 
+.editor-toolbar h2.editor-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+}
+
+.editor-title-kind {
+  flex: none;
+  font-size: 0.72rem;
+}
+
 .editor-toolbar-actions {
   display: flex;
   flex-wrap: wrap;

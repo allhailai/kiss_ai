@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { FileContent, FileDiff, ProjectFile, RebuildModel } from "../../contracts/api";
 import { countDeletedLines, countDiffRangeLines } from "../../domain/diffs";
+import { humanizeFilePath } from "../../domain/files";
 import { projectPathPrefixes } from "../../domain/projectPaths";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
 import { AiAssistPanel } from "./AiAssistPanel";
@@ -198,8 +199,10 @@ function EditorPane({
     <section className={selected.annotation ? "editor-pane annotation-mode" : "editor-pane"}>
       <div className="editor-toolbar">
         <div>
-          <span className="eyebrow">{selected.kind}</span>
-          <h2>{selected.path}</h2>
+          <h2 className="editor-title" title={selected.path}>
+            <span className="eyebrow editor-title-kind">{selected.kind}</span>
+            <span>{humanizeFilePath(selected.path)}</span>
+          </h2>
         </div>
         <div className="editor-toolbar-actions">
           {hasSavedDiff ? (
@@ -219,12 +222,6 @@ function EditorPane({
           ) : null}
         </div>
       </div>
-
-      {selected.annotation ? (
-        <div className="annotation-callout">
-          This AI-managed content is read-only here. Use the rebuild workflow to update annotation state.
-        </div>
-      ) : null}
 
       <div className="editor-meta">
         <AiAssistPanel

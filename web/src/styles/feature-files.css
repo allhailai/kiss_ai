@@ -16,6 +16,7 @@
   justify-content: space-between;
   gap: 20px;
   min-width: 0;
+  padding-right: 110px;
 }
 
 .document-header p {

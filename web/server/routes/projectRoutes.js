@@ -62,7 +62,10 @@ export function registerProjectRoutes(app, {
       const project = request.project;
       const harness = await readProjectJson(project.path, ".harness-state.json", {});
       const cursorApiKey = await resolveCursorApiKey();
-      const inputAnnotations = await listMarkdownFiles(project.path, "inputs_ai", "ai", false, true);
+      const [inputAnnotations, outputAnnotations] = await Promise.all([
+        listMarkdownFiles(project.path, "inputs_ai", "ai", true, true),
+        listMarkdownFiles(project.path, "outputs_ai", "output", true, true),
+      ]);
       const humanAttentionItems = getHumanAttentionItems(harness);
 
       response.json({
@@ -77,7 +80,7 @@ export function registerProjectRoutes(app, {
         lintStatus: harness.last_lint?.status ?? null,
         annotationStatus: harness.last_annotation_scan?.status ?? null,
         annotationsLogged: harness.last_annotation_scan?.annotations_logged ?? 0,
-        annotationFiles: inputAnnotations.length,
+        annotationFiles: inputAnnotations.length + outputAnnotations.length,
         unresolvedReviewItems: harness.last_annotation_scan?.unresolved_review_items ?? [],
         blockedArtifacts: harness.rebuild_scope?.blocked_artifacts ?? [],
         staleOutputs: harness.rebuild_scope?.outputs_marked_stale ?? [],

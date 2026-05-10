@@ -14,7 +14,7 @@ const views: Array<{ id: View; label: string; description: string }> = [
   { id: "build-log", label: "Build Log", description: "Latest rebuild summary and history" },
   { id: "chat", label: "Chat", description: "Project-local agent conversations" },
   { id: "requirements", label: "Requirements", description: "Human-owned source of truth" },
-  { id: "annotations", label: "AI Input Files", description: `AI-managed files under ${projectPathPrefixes.aiInput}` },
+  { id: "annotations", label: "AI Annotations", description: `Editable annotations under ${projectPathPrefixes.aiInput} and ${projectPathPrefixes.output}` },
   { id: "inputs", label: "Human Input Files", description: "Human source material" },
   { id: "outputs", label: "Outputs", description: "Generated research and reports" },
   { id: "design", label: "Design", description: "Project visual identity" },

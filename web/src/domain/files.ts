@@ -103,7 +103,12 @@ export function humanizePathSegment(pathSegment: string) {
     .split(/\s+/)
     .map((word) => {
       const lower = word.toLowerCase();
+      if (lower.length <= 3) return lower.toUpperCase();
       return `${lower.charAt(0).toUpperCase()}${lower.slice(1)}`;
     })
     .join(" ");
+}
+
+export function humanizeFilePath(path: string) {
+  return path.split("/").filter(Boolean).map(humanizePathSegment).join(" / ");
 }

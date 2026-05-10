@@ -33,11 +33,11 @@ const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: str
   },
   outputs: {
     title: "Outputs",
-    explainer: `Generated outputs can be reviewed and edited here. Saves write directly to ${projectPathPrefixes.output}.`,
+    explainer: `Generated outputs are AI-managed. Saved edits under ${projectPathPrefixes.output} are treated as annotations for requirements and the next rebuild.`,
   },
   annotations: {
     title: "Annotation Workspace",
-    explainer: `Files under ${projectPathPrefixes.aiInput} are AI-managed. Human edits here are intentionally visualized as annotations and detected through Git diff.`,
+    explainer: "Add annotations",
   },
 };
 

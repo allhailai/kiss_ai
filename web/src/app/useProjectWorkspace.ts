@@ -118,6 +118,17 @@ export function useProjectWorkspace() {
     [requireSelectedProjectSlug],
   );
 
+  const loadAnnotationTree = useCallback(async () => {
+    const projectSlug = requireSelectedProjectSlug();
+    setLoading(true);
+    try {
+      const [inputsAi, outputs] = await Promise.all([api.tree(projectSlug, "inputs-ai"), api.tree(projectSlug, "outputs")]);
+      setFiles(uniqueFiles([...inputsAi.files, ...outputs.files]));
+    } finally {
+      setLoading(false);
+    }
+  }, [requireSelectedProjectSlug]);
+
   const { selected, selectedDiff, draft, setDraft, clearSelectedFile, selectFile, saveSelected, refreshSelectedFile, revertSelected } = useSelectedFile({
     requireSelectedProjectSlug,
     refreshDesign,
@@ -129,6 +140,7 @@ export function useProjectWorkspace() {
 
   const applyRoute = useRouteDrivenData({
     clearSelectedFile,
+    loadAnnotationTree,
     loadTree,
     refreshBuildLog,
     refreshDesign,
