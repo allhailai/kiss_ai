@@ -1,9 +1,19 @@
-import { useEffect, useRef, useState } from "react";
-import type { AgentCapability, AgentContextFile, AgentContextRef, AgentSession, ProjectFile, RebuildModel } from "../../contracts/api";
-import { api } from "../../data/apiClient";
-import { errorMessage } from "../../domain/errors";
+import { useRef, useState, type RefObject } from "react";
+import type { AgentContextFile, ChatContextRef, Conversation, ProjectFile, RebuildModel } from "../../contracts/api";
 import { ChatComposer } from "../../shared/chat/ChatComposer";
 import { ChatThread } from "../../shared/chat/ChatThread";
+
+type RightPanelChatController = {
+  activeConversation: Conversation | null;
+  handleThreadScroll: () => void;
+  loading: boolean;
+  scrollToLatest: () => void;
+  sendMessage: (options: { content?: string; context?: { activeFiles?: AgentContextFile[]; fileRefs?: ChatContextRef[] } }) => Promise<boolean>;
+  sending: boolean;
+  showJumpToLatest: boolean;
+  startDraftConversation: () => void;
+  threadRef: RefObject<HTMLDivElement | null>;
+};
 
 function contextFileLabel(file: AgentContextFile) {
   return file.label || file.path;
@@ -11,85 +21,39 @@ function contextFileLabel(file: AgentContextFile) {
 
 export function RightPanelAgentChat({
   activeFiles,
+  chat,
   models,
   onModelChange,
   projectFiles,
-  projectSlug,
   selectedModelId,
 }: {
   activeFiles: AgentContextFile[];
+  chat: RightPanelChatController;
   models: RebuildModel[];
   onModelChange: (modelId: string) => void;
   projectFiles: ProjectFile[];
-  projectSlug: string;
   selectedModelId: string;
 }) {
-  const [capabilities, setCapabilities] = useState<AgentCapability[]>([]);
-  const [capabilityError, setCapabilityError] = useState("");
-  const [contextRefs, setContextRefs] = useState<AgentContextRef[]>([]);
+  const [contextRefs, setContextRefs] = useState<ChatContextRef[]>([]);
   const [draft, setDraft] = useState("");
-  const [resetting, setResetting] = useState(false);
-  const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null);
-  const [session, setSession] = useState<AgentSession | null>(null);
   const [selectedContextPath, setSelectedContextPath] = useState("");
-  const [sending, setSending] = useState(false);
-  const threadRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setCapabilityError("");
+  const startNewConversation = () => {
+    if (chat.sending) return;
+    chat.startDraftConversation();
+    setDraft("");
     setContextRefs([]);
     setSelectedContextPath("");
-
-    void (async () => {
-      try {
-        const [capabilityResponse, sessionResponse] = await Promise.all([
-          api.agentCapabilities(projectSlug),
-          api.agentSession(projectSlug),
-        ]);
-        if (!cancelled) {
-          setCapabilities(capabilityResponse.capabilities);
-          setSession(sessionResponse);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setCapabilities([]);
-          setCapabilityError(errorMessage(error, "Could not load agent capabilities."));
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [projectSlug]);
-
-  const startNewConversation = async () => {
-    if (sending || resetting) return;
-
-    setResetting(true);
-    setCapabilityError("");
-    try {
-      setSession(await api.resetAgentSession(projectSlug));
-      setDraft("");
-      setContextRefs([]);
-      setScrollToMessageId(null);
-      setSelectedContextPath("");
-      textareaRef.current?.focus();
-    } catch (error) {
-      setCapabilityError(errorMessage(error, "Could not start a new agent conversation."));
-    } finally {
-      setResetting(false);
-    }
+    textareaRef.current?.focus();
   };
 
   const addContextRef = (path = selectedContextPath) => {
-    if (sending || resetting) return;
+    if (chat.sending) return;
     const file = projectFiles.find((candidate) => candidate.path === path);
     if (!file || contextRefs.some((ref) => ref.path === file.path)) return;
 
-    setContextRefs((current) => [...current, { path: file.path, label: file.name, kind: file.kind, source: "manual" }]);
+    setContextRefs((current) => [...current, { path: file.path, label: file.name, kind: file.kind }]);
     setSelectedContextPath("");
   };
 
@@ -99,25 +63,14 @@ export function RightPanelAgentChat({
 
   const sendMessage = async () => {
     const content = draft.trim();
-    if (!content || sending || resetting) return;
+    if (!content || chat.sending) return;
 
-    setSending(true);
-    setCapabilityError("");
-    const previousMessageIds = new Set((session?.messages ?? []).map((message) => message.id));
-    try {
-      const nextSession = await api.sendAgentSessionMessage(projectSlug, {
-        content,
-        modelId: selectedModelId || undefined,
-        context: activeFiles.length || contextRefs.length ? { activeFiles, fileRefs: contextRefs } : undefined,
-      });
-      const newAssistantMessage = [...nextSession.messages].reverse().find((message) => message.role === "assistant" && !previousMessageIds.has(message.id));
-      setSession(nextSession);
-      setScrollToMessageId(newAssistantMessage?.id ?? null);
+    const sent = await chat.sendMessage({
+      content,
+      context: activeFiles.length || contextRefs.length ? { activeFiles, fileRefs: contextRefs } : undefined,
+    });
+    if (sent) {
       setDraft("");
-    } catch (error) {
-      setCapabilityError(errorMessage(error, "Could not send the agent message."));
-    } finally {
-      setSending(false);
     }
   };
 
@@ -126,27 +79,28 @@ export function RightPanelAgentChat({
       <div className="agent-conversation-header">
         <div>
           <span>AI Chat</span>
-          <strong>{session?.title || "Agent Chat"}</strong>
+          <strong>{chat.activeConversation?.title || "New AI Chat"}</strong>
         </div>
-        <button disabled={sending || resetting} onClick={() => void startNewConversation()} type="button">
-          {resetting ? "Starting..." : "New AI Chat"}
+        <button disabled={chat.loading || chat.sending} onClick={startNewConversation} type="button">
+          New AI Chat
         </button>
       </div>
       <div className="right-panel-agent-thread">
-        {capabilityError ? <p className="agent-event-status">Agent capabilities unavailable: {capabilityError}</p> : null}
         <ChatThread
-          disabled={sending}
+          disabled={chat.sending}
           editable={false}
           emptyDescription="Ask the side-panel agent about this project."
-          emptyTitle={session ? "Start agent chat" : "Loading agent session..."}
-          messages={session?.messages ?? []}
-          scrollToMessageId={scrollToMessageId}
-          showThinking={sending}
-          threadRef={threadRef}
+          emptyTitle={chat.loading ? "Loading conversation..." : "Start AI chat"}
+          messages={chat.activeConversation?.messages ?? []}
+          onJumpToLatest={() => chat.scrollToLatest()}
+          onScroll={chat.handleThreadScroll}
+          showJumpToLatest={chat.showJumpToLatest}
+          showThinking={chat.sending}
+          threadRef={chat.threadRef}
         />
       </div>
-      <div className="agent-active-context" aria-label="Active agent context">
-        <span className="agent-context-label">Active context</span>
+      <div className="agent-active-context" aria-label="Active editable files">
+        <span className="agent-context-label">Active files</span>
         {activeFiles.length ? (
           <div className="agent-context-chips">
             {activeFiles.map((file) => (
@@ -163,7 +117,7 @@ export function RightPanelAgentChat({
       <ChatComposer
         contextFiles={projectFiles}
         contextRefs={contextRefs}
-        disabled={sending || resetting}
+        disabled={chat.sending}
         draft={draft}
         models={models}
         onAddContextRef={addContextRef}

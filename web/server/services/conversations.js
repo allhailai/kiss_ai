@@ -8,6 +8,7 @@ const maxTitleLength = 120;
 const maxSummaryLength = 500;
 const maxMessageContentBytes = 400 * 1024;
 const maxContextRefs = 20;
+const maxActiveFiles = 10;
 
 function nowIso() {
   return new Date().toISOString();
@@ -49,10 +50,28 @@ function normalizeContextRef(value) {
   };
 }
 
+function normalizeActiveFile(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const filePath = trimText(source.path, 300);
+  if (!filePath) return null;
+
+  return {
+    path: filePath,
+    label: trimText(source.label, 160) || undefined,
+    kind: trimText(source.kind, 40) || undefined,
+    editable: typeof source.editable === "boolean" ? source.editable : undefined,
+    annotation: typeof source.annotation === "boolean" ? source.annotation : undefined,
+    contentHash: trimText(source.contentHash, 160) || undefined,
+    draftState: ["saved", "unsaved", "unknown"].includes(source.draftState) ? source.draftState : "unknown",
+    role: source.role === "primary" || source.role === "secondary" ? source.role : undefined,
+  };
+}
+
 function normalizeContext(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const activeFiles = Array.isArray(source.activeFiles) ? source.activeFiles.map(normalizeActiveFile).filter(Boolean).slice(0, maxActiveFiles) : [];
   const fileRefs = Array.isArray(source.fileRefs) ? source.fileRefs.map(normalizeContextRef).filter(Boolean).slice(0, maxContextRefs) : [];
-  return fileRefs.length ? { fileRefs } : undefined;
+  return activeFiles.length || fileRefs.length ? { activeFiles, fileRefs } : undefined;
 }
 
 function normalizeMessage(value, fallback = {}) {

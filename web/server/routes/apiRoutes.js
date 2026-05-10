@@ -1,4 +1,3 @@
-import { registerAgentRoutes } from "./agentRoutes.js";
 import { registerAiRoutes } from "./aiRoutes.js";
 import { registerChatRoutes } from "./chatRoutes.js";
 import { registerFileRoutes } from "./fileRoutes.js";
@@ -21,13 +20,6 @@ export function registerApiRoutes(app, deps) {
     pickRebuildModelId: deps.pickRebuildModelId,
     readProjectJson: deps.readProjectJson,
     resolveCursorApiKey: deps.resolveCursorApiKey,
-  });
-
-  registerAgentRoutes(app, {
-    listAgentCapabilities: deps.listAgentCapabilities,
-    readAgentSession: deps.readAgentSession,
-    resetAgentSession: deps.resetAgentSession,
-    sendAgentSessionMessage: deps.sendAgentSessionMessage,
   });
 
   registerChatRoutes(app, {

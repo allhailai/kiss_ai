@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 const maxPromptFileBytes = 24 * 1024;
 const maxPromptHistoryMessages = 40;
 const maxUserMessageBytes = 120 * 1024;
+const maxContextRefs = 20;
+const maxActiveFiles = 10;
 
 function nowIso() {
   return new Date().toISOString();
@@ -29,11 +31,28 @@ function normalizeContextRef(value) {
   };
 }
 
+function normalizeActiveFile(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const filePath = String(source.path ?? "").trim();
+  if (!filePath) return null;
+  return {
+    path: filePath,
+    label: typeof source.label === "string" ? source.label.trim() : undefined,
+    kind: typeof source.kind === "string" ? source.kind.trim() : undefined,
+    editable: typeof source.editable === "boolean" ? source.editable : undefined,
+    annotation: typeof source.annotation === "boolean" ? source.annotation : undefined,
+    contentHash: typeof source.contentHash === "string" ? source.contentHash.trim() : undefined,
+    draftState: ["saved", "unsaved", "unknown"].includes(source.draftState) ? source.draftState : "unknown",
+    role: source.role === "primary" || source.role === "secondary" ? source.role : undefined,
+  };
+}
+
 function requireSendRequest(body, httpError) {
   const modelId = String(body?.modelId ?? "").trim();
   const content = String(body?.content ?? "").trim();
   const contextSource = body?.context && typeof body.context === "object" && !Array.isArray(body.context) ? body.context : {};
-  const fileRefs = Array.isArray(contextSource.fileRefs) ? contextSource.fileRefs.map(normalizeContextRef).filter(Boolean).slice(0, 20) : [];
+  const activeFiles = Array.isArray(contextSource.activeFiles) ? contextSource.activeFiles.map(normalizeActiveFile).filter(Boolean).slice(0, maxActiveFiles) : [];
+  const fileRefs = Array.isArray(contextSource.fileRefs) ? contextSource.fileRefs.map(normalizeContextRef).filter(Boolean).slice(0, maxContextRefs) : [];
 
   if (!modelId) throw httpError("Chat requires a model.");
   if (!content) throw httpError("Chat requires a message.");
@@ -44,7 +63,7 @@ function requireSendRequest(body, httpError) {
   return {
     modelId,
     content,
-    context: fileRefs.length ? { fileRefs } : undefined,
+    context: activeFiles.length || fileRefs.length ? { activeFiles, fileRefs } : undefined,
   };
 }
 
@@ -86,7 +105,11 @@ async function readOptionalProjectText(readTextFile, projectRoot, relativePath, 
   }
 }
 
-async function readContextFiles({ project, readTextFile, fileRefs }) {
+function uniqueByPath(refs, limit) {
+  return [...new Map(refs.filter((ref) => ref?.path).map((ref) => [ref.path, ref])).values()].slice(-limit);
+}
+
+async function readSourceContextFiles({ project, readTextFile, fileRefs }) {
   return await Promise.all(fileRefs.map(async (ref) => {
     try {
       const file = await readTextFile(project.path, ref.path);
@@ -99,14 +122,46 @@ async function readContextFiles({ project, readTextFile, fileRefs }) {
 
       return {
         path: file.path,
+        label: ref.label || file.path,
         kind: file.kind,
         contentHash: file.contentHash,
+        intent: "source",
         content: trimForPrompt(file.content),
       };
     } catch (error) {
       return {
         path: ref.path,
         error: error instanceof Error ? error.message : "Could not read file context.",
+      };
+    }
+  }));
+}
+
+async function readActiveContextFiles({ project, readTextFile, activeFiles }) {
+  return await Promise.all(activeFiles.map(async (ref) => {
+    try {
+      const file = await readTextFile(project.path, ref.path);
+      const expectedHash = typeof ref.contentHash === "string" && ref.contentHash ? ref.contentHash : null;
+      return {
+        path: file.path,
+        label: ref.label || file.path,
+        kind: file.kind,
+        editable: file.editable,
+        annotation: file.annotation,
+        expectedContentHash: expectedHash,
+        contentHash: file.contentHash,
+        hashStatus: expectedHash ? (expectedHash === file.contentHash ? "matched" : "changed") : "missing_hash",
+        draftState: ref.draftState ?? "unknown",
+        role: ref.role ?? "secondary",
+        intent: "editable_target",
+        content: trimForPrompt(file.content),
+      };
+    } catch (error) {
+      return {
+        path: ref.path,
+        label: ref.label || ref.path,
+        intent: "editable_target",
+        error: error instanceof Error ? error.message : "Could not read active file context.",
       };
     }
   }));
@@ -120,9 +175,14 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     readOptionalProjectText(readTextFile, project.path, "human_output_requirements.md"),
     readOptionalProjectText(readTextFile, project.path, "human_open_questions.md"),
   ]);
+  const activeFiles = conversation.messages.flatMap((message) => message.context?.activeFiles ?? []);
   const fileRefs = conversation.messages.flatMap((message) => message.context?.fileRefs ?? []);
-  const uniqueFileRefs = [...new Map(fileRefs.map((ref) => [ref.path, ref])).values()].slice(-20);
-  const contextFiles = await readContextFiles({ project, readTextFile, fileRefs: uniqueFileRefs });
+  const uniqueActiveFiles = uniqueByPath(activeFiles, maxActiveFiles);
+  const uniqueFileRefs = uniqueByPath(fileRefs, maxContextRefs);
+  const [editableTargetFiles, sourceContextFiles] = await Promise.all([
+    readActiveContextFiles({ project, readTextFile, activeFiles: uniqueActiveFiles }),
+    readSourceContextFiles({ project, readTextFile, fileRefs: uniqueFileRefs }),
+  ]);
   const history = conversation.messages.slice(-maxPromptHistoryMessages).map(formatHistoryMessage);
   const projectName = displayProjectName(harness.project_name ?? project.name, harness.project_slug ?? project.slug);
 
@@ -146,7 +206,8 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
       summary: conversation.summary,
       history,
     },
-    explicitContextFiles: contextFiles,
+    editableTargetFiles,
+    sourceContextFiles,
   };
 
   return [
@@ -155,8 +216,9 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     "Rules:",
     "- Answer the user's latest message using only this conversation and the supplied project context.",
     "- Treat a new conversation as fresh context; do not assume access to previous conversations.",
-    "- You may discuss suggested changes, but do not edit files, run modifying commands, write logs, or create artifacts.",
-    "- Stay inside the current project. Relevant user/project files are limited to human_*.md, inputs_human/, inputs_ai/, and outputs_ai/.",
+    "- You may propose or prepare updates for files listed in editableTargetFiles; do not directly edit files, run modifying commands, write logs, or create artifacts.",
+    "- Treat sourceContextFiles as read-only sources to consider. Do not treat them as editable targets unless the same path also appears in editableTargetFiles.",
+    "- Stay inside the current project. Source context files are limited to human_*.md, inputs_human/, inputs_ai/, and outputs_ai/.",
     "- Do not expose hidden chain-of-thought. Provide concise reasoning summaries when useful.",
     "- If context is missing, say what is missing and suggest the next best step.",
     "",

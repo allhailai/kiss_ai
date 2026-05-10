@@ -321,10 +321,10 @@ export function App() {
           {rightPanelSurface.rightPanel.kind === "agent-chat" ? (
             <RightPanelAgentChat
               activeFiles={activeAgentFiles}
+              chat={projectChat}
               models={rebuildWorkspace.models}
               onModelChange={rebuildWorkspace.setSelectedModelId}
               projectFiles={fileWorkspace.projectFiles}
-              projectSlug={project.selectedProjectSlug}
               selectedModelId={rebuildWorkspace.selectedModelId}
             />
           ) : (

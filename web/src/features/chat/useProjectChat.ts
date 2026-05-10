@@ -1,9 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import type { ChatContextRef, ChatMessage, Conversation, ConversationSummary, ProjectFile } from "../../contracts/api";
+import type { AgentContextFile, ChatContextRef, ChatMessage, Conversation, ConversationSummary, ProjectFile } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { errorMessage } from "../../domain/errors";
 import { projectPathPrefixes } from "../../domain/projectPaths";
 import { useConversationStream } from "./useConversationStream";
+
+type ChatSendContext = {
+  activeFiles?: AgentContextFile[];
+  fileRefs?: ChatContextRef[];
+};
+
+type ChatSendOptions = {
+  content?: string;
+  context?: ChatSendContext;
+};
 
 function isChatContextFile(file: ProjectFile) {
   return (
@@ -107,30 +117,46 @@ export function useProjectChat({
     if (!projectSlug) throw new Error("Select a project first.");
     const conversation = await api.createConversation(projectSlug, { modelId: selectedModelId });
     setActiveConversation(conversation);
-    await refreshConversations();
     return conversation;
   };
 
-  const sendMessage = async () => {
-    if (!projectSlug) return;
-    const content = messageDraft.trim();
-    if (!content || sending) return;
+  const startDraftConversation = () => {
+    if (sending) return;
+    setActiveConversation(null);
+    setMessageDraft("");
+    setContextRefs([]);
+    setSelectedContextPath("");
+    setShowJumpToLatest(false);
+    forceScrollToLatestRef.current = true;
+    shouldStickToLatestRef.current = true;
+    cancelEditingMessage();
+    onNotice("");
+    composerTextareaRef.current?.focus();
+  };
+
+  const sendMessage = async (options: ChatSendOptions = {}) => {
+    if (!projectSlug) return false;
+    const content = (options.content ?? messageDraft).trim();
+    if (!content || sending) return false;
+    const context = options.context ?? (contextRefs.length ? { fileRefs: contextRefs } : undefined);
 
     setSending(true);
     onNotice("");
     try {
       const conversation = await ensureConversation();
-      setMessageDraft("");
+      if (options.content === undefined) setMessageDraft("");
       const next = await api.sendChatMessage(projectSlug, conversation.id, {
         modelId: selectedModelId,
         content,
-        context: contextRefs.length ? { fileRefs: contextRefs } : undefined,
+        context,
       });
       setActiveConversation(next);
       await refreshConversations();
+      return true;
     } catch (error) {
       onNotice(errorMessage(error, "Could not send the chat message."));
       setSending(false);
+      return false;
     }
   };
 
@@ -272,6 +298,7 @@ export function useProjectChat({
     setEditDraft,
     setSelectedContextPath,
     showJumpToLatest,
+    startDraftConversation,
     startEditingMessage,
     threadRef,
     composerTextareaRef,

@@ -1,20 +1,12 @@
 import type { AgentContextFile } from "./agents";
 
 export type {
-  AgentCapabilitiesResponse,
-  AgentCapability,
-  AgentCapabilityRisk,
   AgentContextDraftState,
   AgentContextFile,
   AgentContextFileKind,
   AgentContextFileRole,
   AgentContextRef,
   AgentMessageContext,
-  AgentSession,
-  AgentSessionMessage,
-  AgentToolCall,
-  AgentToolCallStatus,
-  SendAgentSessionMessageRequest,
 } from "./agents";
 
 export type ResolutionOption = {
@@ -266,6 +258,7 @@ export type SendChatMessageRequest = {
   modelId: string;
   content: string;
   context?: {
+    activeFiles?: AgentContextFile[];
     fileRefs?: ChatContextRef[];
   };
 };

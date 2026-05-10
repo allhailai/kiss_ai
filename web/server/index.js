@@ -10,7 +10,6 @@ import { listen } from "./adapters/listen.js";
 import { registerApiRoutes } from "./routes/apiRoutes.js";
 import { createAgentJobService } from "./services/agentJobs.js";
 import { createAiFlowService } from "./services/aiFlows.js";
-import { createAgentCapabilityService } from "./services/agents/capabilities.js";
 import { createBuildLogService } from "./services/buildLogs.js";
 import { createChatAgentService } from "./services/chatAgent.js";
 import { createConversationService } from "./services/conversations.js";
@@ -291,17 +290,6 @@ const { startHumanAttentionResolution, startRebuild } = createAgentJobService({
   setRebuildState,
 });
 
-const { listAgentCapabilities, readAgentSession, resetAgentSession, sendAgentSessionMessage } = createAgentCapabilityService({
-  displayProjectName,
-  httpError,
-  listCursorModels,
-  pickRebuildModelId,
-  readProjectHarness,
-  readTextFile,
-  resolveCursorApiKey,
-  runCursorAgentText,
-});
-
 const { acceptRequirementsAutoUpdate, runAiAssistProposal, runRequirementsAutoUpdateProposal } = createAiFlowService({
   FRAMEWORK_ROOT,
   MAX_FILE_BYTES,
@@ -353,7 +341,6 @@ registerApiRoutes(app, {
   humanFiles,
   httpError,
   lintDesignIdentity,
-  listAgentCapabilities,
   listConversations,
   listCursorModels,
   listMarkdownFiles,
@@ -361,18 +348,15 @@ registerApiRoutes(app, {
   parseDesignIdentity,
   pickRebuildModelId,
   readConversation,
-  readAgentSession,
   readProjectJson,
   readTextFile,
   resolveCursorApiKey,
-  resetAgentSession,
   restoreFileFromHead,
   runAiAssistProposal,
   runRequirementsAutoUpdateProposal,
   searchFiles,
   editChatMessage,
   sendChatMessage,
-  sendAgentSessionMessage,
   startHumanAttentionResolution,
   startRebuild,
   subscribeToConversation,
