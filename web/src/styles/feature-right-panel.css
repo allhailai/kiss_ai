@@ -155,7 +155,7 @@
   min-height: 0;
   height: 100%;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
   gap: 10px;
   overflow: hidden;
 }
@@ -249,6 +249,25 @@
   text-transform: uppercase;
 }
 
+.agent-context-label-button {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.agent-context-label-button::before {
+  content: "+ ";
+}
+
+.agent-context-label-button:hover,
+.agent-context-label-button:focus-visible {
+  color: var(--color-accent);
+  outline: none;
+}
+
 .agent-active-context p {
   margin: 0;
   color: var(--color-secondary);
@@ -262,17 +281,214 @@
   gap: 5px;
 }
 
-.agent-context-chips code {
+.agent-context-chip {
   max-width: 100%;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   overflow: hidden;
-  padding: 3px 7px;
   border: 1px solid var(--color-border);
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-background) 82%, white);
   color: var(--color-secondary);
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.agent-context-chip.highlighted {
+  border-color: color-mix(in srgb, var(--color-accent) 52%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 14%, white);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.agent-context-chips code {
+  min-width: 0;
+  overflow: hidden;
+  padding: 3px 0 3px 7px;
+  border: 0;
+  background: transparent;
+  color: inherit;
   font-size: 0.7rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.agent-context-chip button {
+  flex: 0 0 auto;
+  padding: 3px 7px 3px 1px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-secondary);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.agent-context-chip button:hover,
+.agent-context-chip button:focus-visible {
+  color: var(--color-danger);
+  outline: none;
+}
+
+.agent-file-chooser {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  margin: 0 12px;
+  padding: 9px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, var(--color-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface) 88%, var(--color-background));
+}
+
+.agent-file-chooser div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.agent-file-chooser strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-primary);
+  font-size: 0.84rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-file-chooser p {
+  margin: 0;
+  color: var(--color-secondary);
+  font-size: 0.76rem;
+  line-height: 1.3;
+}
+
+.agent-file-chooser-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-file-chooser-actions button {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: white;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.agent-file-chooser-actions button.secondary {
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-background) 78%, white);
+  color: var(--color-secondary);
+}
+
+.agent-file-chooser-actions button:hover,
+.agent-file-chooser-actions button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+  outline-offset: 2px;
+}
+
+.agent-file-picker {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  margin: 0 12px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-background) 76%, white);
+}
+
+.agent-file-picker-topbar {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agent-file-picker-topbar strong {
+  overflow: hidden;
+  color: var(--color-primary);
+  font-size: 0.82rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-file-picker-topbar button {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: white;
+  color: var(--color-secondary);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.agent-file-picker input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: white;
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.agent-file-picker-results {
+  max-height: 170px;
+  overflow: auto;
+  display: grid;
+  gap: 4px;
+}
+
+.agent-file-picker-results button {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-primary);
+  text-align: left;
+}
+
+.agent-file-picker-results button:hover,
+.agent-file-picker-results button:focus-visible {
+  background: color-mix(in srgb, var(--color-accent) 8%, white);
+  outline: none;
+}
+
+.agent-file-picker-results strong,
+.agent-file-picker-results span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-file-picker-results strong {
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
+.agent-file-picker-results span,
+.agent-file-picker-results p {
+  margin: 0;
+  color: var(--color-secondary);
+  font-size: 0.72rem;
+  line-height: 1.25;
 }
 
 .right-panel-surface .chat-composer {

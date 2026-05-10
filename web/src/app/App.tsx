@@ -21,7 +21,7 @@ import { RebuildWorkspace } from "../features/rebuild/RebuildWorkspace";
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
 import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
-import type { AgentContextFile } from "../contracts/api";
+import type { AgentContextFile, ChatContextRef, FileContent, ProjectFile } from "../contracts/api";
 
 const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: string }>> = {
   requirements: {
@@ -44,13 +44,44 @@ const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: str
 const projectChatPanel = { kind: "project-chat", title: "Project Chat" } as const;
 const agentChatPanel = { kind: "agent-chat", title: "Agent Chat" } as const;
 
+function fileLabel(path: string) {
+  return path.split("/").at(-1) ?? path;
+}
+
+function contextRefFromProjectFile(file: ProjectFile): ChatContextRef {
+  return {
+    path: file.path,
+    label: file.name || fileLabel(file.path),
+    kind: file.kind,
+  };
+}
+
+function activeFileFromProjectFile(file: ProjectFile, selected: FileContent | null, draft: string): AgentContextFile {
+  const selectedFile = selected?.path === file.path ? selected : null;
+  return {
+    path: file.path,
+    label: file.name || fileLabel(file.path),
+    kind: file.kind,
+    editable: file.editable,
+    annotation: file.annotation,
+    contentHash: selectedFile?.contentHash,
+    draftState: selectedFile ? (draft !== selectedFile.content ? "unsaved" : "saved") : "unknown",
+    role: "primary",
+  };
+}
+
 export function App() {
   const workspace = useProjectWorkspace();
   const { designWorkspace, fileWorkspace, project, rebuildWorkspace, route, toastWorkspace } = workspace;
   const rightPanelSurface = useRightPanelSurface();
   const [autoUpdateOpen, setAutoUpdateOpen] = useState(false);
+  const [agentActiveFiles, setAgentActiveFiles] = useState<AgentContextFile[]>([]);
+  const [agentChooserPath, setAgentChooserPath] = useState<string | null>(null);
+  const [agentContextRefs, setAgentContextRefs] = useState<ChatContextRef[]>([]);
+  const [highlightedAgentContext, setHighlightedAgentContext] = useState<{ path: string; target: "active" | "context" } | null>(null);
   const [projectChatPanelDismissed, setProjectChatPanelDismissed] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const agentHighlightTimeoutRef = useRef<number | null>(null);
   const projectChatVisitKeyRef = useRef<string | null>(null);
   const themeStyle = useMemo(() => buildThemeStyle(designWorkspace.design), [designWorkspace.design]);
   const rightPanelWidth = useRightPanelWidth({
@@ -73,24 +104,60 @@ export function App() {
     projectFiles: fileWorkspace.projectFiles,
     onNotice: toastWorkspace.setNotice,
   });
-  const activeAgentFiles = useMemo<AgentContextFile[]>(() => {
-    const selected = fileWorkspace.selected;
-    if (!selected) return [];
-
-    return [
-      {
-        path: selected.path,
-        label: selected.path.split("/").at(-1) ?? selected.path,
-        kind: selected.kind,
-        editable: selected.editable,
-        annotation: selected.annotation,
-        contentHash: selected.contentHash,
-        draftState: fileWorkspace.draft !== selected.content ? "unsaved" : "saved",
-        role: "primary",
-      },
-    ];
-  }, [fileWorkspace.draft, fileWorkspace.selected]);
   const navigateTo = (view: View, filePath?: string | null, context?: Record<string, string>) => route.navigateTo(view, filePath, context);
+  const isAgentPanelOpen = rightPanelSurface.rightPanel?.kind === agentChatPanel.kind;
+  const chooserFile = useMemo(() => {
+    if (!agentChooserPath) return null;
+    return fileWorkspace.projectFiles.find((file) => file.path === agentChooserPath) ?? null;
+  }, [agentChooserPath, fileWorkspace.projectFiles]);
+  const setAgentHighlight = (path: string, target: "active" | "context") => {
+    setHighlightedAgentContext({ path, target });
+    if (agentHighlightTimeoutRef.current) window.clearTimeout(agentHighlightTimeoutRef.current);
+    agentHighlightTimeoutRef.current = window.setTimeout(() => {
+      setHighlightedAgentContext(null);
+      agentHighlightTimeoutRef.current = null;
+    }, 1400);
+  };
+  const showAgentFileChooser = (path: string) => {
+    if (!isAgentPanelOpen) return;
+    if (agentActiveFiles.some((file) => file.path === path)) {
+      setAgentChooserPath(null);
+      setAgentHighlight(path, "active");
+      return;
+    }
+    if (agentContextRefs.some((ref) => ref.path === path)) {
+      setAgentChooserPath(path);
+      setAgentHighlight(path, "context");
+      return;
+    }
+    setAgentChooserPath(path);
+  };
+  const openProjectFileWithAgentContext = (path: string) => {
+    route.openProjectFile(path);
+    showAgentFileChooser(path);
+  };
+  const addAgentActiveFile = (path: string) => {
+    const file = fileWorkspace.projectFiles.find((candidate) => candidate.path === path);
+    if (!file) return;
+    const activeFile = activeFileFromProjectFile(file, fileWorkspace.selected, fileWorkspace.draft);
+    setAgentActiveFiles((current) => {
+      if (current.some((candidate) => candidate.path === activeFile.path)) return current;
+      return [...current, activeFile];
+    });
+    setAgentChooserPath(null);
+    setAgentHighlight(path, "active");
+  };
+  const addAgentContextRef = (path: string) => {
+    const file = fileWorkspace.projectFiles.find((candidate) => candidate.path === path);
+    if (!file) return;
+    const contextRef = contextRefFromProjectFile(file);
+    setAgentContextRefs((current) => {
+      if (current.some((candidate) => candidate.path === contextRef.path)) return current;
+      return [...current, contextRef];
+    });
+    setAgentChooserPath(null);
+    setAgentHighlight(path, "context");
+  };
   const openProjectChatPanel = () => {
     setProjectChatPanelDismissed(false);
     rightPanelSurface.openPanel(projectChatPanel);
@@ -114,6 +181,38 @@ export function App() {
 
     rightPanelSurface.openPanel(agentChatPanel);
   };
+
+  useEffect(() => {
+    return () => {
+      if (agentHighlightTimeoutRef.current) window.clearTimeout(agentHighlightTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    setAgentActiveFiles([]);
+    setAgentChooserPath(null);
+    setAgentContextRefs([]);
+    setHighlightedAgentContext(null);
+  }, [project.selectedProjectSlug]);
+
+  useEffect(() => {
+    setAgentActiveFiles((current) =>
+      current.map((file) => {
+        if (file.path !== fileWorkspace.selected?.path) return file;
+        return activeFileFromProjectFile(
+          {
+            path: fileWorkspace.selected.path,
+            name: fileLabel(fileWorkspace.selected.path),
+            kind: fileWorkspace.selected.kind,
+            editable: fileWorkspace.selected.editable,
+            annotation: fileWorkspace.selected.annotation,
+          },
+          fileWorkspace.selected,
+          fileWorkspace.draft,
+        );
+      }),
+    );
+  }, [fileWorkspace.draft, fileWorkspace.selected]);
 
   useEffect(() => {
     if (!project.selectedProjectSlug || route.view !== "chat") {
@@ -166,7 +265,6 @@ export function App() {
   const appShellClassName = `${sidebarCollapsed ? "app-shell sidebar-collapsed" : "app-shell"}${
     rightPanelSurface.rightPanel ? ` right-panel-open right-panel-${rightPanelSurface.rightPanel.kind}` : ""
   }`;
-  const isAgentPanelOpen = rightPanelSurface.rightPanel?.kind === agentChatPanel.kind;
   const handleRightPanelClose = () => {
     if (route.view === "chat" && rightPanelSurface.rightPanel?.kind === "project-chat") {
       setProjectChatPanelDismissed(true);
@@ -178,7 +276,7 @@ export function App() {
       <GlobalFileSearch
         projectName={rebuildWorkspace.status?.projectName ?? project.selectedProject.name}
         projectSlug={project.selectedProjectSlug}
-        onOpenFile={route.openProjectFile}
+        onOpenFile={openProjectFileWithAgentContext}
         onOpenProjectHome={() => navigateTo("rebuild")}
         onSwitchProject={project.clearSelectedProject}
       />
@@ -206,7 +304,7 @@ export function App() {
             showAiAutoUpdate={Boolean(selectedAutoUpdatePath)}
             onAiAutoUpdate={() => setAutoUpdateOpen(true)}
             onDeleteHumanInputFile={(path) => void fileWorkspace.deleteHumanInputFile(path)}
-            onOpenFile={route.openProjectFile}
+            onOpenFile={openProjectFileWithAgentContext}
             onOpenView={(nextView, filePath) => navigateTo(nextView, filePath)}
           />
         ) : null}
@@ -248,7 +346,7 @@ export function App() {
             onDraft={fileWorkspace.setDraft}
             onModelChange={rebuildWorkspace.setSelectedModelId}
             onNotice={toastWorkspace.setNotice}
-            onOpenFile={route.openProjectFile}
+            onOpenFile={openProjectFileWithAgentContext}
             onUploadFiles={route.view === "inputs" ? fileWorkspace.uploadHumanInputFiles : undefined}
             onRevert={() => void fileWorkspace.revertSelected()}
             onSave={() => void fileWorkspace.saveSelected()}
@@ -320,10 +418,18 @@ export function App() {
         >
           {rightPanelSurface.rightPanel.kind === "agent-chat" ? (
             <RightPanelAgentChat
-              activeFiles={activeAgentFiles}
+              activeFiles={agentActiveFiles}
               chat={projectChat}
+              chooserFile={chooserFile}
+              contextRefs={agentContextRefs}
+              highlightedContext={highlightedAgentContext}
               models={rebuildWorkspace.models}
+              onAddActiveFile={addAgentActiveFile}
+              onAddContextRef={addAgentContextRef}
+              onCloseChooser={() => setAgentChooserPath(null)}
+              onContextRefsChange={setAgentContextRefs}
               onModelChange={rebuildWorkspace.setSelectedModelId}
+              onRemoveActiveFile={(path) => setAgentActiveFiles((current) => current.filter((file) => file.path !== path))}
               projectFiles={fileWorkspace.projectFiles}
               selectedModelId={rebuildWorkspace.selectedModelId}
             />
