@@ -5,11 +5,23 @@ import { randomUUID } from "node:crypto";
 const maxPromptFileBytes = 24 * 1024;
 const maxPromptHistoryMessages = 40;
 const maxUserMessageBytes = 120 * 1024;
+const defaultAgentSessionTitle = "Agent Chat";
+const maxGeneratedTitleLength = 72;
 
 function trimForPrompt(value, maxBytes = maxPromptFileBytes) {
   const text = String(value ?? "");
   if (Buffer.byteLength(text, "utf8") <= maxBytes) return text;
   return `${text.slice(0, maxBytes)}\n\n[Truncated for prompt size.]`;
+}
+
+function normalizeGeneratedTitle(value) {
+  const title = String(value ?? "")
+    .trim()
+    .replace(/^["'`]+|["'`.]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!title) return defaultAgentSessionTitle;
+  return title.length > maxGeneratedTitleLength ? `${title.slice(0, maxGeneratedTitleLength - 3)}...` : title;
 }
 
 function normalizePathLike(value) {
@@ -271,7 +283,7 @@ export function createAgentCapabilityService({
     return {
       id: "agent-panel-default",
       projectSlug: project.slug,
-      title: "Agent Chat",
+      title: defaultAgentSessionTitle,
       createdAt: timestamp,
       updatedAt: timestamp,
       messages: [
@@ -282,6 +294,24 @@ export function createAgentCapabilityService({
       ],
       toolCalls: [],
     };
+  }
+
+  async function generateAgentSessionTitle({ project, content, modelId, apiKey }) {
+    const prompt = [
+      "Create a concise title for this agent chat conversation.",
+      "",
+      "Rules:",
+      "- Return only the title.",
+      "- Use 3-8 words.",
+      "- Do not use quotes, markdown, trailing punctuation, or labels.",
+      "- Base the title only on the user's first prompt.",
+      "",
+      "User first prompt:",
+      trimForPrompt(content, 4 * 1024),
+    ].join("\n");
+
+    const rawTitle = await runCursorAgentText({ project, apiKey, modelId, prompt });
+    return normalizeGeneratedTitle(rawTitle);
   }
 
   function agentSessionPath(project) {
@@ -307,6 +337,10 @@ export function createAgentCapabilityService({
     return session;
   }
 
+  async function resetAgentSession(project) {
+    return await writeAgentSession(project, createEmptySession(project));
+  }
+
   async function sendAgentSessionMessage(project, body) {
     const content = String(body?.content ?? "").trim();
     const modelId = String(body?.modelId ?? "").trim() || null;
@@ -324,7 +358,8 @@ export function createAgentCapabilityService({
 
     const session = await readAgentSession(project);
     const updatedAt = new Date().toISOString();
-    const sessionWithUser = {
+    const firstUserMessage = session.messages.find((message) => message.role === "user");
+    let sessionWithUser = {
       ...session,
       updatedAt,
       messages: [
@@ -345,6 +380,25 @@ export function createAgentCapabilityService({
       }
 
       const resolvedModelId = pickRebuildModelId(models, modelId);
+      if (!firstUserMessage && session.title === defaultAgentSessionTitle) {
+        try {
+          sessionWithUser = {
+            ...sessionWithUser,
+            title: await generateAgentSessionTitle({
+              project,
+              content,
+              modelId: resolvedModelId,
+              apiKey: cursorApiKey.apiKey,
+            }),
+          };
+        } catch {
+          sessionWithUser = {
+            ...sessionWithUser,
+            title: defaultAgentSessionTitle,
+          };
+        }
+      }
+
       const prompt = await createAgentPrompt({
         project,
         session: sessionWithUser,
@@ -384,5 +438,5 @@ export function createAgentCapabilityService({
     }
   }
 
-  return { listAgentCapabilities, readAgentSession, sendAgentSessionMessage };
+  return { listAgentCapabilities, readAgentSession, resetAgentSession, sendAgentSessionMessage };
 }

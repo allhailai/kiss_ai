@@ -28,6 +28,7 @@ export function RightPanelAgentChat({
   const [capabilityError, setCapabilityError] = useState("");
   const [contextRefs, setContextRefs] = useState<AgentContextRef[]>([]);
   const [draft, setDraft] = useState("");
+  const [resetting, setResetting] = useState(false);
   const [session, setSession] = useState<AgentSession | null>(null);
   const [selectedContextPath, setSelectedContextPath] = useState("");
   const [sending, setSending] = useState(false);
@@ -62,8 +63,26 @@ export function RightPanelAgentChat({
     };
   }, [projectSlug]);
 
+  const startNewConversation = async () => {
+    if (sending || resetting) return;
+
+    setResetting(true);
+    setCapabilityError("");
+    try {
+      setSession(await api.resetAgentSession(projectSlug));
+      setDraft("");
+      setContextRefs([]);
+      setSelectedContextPath("");
+      textareaRef.current?.focus();
+    } catch (error) {
+      setCapabilityError(errorMessage(error, "Could not start a new agent conversation."));
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const addContextRef = (path = selectedContextPath) => {
-    if (sending) return;
+    if (sending || resetting) return;
     const file = projectFiles.find((candidate) => candidate.path === path);
     if (!file || contextRefs.some((ref) => ref.path === file.path)) return;
 
@@ -77,7 +96,7 @@ export function RightPanelAgentChat({
 
   const sendMessage = async () => {
     const content = draft.trim();
-    if (!content || sending) return;
+    if (!content || sending || resetting) return;
 
     setSending(true);
     setCapabilityError("");
@@ -99,6 +118,15 @@ export function RightPanelAgentChat({
 
   return (
     <div className="right-panel-agent-chat">
+      <div className="agent-conversation-header">
+        <div>
+          <span>Agent Conversation</span>
+          <strong>{session?.title || "Agent Chat"}</strong>
+        </div>
+        <button disabled={sending || resetting} onClick={() => void startNewConversation()} type="button">
+          {resetting ? "Starting..." : "New Conversation"}
+        </button>
+      </div>
       <div className="right-panel-agent-thread">
         {capabilityError ? <p className="agent-event-status">Agent capabilities unavailable: {capabilityError}</p> : null}
         {!capabilityError && capabilities.length ? (
@@ -130,7 +158,7 @@ export function RightPanelAgentChat({
       <ChatComposer
         contextFiles={projectFiles}
         contextRefs={contextRefs}
-        disabled={sending}
+        disabled={sending || resetting}
         draft={draft}
         models={models}
         onAddContextRef={addContextRef}

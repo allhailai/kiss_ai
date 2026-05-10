@@ -291,7 +291,7 @@ const { startHumanAttentionResolution, startRebuild } = createAgentJobService({
   setRebuildState,
 });
 
-const { listAgentCapabilities, readAgentSession, sendAgentSessionMessage } = createAgentCapabilityService({
+const { listAgentCapabilities, readAgentSession, resetAgentSession, sendAgentSessionMessage } = createAgentCapabilityService({
   displayProjectName,
   httpError,
   listCursorModels,
@@ -365,6 +365,7 @@ registerApiRoutes(app, {
   readProjectJson,
   readTextFile,
   resolveCursorApiKey,
+  resetAgentSession,
   restoreFileFromHead,
   runAiAssistProposal,
   runRequirementsAutoUpdateProposal,

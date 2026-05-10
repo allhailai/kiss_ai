@@ -26,6 +26,7 @@ export function registerApiRoutes(app, deps) {
   registerAgentRoutes(app, {
     listAgentCapabilities: deps.listAgentCapabilities,
     readAgentSession: deps.readAgentSession,
+    resetAgentSession: deps.resetAgentSession,
     sendAgentSessionMessage: deps.sendAgentSessionMessage,
   });
 
