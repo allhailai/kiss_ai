@@ -306,7 +306,10 @@ export function ChatComposer({
                     title={`Remove ${ref.path}`}
                     type="button"
                   >
-                    {contextLabel(ref)} <span aria-hidden="true">x</span>
+                    <span className="chat-context-chip-label">{contextLabel(ref)}</span>
+                    <span className="chat-context-chip-remove" aria-hidden="true">
+                      x
+                    </span>
                   </button>
                 ))}
               </div>
@@ -336,7 +339,7 @@ export function ChatComposer({
                 {models.length ? (
                   tieredModels.map(({ tier, models: tierModels }) => {
                     return (
-                      <div className="chat-model-group" key={tier}>
+                      <div className={`chat-model-group chat-model-group-${tier}`} key={tier}>
                         <p>{modelTierLabels[tier]}</p>
                         {tierModels.map((model) => {
                           const optionIndex = modelOptions.findIndex((option) => option.id === model.id);
@@ -355,7 +358,6 @@ export function ChatComposer({
                               type="button"
                             >
                               <strong>{formatModelLabel(model)}</strong>
-                              <span>{modelTierLabels[model.tier]}</span>
                             </button>
                           );
                         })}

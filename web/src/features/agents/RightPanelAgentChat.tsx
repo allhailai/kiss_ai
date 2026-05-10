@@ -29,9 +29,11 @@ export function RightPanelAgentChat({
   const [contextRefs, setContextRefs] = useState<AgentContextRef[]>([]);
   const [draft, setDraft] = useState("");
   const [resetting, setResetting] = useState(false);
+  const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null);
   const [session, setSession] = useState<AgentSession | null>(null);
   const [selectedContextPath, setSelectedContextPath] = useState("");
   const [sending, setSending] = useState(false);
+  const threadRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
@@ -72,6 +74,7 @@ export function RightPanelAgentChat({
       setSession(await api.resetAgentSession(projectSlug));
       setDraft("");
       setContextRefs([]);
+      setScrollToMessageId(null);
       setSelectedContextPath("");
       textareaRef.current?.focus();
     } catch (error) {
@@ -100,14 +103,16 @@ export function RightPanelAgentChat({
 
     setSending(true);
     setCapabilityError("");
+    const previousMessageIds = new Set((session?.messages ?? []).map((message) => message.id));
     try {
-      setSession(
-        await api.sendAgentSessionMessage(projectSlug, {
-          content,
-          modelId: selectedModelId || undefined,
-          context: activeFiles.length || contextRefs.length ? { activeFiles, fileRefs: contextRefs } : undefined,
-        }),
-      );
+      const nextSession = await api.sendAgentSessionMessage(projectSlug, {
+        content,
+        modelId: selectedModelId || undefined,
+        context: activeFiles.length || contextRefs.length ? { activeFiles, fileRefs: contextRefs } : undefined,
+      });
+      const newAssistantMessage = [...nextSession.messages].reverse().find((message) => message.role === "assistant" && !previousMessageIds.has(message.id));
+      setSession(nextSession);
+      setScrollToMessageId(newAssistantMessage?.id ?? null);
       setDraft("");
     } catch (error) {
       setCapabilityError(errorMessage(error, "Could not send the agent message."));
@@ -120,24 +125,24 @@ export function RightPanelAgentChat({
     <div className="right-panel-agent-chat">
       <div className="agent-conversation-header">
         <div>
-          <span>Agent Conversation</span>
+          <span>AI Chat</span>
           <strong>{session?.title || "Agent Chat"}</strong>
         </div>
         <button disabled={sending || resetting} onClick={() => void startNewConversation()} type="button">
-          {resetting ? "Starting..." : "New Conversation"}
+          {resetting ? "Starting..." : "New AI Chat"}
         </button>
       </div>
       <div className="right-panel-agent-thread">
         {capabilityError ? <p className="agent-event-status">Agent capabilities unavailable: {capabilityError}</p> : null}
-        {!capabilityError && capabilities.length ? (
-          <p className="agent-event-status">{capabilities.filter((capability) => capability.available).length} agent capabilities available.</p>
-        ) : null}
         <ChatThread
           disabled={sending}
           editable={false}
           emptyDescription="Ask the side-panel agent about this project."
           emptyTitle={session ? "Start agent chat" : "Loading agent session..."}
           messages={session?.messages ?? []}
+          scrollToMessageId={scrollToMessageId}
+          showThinking={sending}
+          threadRef={threadRef}
         />
       </div>
       <div className="agent-active-context" aria-label="Active agent context">

@@ -223,6 +223,16 @@
   gap: 8px;
 }
 
+.right-panel-agent-thread > .chat-thread-shell,
+.right-panel-agent-thread .chat-thread,
+.right-panel-agent-thread .chat-message {
+  min-width: 0;
+}
+
+.right-panel-agent-thread > .chat-thread-shell {
+  width: 100%;
+}
+
 .agent-active-context {
   min-width: 0;
   display: grid;

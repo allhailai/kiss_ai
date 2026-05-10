@@ -32,7 +32,7 @@ function ChatMessageBubbleComponent({
   ];
 
   return (
-    <article className={`chat-message chat-message-${message.role} chat-message-${message.status}`}>
+    <article className={`chat-message chat-message-${message.role} chat-message-${message.status}`} data-message-id={message.id}>
       <header>
         <strong>{message.role === "assistant" ? "Agent" : message.role === "system" ? "System" : "You"}</strong>
         <div className="chat-message-actions">
