@@ -4,7 +4,7 @@ import { buildThemeStyle } from "./theme";
 import { useProjectWorkspace } from "./useProjectWorkspace";
 import { RightPanelSurface } from "./RightPanelSurface";
 import { useRightPanelSurface } from "./hooks/useRightPanelSurface";
-import { panelWidthContextKey, useRightPanelWidth } from "./hooks/useRightPanelWidth";
+import { panelWidthContextKey, projectChatDefaultPanelWidth, useRightPanelWidth } from "./hooks/useRightPanelWidth";
 import { type View } from "../navigation/views";
 import { BuildLogWorkspace } from "../features/buildLog/BuildLogWorkspace";
 import { ProjectChatConversationHistory, ProjectChatPanel, useProjectChat } from "../features/chat/ChatWorkspace";
@@ -73,7 +73,7 @@ export function App() {
     setProjectChatPanelDismissed(false);
     rightPanelSurface.openPanel(projectChatPanel);
     if (workspace.view === "chat" && !workspace.routeContext[panelWidthContextKey]) {
-      workspace.replaceRouteContext({ [panelWidthContextKey]: "55%" });
+      workspace.replaceRouteContext({ [panelWidthContextKey]: projectChatDefaultPanelWidth });
     }
   };
   const selectProjectChatConversation = (conversationId: string) => {
@@ -81,7 +81,7 @@ export function App() {
     navigateTo("chat", null, {
       ...workspace.routeContext,
       conversation: conversationId,
-      [panelWidthContextKey]: workspace.routeContext[panelWidthContextKey] || "55%",
+      [panelWidthContextKey]: workspace.routeContext[panelWidthContextKey] || projectChatDefaultPanelWidth,
     });
   };
   const toggleAgentPanel = () => {
@@ -307,15 +307,13 @@ export function App() {
               projectSlug={workspace.selectedProjectSlug}
               selectedModelId={workspace.selectedRebuildModelId}
             />
-          ) : rightPanelSurface.rightPanel.kind === "project-chat" ? (
+          ) : (
             <ProjectChatPanel
               chat={projectChat}
               models={workspace.rebuildModels}
               selectedModelId={workspace.selectedRebuildModelId}
               onModelChange={workspace.setSelectedRebuildModelId}
             />
-          ) : (
-            <p className="chat-empty-state">This reusable panel surface is ready for contextual project tools.</p>
           )}
         </RightPanelSurface>
       ) : null}

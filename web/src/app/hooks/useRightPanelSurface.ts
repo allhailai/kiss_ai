@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 
-export type RightPanelKind = "agent-chat" | "project-chat" | "file-inspector" | "run-details" | "tool-approval";
+export type RightPanelKind = "agent-chat" | "project-chat";
 
 export type RightPanelState = {
   kind: RightPanelKind;
@@ -18,9 +18,5 @@ export function useRightPanelSurface() {
     setRightPanel(null);
   }, []);
 
-  const togglePanel = useCallback((panel: NonNullable<RightPanelState>) => {
-    setRightPanel((current) => (current?.kind === panel.kind ? null : panel));
-  }, []);
-
-  return { closePanel, openPanel, rightPanel, togglePanel };
+  return { closePanel, openPanel, rightPanel };
 }

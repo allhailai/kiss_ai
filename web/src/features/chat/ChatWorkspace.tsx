@@ -2,20 +2,26 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import type { ChatContextRef, ChatMessage, Conversation, ConversationSummary, ProjectFile, RebuildModel } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { errorMessage } from "../../domain/errors";
+import { projectPathPrefixes } from "../../domain/projectPaths";
 import { ChatComposer } from "./ChatComposer";
 import { ChatThread } from "./ChatThread";
 import { formatChatDateTime } from "./chatRendering";
 import { useConversationStream } from "./useConversationStream";
 
 function isChatContextFile(file: ProjectFile) {
-  return /^human_[^/]+\.md$/i.test(file.path) || file.path.startsWith("inputs_human/") || file.path.startsWith("inputs_ai/") || file.path.startsWith("outputs_ai/");
+  return (
+    /^human_[^/]+\.md$/i.test(file.path) ||
+    file.path.startsWith(projectPathPrefixes.humanInput) ||
+    file.path.startsWith(projectPathPrefixes.aiInput) ||
+    file.path.startsWith(projectPathPrefixes.output)
+  );
 }
 
 function isNearScrollBottom(element: HTMLElement) {
   return element.scrollHeight - element.scrollTop - element.clientHeight < 120;
 }
 
-export type ProjectChatController = ReturnType<typeof useProjectChat>;
+type ProjectChatController = ReturnType<typeof useProjectChat>;
 
 export function useProjectChat({
   projectSlug,
@@ -389,33 +395,6 @@ export function ProjectChatPanel({
         textareaRef={chat.composerTextareaRef}
       />
     </section>
-  );
-}
-
-export function ChatWorkspace({
-  projectSlug,
-  models,
-  selectedModelId,
-  projectFiles,
-  onModelChange,
-  onNotice,
-}: {
-  projectSlug: string;
-  models: RebuildModel[];
-  selectedModelId: string;
-  projectFiles: ProjectFile[];
-  onModelChange: (modelId: string) => void;
-  onNotice: (message: string) => void;
-}) {
-  const chat = useProjectChat({ projectSlug, selectedModelId, projectFiles, onNotice });
-
-  return (
-    <div className="chat-workspace">
-      <section className="chat-layout">
-        <ProjectChatConversationHistory chat={chat} />
-        <ProjectChatPanel chat={chat} models={models} selectedModelId={selectedModelId} onModelChange={onModelChange} />
-      </section>
-    </div>
   );
 }
 

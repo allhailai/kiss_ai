@@ -13,6 +13,10 @@ function fileToBase64(file: File) {
   });
 }
 
+function searchProjectFiles(projectSlug: string, query: string) {
+  return request<FileSearchResponse>(`${projectBase(projectSlug)}/search/paths?q=${encodeURIComponent(query)}`);
+}
+
 export const filesApi = {
   tree: (projectSlug: string, section: string) => request<TreeResponse>(`${projectBase(projectSlug)}/tree/${section}`),
   uploadHumanInputs: async (projectSlug: string, files: File[]) =>
@@ -34,10 +38,8 @@ export const filesApi = {
       method: "DELETE",
       body: JSON.stringify({ path }),
     }),
-  searchPathFiles: (projectSlug: string, query: string) =>
-    request<FileSearchResponse>(`${projectBase(projectSlug)}/search/paths?q=${encodeURIComponent(query)}`),
-  searchFiles: (projectSlug: string, query: string) =>
-    request<FileSearchResponse>(`${projectBase(projectSlug)}/search/paths?q=${encodeURIComponent(query)}`),
+  searchPathFiles: searchProjectFiles,
+  searchFiles: searchProjectFiles,
   file: (projectSlug: string, path: string) => request<FileContent>(`${projectBase(projectSlug)}/file?path=${encodeURIComponent(path)}`),
   fileDiff: (projectSlug: string, path: string) =>
     request<FileDiff>(`${projectBase(projectSlug)}/file/diff?path=${encodeURIComponent(path)}`),

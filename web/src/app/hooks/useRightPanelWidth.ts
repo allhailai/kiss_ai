@@ -3,9 +3,9 @@ import type { RightPanelKind } from "./useRightPanelSurface";
 import type { View } from "../../navigation/views";
 
 export const panelWidthContextKey = "panelWidth";
+export const projectChatDefaultPanelWidth = "55%";
 
 const defaultPanelWidth = "420px";
-const projectChatDefaultPanelWidth = "55%";
 const minPanelWidthPx = 320;
 const maxPanelWidthPx = 1200;
 const minWorkspaceWidthPx = 280;

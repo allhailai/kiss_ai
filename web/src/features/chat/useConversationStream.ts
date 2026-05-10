@@ -41,13 +41,13 @@ export function useConversationStream({
   conversationId: string | null | undefined;
   onConversationTruncated: () => void;
   onNotice: (message: string) => void;
-  projectSlug: string;
+  projectSlug: string | null | undefined;
   refreshConversations: () => Promise<unknown>;
   setActiveConversation: Dispatch<SetStateAction<Conversation | null>>;
   setSending: Dispatch<SetStateAction<boolean>>;
 }) {
   useEffect(() => {
-    if (!conversationId || typeof EventSource === "undefined") return;
+    if (!projectSlug || !conversationId || typeof EventSource === "undefined") return;
 
     const eventSource = new EventSource(api.conversationEventsUrl(projectSlug, conversationId));
     const handleEvent = (event: MessageEvent<string>) => {
