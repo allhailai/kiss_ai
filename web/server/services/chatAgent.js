@@ -47,10 +47,15 @@ function normalizeActiveFile(value) {
   };
 }
 
+function normalizeCurrentFile(value) {
+  return normalizeActiveFile(value);
+}
+
 function requireSendRequest(body, httpError) {
   const modelId = String(body?.modelId ?? "").trim();
   const content = String(body?.content ?? "").trim();
   const contextSource = body?.context && typeof body.context === "object" && !Array.isArray(body.context) ? body.context : {};
+  const currentFile = normalizeCurrentFile(contextSource.currentFile);
   const activeFiles = Array.isArray(contextSource.activeFiles) ? contextSource.activeFiles.map(normalizeActiveFile).filter(Boolean).slice(0, maxActiveFiles) : [];
   const fileRefs = Array.isArray(contextSource.fileRefs) ? contextSource.fileRefs.map(normalizeContextRef).filter(Boolean).slice(0, maxContextRefs) : [];
 
@@ -63,7 +68,14 @@ function requireSendRequest(body, httpError) {
   return {
     modelId,
     content,
-    context: activeFiles.length || fileRefs.length ? { activeFiles, fileRefs } : undefined,
+    context:
+      currentFile || activeFiles.length || fileRefs.length
+        ? {
+            ...(currentFile ? { currentFile } : {}),
+            ...(activeFiles.length ? { activeFiles } : {}),
+            ...(fileRefs.length ? { fileRefs } : {}),
+          }
+        : undefined,
   };
 }
 
@@ -167,6 +179,39 @@ async function readActiveContextFiles({ project, readTextFile, activeFiles }) {
   }));
 }
 
+async function readCurrentFileContext({ project, readTextFile, currentFile }) {
+  if (!currentFile?.path) return null;
+
+  try {
+    const file = await readTextFile(project.path, currentFile.path);
+    const expectedHash = typeof currentFile.contentHash === "string" && currentFile.contentHash ? currentFile.contentHash : null;
+
+    return {
+      path: file.path,
+      label: currentFile.label || file.path,
+      kind: file.kind,
+      editable: file.editable,
+      annotation: file.annotation,
+      expectedContentHash: expectedHash,
+      contentHash: file.contentHash,
+      hashStatus: expectedHash ? (expectedHash === file.contentHash ? "matched" : "changed") : "missing_hash",
+      draftState: currentFile.draftState ?? "unknown",
+      role: currentFile.role ?? "primary",
+      intent: "current_file_context",
+      editableIntent: false,
+      content: trimForPrompt(file.content),
+    };
+  } catch (error) {
+    return {
+      path: currentFile.path,
+      label: currentFile.label || currentFile.path,
+      intent: "current_file_context",
+      editableIntent: false,
+      error: error instanceof Error ? error.message : "Could not read current file context.",
+    };
+  }
+}
+
 async function createChatPrompt({ project, conversation, readTextFile, displayProjectName, readProjectHarness }) {
   const [harness, goal, inputs, outputs, openQuestions] = await Promise.all([
     readProjectHarness(project.path),
@@ -175,11 +220,13 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     readOptionalProjectText(readTextFile, project.path, "human_output_requirements.md"),
     readOptionalProjectText(readTextFile, project.path, "human_open_questions.md"),
   ]);
+  const currentFile = [...conversation.messages].reverse().find((message) => message.context?.currentFile)?.context?.currentFile ?? null;
   const activeFiles = conversation.messages.flatMap((message) => message.context?.activeFiles ?? []);
   const fileRefs = conversation.messages.flatMap((message) => message.context?.fileRefs ?? []);
   const uniqueActiveFiles = uniqueByPath(activeFiles, maxActiveFiles);
   const uniqueFileRefs = uniqueByPath(fileRefs, maxContextRefs);
-  const [editableTargetFiles, sourceContextFiles] = await Promise.all([
+  const [currentFileContext, editableTargetFiles, sourceContextFiles] = await Promise.all([
+    readCurrentFileContext({ project, readTextFile, currentFile }),
     readActiveContextFiles({ project, readTextFile, activeFiles: uniqueActiveFiles }),
     readSourceContextFiles({ project, readTextFile, fileRefs: uniqueFileRefs }),
   ]);
@@ -206,6 +253,7 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
       summary: conversation.summary,
       history,
     },
+    currentFileContext,
     editableTargetFiles,
     sourceContextFiles,
   };
@@ -214,11 +262,14 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     "You are the project chat assistant for a local kiss_ai research project.",
     "",
     "Rules:",
-    "- Answer the user's latest message using only this conversation and the supplied project context.",
+    "- Answer the user's latest message using this conversation and supplied project context first.",
     "- Treat a new conversation as fresh context; do not assume access to previous conversations.",
+    "- Treat currentFileContext as read-only context for the file the user is viewing. It does not grant edit permission.",
     "- You may propose or prepare updates for files listed in editableTargetFiles; do not directly edit files, run modifying commands, write logs, or create artifacts.",
     "- Treat sourceContextFiles as read-only sources to consider. Do not treat them as editable targets unless the same path also appears in editableTargetFiles.",
-    "- Stay inside the current project. Source context files are limited to human_*.md, inputs_human/, inputs_ai/, and outputs_ai/.",
+    "- User-selected sourceContextFiles are guidance, not an exclusive boundary. You may inspect other project files when useful.",
+    "- If you rely on project context outside currentFileContext, editableTargetFiles, or sourceContextFiles, briefly explain or cite what additional context you used.",
+    "- Stay inside the current project. User-selected source context files are limited to human_*.md, inputs_human/, inputs_ai/, and outputs_ai/.",
     "- Do not expose hidden chain-of-thought. Provide concise reasoning summaries when useful.",
     "- If context is missing, say what is missing and suggest the next best step.",
     "",

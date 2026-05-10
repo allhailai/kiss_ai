@@ -24,11 +24,10 @@ function ChatMessageBubbleComponent({
   onStartEdit: (message: ChatMessage) => void;
 }) {
   const canEdit = editable && message.role === "user";
-  const contextPaths = [
-    ...new Set([
-      ...(message.context?.activeFiles ?? []).map((file) => file.path),
-      ...(message.context?.fileRefs ?? []).map((ref) => ref.path),
-    ]),
+  const contextEntries = [
+    ...(message.context?.currentFile ? [{ key: `current:${message.context.currentFile.path}`, label: "Viewing", path: message.context.currentFile.path }] : []),
+    ...(message.context?.activeFiles ?? []).map((file) => ({ key: `active:${file.path}`, label: "Editable", path: file.path })),
+    ...(message.context?.fileRefs ?? []).map((ref) => ({ key: `context:${ref.path}`, label: "Context", path: ref.path })),
   ];
 
   return (
@@ -80,10 +79,12 @@ function ChatMessageBubbleComponent({
       ) : (
         <div className="chat-message-content">{renderMessageContent(message.content)}</div>
       )}
-      {contextPaths.length ? (
+      {contextEntries.length ? (
         <div className="chat-message-context">
-          {contextPaths.map((contextPath) => (
-            <code key={contextPath}>{contextPath}</code>
+          {contextEntries.map((entry) => (
+            <code key={entry.key}>
+              {entry.label}: {entry.path}
+            </code>
           ))}
         </div>
       ) : null}

@@ -8,14 +8,15 @@ type RightPanelChatController = {
   handleThreadScroll: () => void;
   loading: boolean;
   scrollToLatest: () => void;
-  sendMessage: (options: { content?: string; context?: { activeFiles?: AgentContextFile[]; fileRefs?: ChatContextRef[] } }) => Promise<boolean>;
+  sendMessage: (options: {
+    content?: string;
+    context?: { currentFile?: AgentContextFile; activeFiles?: AgentContextFile[]; fileRefs?: ChatContextRef[] };
+  }) => Promise<boolean>;
   sending: boolean;
   showJumpToLatest: boolean;
   startDraftConversation: () => void;
   threadRef: RefObject<HTMLDivElement | null>;
 };
-
-type FilePickerTarget = "active" | "context";
 
 function contextFileLabel(file: AgentContextFile) {
   return file.label || file.path;
@@ -34,13 +35,14 @@ export function RightPanelAgentChat({
   chat,
   chooserFile,
   contextRefs,
+  currentFile,
   highlightedContext,
   models,
-  onAddActiveFile,
   onAddContextRef,
   onCloseChooser,
   onContextRefsChange,
   onModelChange,
+  onModifyCurrentFile,
   onRemoveActiveFile,
   projectFiles,
   selectedModelId,
@@ -49,27 +51,30 @@ export function RightPanelAgentChat({
   chat: RightPanelChatController;
   chooserFile: ProjectFile | null;
   contextRefs: ChatContextRef[];
+  currentFile: AgentContextFile | null;
   highlightedContext: { path: string; target: "active" | "context" } | null;
   models: RebuildModel[];
-  onAddActiveFile: (path: string) => void;
   onAddContextRef: (path: string) => void;
   onCloseChooser: () => void;
   onContextRefsChange: Dispatch<SetStateAction<ChatContextRef[]>>;
   onModelChange: (modelId: string) => void;
+  onModifyCurrentFile: () => void;
   onRemoveActiveFile: (path: string) => void;
   projectFiles: ProjectFile[];
   selectedModelId: string;
 }) {
   const [draft, setDraft] = useState("");
   const [filePickerQuery, setFilePickerQuery] = useState("");
-  const [filePickerTarget, setFilePickerTarget] = useState<FilePickerTarget | null>(null);
+  const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [selectedContextPath, setSelectedContextPath] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const chooserInActive = Boolean(chooserFile && activeFiles.some((file) => file.path === chooserFile.path));
   const chooserInContext = Boolean(chooserFile && contextRefs.some((ref) => ref.path === chooserFile.path));
+  const chooserIsCurrentFile = Boolean(chooserFile && currentFile?.path === chooserFile.path);
+  const currentFileInActive = Boolean(currentFile && activeFiles.some((file) => file.path === currentFile.path));
   const filePickerOptions = useMemo(() => {
-    if (!filePickerTarget) return [];
-    const selectedPaths = new Set((filePickerTarget === "active" ? activeFiles : contextRefs).map((file) => file.path));
+    if (!filePickerOpen) return [];
+    const selectedPaths = new Set(contextRefs.map((file) => file.path));
     const query = filePickerQuery.trim().toLowerCase();
     return projectFiles
       .filter((file) => !selectedPaths.has(file.path))
@@ -77,7 +82,7 @@ export function RightPanelAgentChat({
         if (!query) return true;
         return `${file.path} ${file.name} ${file.kind}`.toLowerCase().includes(query);
       });
-  }, [activeFiles, contextRefs, filePickerQuery, filePickerTarget, projectFiles]);
+  }, [contextRefs, filePickerOpen, filePickerQuery, projectFiles]);
 
   const startNewConversation = () => {
     if (chat.sending) return;
@@ -85,27 +90,23 @@ export function RightPanelAgentChat({
     setDraft("");
     onContextRefsChange([]);
     setFilePickerQuery("");
-    setFilePickerTarget(null);
+    setFilePickerOpen(false);
     setSelectedContextPath("");
     onCloseChooser();
     textareaRef.current?.focus();
   };
 
-  const toggleFilePicker = (target: FilePickerTarget) => {
+  const toggleFilePicker = () => {
     if (chat.sending) return;
     setFilePickerQuery("");
-    setFilePickerTarget((current) => (current === target ? null : target));
+    setFilePickerOpen((current) => !current);
   };
 
   const addPickerFile = (path: string) => {
-    if (!filePickerTarget) return;
-    if (filePickerTarget === "active") {
-      onAddActiveFile(path);
-    } else {
-      onAddContextRef(path);
-    }
+    if (!filePickerOpen) return;
+    onAddContextRef(path);
     setFilePickerQuery("");
-    setFilePickerTarget(null);
+    setFilePickerOpen(false);
   };
 
   const addContextRef = (path = selectedContextPath) => {
@@ -127,7 +128,14 @@ export function RightPanelAgentChat({
 
     const sent = await chat.sendMessage({
       content,
-      context: activeFiles.length || contextRefs.length ? { activeFiles, fileRefs: contextRefs } : undefined,
+      context:
+        currentFile || activeFiles.length || contextRefs.length
+          ? {
+              currentFile: currentFile ?? undefined,
+              activeFiles: activeFiles.length ? activeFiles : undefined,
+              fileRefs: contextRefs.length ? contextRefs : undefined,
+            }
+          : undefined,
     });
     if (sent) {
       setDraft("");
@@ -159,11 +167,29 @@ export function RightPanelAgentChat({
           threadRef={chat.threadRef}
         />
       </div>
-      <div className="agent-active-context" aria-label="Active editable files">
-        <button className="agent-context-label agent-context-label-button" onClick={() => toggleFilePicker("active")} type="button">
-          Active files
-        </button>
-        {activeFiles.length ? (
+      <div className="agent-current-file" aria-label="Current file context">
+        <span className="agent-context-label">Viewing</span>
+        {currentFile ? (
+          <>
+            <code title={currentFile.path}>
+              {contextFileLabel(currentFile)}
+              {currentFile.draftState === "unsaved" ? " (unsaved)" : ""}
+            </code>
+            {currentFileInActive ? (
+              <span className="agent-current-file-status">Modify enabled</span>
+            ) : (
+              <button disabled={chat.sending || !currentFile.editable} onClick={onModifyCurrentFile} type="button">
+                AI modify current file
+              </button>
+            )}
+          </>
+        ) : (
+          <span className="agent-current-file-status">No file open</span>
+        )}
+      </div>
+      {activeFiles.length ? (
+        <div className="agent-active-context" aria-label="Editable target files">
+          <span className="agent-context-label">Editable targets</span>
           <div className="agent-context-chips">
             {activeFiles.map((file) => (
               <span
@@ -178,18 +204,16 @@ export function RightPanelAgentChat({
                   {contextFileLabel(file)}
                   {file.draftState === "unsaved" ? " (unsaved)" : ""}
                 </code>
-                <button aria-label={`Remove ${file.path} from active files`} onClick={() => onRemoveActiveFile(file.path)} type="button">
+                <button aria-label={`Remove ${file.path} from editable targets`} onClick={() => onRemoveActiveFile(file.path)} type="button">
                   x
                 </button>
               </span>
             ))}
           </div>
-        ) : (
-          <p>No active file selected.</p>
-        )}
-      </div>
+        </div>
+      ) : null}
       <div className="agent-active-context" aria-label="Source context files">
-        <button className="agent-context-label agent-context-label-button" onClick={() => toggleFilePicker("context")} type="button">
+        <button className="agent-context-label agent-context-label-button" onClick={toggleFilePicker} type="button">
           Context
         </button>
         {contextRefs.length ? (
@@ -214,11 +238,11 @@ export function RightPanelAgentChat({
           <p>No source context selected.</p>
         )}
       </div>
-      {filePickerTarget ? (
-        <section className="agent-file-picker" aria-label={`Add ${filePickerTarget === "active" ? "active" : "context"} file`}>
+      {filePickerOpen ? (
+        <section className="agent-file-picker" aria-label="Add context file">
           <div className="agent-file-picker-topbar">
-            <strong>{filePickerTarget === "active" ? "Add active file" : "Add context file"}</strong>
-            <button onClick={() => setFilePickerTarget(null)} type="button">
+            <strong>Add context file</strong>
+            <button onClick={() => setFilePickerOpen(false)} type="button">
               Close
             </button>
           </div>
@@ -252,9 +276,11 @@ export function RightPanelAgentChat({
             {chooserInContext ? <p>Already added as source context.</p> : <p>Add this file to the current AI chat.</p>}
           </div>
           <div className="agent-file-chooser-actions">
-            <button onClick={() => onAddActiveFile(chooserFile.path)} type="button">
-              + Add to Active
-            </button>
+            {chooserIsCurrentFile ? (
+              <button disabled={chat.sending || !chooserFile.editable} onClick={onModifyCurrentFile} type="button">
+                AI modify current file
+              </button>
+            ) : null}
             {!chooserInContext ? (
               <button onClick={() => onAddContextRef(chooserFile.path)} type="button">
                 + Add to Context

@@ -209,10 +209,24 @@ export type ChatMessage = {
   modelId?: string | null;
   status: ChatMessageStatus;
   context?: {
+    currentFile?: AgentContextFile;
     activeFiles?: AgentContextFile[];
     fileRefs?: ChatContextRef[];
   };
-  metadata?: Record<string, unknown>;
+  metadata?: ChatMessageMetadata;
+};
+
+export type ChatMessageFileEdit = {
+  path: string;
+  summary: string;
+  contentHashBefore?: string;
+  contentHashAfter?: string;
+  appliedAt?: string;
+  status: "proposed" | "applied" | "rejected" | "failed";
+};
+
+export type ChatMessageMetadata = Record<string, unknown> & {
+  fileEdits?: ChatMessageFileEdit[];
 };
 
 export type ConversationSummary = {
@@ -258,6 +272,7 @@ export type SendChatMessageRequest = {
   modelId: string;
   content: string;
   context?: {
+    currentFile?: AgentContextFile;
     activeFiles?: AgentContextFile[];
     fileRefs?: ChatContextRef[];
   };

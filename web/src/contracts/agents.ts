@@ -21,6 +21,10 @@ export type AgentContextRef = {
 };
 
 export type AgentMessageContext = {
+  /** Read-only context for the file currently open in the editor. */
+  currentFile?: AgentContextFile;
+  /** Compatibility name for files/directories explicitly permitted as editable targets. */
   activeFiles?: AgentContextFile[];
+  /** Compatibility name for files/directories explicitly selected as source context. */
   fileRefs?: AgentContextRef[];
 };

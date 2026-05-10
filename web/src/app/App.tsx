@@ -70,6 +70,21 @@ function activeFileFromProjectFile(file: ProjectFile, selected: FileContent | nu
   };
 }
 
+function currentFileFromSelectedFile(selected: FileContent | null, draft: string): AgentContextFile | null {
+  if (!selected) return null;
+
+  return {
+    path: selected.path,
+    label: fileLabel(selected.path),
+    kind: selected.kind,
+    editable: selected.editable,
+    annotation: selected.annotation,
+    contentHash: selected.contentHash,
+    draftState: draft !== selected.content ? "unsaved" : "saved",
+    role: "primary",
+  };
+}
+
 export function App() {
   const workspace = useProjectWorkspace();
   const { designWorkspace, fileWorkspace, project, rebuildWorkspace, route, toastWorkspace } = workspace;
@@ -110,6 +125,10 @@ export function App() {
     if (!agentChooserPath) return null;
     return fileWorkspace.projectFiles.find((file) => file.path === agentChooserPath) ?? null;
   }, [agentChooserPath, fileWorkspace.projectFiles]);
+  const agentCurrentFile = useMemo(
+    () => currentFileFromSelectedFile(fileWorkspace.selected, fileWorkspace.draft),
+    [fileWorkspace.draft, fileWorkspace.selected],
+  );
   const setAgentHighlight = (path: string, target: "active" | "context") => {
     setHighlightedAgentContext({ path, target });
     if (agentHighlightTimeoutRef.current) window.clearTimeout(agentHighlightTimeoutRef.current);
@@ -422,13 +441,14 @@ export function App() {
               chat={projectChat}
               chooserFile={chooserFile}
               contextRefs={agentContextRefs}
+              currentFile={agentCurrentFile}
               highlightedContext={highlightedAgentContext}
               models={rebuildWorkspace.models}
-              onAddActiveFile={addAgentActiveFile}
               onAddContextRef={addAgentContextRef}
               onCloseChooser={() => setAgentChooserPath(null)}
               onContextRefsChange={setAgentContextRefs}
               onModelChange={rebuildWorkspace.setSelectedModelId}
+              onModifyCurrentFile={() => agentCurrentFile && addAgentActiveFile(agentCurrentFile.path)}
               onRemoveActiveFile={(path) => setAgentActiveFiles((current) => current.filter((file) => file.path !== path))}
               projectFiles={fileWorkspace.projectFiles}
               selectedModelId={rebuildWorkspace.selectedModelId}

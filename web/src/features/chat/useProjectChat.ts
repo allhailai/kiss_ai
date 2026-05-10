@@ -6,6 +6,7 @@ import { projectPathPrefixes } from "../../domain/projectPaths";
 import { useConversationStream } from "./useConversationStream";
 
 type ChatSendContext = {
+  currentFile?: AgentContextFile;
   activeFiles?: AgentContextFile[];
   fileRefs?: ChatContextRef[];
 };

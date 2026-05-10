@@ -67,11 +67,22 @@ function normalizeActiveFile(value) {
   };
 }
 
+function normalizeCurrentFile(value) {
+  return normalizeActiveFile(value);
+}
+
 function normalizeContext(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const currentFile = normalizeCurrentFile(source.currentFile);
   const activeFiles = Array.isArray(source.activeFiles) ? source.activeFiles.map(normalizeActiveFile).filter(Boolean).slice(0, maxActiveFiles) : [];
   const fileRefs = Array.isArray(source.fileRefs) ? source.fileRefs.map(normalizeContextRef).filter(Boolean).slice(0, maxContextRefs) : [];
-  return activeFiles.length || fileRefs.length ? { activeFiles, fileRefs } : undefined;
+  if (!currentFile && !activeFiles.length && !fileRefs.length) return undefined;
+
+  return {
+    ...(currentFile ? { currentFile } : {}),
+    ...(activeFiles.length ? { activeFiles } : {}),
+    ...(fileRefs.length ? { fileRefs } : {}),
+  };
 }
 
 function normalizeMessage(value, fallback = {}) {
