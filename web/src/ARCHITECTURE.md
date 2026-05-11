@@ -13,7 +13,7 @@ src/
   editor/     CodeMirror React wrapper and editor extensions
   features/   User-facing workflow components
   navigation/ Route, view, and navigation models
-  shared/     App-neutral shared UI types
+  shared/     App-neutral shared UI components and types
 ```
 
 ## App Layer
@@ -24,7 +24,11 @@ src/
 
 `navigation/views.ts` owns view ids, route-backed view metadata, local storage keys, and file-path-to-view policy. Route hash behavior belongs in `navigation/routes.ts`.
 
-App-owned orchestration belongs in `app/`. Shared UI types such as toast state live under `shared/`, while `features/toast/` owns rendering.
+App-owned orchestration belongs in `app/`. If state drives more than one workflow surface, keep the controller in `app/` or a focused `app/hooks/` module and pass behavior into features as props.
+
+Right-panel behavior is app shell state. Panel persistence, panel width, selected agent conversation mirroring, and file context selection belong in `app/`; the panel UI belongs in `features/agents/`.
+
+Shared UI components such as chat message rendering live under `shared/`, while feature directories own workflow-specific composition.
 
 ## Domain Layer
 
@@ -59,6 +63,9 @@ Use `features/<feature>/` for workflow UI. A feature component can own local UI 
 
 Current features:
 
+- `agents/`
+- `buildLog/`
+- `chat/`
 - `dashboard/`
 - `design/`
 - `files/`
@@ -67,6 +74,22 @@ Current features:
 - `rebuild/`
 - `search/`
 - `toast/`
+
+## Data And Live Updates
+
+Use `contracts/` for shared API shapes and `data/` for transport helpers. Server request validation lives in `server/routes/requestSchemas.js`; when adding or changing an API shape, update the contract type, transport helper, route schema, and focused tests together.
+
+Chat and rebuild workflows use a dual transport:
+
+- A REST request starts or mutates the workflow.
+- An `EventSource` stream sends live snapshots and deltas.
+- Polling or a fresh REST read should remain a recovery path for stream disconnects.
+
+Long-running server work should have an explicit lifecycle state. Rebuilds persist state under `.runtime/`; chat conversations persist messages under the project and should normalize stale streaming messages when recovered.
+
+## Quality Gate
+
+Run `npm run check` from `web/` before handing off substantive changes. It runs app TypeScript, server TypeScript, boundary checks, and Vitest.
 
 ## Adding A New Workflow
 

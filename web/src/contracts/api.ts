@@ -1,4 +1,4 @@
-import type { AgentContextDraftState, AgentContextFile, AgentEditableTargetFile, AgentSourceContextRef } from "./agents";
+import type { AgentContextDraftState, AgentContextFile, AgentContextRef, AgentEditableTargetFile, AgentSourceContextRef } from "./agents";
 
 export type {
   AgentContextDraftState,
@@ -203,11 +203,7 @@ export type ChatMessageRole = "user" | "assistant" | "system";
 
 export type ChatMessageStatus = "complete" | "streaming" | "error";
 
-export type ChatContextRef = {
-  path: string;
-  label?: string;
-  kind?: ProjectFile["kind"];
-};
+export type ChatContextRef = AgentContextRef;
 
 export type ChatMessage = {
   id: string;

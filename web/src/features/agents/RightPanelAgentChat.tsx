@@ -257,16 +257,14 @@ export function RightPanelAgentChat({
             </code>
             {!currentFileInContext || (currentFile.editable && !currentFileInActive) ? (
               <div className="agent-current-file-actions" aria-label="Current file actions">
-                <span className="agent-current-file-help">
-                  <button aria-describedby="agent-current-file-help-text" aria-label="Explain AI Context and AI Editable" type="button">
-                    ?
-                  </button>
-                  <span className="agent-current-file-help-text" id="agent-current-file-help-text" role="tooltip">
+                <details className="agent-current-file-help">
+                  <summary aria-label="Explain AI Context and AI Editable">?</summary>
+                  <span className="agent-current-file-help-text" role="tooltip">
                     <strong>AI Context</strong> tells AI this file may be helpful when answering your questions. AI can still look at other project
                     files if needed.
                     <strong>AI Editable</strong> lets AI change this file if you ask it to make an edit. Use this only for files you want AI to modify.
                   </span>
-                </span>
+                </details>
                 {!currentFileInContext ? (
                   <button className="agent-current-file-action-button" disabled={chat.sending} onClick={() => onAddContextRef(currentFile.path)} type="button">
                     + AI Context

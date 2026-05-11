@@ -1,8 +1,11 @@
 import { openSseStream } from "../utils/sse.js";
 import {
   createConversationBodySchema,
+  chatMessageParamsSchema,
+  conversationParamsSchema,
   editChatMessageBodySchema,
   parseRequestBody,
+  parseRequestParams,
   sendChatMessageBodySchema,
   updateConversationBodySchema,
 } from "./requestSchemas.js";
@@ -26,7 +29,8 @@ export function registerChatRoutes(app, { editChatMessage, httpError, listConver
 
   app.get("/api/projects/:projectSlug/conversations/:conversationId", async (request, response, next) => {
     try {
-      response.json(await readConversation(request.project, request.params.conversationId));
+      const { conversationId } = parseRequestParams(conversationParamsSchema, request.params, httpError);
+      response.json(await readConversation(request.project, conversationId));
     } catch (error) {
       next(error);
     }
@@ -34,7 +38,8 @@ export function registerChatRoutes(app, { editChatMessage, httpError, listConver
 
   app.patch("/api/projects/:projectSlug/conversations/:conversationId", async (request, response, next) => {
     try {
-      response.json(await updateConversation(request.project, request.params.conversationId, parseRequestBody(updateConversationBodySchema, request.body, httpError)));
+      const { conversationId } = parseRequestParams(conversationParamsSchema, request.params, httpError);
+      response.json(await updateConversation(request.project, conversationId, parseRequestBody(updateConversationBodySchema, request.body, httpError)));
     } catch (error) {
       next(error);
     }
@@ -42,7 +47,8 @@ export function registerChatRoutes(app, { editChatMessage, httpError, listConver
 
   app.post("/api/projects/:projectSlug/conversations/:conversationId/messages", async (request, response, next) => {
     try {
-      response.json(await sendChatMessage(request.project, request.params.conversationId, parseRequestBody(sendChatMessageBodySchema, request.body, httpError)));
+      const { conversationId } = parseRequestParams(conversationParamsSchema, request.params, httpError);
+      response.json(await sendChatMessage(request.project, conversationId, parseRequestBody(sendChatMessageBodySchema, request.body, httpError)));
     } catch (error) {
       next(error);
     }
@@ -50,7 +56,8 @@ export function registerChatRoutes(app, { editChatMessage, httpError, listConver
 
   app.post("/api/projects/:projectSlug/conversations/:conversationId/messages/:messageId/edit", async (request, response, next) => {
     try {
-      response.json(await editChatMessage(request.project, request.params.conversationId, request.params.messageId, parseRequestBody(editChatMessageBodySchema, request.body, httpError)));
+      const { conversationId, messageId } = parseRequestParams(chatMessageParamsSchema, request.params, httpError);
+      response.json(await editChatMessage(request.project, conversationId, messageId, parseRequestBody(editChatMessageBodySchema, request.body, httpError)));
     } catch (error) {
       next(error);
     }
@@ -58,9 +65,10 @@ export function registerChatRoutes(app, { editChatMessage, httpError, listConver
 
   app.get("/api/projects/:projectSlug/conversations/:conversationId/events", async (request, response, next) => {
     try {
-      const conversation = await readConversation(request.project, request.params.conversationId);
+      const { conversationId } = parseRequestParams(conversationParamsSchema, request.params, httpError);
+      const conversation = await readConversation(request.project, conversationId);
       const stream = openSseStream(request, response);
-      const unsubscribe = subscribeToConversation(request.project.slug, request.params.conversationId, (event) => {
+      const unsubscribe = subscribeToConversation(request.project.slug, conversationId, (event) => {
         stream.send(event.type === "error" ? "chat_error" : event.type, event);
       });
 

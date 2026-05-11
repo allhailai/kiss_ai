@@ -1,11 +1,21 @@
+import type { Conversation, ConversationSummary } from "../../contracts/api";
 import { formatChatDateTime } from "../../shared/chat/chatRendering";
-import type { ProjectChatController } from "./useProjectChat";
+
+type ChatConversationHistoryController = {
+  activeConversation: Conversation | null;
+  conversationFilter: string;
+  conversations: ConversationSummary[];
+  filteredConversations: ConversationSummary[];
+  openConversation: (conversationId: string) => Promise<void>;
+  sending: boolean;
+  setConversationFilter: (query: string) => void;
+};
 
 export function ProjectChatConversationHistory({
   chat,
   onSelectConversation,
 }: {
-  chat: ProjectChatController;
+  chat: ChatConversationHistoryController;
   onSelectConversation?: (conversationId: string) => void;
 }) {
   return (

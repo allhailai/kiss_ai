@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../data/apiClient";
 import {
   type BuildLogState,
@@ -8,9 +8,9 @@ import {
   type ProjectSummary,
   type RebuildState,
 } from "../contracts/api";
-import { uniqueFiles } from "../domain/files";
 import { buildRouteHash, parseRouteHash } from "../navigation/routes";
 import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type View } from "../navigation/views";
+import { useProjectDataLoaders } from "./hooks/useProjectDataLoaders";
 import { useHumanInputs } from "./hooks/useHumanInputs";
 import { useRebuildSync } from "./hooks/useRebuildSync";
 import { useRebuildActions } from "./hooks/useRebuildActions";
@@ -30,7 +30,7 @@ import type {
 } from "./workspaceControllers";
 
 export function useProjectWorkspace() {
-  const [view, setView] = useState<View>("build-log");
+  const [view, setView] = useState<View>(() => parseRouteHash(window.location.hash).view);
   const [routeContext, setRouteContext] = useState<Record<string, string>>({});
   const [projectsRoot, setProjectsRoot] = useState("");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -50,8 +50,6 @@ export function useProjectWorkspace() {
   const [reverting, setReverting] = useState(false);
   const [inputMutationLoading, setInputMutationLoading] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
-  const selectedProjectSlugRef = useRef(selectedProjectSlug);
-  const treeRequestIdRef = useRef(0);
   const { toasts, setNotice, dismissToast } = useToasts();
   const {
     clearRebuildModels,
@@ -66,18 +64,6 @@ export function useProjectWorkspace() {
     [projects, selectedProjectSlug],
   );
 
-  const requireSelectedProjectSlug = useCallback(() => {
-    if (!selectedProjectSlug) {
-      throw new Error("Select a project first.");
-    }
-
-    return selectedProjectSlug;
-  }, [selectedProjectSlug]);
-
-  useEffect(() => {
-    selectedProjectSlugRef.current = selectedProjectSlug;
-  }, [selectedProjectSlug]);
-
   const refreshProjects = useCallback(async () => {
     setProjectsError("");
     try {
@@ -90,90 +76,25 @@ export function useProjectWorkspace() {
     }
   }, []);
 
-  const refreshStatus = useCallback(async () => {
-    const projectSlug = requireSelectedProjectSlug();
-    const next = await api.status(projectSlug);
-    if (selectedProjectSlugRef.current === projectSlug) {
-      setStatus(next);
-    }
-  }, [requireSelectedProjectSlug]);
-
-  const refreshBuildLog = useCallback(
-    async (tabId?: string | null, path?: string | null, sectionId?: string | null) => {
-      const projectSlug = requireSelectedProjectSlug();
-      const next = await api.buildLog(projectSlug, tabId, path, sectionId);
-      if (selectedProjectSlugRef.current === projectSlug) {
-        setBuildLog(next);
-      }
-    },
-    [requireSelectedProjectSlug],
-  );
-
-  const refreshDesign = useCallback(async () => {
-    const projectSlug = requireSelectedProjectSlug();
-    const next = await api.design(projectSlug);
-    if (selectedProjectSlugRef.current === projectSlug) {
-      setDesign(next);
-    }
-  }, [requireSelectedProjectSlug]);
-
-  const refreshRebuild = useCallback(async () => {
-    const projectSlug = requireSelectedProjectSlug();
-    const next = await api.rebuildState(projectSlug);
-    if (selectedProjectSlugRef.current === projectSlug) {
-      setRebuild(next);
-    }
-    return next;
-  }, [requireSelectedProjectSlug]);
-
-  const refreshProjectFiles = useCallback(async () => {
-    const projectSlug = requireSelectedProjectSlug();
-    const [requirements, human, inputsAi, outputs] = await Promise.all([
-      api.tree(projectSlug, "requirements"),
-      api.tree(projectSlug, "human"),
-      api.tree(projectSlug, "inputs-ai"),
-      api.tree(projectSlug, "outputs"),
-    ]);
-
-    if (selectedProjectSlugRef.current === projectSlug) {
-      setProjectFiles(uniqueFiles([...requirements.files, ...human.files, ...inputsAi.files, ...outputs.files, designProjectFile]));
-    }
-  }, [requireSelectedProjectSlug]);
-
-  const loadTree = useCallback(
-    async (section: string) => {
-      const projectSlug = requireSelectedProjectSlug();
-      const requestId = (treeRequestIdRef.current += 1);
-      setTreeLoading(true);
-      try {
-        const next = await api.tree(projectSlug, section);
-        if (selectedProjectSlugRef.current === projectSlug && treeRequestIdRef.current === requestId) {
-          setFiles(next.files);
-        }
-      } finally {
-        if (treeRequestIdRef.current === requestId) {
-          setTreeLoading(false);
-        }
-      }
-    },
-    [requireSelectedProjectSlug],
-  );
-
-  const loadAnnotationTree = useCallback(async () => {
-    const projectSlug = requireSelectedProjectSlug();
-    const requestId = (treeRequestIdRef.current += 1);
-    setTreeLoading(true);
-    try {
-      const [inputsAi, outputs] = await Promise.all([api.tree(projectSlug, "inputs-ai"), api.tree(projectSlug, "outputs")]);
-      if (selectedProjectSlugRef.current === projectSlug && treeRequestIdRef.current === requestId) {
-        setFiles(uniqueFiles([...inputsAi.files, ...outputs.files]));
-      }
-    } finally {
-      if (treeRequestIdRef.current === requestId) {
-        setTreeLoading(false);
-      }
-    }
-  }, [requireSelectedProjectSlug]);
+  const {
+    loadAnnotationTree,
+    loadTree,
+    refreshBuildLog,
+    refreshDesign,
+    refreshProjectFiles,
+    refreshRebuild,
+    refreshStatus,
+    requireSelectedProjectSlug,
+  } = useProjectDataLoaders({
+    selectedProjectSlug,
+    setBuildLog,
+    setDesign,
+    setFiles,
+    setProjectFiles,
+    setRebuild,
+    setStatus,
+    setTreeLoading,
+  });
 
   const {
     selected,

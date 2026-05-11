@@ -158,6 +158,52 @@ describe("API routes", () => {
     });
   });
 
+  it("validates file route params and oversized write bodies at the route boundary", async () => {
+    const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-route-project-"));
+    await fs.writeFile(path.join(projectRoot, "human_goal_requirements.md"), "Goal\n", "utf8");
+    const service = createFileService(projectRoot);
+    const app = express();
+
+    app.use(express.json({ limit: "4mb" }));
+    app.use((_request, _response, next) => {
+      _request.project = { slug: "demo", path: projectRoot };
+      next();
+    });
+    registerFileRoutes(app, {
+      deleteHumanInputFile: service.deleteHumanInputFile,
+      gitFileDiff: service.gitFileDiff,
+      humanFiles: new Map([["human_goal_requirements.md", { kind: "human", editable: true, annotation: false }]]),
+      httpError,
+      listMarkdownFiles: service.listMarkdownFiles,
+      listProjectFiles: service.listProjectFiles,
+      readTextFile: service.readTextFile,
+      restoreFileFromHead: service.restoreFileFromHead,
+      searchFiles: service.searchFiles,
+      treeRoots: new Map([["outputs", { root: "outputs_ai", kind: "output", editable: true, annotation: true }]]),
+      uploadHumanInputFiles: service.uploadHumanInputFiles,
+      writeTextFile: service.writeTextFile,
+    });
+    app.use(apiErrorHandler);
+
+    await withServer(app, async (baseUrl) => {
+      const invalidTree = await fetch(`${baseUrl}/api/projects/demo/tree/not-a-section`);
+      await expect(invalidTree.json()).resolves.toMatchObject({ code: "invalid_request" });
+      expect(invalidTree.status).toBe(400);
+
+      const oversizedWrite = await fetch(`${baseUrl}/api/projects/demo/file`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: "human_goal_requirements.md",
+          content: "x".repeat(2 * 1024 * 1024 + 1),
+          expectedContentHash: "hash:5",
+        }),
+      });
+      await expect(oversizedWrite.json()).resolves.toMatchObject({ code: "request_too_large" });
+      expect(oversizedWrite.status).toBe(413);
+    });
+  });
+
   it("sends an initial chat SSE snapshot with the conversation payload", async () => {
     const app = express();
     app.use("/api/projects/:projectSlug", (request, _response, next) => {

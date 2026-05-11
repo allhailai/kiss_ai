@@ -23,6 +23,11 @@ function isNearScrollBottom(element: HTMLElement) {
   return element.scrollHeight - element.scrollTop - element.clientHeight < 120;
 }
 
+function hasSettledAssistantReply(conversation: Conversation) {
+  const latestMessage = conversation.messages.at(-1);
+  return latestMessage?.role === "assistant" && latestMessage.status !== "streaming";
+}
+
 export function useProjectChat({
   preferredConversationId,
   projectSlug,
@@ -81,9 +86,11 @@ export function useProjectChat({
     setLoading(true);
     onNotice("");
     try {
-      setActiveConversation(await api.conversation(projectSlug, conversationId));
+      const conversation = await api.conversation(projectSlug, conversationId);
+      setActiveConversation(conversation);
       setContextRefs([]);
       cancelEditingMessage();
+      if (hasSettledAssistantReply(conversation)) setSending(false);
     } catch (error) {
       onNotice(errorMessage(error, "Could not open the conversation."));
     } finally {
@@ -146,6 +153,7 @@ export function useProjectChat({
         context,
       });
       setActiveConversation(next);
+      if (hasSettledAssistantReply(next)) setSending(false);
       await refreshConversations();
       return true;
     } catch (error) {
@@ -176,6 +184,7 @@ export function useProjectChat({
       forceScrollToLatestRef.current = true;
       shouldStickToLatestRef.current = true;
       setActiveConversation(next);
+      if (hasSettledAssistantReply(next)) setSending(false);
       setEditingMessageId(null);
       setEditDraft("");
       await refreshConversations();
@@ -235,10 +244,14 @@ export function useProjectChat({
         const conversationId = preferredConversationId ?? nextConversations[0]?.id;
         if (conversationId) {
           try {
-            setActiveConversation(await api.conversation(projectSlug, conversationId));
+            const conversation = await api.conversation(projectSlug, conversationId);
+            setActiveConversation(conversation);
+            if (hasSettledAssistantReply(conversation)) setSending(false);
           } catch {
             if (conversationId !== nextConversations[0]?.id && nextConversations[0]) {
-              setActiveConversation(await api.conversation(projectSlug, nextConversations[0].id));
+              const conversation = await api.conversation(projectSlug, nextConversations[0].id);
+              setActiveConversation(conversation);
+              if (hasSettledAssistantReply(conversation)) setSending(false);
             }
           }
         }
@@ -256,6 +269,7 @@ export function useProjectChat({
     onNotice,
     projectSlug,
     refreshConversations,
+    sending,
     setActiveConversation,
     setSending,
   });

@@ -95,4 +95,83 @@ describe("conversation service", () => {
       conversations: [{ id: conversation.id, messageCount: 8 }],
     });
   });
+
+  it("recovers stale persisted streaming messages as interrupted errors", async () => {
+    const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-conversations-"));
+    const project = { slug: "demo", path: projectRoot };
+    const service = createConversationService({ httpError, projectPath });
+    const conversation = await service.createConversation(project, { modelId: "model-a" });
+    const index = await fs.readFile(path.join(projectRoot, "conversations", "conversations.json"), "utf8").then(JSON.parse);
+    const record = index.conversations.find((candidate) => candidate.id === conversation.id);
+    const oldTimestamp = "2026-01-01T00:00:00.000Z";
+
+    await fs.writeFile(
+      path.join(projectRoot, record.file),
+      JSON.stringify(
+        {
+          ...conversation,
+          messages: [
+            {
+              id: "msg_streaming",
+              role: "assistant",
+              content: "Partial reply",
+              createdAt: oldTimestamp,
+              updatedAt: oldTimestamp,
+              status: "streaming",
+            },
+          ],
+          updatedAt: oldTimestamp,
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const recovered = await service.readConversation(project, conversation.id);
+
+    expect(recovered.messages[0]).toMatchObject({
+      id: "msg_streaming",
+      status: "error",
+    });
+    expect(recovered.messages[0].content).toContain("Chat generation was interrupted");
+  });
+
+  it("uses createdAt to recover stale streaming messages without updatedAt", async () => {
+    const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-conversations-"));
+    const project = { slug: "demo", path: projectRoot };
+    const service = createConversationService({ httpError, projectPath });
+    const conversation = await service.createConversation(project, { modelId: "model-a" });
+    const index = await fs.readFile(path.join(projectRoot, "conversations", "conversations.json"), "utf8").then(JSON.parse);
+    const record = index.conversations.find((candidate) => candidate.id === conversation.id);
+
+    await fs.writeFile(
+      path.join(projectRoot, record.file),
+      JSON.stringify(
+        {
+          ...conversation,
+          messages: [
+            {
+              id: "msg_streaming",
+              role: "assistant",
+              content: "Partial reply",
+              createdAt: "2026-01-01T00:00:00.000Z",
+              status: "streaming",
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const recovered = await service.readConversation(project, conversation.id);
+
+    expect(recovered.messages[0]).toMatchObject({
+      id: "msg_streaming",
+      status: "error",
+    });
+    expect(recovered.messages[0].content).toContain("Chat generation was interrupted");
+  });
 });

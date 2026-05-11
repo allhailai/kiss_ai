@@ -125,10 +125,11 @@ export function useAgentFileContext({
     setEditableFiles((current) =>
       current.map((file) => {
         if (file.path !== selected?.path) return file;
+        const projectFile = projectFiles.find((candidate) => candidate.path === selected.path);
         return editableTargetFromProjectFile(
           {
             path: selected.path,
-            name: fileBasename(selected.path),
+            name: projectFile?.name ?? file.label ?? fileBasename(selected.path),
             kind: selected.kind,
             editable: selected.editable,
             annotation: selected.annotation,
@@ -138,7 +139,7 @@ export function useAgentFileContext({
         );
       }),
     );
-  }, [draft, selected]);
+  }, [draft, projectFiles, selected]);
 
   return {
     addEditableFile,

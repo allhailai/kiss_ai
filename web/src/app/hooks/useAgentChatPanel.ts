@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ProjectChatController } from "../../features/chat/useProjectChat";
+import type { ProjectChatController } from "./useProjectChat";
 import type { View } from "../../navigation/views";
 import { readAgentChatConversationId, writeAgentChatConversationId } from "../rightPanelSurfaceStorage";
 import type { RightPanelState } from "./useRightPanelSurface";

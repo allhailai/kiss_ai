@@ -78,6 +78,7 @@ export function useSelectedProjectLifecycle({
     setBuildLog,
     setDesign,
     setFiles,
+    setNotice,
     setProjectFiles,
     setRebuild,
     setStatus,

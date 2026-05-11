@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import type { ChatMessage, ChatMessageFileEdit } from "../../contracts/api";
 import { formatChatDateTime, renderMessageContent } from "./chatRendering";
 
@@ -21,12 +21,13 @@ function ChatMessageBubbleComponent({
   message: ChatMessage;
   onCancelEdit: () => void;
   onEditDraftChange: (value: string) => void;
-  onApplyFileEdit?: (edit: ChatMessageFileEdit) => void;
+  onApplyFileEdit?: (edit: ChatMessageFileEdit) => void | Promise<void>;
   onSaveEdit: (message: ChatMessage) => void;
   onStartEdit: (message: ChatMessage) => void;
 }) {
   const canEdit = editable && message.role === "user";
   const fileEdits = message.metadata?.fileEdits ?? [];
+  const [applyingEditKey, setApplyingEditKey] = useState<string | null>(null);
   const contextEntries = [
     ...(message.context?.currentFile ? [{ key: `current:${message.context.currentFile.path}`, label: "Viewing", path: message.context.currentFile.path }] : []),
     ...(message.context?.editableFiles ?? []).map((file) => ({ key: `editable:${file.path}`, label: "Editable", path: file.path })),
@@ -93,18 +94,29 @@ function ChatMessageBubbleComponent({
       ) : null}
       {fileEdits.length ? (
         <div className="chat-message-context">
-          {fileEdits.map((edit) => (
-            <button
-              className="chat-context-chip"
-              disabled={disabled || !edit.proposedContent || edit.status !== "proposed"}
-              key={`${edit.path}-${edit.summary}`}
-              onClick={() => onApplyFileEdit?.(edit)}
-              title={edit.summary}
-              type="button"
-            >
-              Apply draft edit: {edit.path}
-            </button>
-          ))}
+          {fileEdits.map((edit) => {
+            const editKey = `${edit.path}-${edit.summary}`;
+            const applying = applyingEditKey === editKey;
+            return (
+              <button
+                className="chat-context-chip"
+                disabled={disabled || applying || !edit.proposedContent || edit.status !== "proposed"}
+                key={editKey}
+                onClick={() => {
+                  setApplyingEditKey(editKey);
+                  void Promise.resolve(onApplyFileEdit?.(edit))
+                    .catch((error: unknown) => {
+                      console.error("[kiss_ai UI warning] Could not apply chat file edit.", error);
+                    })
+                    .finally(() => setApplyingEditKey(null));
+                }}
+                title={edit.summary}
+                type="button"
+              >
+                {applying ? "Applying draft edit:" : "Apply draft edit:"} {edit.path}
+              </button>
+            );
+          })}
         </div>
       ) : null}
       {message.status === "streaming" ? <span className="agent-event-status">Streaming</span> : null}

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { MAX_USER_MESSAGE_BYTES } from "../contracts/chatLimits.js";
 
+const MAX_WRITE_FILE_BYTES = 2 * 1024 * 1024;
+
 function maxUtf8Bytes(maxBytes, message) {
   return z.string().refine((value) => Buffer.byteLength(value, "utf8") <= maxBytes, { message });
 }
@@ -36,6 +38,15 @@ const chatContextSchema = z.object({
   activeFiles: z.array(agentContextFileSchema).max(10).optional(),
   fileRefs: z.array(contextRefSchema).max(20).optional(),
 });
+
+const conversationIdSchema = z.string().trim().regex(/^[a-zA-Z0-9_-]+$/, "Invalid conversation id.");
+const optionalQueryString = (maxLength) =>
+  z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((value) => (Array.isArray(value) ? value[0] : value))
+    .pipe(z.string().trim().max(maxLength).optional())
+    .transform((value) => value ?? "");
 
 export const createConversationBodySchema = z.object({
   modelId: optionalTrimmedString(160),
@@ -98,17 +109,57 @@ export const filePathBodySchema = z.object({
 });
 
 export const writeFileBodySchema = filePathBodySchema.extend({
-  content: z.string(),
+  content: maxUtf8Bytes(MAX_WRITE_FILE_BYTES, "File content is too large."),
   expectedContentHash: z.string().trim().min(1).max(160),
 });
 
-export function parseRequestBody(schema, body, httpError) {
-  const result = schema.safeParse(body);
+export const treeSectionParamsSchema = z.object({
+  section: z.enum(["requirements", "human", "inputs-ai", "outputs", "logs"]),
+});
+
+export const filePathQuerySchema = z.object({
+  path: optionalQueryString(1_000).pipe(z.string().min(1)),
+});
+
+export const searchFilesQuerySchema = z.object({
+  q: optionalQueryString(300),
+});
+
+export const buildLogQuerySchema = z.object({
+  tab: optionalQueryString(160),
+  path: optionalQueryString(1_000),
+  summary: optionalQueryString(1_000),
+  section: optionalQueryString(300),
+});
+
+export const conversationParamsSchema = z.object({
+  conversationId: conversationIdSchema,
+});
+
+export const chatMessageParamsSchema = conversationParamsSchema.extend({
+  messageId: z.string().trim().min(1).max(160),
+});
+
+function parseRequestPart(schema, value, httpError, label) {
+  const result = schema.safeParse(value);
   if (result.success) return result.data;
 
+  const tooLarge = result.error.issues.some((issue) => String(issue.message).toLowerCase().includes("too large"));
   const message = result.error.issues
     .slice(0, 3)
-    .map((issue) => `${issue.path.join(".") || "body"}: ${issue.message}`)
+    .map((issue) => `${issue.path.join(".") || label}: ${issue.message}`)
     .join("; ");
-  throw httpError(`Invalid request body. ${message}`, 400, "invalid_request");
+  throw httpError(`Invalid request ${label}. ${message}`, tooLarge ? 413 : 400, tooLarge ? "request_too_large" : "invalid_request");
+}
+
+export function parseRequestBody(schema, body, httpError) {
+  return parseRequestPart(schema, body, httpError, "body");
+}
+
+export function parseRequestParams(schema, params, httpError) {
+  return parseRequestPart(schema, params, httpError, "params");
+}
+
+export function parseRequestQuery(schema, query, httpError) {
+  return parseRequestPart(schema, query, httpError, "query");
 }

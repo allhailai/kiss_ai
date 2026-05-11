@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { MAX_USER_MESSAGE_BYTES } from "../contracts/chatLimits.js";
 import { httpError } from "../services/httpErrors.js";
-import { parseRequestBody, sendChatMessageBodySchema, writeFileBodySchema } from "./requestSchemas.js";
+import {
+  buildLogQuerySchema,
+  conversationParamsSchema,
+  filePathQuerySchema,
+  parseRequestBody,
+  parseRequestParams,
+  parseRequestQuery,
+  searchFilesQuerySchema,
+  sendChatMessageBodySchema,
+  treeSectionParamsSchema,
+  writeFileBodySchema,
+} from "./requestSchemas.js";
 
 describe("request schemas", () => {
   it("validates chat message limits by UTF-8 byte length", () => {
@@ -52,5 +63,36 @@ describe("request schemas", () => {
         httpError,
       ),
     ).toThrow("expectedContentHash");
+  });
+
+  it("validates file write content before service-level file handling", () => {
+    expect(() =>
+      parseRequestBody(
+        writeFileBodySchema,
+        {
+          path: "human_goal_requirements.md",
+          content: "x".repeat(2 * 1024 * 1024 + 1),
+          expectedContentHash: "hash",
+        },
+        httpError,
+      ),
+    ).toThrow("File content is too large.");
+  });
+
+  it("validates common route params and query strings", () => {
+    expect(parseRequestParams(treeSectionParamsSchema, { section: "outputs" }, httpError)).toEqual({ section: "outputs" });
+    expect(parseRequestParams(conversationParamsSchema, { conversationId: "conv_123" }, httpError)).toEqual({ conversationId: "conv_123" });
+    expect(parseRequestQuery(filePathQuerySchema, { path: "outputs_ai/report.md" }, httpError)).toEqual({ path: "outputs_ai/report.md" });
+    expect(parseRequestQuery(searchFilesQuerySchema, { q: ["report", "ignored"] }, httpError)).toEqual({ q: "report" });
+    expect(parseRequestQuery(buildLogQuerySchema, { tab: "build-summary", summary: "change_logs/summaries/a.md" }, httpError)).toMatchObject({
+      tab: "build-summary",
+      summary: "change_logs/summaries/a.md",
+    });
+  });
+
+  it("rejects invalid route params and missing file path queries", () => {
+    expect(() => parseRequestParams(treeSectionParamsSchema, { section: "unknown" }, httpError)).toThrow("Invalid request params.");
+    expect(() => parseRequestParams(conversationParamsSchema, { conversationId: "bad/id" }, httpError)).toThrow("Invalid conversation id.");
+    expect(() => parseRequestQuery(filePathQuerySchema, {}, httpError)).toThrow("Invalid request query.");
   });
 });

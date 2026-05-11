@@ -8,6 +8,7 @@ const conversationVersion = 1;
 const conversationIdPattern = /^[a-zA-Z0-9_-]+$/;
 const maxTitleLength = 120;
 const maxSummaryLength = 500;
+const staleStreamingMessageMs = 10 * 60 * 1000;
 
 function nowIso() {
   return new Date().toISOString();
@@ -42,14 +43,22 @@ function normalizeMessage(value, fallback = {}) {
   const createdAt = typeof source.createdAt === "string" ? source.createdAt : fallback.createdAt ?? nowIso();
   const updatedAt = typeof source.updatedAt === "string" ? source.updatedAt : source.status === "streaming" ? nowIso() : null;
   const role = ["user", "assistant", "system"].includes(source.role) ? source.role : fallback.role ?? "assistant";
-  const status = ["complete", "streaming", "error"].includes(source.status) ? source.status : fallback.status ?? "complete";
+  let status = ["complete", "streaming", "error"].includes(source.status) ? source.status : fallback.status ?? "complete";
   const content = typeof source.content === "string" ? source.content : "";
   const metadata = source.metadata && typeof source.metadata === "object" && !Array.isArray(source.metadata) ? source.metadata : {};
+  const streamingTimestamp = Date.parse(source.updatedAt ?? source.createdAt ?? createdAt);
+  const isStaleStreamingMessage = status === "streaming" && Number.isFinite(streamingTimestamp) && Date.now() - streamingTimestamp > staleStreamingMessageMs;
+
+  if (isStaleStreamingMessage) {
+    status = "error";
+  }
 
   return {
     id: typeof source.id === "string" && source.id.trim() ? source.id : createId("msg"),
     role,
-    content,
+    content: isStaleStreamingMessage
+      ? `${content.trim()}\n\n[Chat generation was interrupted before completion. Start a new message to continue.]`.trim()
+      : content,
     createdAt,
     updatedAt,
     modelId: typeof source.modelId === "string" && source.modelId.trim() ? source.modelId.trim() : null,

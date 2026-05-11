@@ -3,6 +3,7 @@ import type { FileContent } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { errorMessage } from "../../domain/errors";
 import { projectPathPrefixes } from "../../domain/projectPaths";
+import type { View } from "../../navigation/views";
 
 export function useHumanInputs({
   clearSelectedFile,
@@ -21,7 +22,7 @@ export function useHumanInputs({
   selected: FileContent | null;
   setInputMutationLoading: (loading: boolean) => void;
   setNotice: (message: string) => void;
-  view: string;
+  view: View;
 }) {
   const uploadHumanInputFiles = useCallback(
     async (files: File[]) => {

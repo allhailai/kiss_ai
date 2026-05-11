@@ -18,6 +18,15 @@ export function createDesignIdentityService() {
   }
 
   async function lintDesignIdentity(projectRoot) {
+    if (process.env.KISS_AI_SKIP_DESIGN_LINT === "1") {
+      return {
+        available: false,
+        ok: false,
+        output: null,
+        message: "DESIGN.md lint is disabled by KISS_AI_SKIP_DESIGN_LINT.",
+      };
+    }
+
     return new Promise((resolve) => {
       execFile(
         "npx",

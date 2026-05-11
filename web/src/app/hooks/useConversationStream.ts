@@ -29,12 +29,18 @@ function applyStreamingDelta(conversation: Conversation, messageId: string, delt
   return { ...conversation, messages, updatedAt };
 }
 
+function hasSettledAssistantReply(conversation: Conversation) {
+  const latestMessage = conversation.messages.at(-1);
+  return latestMessage?.role === "assistant" && latestMessage.status !== "streaming";
+}
+
 export function useConversationStream({
   conversationId,
   onConversationTruncated,
   onNotice,
   projectSlug,
   refreshConversations,
+  sending,
   setActiveConversation,
   setSending,
 }: {
@@ -43,6 +49,7 @@ export function useConversationStream({
   onNotice: (message: string) => void;
   projectSlug: string | null | undefined;
   refreshConversations: () => Promise<unknown>;
+  sending: boolean;
   setActiveConversation: Dispatch<SetStateAction<Conversation | null>>;
   setSending: Dispatch<SetStateAction<boolean>>;
 }) {
@@ -51,12 +58,11 @@ export function useConversationStream({
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
   useEffect(() => {
-    if (!projectSlug || !conversationId || typeof EventSource === "undefined") return;
+    if (!projectSlug || !conversationId) return;
 
     let closed = false;
     let reconnectTimeoutId: number | null = null;
     let pollTimeoutId: number | null = null;
-    const eventSource = api.openConversationEventSource(projectSlug, conversationId);
     const pollConversation = async () => {
       try {
         const conversation = await api.conversation(projectSlug, conversationId);
@@ -65,14 +71,49 @@ export function useConversationStream({
         setActiveConversation(conversation);
         void refreshConversations();
 
-        const latestMessage = conversation.messages.at(-1);
-        if (latestMessage?.role === "assistant" && latestMessage.status !== "streaming") {
+        const settled = hasSettledAssistantReply(conversation);
+        if (settled) {
           setSending(false);
         }
+        return settled;
       } catch {
         // Reconnect remains the primary recovery path.
+        return false;
       }
     };
+
+    if (typeof EventSource === "undefined") {
+      if (!sending) return;
+
+      let pollAttempts = 0;
+      const pollDelayMs = 3000;
+      const maxPollAttempts = 20;
+      const pollUntilSettled = () => {
+        pollTimeoutId = window.setTimeout(() => {
+          void (async () => {
+            const settled = await pollConversation();
+            if (closed || settled) return;
+
+            pollAttempts += 1;
+            if (pollAttempts >= maxPollAttempts) {
+              setSending(false);
+              onNotice("Live chat updates are unavailable. The latest saved conversation was refreshed.");
+              return;
+            }
+
+            pollUntilSettled();
+          })();
+        }, pollDelayMs);
+      };
+
+      pollUntilSettled();
+      return () => {
+        closed = true;
+        if (pollTimeoutId !== null) window.clearTimeout(pollTimeoutId);
+      };
+    }
+
+    const eventSource = api.openConversationEventSource(projectSlug, conversationId);
     const flushDeltas = () => {
       deltaFrameRef.current = null;
       const deltas = pendingDeltasRef.current;
@@ -156,5 +197,5 @@ export function useConversationStream({
         deltaFrameRef.current = null;
       }
     };
-  }, [conversationId, onConversationTruncated, onNotice, projectSlug, reconnectAttempt, refreshConversations, setActiveConversation, setSending]);
+  }, [conversationId, onConversationTruncated, onNotice, projectSlug, reconnectAttempt, refreshConversations, sending, setActiveConversation, setSending]);
 }

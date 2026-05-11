@@ -31,7 +31,7 @@ export function ChatThread({
   messages: ChatMessage[];
   onCancelEdit?: () => void;
   onEditDraftChange?: (value: string) => void;
-  onApplyFileEdit?: (edit: ChatMessageFileEdit) => void;
+  onApplyFileEdit?: (edit: ChatMessageFileEdit) => void | Promise<void>;
   onJumpToLatest?: () => void;
   onSaveEdit?: (message: ChatMessage) => void;
   onScroll?: () => void;

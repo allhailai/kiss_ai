@@ -483,7 +483,7 @@
   flex: 0 0 auto;
 }
 
-.agent-current-file-help button {
+.agent-current-file-help summary {
   width: 20px;
   height: 20px;
   padding: 0;
@@ -494,10 +494,18 @@
   font-size: 0.72rem;
   font-weight: 900;
   line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: help;
+  list-style: none;
 }
 
-.agent-current-file-help button:hover,
-.agent-current-file-help button:focus-visible {
+.agent-current-file-help summary::-webkit-details-marker {
+  display: none;
+}
+
+.agent-current-file-help summary:hover,
+.agent-current-file-help summary:focus-visible {
   border-color: var(--color-accent);
   color: var(--color-accent);
   outline: 2px solid color-mix(in srgb, var(--color-accent) 18%, transparent);

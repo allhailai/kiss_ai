@@ -1,4 +1,4 @@
-import { createProjectBodySchema, parseRequestBody } from "./requestSchemas.js";
+import { buildLogQuerySchema, createProjectBodySchema, parseRequestBody, parseRequestQuery } from "./requestSchemas.js";
 
 export function registerProjectRoutes(app, {
   PROJECTS_ROOT,
@@ -101,9 +101,10 @@ export function registerProjectRoutes(app, {
 
   app.get("/api/projects/:projectSlug/build-log", async (request, response, next) => {
     try {
-      const requestedTabId = String(request.query.tab ?? "");
-      const requestedPath = String(request.query.path ?? request.query.summary ?? "");
-      const requestedSectionId = String(request.query.section ?? "");
+      const query = parseRequestQuery(buildLogQuerySchema, request.query, httpError);
+      const requestedTabId = query.tab;
+      const requestedPath = query.path || query.summary;
+      const requestedSectionId = query.section;
 
       response.json(await buildLogTabState(request.project.path, requestedTabId, requestedPath, requestedSectionId));
     } catch (error) {
