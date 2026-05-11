@@ -27,11 +27,13 @@ function isNearScrollBottom(element: HTMLElement) {
 }
 
 export function useProjectChat({
+  preferredConversationId,
   projectSlug,
   selectedModelId,
   projectFiles,
   onNotice,
 }: {
+  preferredConversationId?: string | null;
   projectSlug: string | null;
   selectedModelId: string;
   projectFiles: ProjectFile[];
@@ -233,8 +235,15 @@ export function useProjectChat({
       setLoading(true);
       try {
         const nextConversations = await refreshConversations();
-        if (nextConversations[0]) {
-          setActiveConversation(await api.conversation(projectSlug, nextConversations[0].id));
+        const conversationId = preferredConversationId ?? nextConversations[0]?.id;
+        if (conversationId) {
+          try {
+            setActiveConversation(await api.conversation(projectSlug, conversationId));
+          } catch {
+            if (conversationId !== nextConversations[0]?.id && nextConversations[0]) {
+              setActiveConversation(await api.conversation(projectSlug, nextConversations[0].id));
+            }
+          }
         }
       } catch (error) {
         onNotice(errorMessage(error, "Could not load conversations."));
@@ -242,7 +251,7 @@ export function useProjectChat({
         setLoading(false);
       }
     })();
-  }, [onNotice, projectSlug, refreshConversations]);
+  }, [onNotice, preferredConversationId, projectSlug, refreshConversations]);
 
   useConversationStream({
     conversationId: activeConversation?.id,

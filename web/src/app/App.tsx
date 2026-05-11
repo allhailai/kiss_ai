@@ -20,6 +20,7 @@ import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
 import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
 import { useAgentFileContext } from "./hooks/useAgentFileContext";
+import { readAgentChatConversationId, writeAgentChatConversationId } from "./rightPanelSurfaceStorage";
 import type { ChatMessageFileEdit } from "../contracts/api";
 
 const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: string }>> = {
@@ -49,6 +50,10 @@ export function App() {
   const [chatPanelDismissed, setChatPanelDismissed] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const projectChatVisitKeyRef = useRef<string | null>(null);
+  const mirroredConversationRef = useRef<{ projectSlug: string | null; conversationId: string | null }>({
+    projectSlug: null,
+    conversationId: null,
+  });
   const themeStyle = useMemo(() => buildThemeStyle(designWorkspace.design), [designWorkspace.design]);
   const rightPanelWidth = useRightPanelWidth({
     panelKind: rightPanelSurface.rightPanel?.kind ?? null,
@@ -62,7 +67,12 @@ export function App() {
       }) as CSSProperties,
     [rightPanelWidth.cssValue, themeStyle],
   );
+  const preferredAgentChatConversationId = useMemo(
+    () => readAgentChatConversationId(project.selectedProjectSlug),
+    [project.selectedProjectSlug],
+  );
   const projectChat = useProjectChat({
+    preferredConversationId: preferredAgentChatConversationId,
     projectSlug: project.selectedProjectSlug,
     selectedModelId: rebuildWorkspace.selectedModelId,
     projectFiles: fileWorkspace.projectFiles,
@@ -106,9 +116,8 @@ export function App() {
   };
   const selectProjectChatConversation = (conversationId: string) => {
     openAgentChatPanel();
-    navigateTo("chat", null, {
-      conversation: conversationId,
-    });
+    writeAgentChatConversationId(project.selectedProjectSlug, conversationId);
+    void projectChat.openConversation(conversationId);
   };
   const toggleAgentPanel = () => {
     if (rightPanelSurface.rightPanel?.kind === agentChatPanel.kind) {
@@ -117,7 +126,7 @@ export function App() {
       return;
     }
 
-    rightPanelSurface.openPanel(agentChatPanel);
+    openAgentChatPanel();
   };
 
   useEffect(() => {
@@ -140,14 +149,37 @@ export function App() {
   }, [chatPanelDismissed, project.selectedProjectSlug, rightPanelSurface.rightPanel, route.view]);
 
   useEffect(() => {
-    if (route.view !== "chat") return;
+    const projectSlug = project.selectedProjectSlug;
+    const conversationId = projectChat.activeConversation?.id ?? null;
+    const previous = mirroredConversationRef.current;
 
-    const conversationId = route.routeContext.conversation;
-    if (!conversationId || projectChat.activeConversation?.id === conversationId) return;
+    if (!projectSlug) {
+      mirroredConversationRef.current = { projectSlug: null, conversationId: null };
+      return;
+    }
 
-    openAgentChatPanel();
-    void projectChat.openConversation(conversationId);
-  }, [projectChat.activeConversation?.id, route.routeContext.conversation, route.view]);
+    if (previous.projectSlug !== projectSlug) {
+      mirroredConversationRef.current = { projectSlug, conversationId: null };
+      return;
+    }
+
+    if (conversationId) {
+      writeAgentChatConversationId(projectSlug, conversationId);
+    } else if (previous.conversationId) {
+      writeAgentChatConversationId(projectSlug, null);
+    }
+
+    mirroredConversationRef.current = { projectSlug, conversationId };
+  }, [project.selectedProjectSlug, projectChat.activeConversation?.id]);
+
+  useEffect(() => {
+    if (!isAgentPanelOpen || !project.selectedProjectSlug) return;
+
+    const storedConversationId = readAgentChatConversationId(project.selectedProjectSlug);
+    if (!storedConversationId || projectChat.activeConversation?.id === storedConversationId) return;
+
+    void projectChat.openConversation(storedConversationId);
+  }, [isAgentPanelOpen, project.selectedProjectSlug, projectChat.activeConversation?.id]);
 
   if (!project.selectedProjectSlug || !project.selectedProject) {
     return (
