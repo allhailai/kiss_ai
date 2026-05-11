@@ -73,6 +73,7 @@ export function RightPanelSurface({
           onPointerUp={handleResizePointerEnd}
           role="separator"
           tabIndex={resizeDisabled ? -1 : 0}
+          title="Drag to resize the side panel"
         />
       ) : null}
       <button aria-label="Close panel" className="right-panel-close-button" onClick={onClose} title="Close panel" type="button">
