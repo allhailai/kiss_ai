@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from "react";
 import type { ChatContextRef, ProjectFile, RebuildModel } from "../../contracts/api";
+import { fileBasename } from "../../domain/files";
 import { formatModelLabel, modelTierLabels, modelTierOrder } from "../../domain/modelLabels";
 
 const composerMaxRows = 8;
@@ -9,7 +10,7 @@ function contextLabel(ref: ChatContextRef) {
 }
 
 function fileLabel(file: ProjectFile) {
-  return file.name || file.path.split("/").at(-1) || file.path;
+  return file.name || fileBasename(file.path);
 }
 
 function resizeComposer(textarea: HTMLTextAreaElement | null) {
@@ -38,7 +39,6 @@ export function ChatComposer({
   onChangeDraft,
   onModelChange,
   onRemoveContextRef = () => undefined,
-  onSelectedContextPathChange = () => undefined,
   onSubmit,
   placeholder = "Ask about this project... Enter to send, Shift+Enter for a new line",
   selectedModelId,
@@ -51,14 +51,12 @@ export function ChatComposer({
   disabled: boolean;
   draft: string;
   models: RebuildModel[];
-  onAddContextRef?: (path?: string) => void;
+  onAddContextRef?: (path: string) => void;
   onChangeDraft: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   onModelChange: (modelId: string) => void;
   onRemoveContextRef?: (path: string) => void;
-  onSelectedContextPathChange?: (path: string) => void;
   onSubmit: () => void;
   placeholder?: string;
-  selectedContextPath: string;
   selectedModelId: string;
   showContextControls?: boolean;
   submitLabel?: string;
@@ -142,7 +140,6 @@ export function ChatComposer({
 
   const addContextFile = (file: ProjectFile | null) => {
     if (!file || disabled) return;
-    onSelectedContextPathChange(file.path);
     onAddContextRef(file.path);
     setContextQuery("");
     setContextPickerOpen(false);

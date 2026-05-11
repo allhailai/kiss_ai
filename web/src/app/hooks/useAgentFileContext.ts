@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AgentContextFile, ChatContextRef, FileContent, ProjectFile } from "../../contracts/api";
-
-function fileLabel(path: string) {
-  return path.split("/").at(-1) ?? path;
-}
+import { fileBasename } from "../../domain/files";
 
 function contextRefFromProjectFile(file: ProjectFile): ChatContextRef {
   return {
     path: file.path,
-    label: file.name || fileLabel(file.path),
+    label: file.name || fileBasename(file.path),
     kind: file.kind,
   };
 }
@@ -17,7 +14,7 @@ function editableTargetFromProjectFile(file: ProjectFile, selected: FileContent 
   const selectedFile = selected?.path === file.path ? selected : null;
   return {
     path: file.path,
-    label: file.name || fileLabel(file.path),
+    label: file.name || fileBasename(file.path),
     kind: file.kind,
     editable: file.editable,
     annotation: file.annotation,
@@ -32,7 +29,7 @@ function currentFileFromSelectedFile(selected: FileContent | null, draft: string
 
   return {
     path: selected.path,
-    label: fileLabel(selected.path),
+    label: fileBasename(selected.path),
     kind: selected.kind,
     editable: selected.editable,
     annotation: selected.annotation,
@@ -73,7 +70,6 @@ export function useAgentFileContext({
   const showFileChooser = (path: string, enabled: boolean) => {
     if (!enabled) return;
     if (editableFiles.some((file) => file.path === path)) {
-      setChooserPath(null);
       setHighlight(path, "active");
       return;
     }
@@ -129,7 +125,7 @@ export function useAgentFileContext({
         return editableTargetFromProjectFile(
           {
             path: selected.path,
-            name: fileLabel(selected.path),
+            name: fileBasename(selected.path),
             kind: selected.kind,
             editable: selected.editable,
             annotation: selected.annotation,

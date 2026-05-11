@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
 import type { AgentContextFile, ChatContextRef, ChatMessageFileEdit, Conversation, ProjectFile, RebuildModel } from "../../contracts/api";
+import { fileBasename } from "../../domain/files";
 import { ChatComposer } from "../../shared/chat/ChatComposer";
 import { ChatThread } from "../../shared/chat/ChatThread";
 
@@ -27,7 +28,7 @@ function contextRefLabel(ref: ChatContextRef) {
 }
 
 function projectFileLabel(file: ProjectFile) {
-  return file.name || file.path.split("/").at(-1) || file.path;
+  return file.name || fileBasename(file.path);
 }
 
 export function RightPanelAgentChat({
@@ -64,7 +65,6 @@ export function RightPanelAgentChat({
   const [draft, setDraft] = useState("");
   const [filePickerQuery, setFilePickerQuery] = useState("");
   const [filePickerOpen, setFilePickerOpen] = useState(false);
-  const [selectedContextPath, setSelectedContextPath] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const currentFileInActive = Boolean(currentFile && activeFiles.some((file) => file.path === currentFile.path));
   const currentFileInContext = Boolean(currentFile && contextRefs.some((ref) => ref.path === currentFile.path));
@@ -87,7 +87,6 @@ export function RightPanelAgentChat({
     onContextRefsChange([]);
     setFilePickerQuery("");
     setFilePickerOpen(false);
-    setSelectedContextPath("");
     textareaRef.current?.focus();
   };
 
@@ -104,13 +103,12 @@ export function RightPanelAgentChat({
     setFilePickerOpen(false);
   };
 
-  const addContextRef = (path = selectedContextPath) => {
+  const addContextRef = (path: string) => {
     if (chat.sending) return;
     const file = projectFiles.find((candidate) => candidate.path === path);
     if (!file || contextRefs.some((ref) => ref.path === file.path)) return;
 
     onContextRefsChange((current) => [...current, { path: file.path, label: file.name, kind: file.kind }]);
-    setSelectedContextPath("");
   };
 
   const removeContextRef = (path: string) => {
@@ -289,10 +287,8 @@ export function RightPanelAgentChat({
         onChangeDraft={(event) => setDraft(event.currentTarget.value)}
         onModelChange={onModelChange}
         onRemoveContextRef={removeContextRef}
-        onSelectedContextPathChange={setSelectedContextPath}
         onSubmit={() => void sendMessage()}
         placeholder="Ask the side-panel agent..."
-        selectedContextPath={selectedContextPath}
         selectedModelId={selectedModelId}
         showContextControls={false}
         submitLabel="Ask"

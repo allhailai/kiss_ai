@@ -14,7 +14,12 @@ function fileToBase64(file: File) {
 }
 
 function searchProjectFiles(projectSlug: string, query: string, signal?: AbortSignal) {
-  return request<FileSearchResponse>(`${projectBase(projectSlug)}/search/paths?q=${encodeURIComponent(query)}`, { signal });
+  const params = new URLSearchParams({ q: query });
+  return request<FileSearchResponse>(`${projectBase(projectSlug)}/search/paths?${params}`, { signal });
+}
+
+function filePathQuery(path: string) {
+  return new URLSearchParams({ path }).toString();
 }
 
 export const filesApi = {
@@ -40,9 +45,8 @@ export const filesApi = {
     }),
   searchPathFiles: searchProjectFiles,
   searchFiles: searchProjectFiles,
-  file: (projectSlug: string, path: string) => request<FileContent>(`${projectBase(projectSlug)}/file?path=${encodeURIComponent(path)}`),
-  fileDiff: (projectSlug: string, path: string) =>
-    request<FileDiff>(`${projectBase(projectSlug)}/file/diff?path=${encodeURIComponent(path)}`),
+  file: (projectSlug: string, path: string) => request<FileContent>(`${projectBase(projectSlug)}/file?${filePathQuery(path)}`),
+  fileDiff: (projectSlug: string, path: string) => request<FileDiff>(`${projectBase(projectSlug)}/file/diff?${filePathQuery(path)}`),
   saveFile: (projectSlug: string, path: string, content: string) =>
     request<FileContent>(`${projectBase(projectSlug)}/file`, {
       method: "PUT",

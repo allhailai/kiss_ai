@@ -45,7 +45,6 @@ export function useProjectChat({
   const [sending, setSending] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
-  const [selectedContextPath, setSelectedContextPath] = useState("");
   const [contextRefs, setContextRefs] = useState<ChatContextRef[]>([]);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const threadRef = useRef<HTMLDivElement | null>(null);
@@ -123,7 +122,6 @@ export function useProjectChat({
     setActiveConversation(null);
     setMessageDraft("");
     setContextRefs([]);
-    setSelectedContextPath("");
     setShowJumpToLatest(false);
     forceScrollToLatestRef.current = true;
     shouldStickToLatestRef.current = true;
@@ -193,12 +191,11 @@ export function useProjectChat({
     setMessageDraft(event.currentTarget.value);
   };
 
-  const addContextRef = (path = selectedContextPath) => {
+  const addContextRef = (path: string) => {
     if (sending) return;
     const file = contextFiles.find((candidate) => candidate.path === path);
     if (!file || contextRefs.some((ref) => ref.path === file.path)) return;
     setContextRefs((current) => [...current, { path: file.path, label: file.name, kind: file.kind }]);
-    setSelectedContextPath("");
   };
 
   const scrollToLatest = (behavior: ScrollBehavior = "smooth") => {
@@ -290,12 +287,10 @@ export function useProjectChat({
     openConversation,
     saveEditedMessage,
     scrollToLatest,
-    selectedContextPath,
     sending,
     setContextRefs,
     setConversationFilter,
     setEditDraft,
-    setSelectedContextPath,
     showJumpToLatest,
     startDraftConversation,
     startEditingMessage,

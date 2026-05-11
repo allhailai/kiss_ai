@@ -53,9 +53,7 @@ export function ProjectChatPanel({
         onChangeDraft={chat.handleComposerChange}
         onModelChange={onModelChange}
         onRemoveContextRef={(path) => chat.setContextRefs((current) => current.filter((candidate) => candidate.path !== path))}
-        onSelectedContextPathChange={chat.setSelectedContextPath}
         onSubmit={() => void chat.sendMessage()}
-        selectedContextPath={chat.selectedContextPath}
         selectedModelId={selectedModelId}
         textareaRef={chat.composerTextareaRef}
       />
