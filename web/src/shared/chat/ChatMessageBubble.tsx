@@ -28,9 +28,23 @@ function ChatMessageBubbleComponent({
   const canEdit = editable && message.role === "user";
   const fileEdits = message.metadata?.fileEdits ?? [];
   const [applyingEditKey, setApplyingEditKey] = useState<string | null>(null);
+  const currentFilePath = message.context?.currentFile?.path;
+  const currentFileIsEditable = Boolean(
+    currentFilePath && message.context?.editableFiles?.some((file) => file.path === currentFilePath),
+  );
   const contextEntries = [
-    ...(message.context?.currentFile ? [{ key: `current:${message.context.currentFile.path}`, label: "Viewing", path: message.context.currentFile.path }] : []),
-    ...(message.context?.editableFiles ?? []).map((file) => ({ key: `editable:${file.path}`, label: "Editable", path: file.path })),
+    ...(message.context?.currentFile
+      ? [
+          {
+            key: `current:${message.context.currentFile.path}`,
+            label: currentFileIsEditable ? "AI Editable" : "Viewing",
+            path: message.context.currentFile.path,
+          },
+        ]
+      : []),
+    ...(message.context?.editableFiles ?? [])
+      .filter((file) => file.path !== currentFilePath)
+      .map((file) => ({ key: `editable:${file.path}`, label: "AI Editable", path: file.path })),
     ...(message.context?.sourceFiles ?? []).map((ref) => ({ key: `context:${ref.path}`, label: "Context", path: ref.path })),
   ];
 

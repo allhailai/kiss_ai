@@ -37,6 +37,15 @@ function projectFileLabel(file: ProjectFile) {
   return file.name || fileBasename(file.path);
 }
 
+function uniqueEditableFiles(files: AgentContextFile[]) {
+  const seen = new Set<string>();
+  return files.filter((file) => {
+    if (seen.has(file.path)) return false;
+    seen.add(file.path);
+    return true;
+  });
+}
+
 export function RightPanelAgentChat({
   activeFiles,
   chat,
@@ -76,6 +85,7 @@ export function RightPanelAgentChat({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const currentFileInActive = Boolean(currentFile && activeFiles.some((file) => file.path === currentFile.path));
   const currentFileInContext = Boolean(currentFile && contextRefs.some((ref) => ref.path === currentFile.path));
+  const currentFileIsEditable = Boolean(currentFile?.editable);
   const filePickerOptions = useMemo(() => {
     if (!filePickerOpen) return [];
     const selectedPaths = new Set(contextRefs.map((file) => file.path));
@@ -135,6 +145,7 @@ export function RightPanelAgentChat({
   const sendMessage = async () => {
     const content = draft.trim();
     if (!content || chat.sending) return;
+    const editableFiles = uniqueEditableFiles([...(currentFileIsEditable && currentFile ? [currentFile] : []), ...activeFiles]);
 
     const sent = await chat.sendMessage({
       content,
@@ -142,7 +153,7 @@ export function RightPanelAgentChat({
         currentFile || activeFiles.length || contextRefs.length
           ? {
               currentFile: currentFile ?? undefined,
-              editableFiles: activeFiles.length ? activeFiles : undefined,
+              editableFiles: editableFiles.length ? editableFiles : undefined,
               sourceFiles: contextRefs.length ? contextRefs : undefined,
             }
           : undefined,
@@ -248,7 +259,7 @@ export function RightPanelAgentChat({
         />
       </div>
       <div className="agent-current-file" aria-label="Current file context">
-        <span className="agent-context-label">Viewing</span>
+        <span className="agent-context-label">{currentFileIsEditable ? "AI Editable" : "Viewing"}</span>
         {currentFile ? (
           <div className="agent-current-file-main">
             <code title={currentFile.path}>
@@ -260,9 +271,11 @@ export function RightPanelAgentChat({
                 <details className="agent-current-file-help">
                   <summary aria-label="Explain AI Context and AI Editable">?</summary>
                   <span className="agent-current-file-help-text" role="tooltip">
+                    <strong>Current file</strong>
+                    The open file is AI Editable by default when the file allows edits.
                     <strong>AI Context</strong> tells AI this file may be helpful when answering your questions. AI can still look at other project
                     files if needed.
-                    <strong>AI Editable</strong> lets AI change this file if you ask it to make an edit. Use this only for files you want AI to modify.
+                    <strong>Editable targets</strong> stay editable when you switch files, so use them for multi-file edits.
                   </span>
                 </details>
                 {!currentFileInContext ? (
@@ -272,7 +285,7 @@ export function RightPanelAgentChat({
                 ) : null}
                 {currentFile.editable && !currentFileInActive ? (
                   <button className="agent-current-file-action-button" disabled={chat.sending} onClick={onModifyCurrentFile} type="button">
-                    + AI Editable
+                    + Editable target
                   </button>
                 ) : null}
               </div>
