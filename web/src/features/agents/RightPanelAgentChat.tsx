@@ -1,19 +1,25 @@
 import { useMemo, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
-import type { AgentContextFile, ChatContextRef, ChatMessageFileEdit, Conversation, ProjectFile, RebuildModel } from "../../contracts/api";
+import type { AgentContextFile, ChatContextRef, ChatMessageFileEdit, Conversation, ConversationSummary, ProjectFile, RebuildModel } from "../../contracts/api";
 import { fileBasename } from "../../domain/files";
 import { ChatComposer } from "../../shared/chat/ChatComposer";
 import { ChatThread } from "../../shared/chat/ChatThread";
+import { formatChatDateTime } from "../../shared/chat/chatRendering";
 
 type RightPanelChatController = {
   activeConversation: Conversation | null;
+  conversationFilter: string;
+  conversations: ConversationSummary[];
+  filteredConversations: ConversationSummary[];
   handleThreadScroll: () => void;
   loading: boolean;
+  openConversation: (conversationId: string) => Promise<void>;
   scrollToLatest: () => void;
   sendMessage: (options: {
     content?: string;
     context?: { currentFile?: AgentContextFile; editableFiles?: AgentContextFile[]; sourceFiles?: ChatContextRef[] };
   }) => Promise<boolean>;
   sending: boolean;
+  setConversationFilter: (query: string) => void;
   showJumpToLatest: boolean;
   startDraftConversation: () => void;
   threadRef: RefObject<HTMLDivElement | null>;
@@ -65,6 +71,8 @@ export function RightPanelAgentChat({
   const [draft, setDraft] = useState("");
   const [filePickerQuery, setFilePickerQuery] = useState("");
   const [filePickerOpen, setFilePickerOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const titleTriggerRef = useRef<HTMLButtonElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const currentFileInActive = Boolean(currentFile && activeFiles.some((file) => file.path === currentFile.path));
   const currentFileInContext = Boolean(currentFile && contextRefs.some((ref) => ref.path === currentFile.path));
@@ -87,7 +95,15 @@ export function RightPanelAgentChat({
     onContextRefsChange([]);
     setFilePickerQuery("");
     setFilePickerOpen(false);
+    setHistoryOpen(false);
     textareaRef.current?.focus();
+  };
+
+  const selectConversation = (conversationId: string) => {
+    if (chat.sending) return;
+    setHistoryOpen(false);
+    void chat.openConversation(conversationId);
+    titleTriggerRef.current?.focus();
   };
 
   const toggleFilePicker = () => {
@@ -138,12 +154,81 @@ export function RightPanelAgentChat({
   return (
     <div className="right-panel-agent-chat">
       <div className="agent-conversation-header">
-        <div>
-          <span>AI Chat</span>
-          <strong>{chat.activeConversation?.title || "New AI Chat"}</strong>
+        <div className="agent-conversation-title">
+          <button
+            aria-expanded={historyOpen}
+            aria-haspopup="listbox"
+            aria-label="Select chat conversation"
+            className="agent-conversation-title-trigger"
+            onClick={() => setHistoryOpen((open) => !open)}
+            ref={titleTriggerRef}
+            type="button"
+          >
+            <span>AI Chat</span>
+            <strong>{chat.activeConversation?.title || "New AI Chat"}</strong>
+            <span aria-hidden="true" className="agent-conversation-title-chevron">
+              ▾
+            </span>
+          </button>
+          {historyOpen ? (
+            <section
+              aria-label="Saved chat conversations"
+              className="agent-history-popover"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setHistoryOpen(false);
+                  titleTriggerRef.current?.focus();
+                }
+              }}
+            >
+              <input
+                aria-label="Filter conversations"
+                className="agent-history-filter"
+                onChange={(event) => chat.setConversationFilter(event.currentTarget.value)}
+                placeholder="Search conversations"
+                type="search"
+                value={chat.conversationFilter}
+              />
+              <div className="agent-history-list" role="listbox">
+                {chat.filteredConversations.length ? (
+                  chat.filteredConversations.map((conversation) => (
+                    <button
+                      aria-selected={chat.activeConversation?.id === conversation.id}
+                      className={chat.activeConversation?.id === conversation.id ? "agent-history-item active" : "agent-history-item"}
+                      disabled={chat.sending}
+                      key={conversation.id}
+                      onClick={() => selectConversation(conversation.id)}
+                      role="option"
+                      type="button"
+                    >
+                      <strong>{conversation.title}</strong>
+                      <span>{conversation.summary || "No summary yet."}</span>
+                      <small>
+                        {formatChatDateTime(conversation.updatedAt)} · {conversation.messageCount} message
+                        {conversation.messageCount === 1 ? "" : "s"}
+                      </small>
+                    </button>
+                  ))
+                ) : (
+                  <p className="agent-history-empty">No conversations match this filter.</p>
+                )}
+              </div>
+            </section>
+          ) : null}
         </div>
-        <button disabled={chat.loading || chat.sending} onClick={startNewConversation} type="button">
-          New AI Chat
+        <button
+          aria-label="New AI Chat"
+          className="agent-new-conversation-button"
+          disabled={chat.loading || chat.sending}
+          onClick={startNewConversation}
+          title="New AI Chat"
+          type="button"
+        >
+          <span aria-hidden="true" className="agent-new-conversation-icon">
+            ✎
+          </span>
+          <span className="agent-new-conversation-label">New AI Chat</span>
         </button>
       </div>
       <div className="right-panel-agent-thread">
