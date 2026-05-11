@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
-import type { AgentContextFile, ChatContextRef, Conversation, ProjectFile, RebuildModel } from "../../contracts/api";
+import type { AgentContextFile, ChatContextRef, ChatMessageFileEdit, Conversation, ProjectFile, RebuildModel } from "../../contracts/api";
 import { ChatComposer } from "../../shared/chat/ChatComposer";
 import { ChatThread } from "../../shared/chat/ChatThread";
 
@@ -10,7 +10,7 @@ type RightPanelChatController = {
   scrollToLatest: () => void;
   sendMessage: (options: {
     content?: string;
-    context?: { currentFile?: AgentContextFile; activeFiles?: AgentContextFile[]; fileRefs?: ChatContextRef[] };
+    context?: { currentFile?: AgentContextFile; editableFiles?: AgentContextFile[]; sourceFiles?: ChatContextRef[] };
   }) => Promise<boolean>;
   sending: boolean;
   showJumpToLatest: boolean;
@@ -39,6 +39,7 @@ export function RightPanelAgentChat({
   highlightedContext,
   models,
   onAddContextRef,
+  onApplyFileEdit,
   onCloseChooser,
   onContextRefsChange,
   onModelChange,
@@ -55,6 +56,7 @@ export function RightPanelAgentChat({
   highlightedContext: { path: string; target: "active" | "context" } | null;
   models: RebuildModel[];
   onAddContextRef: (path: string) => void;
+  onApplyFileEdit: (edit: ChatMessageFileEdit) => void;
   onCloseChooser: () => void;
   onContextRefsChange: Dispatch<SetStateAction<ChatContextRef[]>>;
   onModelChange: (modelId: string) => void;
@@ -132,8 +134,8 @@ export function RightPanelAgentChat({
         currentFile || activeFiles.length || contextRefs.length
           ? {
               currentFile: currentFile ?? undefined,
-              activeFiles: activeFiles.length ? activeFiles : undefined,
-              fileRefs: contextRefs.length ? contextRefs : undefined,
+              editableFiles: activeFiles.length ? activeFiles : undefined,
+              sourceFiles: contextRefs.length ? contextRefs : undefined,
             }
           : undefined,
     });
@@ -160,6 +162,7 @@ export function RightPanelAgentChat({
           emptyDescription="Ask the side-panel agent about this project."
           emptyTitle={chat.loading ? "Loading conversation..." : "Start AI chat"}
           messages={chat.activeConversation?.messages ?? []}
+          onApplyFileEdit={onApplyFileEdit}
           onJumpToLatest={() => chat.scrollToLatest()}
           onScroll={chat.handleThreadScroll}
           showJumpToLatest={chat.showJumpToLatest}

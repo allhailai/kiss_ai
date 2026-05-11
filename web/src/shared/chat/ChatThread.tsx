@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
-import type { ChatMessage } from "../../contracts/api";
+import type { ChatMessage, ChatMessageFileEdit } from "../../contracts/api";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 
 export function ChatThread({
@@ -12,6 +12,7 @@ export function ChatThread({
   messages,
   onCancelEdit = () => undefined,
   onEditDraftChange = () => undefined,
+  onApplyFileEdit,
   onJumpToLatest,
   onSaveEdit = () => undefined,
   onScroll,
@@ -30,6 +31,7 @@ export function ChatThread({
   messages: ChatMessage[];
   onCancelEdit?: () => void;
   onEditDraftChange?: (value: string) => void;
+  onApplyFileEdit?: (edit: ChatMessageFileEdit) => void;
   onJumpToLatest?: () => void;
   onSaveEdit?: (message: ChatMessage) => void;
   onScroll?: () => void;
@@ -69,6 +71,7 @@ export function ChatThread({
               isEditing={editingMessageId === message.id}
               key={message.id}
               message={message}
+              onApplyFileEdit={onApplyFileEdit}
               onCancelEdit={onCancelEdit}
               onEditDraftChange={onEditDraftChange}
               onSaveEdit={onSaveEdit}

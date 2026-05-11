@@ -1,4 +1,4 @@
-import type { BuildLogState, CreateProjectRequest, ProjectListResponse, ProjectStatus, ProjectSummary, RebuildModelsResponse } from "../contracts/api";
+import type { BuildLogState, CreateProjectRequest, DesignState, ProjectListResponse, ProjectStatus, ProjectSummary, RebuildModelsResponse } from "../contracts/api";
 import { projectBase, request } from "./request";
 
 export const projectsApi = {
@@ -10,6 +10,7 @@ export const projectsApi = {
     }),
   rebuildModels: () => request<RebuildModelsResponse>("/api/cursor/models"),
   status: (projectSlug: string) => request<ProjectStatus>(`${projectBase(projectSlug)}/status`),
+  design: (projectSlug: string) => request<DesignState>(`${projectBase(projectSlug)}/design`),
   buildLog: (projectSlug: string, tabId?: string | null, path?: string | null, sectionId?: string | null) => {
     const params = new URLSearchParams();
     if (tabId) params.set("tab", tabId);

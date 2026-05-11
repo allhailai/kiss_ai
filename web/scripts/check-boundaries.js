@@ -42,6 +42,11 @@ function importsFeatureSubdirectory(specifier, filePath) {
 
 const srcRules = [
   {
+    from: "main.tsx",
+    test: (specifier) => !["react", "react-dom/client", "./app/App", "./styles.css", "./editor/MarkdownEditor.css", "./editor/markdownTableExtension.css"].includes(specifier),
+    message: "main.tsx must stay a thin entrypoint that imports only React, the app shell, and global styles",
+  },
+  {
     from: "contracts",
     test: (specifier) => !specifier.startsWith("./") && !specifier.startsWith("../contracts/"),
     message: "contract modules must not import implementation modules",
@@ -49,7 +54,7 @@ const srcRules = [
   {
     from: "features",
     test: (specifier, filePath) => importsLayer(specifier, filePath, "app") || importsOtherFeature(specifier, filePath),
-    message: "feature modules must not import from app-owned modules",
+    message: "feature modules must not import app-owned modules or other feature implementations",
   },
   {
     from: "data",
@@ -86,7 +91,7 @@ const srcRules = [
       importsLayer(specifier, filePath, "data") ||
       importsLayer(specifier, filePath, "editor") ||
       importsLayer(specifier, filePath, "features"),
-    message: "navigation modules must not import app, transport, editor, or feature modules",
+    message: "navigation modules must not import app, data, editor, or feature modules",
   },
   {
     from: "shared",
@@ -112,7 +117,6 @@ const serverRules = [
     test: (specifier, filePath) =>
       (specifier === "node:fs" || specifier === "node:fs/promises") &&
       !new Set([
-        "aiFlows.js",
         "buildLogs.js",
         "capabilities.js",
         "conversations.js",
@@ -133,6 +137,28 @@ const serverRules = [
     test: (specifier, filePath) => specifier === "@cursor/sdk" && path.basename(filePath) !== "cursorModels.js",
     message: "server services must keep Cursor SDK access in approved service modules",
   },
+  {
+    from: "agentRuntimes",
+    test: (specifier, filePath) => specifier === "@cursor/sdk" && path.basename(filePath) !== "cursorSdk.js",
+    message: "server runtime adapters must keep Cursor SDK access in cursorSdk.js",
+  },
+  {
+    from: "adapters",
+    test: (specifier) => specifier === "node:fs" || specifier === "node:fs/promises" || specifier === "node:child_process" || specifier === "@cursor/sdk",
+    message: "server adapters must stay thin and avoid filesystem, process, or Cursor SDK access",
+  },
+  {
+    from: "utils",
+    test: (specifier) => specifier === "node:fs" || specifier === "node:fs/promises" || specifier === "node:child_process" || specifier === "@cursor/sdk",
+    message: "server utilities must stay framework-neutral and avoid filesystem, process, or Cursor SDK access",
+  },
+  {
+    from: "root",
+    test: (specifier, filePath) =>
+      !new Set(["index.js", "agentRuns.js"]).has(path.basename(filePath)) &&
+      (specifier === "node:fs" || specifier === "node:fs/promises" || specifier === "node:child_process" || specifier === "@cursor/sdk"),
+    message: "server root files must not bypass route, service, adapter, or runtime ownership",
+  },
 ];
 
 async function listSourceFiles(directory) {
@@ -141,6 +167,7 @@ async function listSourceFiles(directory) {
     entries.map(async (entry) => {
       const entryPath = path.join(directory, entry.name);
       if (entry.isDirectory()) return listSourceFiles(entryPath);
+      if (/\.(test|spec)\.(js|ts|tsx)$/.test(entry.name)) return [];
       if (/\.(js|ts|tsx)$/.test(entry.name)) return [entryPath];
       return [];
     }),
@@ -151,6 +178,11 @@ async function listSourceFiles(directory) {
 
 function firstPathSegment(filePath) {
   return path.relative(SRC_ROOT, filePath).split(path.sep)[0];
+}
+
+function serverLayer(filePath) {
+  const parts = path.relative(SERVER_ROOT, filePath).split(path.sep);
+  return parts.length === 1 ? "root" : parts[0];
 }
 
 const violations = [];
@@ -171,7 +203,7 @@ for (const filePath of await listSourceFiles(SRC_ROOT)) {
 }
 
 for (const filePath of await listSourceFiles(SERVER_ROOT)) {
-  const layer = path.relative(SERVER_ROOT, filePath).split(path.sep)[0];
+  const layer = serverLayer(filePath);
   const applicableRules = serverRules.filter((rule) => rule.from === layer);
   if (!applicableRules.length) continue;
 

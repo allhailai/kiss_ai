@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import type { AgentContextFile, ChatContextRef, ChatMessage, Conversation, ConversationSummary, ProjectFile } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { errorMessage } from "../../domain/errors";
-import { projectPathPrefixes } from "../../domain/projectPaths";
+import { isChatSourceContextPath } from "../../domain/projectPaths";
 import { useConversationStream } from "./useConversationStream";
 
 type ChatSendContext = {
   currentFile?: AgentContextFile;
+  editableFiles?: AgentContextFile[];
+  sourceFiles?: ChatContextRef[];
   activeFiles?: AgentContextFile[];
   fileRefs?: ChatContextRef[];
 };
@@ -17,12 +19,7 @@ type ChatSendOptions = {
 };
 
 function isChatContextFile(file: ProjectFile) {
-  return (
-    /^human_[^/]+\.md$/i.test(file.path) ||
-    file.path.startsWith(projectPathPrefixes.humanInput) ||
-    file.path.startsWith(projectPathPrefixes.aiInput) ||
-    file.path.startsWith(projectPathPrefixes.output)
-  );
+  return isChatSourceContextPath(file.path);
 }
 
 function isNearScrollBottom(element: HTMLElement) {
@@ -139,7 +136,7 @@ export function useProjectChat({
     if (!projectSlug) return false;
     const content = (options.content ?? messageDraft).trim();
     if (!content || sending) return false;
-    const context = options.context ?? (contextRefs.length ? { fileRefs: contextRefs } : undefined);
+    const context = options.context ?? (contextRefs.length ? { sourceFiles: contextRefs } : undefined);
 
     setSending(true);
     onNotice("");
@@ -185,6 +182,7 @@ export function useProjectChat({
       setEditingMessageId(null);
       setEditDraft("");
       await refreshConversations();
+      setSending(false);
     } catch (error) {
       onNotice(errorMessage(error, "Could not edit the chat message."));
       setSending(false);

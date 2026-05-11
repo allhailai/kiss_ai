@@ -56,8 +56,10 @@ function requireSendRequest(body, httpError) {
   const content = String(body?.content ?? "").trim();
   const contextSource = body?.context && typeof body.context === "object" && !Array.isArray(body.context) ? body.context : {};
   const currentFile = normalizeCurrentFile(contextSource.currentFile);
-  const activeFiles = Array.isArray(contextSource.activeFiles) ? contextSource.activeFiles.map(normalizeActiveFile).filter(Boolean).slice(0, maxActiveFiles) : [];
-  const fileRefs = Array.isArray(contextSource.fileRefs) ? contextSource.fileRefs.map(normalizeContextRef).filter(Boolean).slice(0, maxContextRefs) : [];
+  const editableFileSource = Array.isArray(contextSource.editableFiles) ? contextSource.editableFiles : contextSource.activeFiles;
+  const sourceFileSource = Array.isArray(contextSource.sourceFiles) ? contextSource.sourceFiles : contextSource.fileRefs;
+  const editableFiles = Array.isArray(editableFileSource) ? editableFileSource.map(normalizeActiveFile).filter(Boolean).slice(0, maxActiveFiles) : [];
+  const sourceFiles = Array.isArray(sourceFileSource) ? sourceFileSource.map(normalizeContextRef).filter(Boolean).slice(0, maxContextRefs) : [];
 
   if (!modelId) throw httpError("Chat requires a model.");
   if (!content) throw httpError("Chat requires a message.");
@@ -69,11 +71,11 @@ function requireSendRequest(body, httpError) {
     modelId,
     content,
     context:
-      currentFile || activeFiles.length || fileRefs.length
+      currentFile || editableFiles.length || sourceFiles.length
         ? {
             ...(currentFile ? { currentFile } : {}),
-            ...(activeFiles.length ? { activeFiles } : {}),
-            ...(fileRefs.length ? { fileRefs } : {}),
+            ...(editableFiles.length ? { editableFiles } : {}),
+            ...(sourceFiles.length ? { sourceFiles } : {}),
           }
         : undefined,
   };
@@ -221,14 +223,14 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     readOptionalProjectText(readTextFile, project.path, "human_open_questions.md"),
   ]);
   const currentFile = [...conversation.messages].reverse().find((message) => message.context?.currentFile)?.context?.currentFile ?? null;
-  const activeFiles = conversation.messages.flatMap((message) => message.context?.activeFiles ?? []);
-  const fileRefs = conversation.messages.flatMap((message) => message.context?.fileRefs ?? []);
-  const uniqueActiveFiles = uniqueByPath(activeFiles, maxActiveFiles);
-  const uniqueFileRefs = uniqueByPath(fileRefs, maxContextRefs);
+  const activeFiles = conversation.messages.flatMap((message) => message.context?.editableFiles ?? message.context?.activeFiles ?? []);
+  const fileRefs = conversation.messages.flatMap((message) => message.context?.sourceFiles ?? message.context?.fileRefs ?? []);
+  const uniqueEditableFiles = uniqueByPath(activeFiles, maxActiveFiles);
+  const uniqueSourceFiles = uniqueByPath(fileRefs, maxContextRefs);
   const [currentFileContext, editableTargetFiles, sourceContextFiles] = await Promise.all([
     readCurrentFileContext({ project, readTextFile, currentFile }),
-    readActiveContextFiles({ project, readTextFile, activeFiles: uniqueActiveFiles }),
-    readSourceContextFiles({ project, readTextFile, fileRefs: uniqueFileRefs }),
+    readActiveContextFiles({ project, readTextFile, activeFiles: uniqueEditableFiles }),
+    readSourceContextFiles({ project, readTextFile, fileRefs: uniqueSourceFiles }),
   ]);
   const history = conversation.messages.slice(-maxPromptHistoryMessages).map(formatHistoryMessage);
   const projectName = displayProjectName(harness.project_name ?? project.name, harness.project_slug ?? project.slug);
@@ -267,6 +269,9 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     "- Treat currentFileContext as read-only context for the file the user is viewing. It does not grant edit permission.",
     "- You may propose or prepare updates for files listed in editableTargetFiles; do not directly edit files, run modifying commands, write logs, or create artifacts.",
     "- Treat sourceContextFiles as read-only sources to consider. Do not treat them as editable targets unless the same path also appears in editableTargetFiles.",
+    "- When the user asks for file changes, propose edits only for editableTargetFiles and keep the response proposal-only.",
+    "- For each proposed file edit, include a tagged block: <file_edit><path>relative/path.md</path><summary>short summary</summary><proposedContent>full replacement file content</proposedContent></file_edit>.",
+    "- The web UI may apply tagged file_edit proposals to the unsaved editor draft. Never write files directly.",
     "- User-selected sourceContextFiles are guidance, not an exclusive boundary. You may inspect other project files when useful.",
     "- If you rely on project context outside currentFileContext, editableTargetFiles, or sourceContextFiles, briefly explain or cite what additional context you used.",
     "- Stay inside the current project. User-selected source context files are limited to human_*.md, inputs_human/, inputs_ai/, and outputs_ai/.",
@@ -284,6 +289,42 @@ function summarizeAssistantText(text) {
   const compact = String(text ?? "").replace(/\s+/g, " ").trim();
   if (!compact) return "";
   return compact.length > 240 ? `${compact.slice(0, 237)}...` : compact;
+}
+
+function firstTagContent(text, tagName) {
+  const pattern = new RegExp(`<${tagName}>\\s*([\\s\\S]*?)\\s*<\\/${tagName}>`, "i");
+  return String(text ?? "").match(pattern)?.[1]?.trim() ?? "";
+}
+
+function allTagContent(text, tagName) {
+  const pattern = new RegExp(`<${tagName}>\\s*([\\s\\S]*?)\\s*<\\/${tagName}>`, "gi");
+  return [...String(text ?? "").matchAll(pattern)].map((match) => match[1]?.trim() ?? "");
+}
+
+function extractFileEditProposals(rawText, conversation) {
+  const editableTargets = new Map(
+    conversation.messages
+      .flatMap((message) => message.context?.editableFiles ?? message.context?.activeFiles ?? [])
+      .filter((file) => file?.path)
+      .map((file) => [file.path, file]),
+  );
+
+  return allTagContent(rawText, "file_edit")
+    .map((editText) => {
+      const path = firstTagContent(editText, "path");
+      const target = editableTargets.get(path);
+      const proposedContent = firstTagContent(editText, "proposedContent");
+      if (!path || !target || !proposedContent) return null;
+
+      return {
+        path,
+        summary: firstTagContent(editText, "summary") || `Proposed edit for ${path}.`,
+        proposedContent,
+        contentHashBefore: target.contentHash,
+        status: "proposed",
+      };
+    })
+    .filter(Boolean);
 }
 
 export function createChatAgentService({
@@ -338,6 +379,7 @@ export function createChatAgentService({
         });
 
         const assistantText = assistantTextChunks.join("");
+        const fileEdits = extractFileEditProposals(assistantText, conversationWithUser);
         const finalConversation = await appendMessage(project, conversationId, {
           id: assistantMessageId,
           role: "assistant",
@@ -345,7 +387,10 @@ export function createChatAgentService({
           createdAt: nowIso(),
           modelId,
           status: "complete",
-          metadata: { cursorApiKeySource: cursorApiKey.source },
+          metadata: {
+            cursorApiKeySource: cursorApiKey.source,
+            ...(fileEdits.length ? { fileEdits } : {}),
+          },
         });
         const nextConversation =
           finalConversation.summary || !assistantText

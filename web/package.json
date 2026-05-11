@@ -8,8 +8,10 @@
     "dev:server": "node --watch server/index.js",
     "dev:client": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
-    "check": "tsc --noEmit && npm run check:boundaries",
-    "check:boundaries": "node scripts/check-boundaries.js"
+    "check": "tsc --noEmit && npm run check:server && npm run check:boundaries && npm test -- --run",
+    "check:boundaries": "node scripts/check-boundaries.js",
+    "check:server": "tsc -p tsconfig.server.json --noEmit",
+    "test": "vitest"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.0",
@@ -27,11 +29,13 @@
     "yaml": "^2.8.3"
   },
   "devDependencies": {
+    "@types/node": "^25.6.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^9.2.1",
     "typescript": "^6.0.3",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vitest": "^4.1.5"
   }
 }

@@ -1,12 +1,14 @@
-import type { AgentContextFile } from "./agents";
+import type { AgentContextFile, AgentEditableTargetFile, AgentSourceContextRef } from "./agents";
 
 export type {
   AgentContextDraftState,
+  AgentContextRef,
+  AgentEditableTargetFile,
   AgentContextFile,
   AgentContextFileKind,
   AgentContextFileRole,
-  AgentContextRef,
   AgentMessageContext,
+  AgentSourceContextRef,
 } from "./agents";
 
 export type ResolutionOption = {
@@ -210,6 +212,8 @@ export type ChatMessage = {
   status: ChatMessageStatus;
   context?: {
     currentFile?: AgentContextFile;
+    editableFiles?: AgentEditableTargetFile[];
+    sourceFiles?: AgentSourceContextRef[];
     activeFiles?: AgentContextFile[];
     fileRefs?: ChatContextRef[];
   };
@@ -219,6 +223,7 @@ export type ChatMessage = {
 export type ChatMessageFileEdit = {
   path: string;
   summary: string;
+  proposedContent?: string;
   contentHashBefore?: string;
   contentHashAfter?: string;
   appliedAt?: string;
@@ -273,6 +278,8 @@ export type SendChatMessageRequest = {
   content: string;
   context?: {
     currentFile?: AgentContextFile;
+    editableFiles?: AgentEditableTargetFile[];
+    sourceFiles?: AgentSourceContextRef[];
     activeFiles?: AgentContextFile[];
     fileRefs?: ChatContextRef[];
   };

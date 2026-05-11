@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import type { FileContent, FileDiff } from "../../contracts/api";
 import { api } from "../../data/apiClient";
+import { errorMessage } from "../../domain/errors";
 import { isDesignIdentityPath } from "../../domain/projectPaths";
 
 type UseSelectedFileOptions = {
@@ -23,6 +24,7 @@ export function useSelectedFile({
   const [selected, setSelected] = useState<FileContent | null>(null);
   const [selectedDiff, setSelectedDiff] = useState<FileDiff | null>(null);
   const [draft, setDraft] = useState("");
+  const hasUnsavedChanges = Boolean(selected && draft !== selected.content);
 
   const clearSelectedFile = useCallback(() => {
     setSelected(null);
@@ -61,52 +63,79 @@ export function useSelectedFile({
     if (!selected) return;
     const projectSlug = requireSelectedProjectSlug();
 
-    const saved = await api.saveFile(projectSlug, selected.path, draft);
-    const diff = await api.fileDiff(projectSlug, saved.path);
-    setSelected(saved);
-    setSelectedDiff(diff);
-    setDraft(saved.content);
+    setLoading(true);
+    setNotice("");
+    try {
+      const saved = await api.saveFile(projectSlug, selected.path, draft);
+      const diff = await api.fileDiff(projectSlug, saved.path);
+      setSelected(saved);
+      setSelectedDiff(diff);
+      setDraft(saved.content);
 
-    if (isDesignIdentityPath(saved.path)) {
-      await refreshDesign();
+      if (isDesignIdentityPath(saved.path)) {
+        await refreshDesign();
+      }
+
+      await refreshStatus();
+      setNotice(`Saved ${saved.path}.`);
+    } catch (error) {
+      setNotice(errorMessage(error, "Could not save the selected file."));
+    } finally {
+      setLoading(false);
     }
-
-    await refreshStatus();
-  }, [draft, refreshDesign, refreshStatus, requireSelectedProjectSlug, selected]);
+  }, [draft, refreshDesign, refreshStatus, requireSelectedProjectSlug, selected, setLoading, setNotice]);
 
   const refreshSelectedFile = useCallback(async () => {
     if (!selected) return;
     const projectSlug = requireSelectedProjectSlug();
-    const file = await loadSelectedFile(projectSlug, selected.path);
+    setLoading(true);
+    setNotice("");
+    try {
+      const file = await loadSelectedFile(projectSlug, selected.path);
 
-    if (isDesignIdentityPath(file.path)) {
-      await refreshDesign();
+      if (isDesignIdentityPath(file.path)) {
+        await refreshDesign();
+      }
+
+      await refreshStatus();
+    } catch (error) {
+      setNotice(errorMessage(error, "Could not refresh the selected file."));
+    } finally {
+      setLoading(false);
     }
-
-    await refreshStatus();
-  }, [loadSelectedFile, refreshDesign, refreshStatus, requireSelectedProjectSlug, selected]);
+  }, [loadSelectedFile, refreshDesign, refreshStatus, requireSelectedProjectSlug, selected, setLoading, setNotice]);
 
   const revertSelected = useCallback(async () => {
     if (!selected) return;
     const projectSlug = requireSelectedProjectSlug();
 
-    const reverted = await api.revertFile(projectSlug, selected.path);
-    const diff = await api.fileDiff(projectSlug, reverted.path);
-    setSelected(reverted);
-    setSelectedDiff(diff);
-    setDraft(reverted.content);
+    setLoading(true);
+    setNotice("");
+    try {
+      const reverted = await api.revertFile(projectSlug, selected.path);
+      const diff = await api.fileDiff(projectSlug, reverted.path);
+      setSelected(reverted);
+      setSelectedDiff(diff);
+      setDraft(reverted.content);
 
-    if (isDesignIdentityPath(reverted.path)) {
-      await refreshDesign();
+      if (isDesignIdentityPath(reverted.path)) {
+        await refreshDesign();
+      }
+
+      await refreshStatus();
+      setNotice(`Reverted ${reverted.path}.`);
+    } catch (error) {
+      setNotice(errorMessage(error, "Could not revert the selected file."));
+    } finally {
+      setLoading(false);
     }
-
-    await refreshStatus();
-  }, [refreshDesign, refreshStatus, requireSelectedProjectSlug, selected]);
+  }, [refreshDesign, refreshStatus, requireSelectedProjectSlug, selected, setLoading, setNotice]);
 
   return {
     selected,
     selectedDiff,
     draft,
+    hasUnsavedChanges,
     setDraft,
     clearSelectedFile,
     selectFile,

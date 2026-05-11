@@ -5,11 +5,10 @@ import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createRebuildStore } from "./agentRuns.js";
-import { runCursorAgent, runCursorAgentText } from "./agentRuntimes/cursorSdk.js";
+import { runCursorAgent } from "./agentRuntimes/cursorSdk.js";
 import { listen } from "./adapters/listen.js";
 import { registerApiRoutes } from "./routes/apiRoutes.js";
 import { createAgentJobService } from "./services/agentJobs.js";
-import { createAiFlowService } from "./services/aiFlows.js";
 import { createBuildLogService } from "./services/buildLogs.js";
 import { createChatAgentService } from "./services/chatAgent.js";
 import { createConversationService } from "./services/conversations.js";
@@ -26,19 +25,11 @@ const PORT = Number(process.env.KISS_AI_UI_PORT ?? 8787);
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const MAX_SEARCH_RESULTS = 25;
-const MAX_AI_ASSIST_FULL_CONTENT_BYTES = 80 * 1024;
-const MAX_AI_ASSIST_CONTEXT_BYTES = 18 * 1024;
 const REBUILD_STATE_DIR = path.join(WEB_ROOT, ".runtime", "rebuild");
 const FRAMEWORK_ROOT = path.resolve(process.env.KISS_AI_FRAMEWORK_ROOT ?? path.join(PROJECTS_ROOT, "_kiss_ai", "framework"));
 const warnedCursorKeyMessages = new Set();
 const reservedProjectDirectories = new Set(["_kiss_ai", ".obsidian", "_archive", "_templates"]);
 const projectSlugPattern = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
-const REQUIREMENT_AUTO_UPDATE_PATHS = [
-  "human_goal_requirements.md",
-  "human_input_requirements.md",
-  "human_output_requirements.md",
-];
-const requirementAutoUpdatePathSet = new Set(REQUIREMENT_AUTO_UPDATE_PATHS);
 const buildLogDefinitions = [
   {
     id: "build-summary",
@@ -290,27 +281,6 @@ const { startHumanAttentionResolution, startRebuild } = createAgentJobService({
   setRebuildState,
 });
 
-const { acceptRequirementsAutoUpdate, runAiAssistProposal, runRequirementsAutoUpdateProposal } = createAiFlowService({
-  FRAMEWORK_ROOT,
-  MAX_FILE_BYTES,
-  MAX_AI_ASSIST_FULL_CONTENT_BYTES,
-  MAX_AI_ASSIST_CONTEXT_BYTES,
-  REQUIREMENT_AUTO_UPDATE_PATHS,
-  classifyPath,
-  displayProjectName,
-  hashText,
-  httpError,
-  listCursorModels,
-  pickRebuildModelId,
-  projectPath,
-  readProjectHarness,
-  readTextFile,
-  requirementAutoUpdatePathSet,
-  resolveCursorApiKey,
-  runCursorAgentText,
-  writeTextFile,
-});
-
 function execFileText(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     execFile(command, args, options, (error, stdout, stderr) => {
@@ -326,7 +296,6 @@ function execFileText(command, args, options = {}) {
 
 registerApiRoutes(app, {
   PROJECTS_ROOT,
-  acceptRequirementsAutoUpdate,
   attachProject,
   buildLogTabState,
   createProjectFromTemplate,
@@ -352,8 +321,6 @@ registerApiRoutes(app, {
   readTextFile,
   resolveCursorApiKey,
   restoreFileFromHead,
-  runAiAssistProposal,
-  runRequirementsAutoUpdateProposal,
   searchFiles,
   editChatMessage,
   sendChatMessage,

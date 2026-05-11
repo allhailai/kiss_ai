@@ -129,7 +129,18 @@ export function useProjectWorkspace() {
     }
   }, [requireSelectedProjectSlug]);
 
-  const { selected, selectedDiff, draft, setDraft, clearSelectedFile, selectFile, saveSelected, refreshSelectedFile, revertSelected } = useSelectedFile({
+  const {
+    selected,
+    selectedDiff,
+    draft,
+    hasUnsavedChanges,
+    setDraft,
+    clearSelectedFile,
+    selectFile,
+    saveSelected,
+    refreshSelectedFile,
+    revertSelected,
+  } = useSelectedFile({
     requireSelectedProjectSlug,
     refreshDesign,
     refreshProjectFiles,
@@ -137,6 +148,29 @@ export function useProjectWorkspace() {
     setLoading,
     setNotice,
   });
+
+  const currentRoute = useMemo(
+    () => ({
+      projectSlug: selectedProjectSlug,
+      view,
+      filePath: selected?.path ?? null,
+      context: routeContext,
+    }),
+    [routeContext, selected?.path, selectedProjectSlug, view],
+  );
+  const canLeaveCurrentRoute = useCallback(
+    (nextRoute: { projectSlug: string | null; view: View; filePath: string | null; context: Record<string, string> }) => {
+      const sameRoute =
+        currentRoute.projectSlug === nextRoute.projectSlug &&
+        currentRoute.view === nextRoute.view &&
+        currentRoute.filePath === nextRoute.filePath &&
+        JSON.stringify(currentRoute.context) === JSON.stringify(nextRoute.context);
+      if (sameRoute || !hasUnsavedChanges) return true;
+
+      return window.confirm("Discard unsaved changes to the current file?");
+    },
+    [currentRoute, hasUnsavedChanges],
+  );
 
   const applyRoute = useRouteDrivenData({
     clearSelectedFile,
@@ -153,7 +187,7 @@ export function useProjectWorkspace() {
     setView,
   });
 
-  const { navigateTo } = useRouteSync({ applyRoute, selectedProjectSlug, setSelectedProjectSlug });
+  const { navigateTo } = useRouteSync({ applyRoute, canLeaveCurrentRoute, currentRoute, selectedProjectSlug, setSelectedProjectSlug });
 
   const replaceRouteContext = useCallback(
     (patch: Record<string, string | null | undefined>) => {
@@ -213,17 +247,24 @@ export function useProjectWorkspace() {
     view,
   });
 
-  const selectProject = useCallback((projectSlug: string) => {
-    setSelectedProjectSlug(projectSlug);
-    window.localStorage.setItem(selectedProjectStorageKey, projectSlug);
-    window.location.hash = buildRouteHash(projectSlug, "rebuild");
-  }, []);
+  const selectProject = useCallback(
+    (projectSlug: string) => {
+      if (!canLeaveCurrentRoute({ projectSlug, view: "rebuild", filePath: null, context: {} })) return;
+
+      setSelectedProjectSlug(projectSlug);
+      window.localStorage.setItem(selectedProjectStorageKey, projectSlug);
+      window.location.hash = buildRouteHash(projectSlug, "rebuild");
+    },
+    [canLeaveCurrentRoute],
+  );
 
   const clearSelectedProject = useCallback(() => {
+    if (!canLeaveCurrentRoute({ projectSlug: null, view: "rebuild", filePath: null, context: {} })) return;
+
     setSelectedProjectSlug(null);
     window.localStorage.removeItem(selectedProjectStorageKey);
     window.location.hash = "#/projects";
-  }, []);
+  }, [canLeaveCurrentRoute]);
 
   const createProject = useCallback(
     async (name: string, slug?: string) => {
@@ -307,6 +348,7 @@ export function useProjectWorkspace() {
     deleteHumanInputFile,
     draft,
     files,
+    hasUnsavedChanges,
     loading,
     projectFiles,
     refreshSelectedFile,
@@ -366,6 +408,7 @@ export function useProjectWorkspace() {
     selected,
     selectedDiff,
     draft,
+    hasUnsavedChanges,
     toasts,
     loading,
     creatingProject,

@@ -40,6 +40,13 @@ export function createProjectFileService({
     return relativePath.split("/").some((segment) => segment.startsWith("."));
   }
 
+  function hasTraversalSegment(relativePath) {
+    return String(relativePath ?? "")
+      .replaceAll("\\", "/")
+      .split("/")
+      .some((segment) => segment === "..");
+  }
+
   function projectFileItem(projectRoot, rootRelative, relative, meta, stat) {
     const previewable = isPreviewablePath(relative);
 
@@ -64,7 +71,11 @@ export function createProjectFileService({
   }
 
   function projectPath(projectRoot, relativePath) {
-    const normalized = path.normalize(relativePath).replace(/^(\.\.(\/|\\|$))+/, "");
+    if (hasTraversalSegment(relativePath)) {
+      throw httpError("Path escapes the project root.", 403, "path_escape");
+    }
+
+    const normalized = path.normalize(String(relativePath ?? ""));
     const absolute = path.resolve(projectRoot, normalized);
 
     if (!isPathInsideRoot(projectRoot, absolute)) {

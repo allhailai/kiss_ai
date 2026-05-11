@@ -20,11 +20,18 @@ export type AgentContextRef = {
   source?: "active_file" | "manual";
 };
 
+export type AgentEditableTargetFile = AgentContextFile;
+export type AgentSourceContextRef = AgentContextRef;
+
 export type AgentMessageContext = {
   /** Read-only context for the file currently open in the editor. */
   currentFile?: AgentContextFile;
-  /** Compatibility name for files/directories explicitly permitted as editable targets. */
+  /** Files explicitly permitted as editable targets for proposal/apply-to-draft flows. */
+  editableFiles?: AgentEditableTargetFile[];
+  /** Files explicitly selected as read-only source context. */
+  sourceFiles?: AgentSourceContextRef[];
+  /** Compatibility name for files explicitly permitted as editable targets. */
   activeFiles?: AgentContextFile[];
-  /** Compatibility name for files/directories explicitly selected as source context. */
+  /** Compatibility name for files explicitly selected as source context. */
   fileRefs?: AgentContextRef[];
 };

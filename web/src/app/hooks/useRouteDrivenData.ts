@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import type { ProjectFile } from "../../contracts/api";
+import { errorMessage } from "../../domain/errors";
 import { designIdentityFilePath } from "../../domain/projectPaths";
 import { designProjectFile, type RouteState, type View } from "../../navigation/views";
 
@@ -34,42 +35,46 @@ export function useRouteDrivenData({
     async (route: RouteState) => {
       if (!route.projectSlug || route.projectSlug !== selectedProjectSlug) return;
 
-      const nextView = route.view;
-      setView(nextView);
-      setRouteContext(route.context);
-      setNotice("");
-      clearSelectedFile();
+      try {
+        const nextView = route.view;
+        setView(nextView);
+        setRouteContext(route.context);
+        setNotice("");
+        clearSelectedFile();
 
-      if (nextView === "requirements") {
-        await loadTree("requirements");
-      } else if (nextView === "inputs") {
-        await loadTree("human");
-      } else if (nextView === "outputs") {
-        await loadTree("outputs");
-      } else if (nextView === "annotations") {
-        await loadAnnotationTree();
-      } else {
-        setFiles([]);
-      }
+        if (nextView === "requirements") {
+          await loadTree("requirements");
+        } else if (nextView === "inputs") {
+          await loadTree("human");
+        } else if (nextView === "outputs") {
+          await loadTree("outputs");
+        } else if (nextView === "annotations") {
+          await loadAnnotationTree();
+        } else {
+          setFiles([]);
+        }
 
-      if (nextView === "dashboard") {
-        await refreshDesign();
-      } else if (nextView === "design") {
-        setFiles([designProjectFile]);
-        await refreshDesign();
-        await selectFile(route.filePath ?? designIdentityFilePath);
-      }
+        if (nextView === "dashboard") {
+          await refreshDesign();
+        } else if (nextView === "design") {
+          setFiles([designProjectFile]);
+          await refreshDesign();
+          await selectFile(route.filePath ?? designIdentityFilePath);
+        }
 
-      if (nextView === "rebuild") {
-        await refreshRebuild();
-      }
+        if (nextView === "rebuild") {
+          await refreshRebuild();
+        }
 
-      if (nextView === "build-log") {
-        await refreshBuildLog();
-      }
+        if (nextView === "build-log") {
+          await refreshBuildLog();
+        }
 
-      if (route.filePath && nextView !== "design") {
-        await selectFile(route.filePath);
+        if (route.filePath && nextView !== "design") {
+          await selectFile(route.filePath);
+        }
+      } catch (error) {
+        setNotice(errorMessage(error, "Could not load this view."));
       }
     },
     [

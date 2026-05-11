@@ -18,8 +18,6 @@ export function SimplifiedNavigator({
   projectFiles,
   loading,
   selectedPath,
-  showAiAutoUpdate,
-  onAiAutoUpdate,
   onDeleteHumanInputFile,
   onOpenView,
   onOpenFile,
@@ -28,8 +26,6 @@ export function SimplifiedNavigator({
   projectFiles: ProjectFile[];
   loading: boolean;
   selectedPath: string | null;
-  showAiAutoUpdate?: boolean;
-  onAiAutoUpdate?: () => void;
   onDeleteHumanInputFile?: (path: string) => void;
   onOpenView: (view: View, path?: string | null) => void;
   onOpenFile: (path: string) => void;
@@ -130,12 +126,6 @@ export function SimplifiedNavigator({
               <DefineNavLabel label={openQuestionsNavLeaf.label} />
             </button>
           </div>
-          {showAiAutoUpdate ? (
-            <button className="local-nav-action" onClick={onAiAutoUpdate} type="button">
-              <strong>Align Files with AI</strong>
-              <span>Use AI to keep related files consistent</span>
-            </button>
-          ) : null}
         </>
       );
     }

@@ -74,14 +74,16 @@ function normalizeCurrentFile(value) {
 function normalizeContext(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const currentFile = normalizeCurrentFile(source.currentFile);
-  const activeFiles = Array.isArray(source.activeFiles) ? source.activeFiles.map(normalizeActiveFile).filter(Boolean).slice(0, maxActiveFiles) : [];
-  const fileRefs = Array.isArray(source.fileRefs) ? source.fileRefs.map(normalizeContextRef).filter(Boolean).slice(0, maxContextRefs) : [];
-  if (!currentFile && !activeFiles.length && !fileRefs.length) return undefined;
+  const editableFileSource = Array.isArray(source.editableFiles) ? source.editableFiles : source.activeFiles;
+  const sourceFileSource = Array.isArray(source.sourceFiles) ? source.sourceFiles : source.fileRefs;
+  const editableFiles = Array.isArray(editableFileSource) ? editableFileSource.map(normalizeActiveFile).filter(Boolean).slice(0, maxActiveFiles) : [];
+  const sourceFiles = Array.isArray(sourceFileSource) ? sourceFileSource.map(normalizeContextRef).filter(Boolean).slice(0, maxContextRefs) : [];
+  if (!currentFile && !editableFiles.length && !sourceFiles.length) return undefined;
 
   return {
     ...(currentFile ? { currentFile } : {}),
-    ...(activeFiles.length ? { activeFiles } : {}),
-    ...(fileRefs.length ? { fileRefs } : {}),
+    ...(editableFiles.length ? { editableFiles } : {}),
+    ...(sourceFiles.length ? { sourceFiles } : {}),
   };
 }
 
@@ -306,7 +308,8 @@ export function createConversationService({ httpError, projectPath }) {
     return next;
   }
 
-  async function writeConversation(project, conversation, { archived } = {}) {
+  async function writeConversation(project, conversation, options = {}) {
+    const archived = options.archived;
     const next = normalizeConversation(project, { ...conversation, updatedAt: conversation.updatedAt ?? nowIso() }, { id: conversation.id });
     const index = await readIndex(project.path);
     const record = index.conversations.find((candidate) => candidate.id === next.id);

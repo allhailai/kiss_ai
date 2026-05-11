@@ -38,3 +38,16 @@ export function isDesignIdentityPath(path: string) {
 export function isRequirementAutoUpdatePath(path: string): path is RequirementAutoUpdatePath {
   return requirementAutoUpdatePaths.includes(path as RequirementAutoUpdatePath);
 }
+
+export function isHumanRequirementPath(path: string) {
+  return /^human_[^/]+\.md$/i.test(path);
+}
+
+export function isChatSourceContextPath(path: string) {
+  return (
+    isHumanRequirementPath(path) ||
+    path.startsWith(projectPathPrefixes.humanInput) ||
+    path.startsWith(projectPathPrefixes.aiInput) ||
+    path.startsWith(projectPathPrefixes.output)
+  );
+}

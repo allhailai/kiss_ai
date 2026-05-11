@@ -1,32 +1,61 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { buildRouteHash, parseRouteHash } from "../../navigation/routes";
 import type { RouteState, View } from "../../navigation/views";
 
 type UseRouteSyncOptions = {
   applyRoute: (route: RouteState) => Promise<void>;
+  canLeaveCurrentRoute?: (nextRoute: RouteState) => boolean;
+  currentRoute: RouteState;
   selectedProjectSlug: string | null;
   setSelectedProjectSlug: (projectSlug: string | null) => void;
 };
 
-export function useRouteSync({ applyRoute, selectedProjectSlug, setSelectedProjectSlug }: UseRouteSyncOptions) {
+function applyRouteSafely(applyRoute: (route: RouteState) => Promise<void>, route: RouteState) {
+  applyRoute(route).catch((error: unknown) => {
+    console.error("[kiss_ai UI warning] Route sync failed.", error);
+  });
+}
+
+export function useRouteSync({ applyRoute, canLeaveCurrentRoute, currentRoute, selectedProjectSlug, setSelectedProjectSlug }: UseRouteSyncOptions) {
+  const applyRouteRef = useRef(applyRoute);
+  const canLeaveCurrentRouteRef = useRef(canLeaveCurrentRoute);
+  const currentRouteRef = useRef(currentRoute);
+  const selectedProjectSlugRef = useRef(selectedProjectSlug);
+
+  applyRouteRef.current = applyRoute;
+  canLeaveCurrentRouteRef.current = canLeaveCurrentRoute;
+  currentRouteRef.current = currentRoute;
+  selectedProjectSlugRef.current = selectedProjectSlug;
+
   const navigateTo = useCallback(
     (nextView: View, filePath?: string | null, context: Record<string, string> = {}) => {
-      const nextHash = buildRouteHash(selectedProjectSlug, nextView, filePath, context);
+      const nextRoute = { projectSlug: selectedProjectSlugRef.current, view: nextView, filePath: filePath ?? null, context };
+      if (canLeaveCurrentRouteRef.current && !canLeaveCurrentRouteRef.current(nextRoute)) return;
+
+      const nextHash = buildRouteHash(selectedProjectSlugRef.current, nextView, filePath, context);
+      const currentHash = buildRouteHash(
+        currentRouteRef.current.projectSlug,
+        currentRouteRef.current.view,
+        currentRouteRef.current.filePath,
+        currentRouteRef.current.context,
+      );
 
       if (window.location.hash === nextHash) {
-        void applyRoute({ projectSlug: selectedProjectSlug, view: nextView, filePath: filePath ?? null, context });
+        if (currentHash !== nextHash) {
+          applyRouteSafely(applyRouteRef.current, nextRoute);
+        }
         return;
       }
 
       window.location.hash = nextHash;
     },
-    [applyRoute, selectedProjectSlug],
+    [],
   );
 
   useEffect(() => {
     const syncRoute = () => {
       const route = parseRouteHash(window.location.hash);
-      const routeProjectSlug = route.projectSlug ?? selectedProjectSlug;
+      const routeProjectSlug = route.projectSlug ?? selectedProjectSlugRef.current;
 
       if (!routeProjectSlug) {
         if (window.location.hash !== "#/projects") {
@@ -42,19 +71,37 @@ export function useRouteSync({ applyRoute, selectedProjectSlug, setSelectedProje
         }
       }
 
-      if (selectedProjectSlug !== routeProjectSlug) {
+      const nextRoute = { ...route, projectSlug: routeProjectSlug };
+      const nextHash = buildRouteHash(nextRoute.projectSlug, nextRoute.view, nextRoute.filePath, nextRoute.context);
+      const currentHash = buildRouteHash(
+        currentRouteRef.current.projectSlug,
+        currentRouteRef.current.view,
+        currentRouteRef.current.filePath,
+        currentRouteRef.current.context,
+      );
+
+      if (currentHash === nextHash) return;
+
+      if (canLeaveCurrentRouteRef.current && !canLeaveCurrentRouteRef.current(nextRoute)) {
+        if (window.location.hash !== currentHash) {
+          window.history.replaceState(null, "", currentHash);
+        }
+        return;
+      }
+
+      if (selectedProjectSlugRef.current !== routeProjectSlug) {
         setSelectedProjectSlug(routeProjectSlug);
         return;
       }
 
-      void applyRoute({ ...route, projectSlug: routeProjectSlug });
+      applyRouteSafely(applyRouteRef.current, nextRoute);
     };
 
     syncRoute();
     window.addEventListener("hashchange", syncRoute);
 
     return () => window.removeEventListener("hashchange", syncRoute);
-  }, [applyRoute, selectedProjectSlug, setSelectedProjectSlug]);
+  }, [selectedProjectSlug, setSelectedProjectSlug]);
 
   return { navigateTo };
 }

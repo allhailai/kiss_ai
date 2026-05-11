@@ -48,12 +48,9 @@ export function registerApiRoutes(app, deps) {
   });
 
   registerAiRoutes(app, {
-    acceptRequirementsAutoUpdate: deps.acceptRequirementsAutoUpdate,
     lintDesignIdentity: deps.lintDesignIdentity,
     parseDesignIdentity: deps.parseDesignIdentity,
     readTextFile: deps.readTextFile,
-    runAiAssistProposal: deps.runAiAssistProposal,
-    runRequirementsAutoUpdateProposal: deps.runRequirementsAutoUpdateProposal,
   });
 
   registerRebuildRoutes(app, {
