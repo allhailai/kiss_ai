@@ -34,6 +34,20 @@ const unsavedDraftConversation = {
   ],
 };
 
+const conversationRootFileContext = {
+  fileContext: {
+    ai_editable_files: [
+      {
+        path: "outputs_ai/report.md",
+        contentHash: "root-hash-before",
+        draftState: "saved",
+      },
+    ],
+    context_files: [],
+  },
+  messages: [],
+};
+
 describe("extractFileEditProposals", () => {
   it("extracts authorized file edit proposals", () => {
     const text = [
@@ -87,6 +101,27 @@ describe("extractFileEditProposals", () => {
         draftContentHashBefore: "875c617c41c20743135952b42908802b8ca4679103faac5dfaf13b11ff3b9a22",
         draftStateBefore: "unsaved",
       }),
+    ]);
+  });
+
+  it("extracts proposals authorized by conversation-level file context", () => {
+    const text = [
+      "<file_edit>",
+      "<path>outputs_ai/report.md</path>",
+      "<summary>Update report.</summary>",
+      "<proposedContent>New report</proposedContent>",
+      "</file_edit>",
+    ].join("\n");
+
+    expect(extractFileEditProposals(text, conversationRootFileContext, new Set(["outputs_ai/report.md"]))).toEqual([
+      {
+        path: "outputs_ai/report.md",
+        summary: "Update report.",
+        proposedContent: "New report",
+        contentHashBefore: "root-hash-before",
+        draftStateBefore: "saved",
+        status: "proposed",
+      },
     ]);
   });
 

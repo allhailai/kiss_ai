@@ -37,6 +37,11 @@ const chatContextSchema = z.object({
   context_files: z.array(contextFileSchema).max(20).optional(),
 });
 
+const conversationFileContextSchema = z.object({
+  ai_editable_files: z.array(agentContextFileSchema).max(10).optional(),
+  context_files: z.array(contextFileSchema).max(20).optional(),
+});
+
 const conversationIdSchema = z.string().trim().regex(/^[a-zA-Z0-9_-]+$/, "Invalid conversation id.");
 const optionalQueryString = (maxLength) =>
   z
@@ -60,6 +65,7 @@ export const updateConversationBodySchema = z.object({
   title: optionalTrimmedString(120),
   summary: optionalTrimmedString(500),
   archived: z.boolean().optional(),
+  fileContext: conversationFileContextSchema.optional(),
 });
 
 export const sendChatMessageBodySchema = z.object({

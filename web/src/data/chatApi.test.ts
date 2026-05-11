@@ -14,6 +14,7 @@ describe("chatApi", () => {
         JSON.stringify({
           createdAt: "2026-05-11T00:00:00.000Z",
           defaultModelId: "gpt-test",
+          fileContext: { ai_editable_files: [], context_files: [] },
           id: "conv_1",
           messages: [],
           projectSlug: "demo",
@@ -49,6 +50,49 @@ describe("chatApi", () => {
           },
         }),
         method: "POST",
+      }),
+    );
+  });
+
+  it("updates conversation-level file context", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          createdAt: "2026-05-11T00:00:00.000Z",
+          defaultModelId: "gpt-test",
+          fileContext: {
+            ai_editable_files: [{ path: "outputs_ai/report.md" }],
+            context_files: [{ path: "inputs_human/source.md" }],
+          },
+          id: "conv_1",
+          messages: [],
+          projectSlug: "demo",
+          summary: "",
+          title: "New conversation",
+          updatedAt: "2026-05-11T00:00:00.000Z",
+          version: 1,
+        }),
+        { headers: { "Content-Type": "application/json" }, status: 200 },
+      ),
+    );
+
+    await chatApi.updateConversation("demo", "conv_1", {
+      fileContext: {
+        ai_editable_files: [{ path: "outputs_ai/report.md" }],
+        context_files: [{ path: "inputs_human/source.md" }],
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/demo/conversations/conv_1",
+      expect.objectContaining({
+        body: JSON.stringify({
+          fileContext: {
+            ai_editable_files: [{ path: "outputs_ai/report.md" }],
+            context_files: [{ path: "inputs_human/source.md" }],
+          },
+        }),
+        method: "PATCH",
       }),
     );
   });

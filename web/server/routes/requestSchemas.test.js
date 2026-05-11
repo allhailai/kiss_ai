@@ -11,6 +11,7 @@ import {
   searchFilesQuerySchema,
   sendChatMessageBodySchema,
   treeSectionParamsSchema,
+  updateConversationBodySchema,
   writeFileBodySchema,
 } from "./requestSchemas.js";
 
@@ -50,6 +51,38 @@ describe("request schemas", () => {
       ai_editable_files: [{ path: "outputs_ai/wiki/page.md", draftState: "unsaved" }],
       context_files: [{ path: "inputs_human/source.md" }],
     });
+  });
+
+  it("accepts conversation-level file context updates", () => {
+    const parsed = parseRequestBody(
+      updateConversationBodySchema,
+      {
+        fileContext: {
+          ai_editable_files: [{ path: "outputs_ai/wiki/page.md", draftState: "saved" }],
+          context_files: [{ path: "inputs_human/source.md" }],
+        },
+      },
+      httpError,
+    );
+
+    expect(parsed.fileContext).toMatchObject({
+      ai_editable_files: [{ path: "outputs_ai/wiki/page.md", draftState: "saved" }],
+      context_files: [{ path: "inputs_human/source.md" }],
+    });
+  });
+
+  it("rejects oversized conversation-level file context updates", () => {
+    expect(() =>
+      parseRequestBody(
+        updateConversationBodySchema,
+        {
+          fileContext: {
+            ai_editable_files: Array.from({ length: 11 }, (_, index) => ({ path: `outputs_ai/${index}.md` })),
+          },
+        },
+        httpError,
+      ),
+    ).toThrow("Invalid request body.");
   });
 
   it("requires write requests to include a loaded content hash", () => {

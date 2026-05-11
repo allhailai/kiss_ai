@@ -19,6 +19,7 @@ describe("conversation service", () => {
     const project = { slug: "demo", path: projectRoot };
     const service = createConversationService({ httpError, projectPath });
     const conversation = await service.createConversation(project, { modelId: "model-a" });
+    expect(conversation.fileContext).toEqual({ ai_editable_files: [], context_files: [] });
 
     await service.appendMessage(project, conversation.id, {
       role: "user",
@@ -38,6 +39,42 @@ describe("conversation service", () => {
     });
     await expect(service.listConversations(project)).resolves.toMatchObject({
       conversations: [{ id: conversation.id, messageCount: 1 }],
+    });
+  });
+
+  it("persists conversation-level file context independently from message context", async () => {
+    const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-conversations-"));
+    const project = { slug: "demo", path: projectRoot };
+    const service = createConversationService({ httpError, projectPath });
+    const conversation = await service.createConversation(project, { modelId: "model-a" });
+
+    const updated = await service.updateConversation(project, conversation.id, {
+      fileContext: {
+        ai_editable_files: [{ path: "outputs_ai/report.md", contentHash: "ignored-later", draftState: "saved" }],
+        context_files: [{ path: "inputs_human/source.md" }],
+      },
+    });
+
+    expect(updated.fileContext).toMatchObject({
+      ai_editable_files: [{ path: "outputs_ai/report.md", contentHash: "ignored-later", draftState: "saved" }],
+      context_files: [{ path: "inputs_human/source.md" }],
+    });
+
+    await service.appendMessage(project, conversation.id, {
+      role: "user",
+      content: "Keep the root file context.",
+      context: {
+        context_files: [{ path: "inputs_human/message-only.md" }],
+      },
+    });
+
+    const saved = await service.readConversation(project, conversation.id);
+    expect(saved.fileContext).toMatchObject({
+      ai_editable_files: [{ path: "outputs_ai/report.md" }],
+      context_files: [{ path: "inputs_human/source.md" }],
+    });
+    expect(saved.messages[0].context).toMatchObject({
+      context_files: [{ path: "inputs_human/message-only.md" }],
     });
   });
 

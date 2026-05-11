@@ -66,3 +66,18 @@ export function normalizeChatContext(value, options = {}) {
     ...(contextFiles.length ? { context_files: contextFiles } : {}),
   };
 }
+
+export function normalizeConversationFileContext(value, options = {}) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const aiEditableFileSource = source.ai_editable_files;
+  const contextFileSource = source.context_files;
+  const aiEditableFiles = Array.isArray(aiEditableFileSource)
+    ? aiEditableFileSource.map((file) => normalizeAiEditableFile(file, options)).filter(Boolean).slice(0, maxAiEditableFiles)
+    : [];
+  const contextFiles = Array.isArray(contextFileSource) ? contextFileSource.map(normalizeContextFile).filter(Boolean).slice(0, maxContextFiles) : [];
+
+  return {
+    ai_editable_files: aiEditableFiles,
+    context_files: contextFiles,
+  };
+}

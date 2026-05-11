@@ -80,11 +80,15 @@ export function App() {
     view: route.view,
   });
   const agentFileContext = useAgentFileContext({
+    aiEditableFiles: projectChat.aiEditableFiles,
+    contextFiles: projectChat.contextFiles,
     draft: fileWorkspace.draft,
     openProjectFile: route.openProjectFile,
     projectFiles: fileWorkspace.projectFiles,
     projectSlug: project.selectedProjectSlug,
     selected: fileWorkspace.selected,
+    setAiEditableFiles: projectChat.setAiEditableFiles,
+    setContextFiles: projectChat.setContextFiles,
   });
   const openProjectFileWithAgentContext = (path: string) => {
     agentFileContext.openProjectFileWithAgentContext(path, isAgentPanelOpen);
@@ -252,7 +256,7 @@ export function App() {
             models={rebuildWorkspace.models}
             onAddContextFile={agentFileContext.addContextFile}
             onApplyFileEdit={applyChatFileEdit}
-            onContextFilesChange={agentFileContext.setContextFiles}
+            onContextFilesChange={projectChat.setContextFiles}
             onModelChange={rebuildWorkspace.setSelectedModelId}
             onModifyCurrentFile={() => agentFileContext.currentFile && agentFileContext.addEditableFile(agentFileContext.currentFile.path)}
             onRemoveAiEditableFile={agentFileContext.removeAiEditableFile}

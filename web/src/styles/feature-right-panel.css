@@ -421,6 +421,10 @@
   text-transform: uppercase;
 }
 
+.agent-file-context-editable .agent-context-label {
+  color: var(--color-accent);
+}
+
 .agent-context-label-button {
   justify-self: start;
   padding: 0;
@@ -622,6 +626,11 @@
     border-color 0.16s ease,
     background 0.16s ease,
     box-shadow 0.16s ease;
+}
+
+.agent-file-context-editable .agent-context-chip {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .agent-context-chip.highlighted {

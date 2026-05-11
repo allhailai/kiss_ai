@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { AgentContextFile, ChatContextFile, FileContent, ProjectFile } from "../../contracts/api";
 import { fileBasename } from "../../domain/files";
 
@@ -26,6 +26,43 @@ function editableTargetFromProjectFile(file: ProjectFile, selected: FileContent 
   };
 }
 
+function editableSelectionFromProjectFile(file: ProjectFile): AgentContextFile {
+  return {
+    path: file.path,
+    label: file.name || fileBasename(file.path),
+    kind: file.kind,
+    editable: file.editable,
+    annotation: file.annotation,
+    role: "primary",
+  };
+}
+
+function enrichEditableTarget(file: AgentContextFile, projectFiles: ProjectFile[], selected: FileContent | null, draft: string): AgentContextFile {
+  const projectFile = projectFiles.find((candidate) => candidate.path === file.path);
+  if (selected?.path === file.path) {
+    return editableTargetFromProjectFile(
+      {
+        path: selected.path,
+        name: projectFile?.name ?? file.label ?? fileBasename(selected.path),
+        kind: selected.kind,
+        editable: selected.editable,
+        annotation: selected.annotation,
+      },
+      selected,
+      draft,
+    );
+  }
+
+  return {
+    ...file,
+    label: file.label ?? projectFile?.name ?? fileBasename(file.path),
+    kind: file.kind ?? projectFile?.kind,
+    editable: file.editable ?? projectFile?.editable,
+    annotation: file.annotation ?? projectFile?.annotation,
+    draftState: file.draftState ?? "unknown",
+  };
+}
+
 function currentFileFromSelectedFile(selected: FileContent | null, draft: string): AgentContextFile | null {
   if (!selected) return null;
 
@@ -43,23 +80,33 @@ function currentFileFromSelectedFile(selected: FileContent | null, draft: string
 }
 
 export function useAgentFileContext({
+  aiEditableFiles,
+  contextFiles,
   draft,
   openProjectFile,
   projectFiles,
   projectSlug,
   selected,
+  setAiEditableFiles,
+  setContextFiles,
 }: {
+  aiEditableFiles: AgentContextFile[];
+  contextFiles: ChatContextFile[];
   draft: string;
   openProjectFile: (path: string) => void;
   projectFiles: ProjectFile[];
   projectSlug: string | null;
   selected: FileContent | null;
+  setAiEditableFiles: Dispatch<SetStateAction<AgentContextFile[]>>;
+  setContextFiles: Dispatch<SetStateAction<ChatContextFile[]>>;
 }) {
-  const [aiEditableFiles, setAiEditableFiles] = useState<AgentContextFile[]>([]);
-  const [contextFiles, setContextFiles] = useState<ChatContextFile[]>([]);
   const [highlightedContext, setHighlightedContext] = useState<{ path: string; target: "editable" | "context" } | null>(null);
   const highlightTimeoutRef = useRef<number | null>(null);
   const currentFile = useMemo(() => currentFileFromSelectedFile(selected, draft), [draft, selected]);
+  const enrichedAiEditableFiles = useMemo(
+    () => aiEditableFiles.map((file) => enrichEditableTarget(file, projectFiles, selected, draft)),
+    [aiEditableFiles, draft, projectFiles, selected],
+  );
 
   const setHighlight = (path: string, target: "editable" | "context") => {
     setHighlightedContext({ path, target });
@@ -90,7 +137,7 @@ export function useAgentFileContext({
   const addEditableFile = (path: string) => {
     const file = projectFiles.find((candidate) => candidate.path === path);
     if (!file) return;
-    const editableFile = editableTargetFromProjectFile(file, selected, draft);
+    const editableFile = editableSelectionFromProjectFile(file);
     setAiEditableFiles((current) => {
       if (current.some((candidate) => candidate.path === editableFile.path)) return current;
       return [...current, editableFile];
@@ -116,36 +163,14 @@ export function useAgentFileContext({
   }, []);
 
   useEffect(() => {
-    setAiEditableFiles([]);
-    setContextFiles([]);
     setHighlightedContext(null);
   }, [projectSlug]);
-
-  useEffect(() => {
-    setAiEditableFiles((current) =>
-      current.map((file) => {
-        if (file.path !== selected?.path) return file;
-        const projectFile = projectFiles.find((candidate) => candidate.path === selected.path);
-        return editableTargetFromProjectFile(
-          {
-            path: selected.path,
-            name: projectFile?.name ?? file.label ?? fileBasename(selected.path),
-            kind: selected.kind,
-            editable: selected.editable,
-            annotation: selected.annotation,
-          },
-          selected,
-          draft,
-        );
-      }),
-    );
-  }, [draft, projectFiles, selected]);
 
   return {
     addEditableFile,
     addContextFile,
     currentFile,
-    aiEditableFiles,
+    aiEditableFiles: enrichedAiEditableFiles,
     contextFiles,
     highlightedContext,
     openProjectFileWithAgentContext,

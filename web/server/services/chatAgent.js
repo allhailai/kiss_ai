@@ -198,8 +198,8 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     readOptionalProjectText(readTextFile, project.path, "human_open_questions.md"),
   ]);
   const currentFile = [...conversation.messages].reverse().find((message) => message.context?.currentFile)?.context?.currentFile ?? null;
-  const aiEditableFiles = conversation.messages.flatMap((message) => message.context?.ai_editable_files ?? []);
-  const contextFiles = conversation.messages.flatMap((message) => message.context?.context_files ?? []);
+  const aiEditableFiles = conversation.fileContext?.ai_editable_files ?? [];
+  const contextFiles = conversation.fileContext?.context_files ?? [];
   const uniqueAiEditableFiles = uniqueByPath(aiEditableFiles, maxAiEditableFiles);
   const uniqueContextFiles = uniqueByPath(contextFiles, maxContextFiles);
   const [currentFileContext, aiEditableFileResults, contextFileResults] = await Promise.all([
@@ -285,9 +285,11 @@ function allTagContent(text, tagName) {
 }
 
 export function extractFileEditProposals(rawText, conversation, authorizedEditablePaths = null) {
+  const conversationEditableTargets = conversation.fileContext?.ai_editable_files?.length
+    ? conversation.fileContext.ai_editable_files
+    : conversation.messages.flatMap((message) => message.context?.ai_editable_files ?? []);
   const editableTargets = new Map(
-    conversation.messages
-      .flatMap((message) => message.context?.ai_editable_files ?? [])
+    conversationEditableTargets
       .filter((file) => file?.path)
       .map((file) => [file.path, file]),
   );

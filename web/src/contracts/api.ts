@@ -237,6 +237,11 @@ export type ChatMessageMetadata = Record<string, unknown> & {
   fileEdits?: ChatMessageFileEdit[];
 };
 
+export type ConversationFileContext = {
+  ai_editable_files: AgentEditableTargetFile[];
+  context_files: AgentContextSourceFile[];
+};
+
 export type ConversationSummary = {
   id: string;
   file: string;
@@ -262,6 +267,7 @@ export type Conversation = {
   createdAt: string;
   updatedAt: string;
   defaultModelId: string | null;
+  fileContext: ConversationFileContext;
   messages: ChatMessage[];
 };
 
@@ -274,6 +280,7 @@ export type UpdateConversationRequest = {
   title?: string;
   summary?: string;
   archived?: boolean;
+  fileContext?: ConversationFileContext;
 };
 
 export type SendChatMessageRequest = {

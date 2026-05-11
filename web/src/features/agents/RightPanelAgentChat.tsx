@@ -28,7 +28,6 @@ type RightPanelChatController = {
 type VisibleEditableTarget = {
   file: AgentContextFile;
   isCurrent: boolean;
-  isTemporary: boolean;
 };
 
 function contextFileLabel(file: AgentContextFile) {
@@ -84,7 +83,6 @@ export function RightPanelAgentChat({
   selectedModelId: string;
 }) {
   const [draft, setDraft] = useState("");
-  const [excludedCurrentEditablePaths, setExcludedCurrentEditablePaths] = useState<Set<string>>(() => new Set());
   const [filePickerQuery, setFilePickerQuery] = useState("");
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -92,20 +90,9 @@ export function RightPanelAgentChat({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const currentFileInAiEditable = Boolean(currentFile && aiEditableFiles.some((file) => file.path === currentFile.path));
   const currentFileInContext = Boolean(currentFile && contextFiles.some((file) => file.path === currentFile.path));
-  const currentFileIsEditable = Boolean(currentFile?.editable);
-  const currentFileTemporarilyExcluded = Boolean(currentFile && excludedCurrentEditablePaths.has(currentFile.path));
   const visibleEditableTargets = useMemo<VisibleEditableTarget[]>(() => {
     const seen = new Set<string>();
     const targets: VisibleEditableTarget[] = [];
-
-    if (currentFileIsEditable && currentFile && (!currentFileTemporarilyExcluded || currentFileInAiEditable)) {
-      seen.add(currentFile.path);
-      targets.push({
-        file: currentFile,
-        isCurrent: true,
-        isTemporary: !currentFileInAiEditable,
-      });
-    }
 
     aiEditableFiles.forEach((file) => {
       if (seen.has(file.path)) return;
@@ -113,12 +100,11 @@ export function RightPanelAgentChat({
       targets.push({
         file,
         isCurrent: currentFile?.path === file.path,
-        isTemporary: false,
       });
     });
 
     return targets;
-  }, [aiEditableFiles, currentFile, currentFileInAiEditable, currentFileIsEditable, currentFileTemporarilyExcluded]);
+  }, [aiEditableFiles, currentFile]);
   const requestAiEditableFiles = useMemo(() => uniqueEditableFiles(visibleEditableTargets.map((target) => target.file)), [visibleEditableTargets]);
   const filePickerOptions = useMemo(() => {
     if (!filePickerOpen) return [];
@@ -137,7 +123,6 @@ export function RightPanelAgentChat({
     if (chat.sending) return;
     chat.startDraftConversation();
     setDraft("");
-    onContextFilesChange([]);
     setFilePickerQuery("");
     setFilePickerOpen(false);
     setHistoryOpen(false);
@@ -176,22 +161,8 @@ export function RightPanelAgentChat({
     onContextFilesChange((current) => current.filter((file) => file.path !== path));
   };
 
-  const excludeTemporaryEditableCurrentFile = (path: string) => {
-    setExcludedCurrentEditablePaths((current) => new Set(current).add(path));
-  };
-
-  const includeTemporaryEditableCurrentFile = (path: string) => {
-    setExcludedCurrentEditablePaths((current) => {
-      if (!current.has(path)) return current;
-      const next = new Set(current);
-      next.delete(path);
-      return next;
-    });
-  };
-
   const pinCurrentFileAsEditableTarget = () => {
     if (!currentFile) return;
-    includeTemporaryEditableCurrentFile(currentFile.path);
     onModifyCurrentFile();
   };
 
@@ -321,23 +292,24 @@ export function RightPanelAgentChat({
             {!currentFileInContext || (currentFile.editable && !currentFileInAiEditable) ? (
               <div className="agent-current-file-actions" aria-label="Current file actions">
                 <details className="agent-current-file-help">
-                  <summary aria-label="Explain AI Context and AI Editable">?</summary>
+                  <summary aria-label="Explain Context and Editable targets">?</summary>
                   <span className="agent-current-file-help-text" role="tooltip">
                     <strong>Current file</strong>
-                    The open file appears as a temporary AI Editable target when the file allows edits.
-                    <strong>AI Context</strong> tells AI this file may be helpful when answering your questions. AI can still look at other project
+                    The open file is sent as the current file so AI knows what you are viewing.
+                    <strong>Context</strong> tells AI this file may be helpful when answering your questions. AI can still look at other project
                     files if needed.
-                    <strong>Editable targets</strong> stay editable when you switch files, so use them for multi-file edits.
+                    <strong>Editable targets</strong>
+                    Editable files will be updated by AI. Add files that you want AI to update & edit.
                   </span>
                 </details>
                 {!currentFileInContext ? (
                   <button className="agent-current-file-action-button" disabled={chat.sending} onClick={() => onAddContextFile(currentFile.path)} type="button">
-                    + AI Context
+                    + Context
                   </button>
                 ) : null}
                 {currentFile.editable && !currentFileInAiEditable ? (
                   <button className="agent-current-file-action-button" disabled={chat.sending} onClick={pinCurrentFileAsEditableTarget} type="button">
-                    + Editable target
+                    + Editable
                   </button>
                 ) : null}
               </div>
@@ -347,18 +319,18 @@ export function RightPanelAgentChat({
           <span className="agent-current-file-status">No file open</span>
         )}
       </div>
-      {visibleEditableTargets.length || (currentFileIsEditable && currentFileTemporarilyExcluded && currentFile) ? (
-        <div className="agent-file-context" aria-label="Editable target files">
+      {visibleEditableTargets.length ? (
+        <div className="agent-file-context agent-file-context-editable" aria-label="Editable target files">
           <div className="agent-context-header">
             <span className="agent-context-label">AI Editable</span>
           </div>
           <div className="agent-context-chips">
-            {visibleEditableTargets.map(({ file, isCurrent, isTemporary }) => (
+            {visibleEditableTargets.map(({ file, isCurrent }) => (
               <span
                 className={
                   highlightedContext?.target === "editable" && highlightedContext.path === file.path
-                    ? `agent-context-chip highlighted${isTemporary ? " temporary" : ""}`
-                    : `agent-context-chip${isTemporary ? " temporary" : ""}`
+                    ? "agent-context-chip highlighted"
+                    : "agent-context-chip"
                 }
                 key={file.path}
               >
@@ -369,23 +341,13 @@ export function RightPanelAgentChat({
                 {isCurrent ? <small>Current</small> : null}
                 <button
                   aria-label={`Remove ${file.path} from editable targets`}
-                  onClick={() => (isTemporary ? excludeTemporaryEditableCurrentFile(file.path) : onRemoveAiEditableFile(file.path))}
+                  onClick={() => onRemoveAiEditableFile(file.path)}
                   type="button"
                 >
                   x
                 </button>
               </span>
             ))}
-            {currentFileIsEditable && currentFileTemporarilyExcluded && currentFile ? (
-              <button
-                className="agent-context-chip agent-context-chip-action"
-                disabled={chat.sending}
-                onClick={() => includeTemporaryEditableCurrentFile(currentFile.path)}
-                type="button"
-              >
-                + AI Editable
-              </button>
-            ) : null}
           </div>
         </div>
       ) : null}

@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { MAX_STORED_MESSAGE_BYTES } from "../contracts/chatLimits.js";
-import { normalizeChatContext } from "./chatContext.js";
+import { normalizeChatContext, normalizeConversationFileContext } from "./chatContext.js";
 
 const conversationVersion = 1;
 const conversationIdPattern = /^[a-zA-Z0-9_-]+$/;
@@ -85,6 +85,7 @@ function normalizeConversation(project, value, fallback = {}) {
     createdAt,
     updatedAt,
     defaultModelId: typeof source.defaultModelId === "string" && source.defaultModelId.trim() ? source.defaultModelId.trim() : null,
+    fileContext: normalizeConversationFileContext(source.fileContext, { maxDraftContentLength: MAX_STORED_MESSAGE_BYTES }),
     messages,
   };
 }
@@ -249,6 +250,7 @@ export function createConversationService({ httpError, projectPath }) {
         createdAt,
         updatedAt: createdAt,
         defaultModelId: trimText(body?.modelId, 160) || null,
+        fileContext: normalizeConversationFileContext(body?.fileContext, { maxDraftContentLength: MAX_STORED_MESSAGE_BYTES }),
         messages: [],
       },
       { id, createdAt, updatedAt: createdAt },
@@ -271,6 +273,10 @@ export function createConversationService({ httpError, projectPath }) {
       ...conversation,
       title: body?.title === undefined ? conversation.title : trimText(body.title, maxTitleLength) || conversation.title,
       summary: body?.summary === undefined ? conversation.summary : trimText(body.summary, maxSummaryLength),
+      fileContext:
+        body?.fileContext === undefined
+          ? conversation.fileContext
+          : normalizeConversationFileContext(body.fileContext, { maxDraftContentLength: MAX_STORED_MESSAGE_BYTES }),
       updatedAt: nowIso(),
     };
     const index = await readIndex(project.path);
