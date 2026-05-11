@@ -405,7 +405,7 @@
   width: 100%;
 }
 
-.agent-active-context {
+.agent-file-context {
   min-width: 0;
   display: grid;
   gap: 6px;
@@ -440,10 +440,18 @@
   outline: none;
 }
 
-.agent-active-context p {
+.agent-file-context p {
   margin: 0;
   color: var(--color-secondary);
   font-size: 0.78rem;
+}
+
+.agent-context-header {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .agent-current-file {
@@ -622,6 +630,11 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 18%, transparent);
 }
 
+.agent-context-chip.temporary {
+  border-color: color-mix(in srgb, var(--color-accent) 36%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-background));
+}
+
 .agent-context-chips code {
   min-width: 0;
   overflow: hidden;
@@ -632,6 +645,15 @@
   font-size: 0.7rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.agent-context-chip small {
+  flex: 0 0 auto;
+  color: var(--color-accent);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .agent-context-chip button {
@@ -650,6 +672,26 @@
 .agent-context-chip button:focus-visible {
   color: var(--color-danger);
   outline: none;
+}
+
+.agent-context-chip-action {
+  padding: 3px 8px;
+  color: var(--color-accent);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.agent-context-chip-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.agent-context-chip-action:hover:not(:disabled),
+.agent-context-chip-action:focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-background));
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+  outline-offset: 2px;
 }
 
 .agent-file-picker {

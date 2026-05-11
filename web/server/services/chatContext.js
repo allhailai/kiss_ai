@@ -1,5 +1,5 @@
-const maxContextRefs = 20;
-const maxActiveFiles = 10;
+const maxContextFiles = 20;
+const maxAiEditableFiles = 10;
 
 function trimText(value, maxLength) {
   return String(value ?? "").trim().slice(0, maxLength);
@@ -10,7 +10,7 @@ function truncateText(value, maxLength) {
   return maxLength === Infinity ? text : text.slice(0, maxLength);
 }
 
-export function normalizeContextRef(value) {
+export function normalizeContextFile(value) {
   const source = value && typeof value === "object" ? value : {};
   const filePath = trimText(source.path, 300);
   if (!filePath) return null;
@@ -22,7 +22,7 @@ export function normalizeContextRef(value) {
   };
 }
 
-export function normalizeActiveFile(value, { maxDraftContentLength = Infinity } = {}) {
+export function normalizeAiEditableFile(value, { maxDraftContentLength = Infinity } = {}) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const filePath = trimText(source.path, 300);
   if (!filePath) return null;
@@ -45,24 +45,24 @@ export function normalizeActiveFile(value, { maxDraftContentLength = Infinity } 
 }
 
 export function normalizeCurrentFile(value, options = {}) {
-  return normalizeActiveFile(value, options);
+  return normalizeAiEditableFile(value, options);
 }
 
 export function normalizeChatContext(value, options = {}) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const currentFile = normalizeCurrentFile(source.currentFile, options);
-  const editableFileSource = Array.isArray(source.editableFiles) ? source.editableFiles : source.activeFiles;
-  const sourceFileSource = Array.isArray(source.sourceFiles) ? source.sourceFiles : source.fileRefs;
-  const editableFiles = Array.isArray(editableFileSource)
-    ? editableFileSource.map((file) => normalizeActiveFile(file, options)).filter(Boolean).slice(0, maxActiveFiles)
+  const aiEditableFileSource = source.ai_editable_files;
+  const contextFileSource = source.context_files;
+  const aiEditableFiles = Array.isArray(aiEditableFileSource)
+    ? aiEditableFileSource.map((file) => normalizeAiEditableFile(file, options)).filter(Boolean).slice(0, maxAiEditableFiles)
     : [];
-  const sourceFiles = Array.isArray(sourceFileSource) ? sourceFileSource.map(normalizeContextRef).filter(Boolean).slice(0, maxContextRefs) : [];
+  const contextFiles = Array.isArray(contextFileSource) ? contextFileSource.map(normalizeContextFile).filter(Boolean).slice(0, maxContextFiles) : [];
 
-  if (!currentFile && !editableFiles.length && !sourceFiles.length) return undefined;
+  if (!currentFile && !aiEditableFiles.length && !contextFiles.length) return undefined;
 
   return {
     ...(currentFile ? { currentFile } : {}),
-    ...(editableFiles.length ? { editableFiles } : {}),
-    ...(sourceFiles.length ? { sourceFiles } : {}),
+    ...(aiEditableFiles.length ? { ai_editable_files: aiEditableFiles } : {}),
+    ...(contextFiles.length ? { context_files: contextFiles } : {}),
   };
 }

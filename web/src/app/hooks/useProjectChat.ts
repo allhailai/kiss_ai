@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import type { AgentContextFile, ChatContextRef, ChatMessage, Conversation, ConversationSummary, ProjectFile } from "../../contracts/api";
+import type { AgentContextFile, ChatContextFile, ChatMessage, Conversation, ConversationSummary, ProjectFile } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { errorMessage } from "../../domain/errors";
 import { useConversationStream } from "./useConversationStream";
 
 type ChatSendContext = {
   currentFile?: AgentContextFile;
-  editableFiles?: AgentContextFile[];
-  sourceFiles?: ChatContextRef[];
+  ai_editable_files?: AgentContextFile[];
+  context_files?: ChatContextFile[];
 };
 
 type ChatSendOptions = {
@@ -49,13 +49,13 @@ export function useProjectChat({
   const [sending, setSending] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
-  const [contextRefs, setContextRefs] = useState<ChatContextRef[]>([]);
+  const [selectedContextFiles, setSelectedContextFiles] = useState<ChatContextFile[]>([]);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const threadRef = useRef<HTMLDivElement | null>(null);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const shouldStickToLatestRef = useRef(true);
   const forceScrollToLatestRef = useRef(false);
-  const contextFiles = useMemo(() => projectFiles.filter(isChatContextFile), [projectFiles]);
+  const availableContextFiles = useMemo(() => projectFiles.filter(isChatContextFile), [projectFiles]);
   const filteredConversations = useMemo(() => {
     const query = conversationFilter.trim().toLowerCase();
     if (!query) return conversations;
@@ -88,7 +88,7 @@ export function useProjectChat({
     try {
       const conversation = await api.conversation(projectSlug, conversationId);
       setActiveConversation(conversation);
-      setContextRefs([]);
+      setSelectedContextFiles([]);
       cancelEditingMessage();
       if (hasSettledAssistantReply(conversation)) setSending(false);
     } catch (error) {
@@ -105,7 +105,7 @@ export function useProjectChat({
     try {
       const conversation = await api.createConversation(projectSlug, { modelId: selectedModelId });
       setActiveConversation(conversation);
-      setContextRefs([]);
+      setSelectedContextFiles([]);
       cancelEditingMessage();
       await refreshConversations();
     } catch (error) {
@@ -127,7 +127,7 @@ export function useProjectChat({
     if (sending) return;
     setActiveConversation(null);
     setMessageDraft("");
-    setContextRefs([]);
+    setSelectedContextFiles([]);
     setShowJumpToLatest(false);
     forceScrollToLatestRef.current = true;
     shouldStickToLatestRef.current = true;
@@ -140,7 +140,7 @@ export function useProjectChat({
     if (!projectSlug) return false;
     const content = (options.content ?? messageDraft).trim();
     if (!content || sending) return false;
-    const context = options.context ?? (contextRefs.length ? { sourceFiles: contextRefs } : undefined);
+    const context = options.context ?? (selectedContextFiles.length ? { context_files: selectedContextFiles } : undefined);
 
     setSending(true);
     onNotice("");
@@ -199,11 +199,11 @@ export function useProjectChat({
     setMessageDraft(event.currentTarget.value);
   };
 
-  const addContextRef = (path: string) => {
+  const addContextFile = (path: string) => {
     if (sending) return;
-    const file = contextFiles.find((candidate) => candidate.path === path);
-    if (!file || contextRefs.some((ref) => ref.path === file.path)) return;
-    setContextRefs((current) => [...current, { path: file.path, label: file.name, kind: file.kind }]);
+    const file = availableContextFiles.find((candidate) => candidate.path === path);
+    if (!file || selectedContextFiles.some((ref) => ref.path === file.path)) return;
+    setSelectedContextFiles((current) => [...current, { path: file.path, label: file.name, kind: file.kind }]);
   };
 
   const scrollToLatest = (behavior: ScrollBehavior = "smooth") => {
@@ -226,7 +226,7 @@ export function useProjectChat({
     if (!projectSlug) {
       setActiveConversation(null);
       setConversations([]);
-      setContextRefs([]);
+      setSelectedContextFiles([]);
       cancelEditingMessage();
       setLoading(false);
       setSending(false);
@@ -235,7 +235,7 @@ export function useProjectChat({
 
     setActiveConversation(null);
     setConversations([]);
-    setContextRefs([]);
+    setSelectedContextFiles([]);
     cancelEditingMessage();
     void (async () => {
       setLoading(true);
@@ -290,10 +290,10 @@ export function useProjectChat({
 
   return {
     activeConversation,
-    addContextRef,
+    addContextFile,
     cancelEditingMessage,
-    contextFiles,
-    contextRefs,
+    availableContextFiles,
+    selectedContextFiles,
     conversationFilter,
     conversations,
     createConversation,
@@ -308,7 +308,7 @@ export function useProjectChat({
     saveEditedMessage,
     scrollToLatest,
     sending,
-    setContextRefs,
+    setSelectedContextFiles,
     setConversationFilter,
     setEditDraft,
     showJumpToLatest,

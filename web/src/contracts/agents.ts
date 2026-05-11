@@ -14,7 +14,7 @@ export type AgentContextFile = {
   role?: AgentContextFileRole;
 };
 
-export type AgentContextRef = {
+export type AgentContextFileSelection = {
   path: string;
   label?: string;
   kind?: AgentContextFileKind;
@@ -22,13 +22,13 @@ export type AgentContextRef = {
 };
 
 export type AgentEditableTargetFile = AgentContextFile;
-export type AgentSourceContextRef = AgentContextRef;
+export type AgentContextSourceFile = AgentContextFileSelection;
 
 export type AgentMessageContext = {
   /** Read-only context for the file currently open in the editor. */
   currentFile?: AgentContextFile;
   /** Files explicitly permitted as editable targets for proposal/apply-to-draft flows. */
-  editableFiles?: AgentEditableTargetFile[];
+  ai_editable_files?: AgentEditableTargetFile[];
   /** Files explicitly selected as read-only source context. */
-  sourceFiles?: AgentSourceContextRef[];
+  context_files?: AgentContextSourceFile[];
 };

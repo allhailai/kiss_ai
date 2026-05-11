@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
-import type { AgentContextFile, ChatContextRef, ChatMessageFileEdit, Conversation, ConversationSummary, ProjectFile, RebuildModel } from "../../contracts/api";
+import type { AgentContextFile, ChatContextFile, ChatMessageFileEdit, Conversation, ConversationSummary, ProjectFile, RebuildModel } from "../../contracts/api";
 import { fileBasename } from "../../domain/files";
 import { ChatComposer } from "../../shared/chat/ChatComposer";
 import { ChatThread } from "../../shared/chat/ChatThread";
@@ -16,7 +16,7 @@ type RightPanelChatController = {
   scrollToLatest: () => void;
   sendMessage: (options: {
     content?: string;
-    context?: { currentFile?: AgentContextFile; editableFiles?: AgentContextFile[]; sourceFiles?: ChatContextRef[] };
+    context?: { currentFile?: AgentContextFile; ai_editable_files?: AgentContextFile[]; context_files?: ChatContextFile[] };
   }) => Promise<boolean>;
   sending: boolean;
   setConversationFilter: (query: string) => void;
@@ -25,12 +25,18 @@ type RightPanelChatController = {
   threadRef: RefObject<HTMLDivElement | null>;
 };
 
+type VisibleEditableTarget = {
+  file: AgentContextFile;
+  isCurrent: boolean;
+  isTemporary: boolean;
+};
+
 function contextFileLabel(file: AgentContextFile) {
   return file.label || file.path;
 }
 
-function contextRefLabel(ref: ChatContextRef) {
-  return ref.label || ref.path;
+function contextFileSelectionLabel(file: ChatContextFile) {
+  return file.label || file.path;
 }
 
 function projectFileLabel(file: ProjectFile) {
@@ -47,48 +53,76 @@ function uniqueEditableFiles(files: AgentContextFile[]) {
 }
 
 export function RightPanelAgentChat({
-  activeFiles,
+  aiEditableFiles,
   chat,
-  contextRefs,
+  contextFiles,
   currentFile,
   highlightedContext,
   models,
-  onAddContextRef,
+  onAddContextFile,
   onApplyFileEdit,
-  onContextRefsChange,
+  onContextFilesChange,
   onModelChange,
   onModifyCurrentFile,
-  onRemoveActiveFile,
+  onRemoveAiEditableFile,
   projectFiles,
   selectedModelId,
 }: {
-  activeFiles: AgentContextFile[];
+  aiEditableFiles: AgentContextFile[];
   chat: RightPanelChatController;
-  contextRefs: ChatContextRef[];
+  contextFiles: ChatContextFile[];
   currentFile: AgentContextFile | null;
-  highlightedContext: { path: string; target: "active" | "context" } | null;
+  highlightedContext: { path: string; target: "editable" | "context" } | null;
   models: RebuildModel[];
-  onAddContextRef: (path: string) => void;
+  onAddContextFile: (path: string) => void;
   onApplyFileEdit: (edit: ChatMessageFileEdit) => void;
-  onContextRefsChange: Dispatch<SetStateAction<ChatContextRef[]>>;
+  onContextFilesChange: Dispatch<SetStateAction<ChatContextFile[]>>;
   onModelChange: (modelId: string) => void;
   onModifyCurrentFile: () => void;
-  onRemoveActiveFile: (path: string) => void;
+  onRemoveAiEditableFile: (path: string) => void;
   projectFiles: ProjectFile[];
   selectedModelId: string;
 }) {
   const [draft, setDraft] = useState("");
+  const [excludedCurrentEditablePaths, setExcludedCurrentEditablePaths] = useState<Set<string>>(() => new Set());
   const [filePickerQuery, setFilePickerQuery] = useState("");
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const titleTriggerRef = useRef<HTMLButtonElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const currentFileInActive = Boolean(currentFile && activeFiles.some((file) => file.path === currentFile.path));
-  const currentFileInContext = Boolean(currentFile && contextRefs.some((ref) => ref.path === currentFile.path));
+  const currentFileInAiEditable = Boolean(currentFile && aiEditableFiles.some((file) => file.path === currentFile.path));
+  const currentFileInContext = Boolean(currentFile && contextFiles.some((file) => file.path === currentFile.path));
   const currentFileIsEditable = Boolean(currentFile?.editable);
+  const currentFileTemporarilyExcluded = Boolean(currentFile && excludedCurrentEditablePaths.has(currentFile.path));
+  const visibleEditableTargets = useMemo<VisibleEditableTarget[]>(() => {
+    const seen = new Set<string>();
+    const targets: VisibleEditableTarget[] = [];
+
+    if (currentFileIsEditable && currentFile && (!currentFileTemporarilyExcluded || currentFileInAiEditable)) {
+      seen.add(currentFile.path);
+      targets.push({
+        file: currentFile,
+        isCurrent: true,
+        isTemporary: !currentFileInAiEditable,
+      });
+    }
+
+    aiEditableFiles.forEach((file) => {
+      if (seen.has(file.path)) return;
+      seen.add(file.path);
+      targets.push({
+        file,
+        isCurrent: currentFile?.path === file.path,
+        isTemporary: false,
+      });
+    });
+
+    return targets;
+  }, [aiEditableFiles, currentFile, currentFileInAiEditable, currentFileIsEditable, currentFileTemporarilyExcluded]);
+  const requestAiEditableFiles = useMemo(() => uniqueEditableFiles(visibleEditableTargets.map((target) => target.file)), [visibleEditableTargets]);
   const filePickerOptions = useMemo(() => {
     if (!filePickerOpen) return [];
-    const selectedPaths = new Set(contextRefs.map((file) => file.path));
+    const selectedPaths = new Set(contextFiles.map((file) => file.path));
     const query = filePickerQuery.trim().toLowerCase();
     return projectFiles
       .filter((file) => file.chatContextReadable)
@@ -97,13 +131,13 @@ export function RightPanelAgentChat({
         if (!query) return true;
         return `${file.path} ${file.name} ${file.kind}`.toLowerCase().includes(query);
       });
-  }, [contextRefs, filePickerOpen, filePickerQuery, projectFiles]);
+  }, [contextFiles, filePickerOpen, filePickerQuery, projectFiles]);
 
   const startNewConversation = () => {
     if (chat.sending) return;
     chat.startDraftConversation();
     setDraft("");
-    onContextRefsChange([]);
+    onContextFilesChange([]);
     setFilePickerQuery("");
     setFilePickerOpen(false);
     setHistoryOpen(false);
@@ -125,36 +159,54 @@ export function RightPanelAgentChat({
 
   const addPickerFile = (path: string) => {
     if (!filePickerOpen) return;
-    onAddContextRef(path);
+    onAddContextFile(path);
     setFilePickerQuery("");
     setFilePickerOpen(false);
   };
 
-  const addContextRef = (path: string) => {
+  const addContextFile = (path: string) => {
     if (chat.sending) return;
     const file = projectFiles.find((candidate) => candidate.path === path);
-    if (!file || contextRefs.some((ref) => ref.path === file.path)) return;
+    if (!file || contextFiles.some((contextFile) => contextFile.path === file.path)) return;
 
-    onContextRefsChange((current) => [...current, { path: file.path, label: file.name, kind: file.kind }]);
+    onContextFilesChange((current) => [...current, { path: file.path, label: file.name, kind: file.kind }]);
   };
 
-  const removeContextRef = (path: string) => {
-    onContextRefsChange((current) => current.filter((ref) => ref.path !== path));
+  const removeContextFile = (path: string) => {
+    onContextFilesChange((current) => current.filter((file) => file.path !== path));
+  };
+
+  const excludeTemporaryEditableCurrentFile = (path: string) => {
+    setExcludedCurrentEditablePaths((current) => new Set(current).add(path));
+  };
+
+  const includeTemporaryEditableCurrentFile = (path: string) => {
+    setExcludedCurrentEditablePaths((current) => {
+      if (!current.has(path)) return current;
+      const next = new Set(current);
+      next.delete(path);
+      return next;
+    });
+  };
+
+  const pinCurrentFileAsEditableTarget = () => {
+    if (!currentFile) return;
+    includeTemporaryEditableCurrentFile(currentFile.path);
+    onModifyCurrentFile();
   };
 
   const sendMessage = async () => {
     const content = draft.trim();
     if (!content || chat.sending) return;
-    const editableFiles = uniqueEditableFiles([...(currentFileIsEditable && currentFile ? [currentFile] : []), ...activeFiles]);
 
     const sent = await chat.sendMessage({
       content,
       context:
-        currentFile || activeFiles.length || contextRefs.length
+        currentFile || requestAiEditableFiles.length || contextFiles.length
           ? {
               currentFile: currentFile ?? undefined,
-              editableFiles: editableFiles.length ? editableFiles : undefined,
-              sourceFiles: contextRefs.length ? contextRefs : undefined,
+              ai_editable_files: requestAiEditableFiles.length ? requestAiEditableFiles : undefined,
+              context_files: contextFiles.length ? contextFiles : undefined,
             }
           : undefined,
     });
@@ -259,32 +311,32 @@ export function RightPanelAgentChat({
         />
       </div>
       <div className="agent-current-file" aria-label="Current file context">
-        <span className="agent-context-label">{currentFileIsEditable ? "AI Editable" : "Viewing"}</span>
+        <span className="agent-context-label">Viewing</span>
         {currentFile ? (
           <div className="agent-current-file-main">
             <code title={currentFile.path}>
               {contextFileLabel(currentFile)}
               {currentFile.draftState === "unsaved" ? " (unsaved)" : ""}
             </code>
-            {!currentFileInContext || (currentFile.editable && !currentFileInActive) ? (
+            {!currentFileInContext || (currentFile.editable && !currentFileInAiEditable) ? (
               <div className="agent-current-file-actions" aria-label="Current file actions">
                 <details className="agent-current-file-help">
                   <summary aria-label="Explain AI Context and AI Editable">?</summary>
                   <span className="agent-current-file-help-text" role="tooltip">
                     <strong>Current file</strong>
-                    The open file is AI Editable by default when the file allows edits.
+                    The open file appears as a temporary AI Editable target when the file allows edits.
                     <strong>AI Context</strong> tells AI this file may be helpful when answering your questions. AI can still look at other project
                     files if needed.
                     <strong>Editable targets</strong> stay editable when you switch files, so use them for multi-file edits.
                   </span>
                 </details>
                 {!currentFileInContext ? (
-                  <button className="agent-current-file-action-button" disabled={chat.sending} onClick={() => onAddContextRef(currentFile.path)} type="button">
+                  <button className="agent-current-file-action-button" disabled={chat.sending} onClick={() => onAddContextFile(currentFile.path)} type="button">
                     + AI Context
                   </button>
                 ) : null}
-                {currentFile.editable && !currentFileInActive ? (
-                  <button className="agent-current-file-action-button" disabled={chat.sending} onClick={onModifyCurrentFile} type="button">
+                {currentFile.editable && !currentFileInAiEditable ? (
+                  <button className="agent-current-file-action-button" disabled={chat.sending} onClick={pinCurrentFileAsEditableTarget} type="button">
                     + Editable target
                   </button>
                 ) : null}
@@ -295,16 +347,18 @@ export function RightPanelAgentChat({
           <span className="agent-current-file-status">No file open</span>
         )}
       </div>
-      {activeFiles.length ? (
-        <div className="agent-active-context" aria-label="Editable target files">
-          <span className="agent-context-label">Editable targets</span>
+      {visibleEditableTargets.length || (currentFileIsEditable && currentFileTemporarilyExcluded && currentFile) ? (
+        <div className="agent-file-context" aria-label="Editable target files">
+          <div className="agent-context-header">
+            <span className="agent-context-label">AI Editable</span>
+          </div>
           <div className="agent-context-chips">
-            {activeFiles.map((file) => (
+            {visibleEditableTargets.map(({ file, isCurrent, isTemporary }) => (
               <span
                 className={
-                  highlightedContext?.target === "active" && highlightedContext.path === file.path
-                    ? "agent-context-chip highlighted"
-                    : "agent-context-chip"
+                  highlightedContext?.target === "editable" && highlightedContext.path === file.path
+                    ? `agent-context-chip highlighted${isTemporary ? " temporary" : ""}`
+                    : `agent-context-chip${isTemporary ? " temporary" : ""}`
                 }
                 key={file.path}
               >
@@ -312,31 +366,46 @@ export function RightPanelAgentChat({
                   {contextFileLabel(file)}
                   {file.draftState === "unsaved" ? " (unsaved)" : ""}
                 </code>
-                <button aria-label={`Remove ${file.path} from editable targets`} onClick={() => onRemoveActiveFile(file.path)} type="button">
+                {isCurrent ? <small>Current</small> : null}
+                <button
+                  aria-label={`Remove ${file.path} from editable targets`}
+                  onClick={() => (isTemporary ? excludeTemporaryEditableCurrentFile(file.path) : onRemoveAiEditableFile(file.path))}
+                  type="button"
+                >
                   x
                 </button>
               </span>
             ))}
+            {currentFileIsEditable && currentFileTemporarilyExcluded && currentFile ? (
+              <button
+                className="agent-context-chip agent-context-chip-action"
+                disabled={chat.sending}
+                onClick={() => includeTemporaryEditableCurrentFile(currentFile.path)}
+                type="button"
+              >
+                + AI Editable
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}
-      {contextRefs.length ? (
-        <div className="agent-active-context" aria-label="Source context files">
+      {contextFiles.length ? (
+        <div className="agent-file-context" aria-label="Source context files">
           <button className="agent-context-label agent-context-label-button" onClick={toggleFilePicker} type="button">
             Context
           </button>
           <div className="agent-context-chips">
-            {contextRefs.map((ref) => (
+            {contextFiles.map((file) => (
               <span
                 className={
-                  highlightedContext?.target === "context" && highlightedContext.path === ref.path
+                  highlightedContext?.target === "context" && highlightedContext.path === file.path
                     ? "agent-context-chip highlighted"
                     : "agent-context-chip"
                 }
-                key={ref.path}
+                key={file.path}
               >
-                <code title={ref.path}>{contextRefLabel(ref)}</code>
-                <button aria-label={`Remove ${ref.path} from context`} onClick={() => removeContextRef(ref.path)} type="button">
+                <code title={file.path}>{contextFileSelectionLabel(file)}</code>
+                <button aria-label={`Remove ${file.path} from context`} onClick={() => removeContextFile(file.path)} type="button">
                   x
                 </button>
               </span>
@@ -344,7 +413,7 @@ export function RightPanelAgentChat({
           </div>
         </div>
       ) : null}
-      {contextRefs.length && filePickerOpen ? (
+      {contextFiles.length && filePickerOpen ? (
         <section className="agent-file-picker" aria-label="Add context file">
           <div className="agent-file-picker-topbar">
             <strong>Add context file</strong>
@@ -376,14 +445,14 @@ export function RightPanelAgentChat({
       ) : null}
       <ChatComposer
         contextFiles={projectFiles}
-        contextRefs={contextRefs}
+        selectedContextFiles={contextFiles}
         disabled={chat.sending}
         draft={draft}
         models={models}
-        onAddContextRef={addContextRef}
+        onAddContextFile={addContextFile}
         onChangeDraft={(event) => setDraft(event.currentTarget.value)}
         onModelChange={onModelChange}
-        onRemoveContextRef={removeContextRef}
+        onRemoveContextFile={removeContextFile}
         onSubmit={() => void sendMessage()}
         placeholder="Ask the side-panel agent..."
         selectedModelId={selectedModelId}

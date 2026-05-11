@@ -5,7 +5,7 @@ const conversation = {
   messages: [
     {
       context: {
-        editableFiles: [
+        ai_editable_files: [
           {
             path: "human_goal_requirements.md",
             contentHash: "hash-before",
@@ -21,7 +21,7 @@ const unsavedDraftConversation = {
   messages: [
     {
       context: {
-        editableFiles: [
+        ai_editable_files: [
           {
             path: "human_goal_requirements.md",
             contentHash: "hash-before",

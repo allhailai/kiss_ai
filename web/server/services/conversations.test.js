@@ -25,44 +25,20 @@ describe("conversation service", () => {
       content: "Please update this file.",
       context: {
         currentFile: { path: "human_goal_requirements.md", draftState: "saved" },
-        editableFiles: [{ path: "human_goal_requirements.md", contentHash: "abc123", draftState: "saved" }],
-        sourceFiles: [{ path: "inputs_human/source.md" }],
+        ai_editable_files: [{ path: "human_goal_requirements.md", contentHash: "abc123", draftState: "saved" }],
+        context_files: [{ path: "inputs_human/source.md" }],
       },
     });
 
     const saved = await service.readConversation(project, conversation.id);
     expect(saved.messages[0].context).toMatchObject({
       currentFile: { path: "human_goal_requirements.md" },
-      editableFiles: [{ path: "human_goal_requirements.md", contentHash: "abc123" }],
-      sourceFiles: [{ path: "inputs_human/source.md" }],
+      ai_editable_files: [{ path: "human_goal_requirements.md", contentHash: "abc123" }],
+      context_files: [{ path: "inputs_human/source.md" }],
     });
     await expect(service.listConversations(project)).resolves.toMatchObject({
       conversations: [{ id: conversation.id, messageCount: 1 }],
     });
-  });
-
-  it("normalizes legacy chat context aliases to canonical names", async () => {
-    const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-conversations-"));
-    const project = { slug: "demo", path: projectRoot };
-    const service = createConversationService({ httpError, projectPath });
-    const conversation = await service.createConversation(project, { modelId: "model-a" });
-
-    await service.appendMessage(project, conversation.id, {
-      role: "user",
-      content: "Please use legacy context.",
-      context: {
-        activeFiles: [{ path: "human_goal_requirements.md", contentHash: "abc123", draftState: "saved" }],
-        fileRefs: [{ path: "inputs_human/source.md" }],
-      },
-    });
-
-    const saved = await service.readConversation(project, conversation.id);
-    expect(saved.messages[0].context).toMatchObject({
-      editableFiles: [{ path: "human_goal_requirements.md", contentHash: "abc123" }],
-      sourceFiles: [{ path: "inputs_human/source.md" }],
-    });
-    expect(saved.messages[0].context).not.toHaveProperty("activeFiles");
-    expect(saved.messages[0].context).not.toHaveProperty("fileRefs");
   });
 
   it("serializes overlapping message appends for the same project", async () => {

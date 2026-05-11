@@ -4,8 +4,8 @@ import { normalizeChatContext } from "./chatContext.js";
 
 const maxPromptFileBytes = 24 * 1024;
 const maxPromptHistoryMessages = 40;
-const maxContextRefs = 20;
-const maxActiveFiles = 10;
+const maxContextFiles = 20;
+const maxAiEditableFiles = 10;
 
 function nowIso() {
   return new Date().toISOString();
@@ -81,24 +81,24 @@ async function readOptionalProjectText(readTextFile, projectRoot, relativePath, 
   }
 }
 
-function uniqueByPath(refs, limit) {
-  return [...new Map(refs.filter((ref) => ref?.path).map((ref) => [ref.path, ref])).values()].slice(-limit);
+function uniqueByPath(files, limit) {
+  return [...new Map(files.filter((file) => file?.path).map((file) => [file.path, file])).values()].slice(-limit);
 }
 
-async function readSourceContextFiles({ project, readTextFile, fileRefs }) {
-  return await Promise.all(fileRefs.map(async (ref) => {
+async function readContextFiles({ project, readTextFile, contextFiles }) {
+  return await Promise.all(contextFiles.map(async (contextFile) => {
     try {
-      const file = await readTextFile(project.path, ref.path);
+      const file = await readTextFile(project.path, contextFile.path);
       if (!/^human_[^/]+\.md$/i.test(file.path) && !file.path.startsWith("inputs_human/") && !file.path.startsWith("inputs_ai/") && !file.path.startsWith("outputs_ai/")) {
         return {
-          path: ref.path,
+          path: contextFile.path,
           error: "This path is outside the chat context allowlist.",
         };
       }
 
       return {
         path: file.path,
-        label: ref.label || file.path,
+        label: contextFile.label || file.path,
         kind: file.kind,
         contentHash: file.contentHash,
         intent: "source",
@@ -106,49 +106,49 @@ async function readSourceContextFiles({ project, readTextFile, fileRefs }) {
       };
     } catch (error) {
       return {
-        path: ref.path,
+        path: contextFile.path,
         error: error instanceof Error ? error.message : "Could not read file context.",
       };
     }
   }));
 }
 
-async function readActiveContextFiles({ project, readTextFile, activeFiles }) {
-  return await Promise.all(activeFiles.map(async (ref) => {
+async function readAiEditableFiles({ project, readTextFile, aiEditableFiles }) {
+  return await Promise.all(aiEditableFiles.map(async (editableFile) => {
     try {
-      const file = await readTextFile(project.path, ref.path);
+      const file = await readTextFile(project.path, editableFile.path);
       if (!file.editable) {
         return {
           path: file.path,
-          label: ref.label || file.path,
+          label: editableFile.label || file.path,
           intent: "editable_target",
           error: "This path is not editable in the lab UI.",
         };
       }
 
-      const expectedHash = typeof ref.contentHash === "string" && ref.contentHash ? ref.contentHash : null;
-      const hasUnsavedDraft = ref.draftState === "unsaved" && typeof ref.draftContent === "string";
+      const expectedHash = typeof editableFile.contentHash === "string" && editableFile.contentHash ? editableFile.contentHash : null;
+      const hasUnsavedDraft = editableFile.draftState === "unsaved" && typeof editableFile.draftContent === "string";
       return {
         path: file.path,
-        label: ref.label || file.path,
+        label: editableFile.label || file.path,
         kind: file.kind,
         editable: file.editable,
         annotation: file.annotation,
         expectedContentHash: expectedHash,
         contentHash: file.contentHash,
         hashStatus: expectedHash ? (expectedHash === file.contentHash ? "matched" : "changed") : "missing_hash",
-        draftState: ref.draftState ?? "unknown",
-        role: ref.role ?? "secondary",
+        draftState: editableFile.draftState ?? "unknown",
+        role: editableFile.role ?? "secondary",
         intent: "editable_target",
         contentSource: hasUnsavedDraft ? "unsaved_draft" : "saved_file",
-        content: trimForPrompt(hasUnsavedDraft ? ref.draftContent : file.content),
+        content: trimForPrompt(hasUnsavedDraft ? editableFile.draftContent : file.content),
       };
     } catch (error) {
       return {
-        path: ref.path,
-        label: ref.label || ref.path,
+        path: editableFile.path,
+        label: editableFile.label || editableFile.path,
         intent: "editable_target",
-        error: error instanceof Error ? error.message : "Could not read active file context.",
+        error: error instanceof Error ? error.message : "Could not read AI editable file context.",
       };
     }
   }));
@@ -198,18 +198,18 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     readOptionalProjectText(readTextFile, project.path, "human_open_questions.md"),
   ]);
   const currentFile = [...conversation.messages].reverse().find((message) => message.context?.currentFile)?.context?.currentFile ?? null;
-  const activeFiles = conversation.messages.flatMap((message) => message.context?.editableFiles ?? message.context?.activeFiles ?? []);
-  const fileRefs = conversation.messages.flatMap((message) => message.context?.sourceFiles ?? message.context?.fileRefs ?? []);
-  const uniqueEditableFiles = uniqueByPath(activeFiles, maxActiveFiles);
-  const uniqueSourceFiles = uniqueByPath(fileRefs, maxContextRefs);
-  const [currentFileContext, editableTargetFileResults, sourceContextFiles] = await Promise.all([
+  const aiEditableFiles = conversation.messages.flatMap((message) => message.context?.ai_editable_files ?? []);
+  const contextFiles = conversation.messages.flatMap((message) => message.context?.context_files ?? []);
+  const uniqueAiEditableFiles = uniqueByPath(aiEditableFiles, maxAiEditableFiles);
+  const uniqueContextFiles = uniqueByPath(contextFiles, maxContextFiles);
+  const [currentFileContext, aiEditableFileResults, contextFileResults] = await Promise.all([
     readCurrentFileContext({ project, readTextFile, currentFile }),
-    readActiveContextFiles({ project, readTextFile, activeFiles: uniqueEditableFiles }),
-    readSourceContextFiles({ project, readTextFile, fileRefs: uniqueSourceFiles }),
+    readAiEditableFiles({ project, readTextFile, aiEditableFiles: uniqueAiEditableFiles }),
+    readContextFiles({ project, readTextFile, contextFiles: uniqueContextFiles }),
   ]);
-  const editableTargetFiles = editableTargetFileResults.filter((file) => !file.error && file.editable);
-  const rejectedEditableTargetFiles = editableTargetFileResults.filter((file) => file.error);
-  const authorizedEditablePaths = new Set(editableTargetFiles.map((file) => file.path));
+  const authorizedAiEditableFiles = aiEditableFileResults.filter((file) => !file.error && file.editable);
+  const rejectedAiEditableFiles = aiEditableFileResults.filter((file) => file.error);
+  const authorizedEditablePaths = new Set(authorizedAiEditableFiles.map((file) => file.path));
   const history = conversation.messages.slice(-maxPromptHistoryMessages).map(formatHistoryMessage);
   const projectName = displayProjectName(harness.project_name ?? project.name, harness.project_slug ?? project.slug);
 
@@ -234,9 +234,9 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
       history,
     },
     currentFileContext,
-    editableTargetFiles,
-    rejectedEditableTargetFiles,
-    sourceContextFiles,
+    ai_editable_files: authorizedAiEditableFiles,
+    rejected_ai_editable_files: rejectedAiEditableFiles,
+    context_files: contextFileResults,
   };
 
   const prompt = [
@@ -247,13 +247,13 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     "- Treat a new conversation as fresh context; do not assume access to previous conversations.",
     "- Treat currentFileContext as read-only context for the file the user is viewing. It does not grant edit permission.",
     "- Context entries with contentSource=unsaved_draft reflect the user's current unsaved editor draft and should be treated as newer than saved file content.",
-    "- You may propose or prepare updates for files listed in editableTargetFiles; base proposals on the provided content field, do not directly edit files, run modifying commands, write logs, or create artifacts.",
-    "- Treat sourceContextFiles as read-only sources to consider. Do not treat them as editable targets unless the same path also appears in editableTargetFiles.",
-    "- When the user asks for file changes, propose edits only for editableTargetFiles and keep the response proposal-only.",
+    "- You may propose or prepare updates for files listed in ai_editable_files; base proposals on the provided content field, do not directly edit files, run modifying commands, write logs, or create artifacts.",
+    "- Treat context_files as read-only sources to consider. Do not treat them as editable targets unless the same path also appears in ai_editable_files.",
+    "- When the user asks for file changes, propose edits only for ai_editable_files and keep the response proposal-only.",
     "- For each proposed file edit, include a tagged block: <file_edit><path>relative/path.md</path><summary>short summary</summary><proposedContent>full replacement file content</proposedContent></file_edit>.",
     "- The web UI may apply tagged file_edit proposals to the unsaved editor draft. Never write files directly.",
-    "- User-selected sourceContextFiles are the only ad hoc file contents included beyond the standard requirement files in the project payload.",
-    "- If needed context is missing from currentFileContext, editableTargetFiles, sourceContextFiles, or the standard requirement files, say what is missing.",
+    "- User-selected context_files are the only ad hoc file contents included beyond the standard requirement files in the project payload.",
+    "- If needed context is missing from currentFileContext, ai_editable_files, context_files, or the standard requirement files, say what is missing.",
     "- Stay inside the current project. User-selected source context files are limited to human_*.md, inputs_human/, inputs_ai/, and outputs_ai/.",
     "- Do not expose hidden chain-of-thought. Provide concise reasoning summaries when useful.",
     "- If context is missing, say what is missing and suggest the next best step.",
@@ -287,7 +287,7 @@ function allTagContent(text, tagName) {
 export function extractFileEditProposals(rawText, conversation, authorizedEditablePaths = null) {
   const editableTargets = new Map(
     conversation.messages
-      .flatMap((message) => message.context?.editableFiles ?? message.context?.activeFiles ?? [])
+      .flatMap((message) => message.context?.ai_editable_files ?? [])
       .filter((file) => file?.path)
       .map((file) => [file.path, file]),
   );

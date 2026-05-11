@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from "react";
-import type { ChatContextRef, ProjectFile, RebuildModel } from "../../contracts/api";
+import type { ChatContextFile, ProjectFile, RebuildModel } from "../../contracts/api";
 import { fileBasename } from "../../domain/files";
 import { formatModelLabel, modelTierLabels, modelTierOrder } from "../../domain/modelLabels";
 
 const composerMaxRows = 8;
 
-function contextLabel(ref: ChatContextRef) {
-  return ref.label || ref.path;
+function contextLabel(file: ChatContextFile) {
+  return file.label || file.path;
 }
 
 function fileLabel(file: ProjectFile) {
@@ -31,14 +31,14 @@ function resizeComposer(textarea: HTMLTextAreaElement | null) {
 
 export function ChatComposer({
   contextFiles,
-  contextRefs,
+  selectedContextFiles,
   disabled,
   draft,
   models,
-  onAddContextRef = () => undefined,
+  onAddContextFile = () => undefined,
   onChangeDraft,
   onModelChange,
-  onRemoveContextRef = () => undefined,
+  onRemoveContextFile = () => undefined,
   onSubmit,
   placeholder = "Ask about this project... Enter to send, Shift+Enter for a new line",
   selectedModelId,
@@ -47,14 +47,14 @@ export function ChatComposer({
   textareaRef,
 }: {
   contextFiles: ProjectFile[];
-  contextRefs: ChatContextRef[];
+  selectedContextFiles: ChatContextFile[];
   disabled: boolean;
   draft: string;
   models: RebuildModel[];
-  onAddContextRef?: (path: string) => void;
+  onAddContextFile?: (path: string) => void;
   onChangeDraft: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   onModelChange: (modelId: string) => void;
-  onRemoveContextRef?: (path: string) => void;
+  onRemoveContextFile?: (path: string) => void;
   onSubmit: () => void;
   placeholder?: string;
   selectedModelId: string;
@@ -72,7 +72,7 @@ export function ChatComposer({
   const contextBlurTimeoutRef = useRef<number | null>(null);
   const modelBlurTimeoutRef = useRef<number | null>(null);
   const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
-  const selectedContextPaths = useMemo(() => new Set(contextRefs.map((ref) => ref.path)), [contextRefs]);
+  const selectedContextPaths = useMemo(() => new Set(selectedContextFiles.map((file) => file.path)), [selectedContextFiles]);
   const filteredContextFiles = useMemo(() => {
     const query = contextQuery.trim().toLowerCase();
     return contextFiles
@@ -140,7 +140,7 @@ export function ChatComposer({
 
   const addContextFile = (file: ProjectFile | null) => {
     if (!file || disabled) return;
-    onAddContextRef(file.path);
+    onAddContextFile(file.path);
     setContextQuery("");
     setContextPickerOpen(false);
     textareaRef.current?.focus();
@@ -293,17 +293,17 @@ export function ChatComposer({
                 </div>
               ) : null}
             </div>
-            {contextRefs.length ? (
+            {selectedContextFiles.length ? (
               <div className="chat-context-chips" aria-label="Selected file context">
-                {contextRefs.map((ref) => (
+                {selectedContextFiles.map((file) => (
                   <button
                     className="chat-context-chip"
-                    key={ref.path}
-                    onClick={() => onRemoveContextRef(ref.path)}
-                    title={`Remove ${ref.path}`}
+                    key={file.path}
+                    onClick={() => onRemoveContextFile(file.path)}
+                    title={`Remove ${file.path}`}
                     type="button"
                   >
-                    <span className="chat-context-chip-label">{contextLabel(ref)}</span>
+                    <span className="chat-context-chip-label">{contextLabel(file)}</span>
                     <span className="chat-context-chip-remove" aria-hidden="true">
                       x
                     </span>

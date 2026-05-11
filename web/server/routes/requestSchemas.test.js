@@ -38,8 +38,8 @@ describe("request schemas", () => {
         content: "Use the selected files.",
         context: {
           currentFile: { path: "human_goal_requirements.md", draftState: "saved" },
-          editableFiles: [{ path: "outputs_ai/wiki/page.md", draftContent: "Draft", draftState: "unsaved" }],
-          sourceFiles: [{ path: "inputs_human/source.md" }],
+          ai_editable_files: [{ path: "outputs_ai/wiki/page.md", draftContent: "Draft", draftState: "unsaved" }],
+          context_files: [{ path: "inputs_human/source.md" }],
         },
       },
       httpError,
@@ -47,8 +47,8 @@ describe("request schemas", () => {
 
     expect(parsed.context).toMatchObject({
       currentFile: { path: "human_goal_requirements.md" },
-      editableFiles: [{ path: "outputs_ai/wiki/page.md", draftState: "unsaved" }],
-      sourceFiles: [{ path: "inputs_human/source.md" }],
+      ai_editable_files: [{ path: "outputs_ai/wiki/page.md", draftState: "unsaved" }],
+      context_files: [{ path: "inputs_human/source.md" }],
     });
   });
 

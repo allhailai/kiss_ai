@@ -16,13 +16,13 @@ function optionalTrimmedString(maxLength) {
     .transform((value) => (value ? value : undefined));
 }
 
-const contextRefSchema = z.object({
+const contextFileSchema = z.object({
   path: z.string().trim().min(1).max(300),
   label: optionalTrimmedString(160),
   kind: optionalTrimmedString(40),
 });
 
-const agentContextFileSchema = contextRefSchema.extend({
+const agentContextFileSchema = contextFileSchema.extend({
   editable: z.boolean().optional(),
   annotation: z.boolean().optional(),
   contentHash: optionalTrimmedString(160),
@@ -33,10 +33,8 @@ const agentContextFileSchema = contextRefSchema.extend({
 
 const chatContextSchema = z.object({
   currentFile: agentContextFileSchema.optional(),
-  editableFiles: z.array(agentContextFileSchema).max(10).optional(),
-  sourceFiles: z.array(contextRefSchema).max(20).optional(),
-  activeFiles: z.array(agentContextFileSchema).max(10).optional(),
-  fileRefs: z.array(contextRefSchema).max(20).optional(),
+  ai_editable_files: z.array(agentContextFileSchema).max(10).optional(),
+  context_files: z.array(contextFileSchema).max(20).optional(),
 });
 
 const conversationIdSchema = z.string().trim().regex(/^[a-zA-Z0-9_-]+$/, "Invalid conversation id.");

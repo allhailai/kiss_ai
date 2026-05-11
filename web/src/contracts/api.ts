@@ -1,14 +1,14 @@
-import type { AgentContextDraftState, AgentContextFile, AgentContextRef, AgentEditableTargetFile, AgentSourceContextRef } from "./agents";
+import type { AgentContextDraftState, AgentContextFile, AgentContextFileSelection, AgentContextSourceFile, AgentEditableTargetFile } from "./agents";
 
 export type {
   AgentContextDraftState,
-  AgentContextRef,
+  AgentContextFileSelection,
+  AgentContextSourceFile,
   AgentEditableTargetFile,
   AgentContextFile,
   AgentContextFileKind,
   AgentContextFileRole,
   AgentMessageContext,
-  AgentSourceContextRef,
 } from "./agents";
 
 export type ResolutionOption = {
@@ -203,7 +203,7 @@ export type ChatMessageRole = "user" | "assistant" | "system";
 
 export type ChatMessageStatus = "complete" | "streaming" | "error";
 
-export type ChatContextRef = AgentContextRef;
+export type ChatContextFile = AgentContextFileSelection;
 
 export type ChatMessage = {
   id: string;
@@ -215,8 +215,8 @@ export type ChatMessage = {
   status: ChatMessageStatus;
   context?: {
     currentFile?: AgentContextFile;
-    editableFiles?: AgentEditableTargetFile[];
-    sourceFiles?: AgentSourceContextRef[];
+    ai_editable_files?: AgentEditableTargetFile[];
+    context_files?: AgentContextSourceFile[];
   };
   metadata?: ChatMessageMetadata;
 };
@@ -281,8 +281,8 @@ export type SendChatMessageRequest = {
   content: string;
   context?: {
     currentFile?: AgentContextFile;
-    editableFiles?: AgentEditableTargetFile[];
-    sourceFiles?: AgentSourceContextRef[];
+    ai_editable_files?: AgentEditableTargetFile[];
+    context_files?: AgentContextSourceFile[];
   };
 };
 

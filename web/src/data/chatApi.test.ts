@@ -31,8 +31,8 @@ describe("chatApi", () => {
       content: "Use this file.",
       context: {
         currentFile: { path: "human_goal_requirements.md", draftState: "saved" },
-        editableFiles: [{ path: "outputs_ai/report.md", draftState: "unknown" }],
-        sourceFiles: [{ path: "inputs_human/source.md" }],
+        ai_editable_files: [{ path: "outputs_ai/report.md", draftState: "unknown" }],
+        context_files: [{ path: "inputs_human/source.md" }],
       },
     });
 
@@ -44,8 +44,8 @@ describe("chatApi", () => {
           content: "Use this file.",
           context: {
             currentFile: { path: "human_goal_requirements.md", draftState: "saved" },
-            editableFiles: [{ path: "outputs_ai/report.md", draftState: "unknown" }],
-            sourceFiles: [{ path: "inputs_human/source.md" }],
+            ai_editable_files: [{ path: "outputs_ai/report.md", draftState: "unknown" }],
+            context_files: [{ path: "inputs_human/source.md" }],
           },
         }),
         method: "POST",
