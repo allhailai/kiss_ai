@@ -2,15 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import type { AgentContextFile, ChatContextRef, ChatMessage, Conversation, ConversationSummary, ProjectFile } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { errorMessage } from "../../domain/errors";
-import { isChatSourceContextPath } from "../../domain/projectPaths";
 import { useConversationStream } from "./useConversationStream";
 
 type ChatSendContext = {
   currentFile?: AgentContextFile;
   editableFiles?: AgentContextFile[];
   sourceFiles?: ChatContextRef[];
-  activeFiles?: AgentContextFile[];
-  fileRefs?: ChatContextRef[];
 };
 
 type ChatSendOptions = {
@@ -19,7 +16,7 @@ type ChatSendOptions = {
 };
 
 function isChatContextFile(file: ProjectFile) {
-  return isChatSourceContextPath(file.path);
+  return Boolean(file.chatContextReadable);
 }
 
 function isNearScrollBottom(element: HTMLElement) {

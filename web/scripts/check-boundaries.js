@@ -121,6 +121,7 @@ const serverRules = [
         "capabilities.js",
         "conversations.js",
         "cursorModels.js",
+        "harnessState.js",
         "projectFiles.js",
         "projects.js",
       ]).has(path.basename(filePath)),

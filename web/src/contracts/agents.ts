@@ -9,6 +9,7 @@ export type AgentContextFile = {
   editable?: boolean;
   annotation?: boolean;
   contentHash?: string;
+  draftContent?: string;
   draftState?: AgentContextDraftState;
   role?: AgentContextFileRole;
 };
@@ -30,8 +31,4 @@ export type AgentMessageContext = {
   editableFiles?: AgentEditableTargetFile[];
   /** Files explicitly selected as read-only source context. */
   sourceFiles?: AgentSourceContextRef[];
-  /** Compatibility name for files explicitly permitted as editable targets. */
-  activeFiles?: AgentContextFile[];
-  /** Compatibility name for files explicitly selected as source context. */
-  fileRefs?: AgentContextRef[];
 };

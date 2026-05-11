@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { projectPathPrefixes } from "../domain/projectPaths";
+import { resolveChatFileEditApplication } from "./chatFileEdits";
 import { buildThemeStyle } from "./theme";
 import { useProjectWorkspace } from "./useProjectWorkspace";
 import { RightPanelSurface } from "./RightPanelSurface";
 import { RightPanelToggle } from "./RightPanelToggle";
 import { useRightPanelSurface } from "./hooks/useRightPanelSurface";
 import { useRightPanelWidth } from "./hooks/useRightPanelWidth";
+import { useAgentChatPanel } from "./hooks/useAgentChatPanel";
 import { type View } from "../navigation/views";
 import { BuildLogWorkspace } from "../features/buildLog/BuildLogWorkspace";
 import { ProjectChatConversationHistory } from "../features/chat/ProjectChatConversationHistory";
@@ -20,7 +22,7 @@ import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
 import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
 import { useAgentFileContext } from "./hooks/useAgentFileContext";
-import { readAgentChatConversationId, writeAgentChatConversationId } from "./rightPanelSurfaceStorage";
+import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
 import type { ChatMessageFileEdit } from "../contracts/api";
 
 const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: string }>> = {
@@ -41,19 +43,11 @@ const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: str
   },
 };
 
-const agentChatPanel = { kind: "agent-chat", title: "Agent Chat" } as const;
-
 export function App() {
   const workspace = useProjectWorkspace();
   const { designWorkspace, fileWorkspace, project, rebuildWorkspace, route, toastWorkspace } = workspace;
   const rightPanelSurface = useRightPanelSurface();
-  const [chatPanelDismissed, setChatPanelDismissed] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const projectChatVisitKeyRef = useRef<string | null>(null);
-  const mirroredConversationRef = useRef<{ projectSlug: string | null; conversationId: string | null }>({
-    projectSlug: null,
-    conversationId: null,
-  });
   const themeStyle = useMemo(() => buildThemeStyle(designWorkspace.design), [designWorkspace.design]);
   const rightPanelWidth = useRightPanelWidth({
     panelKind: rightPanelSurface.rightPanel?.kind ?? null,
@@ -79,7 +73,12 @@ export function App() {
     onNotice: toastWorkspace.setNotice,
   });
   const navigateTo = (view: View, filePath?: string | null, context?: Record<string, string>) => route.navigateTo(view, filePath, context);
-  const isAgentPanelOpen = rightPanelSurface.rightPanel?.kind === agentChatPanel.kind;
+  const { closeAgentPanel, isAgentPanelOpen, selectProjectChatConversation, toggleAgentPanel } = useAgentChatPanel({
+    projectChat,
+    projectSlug: project.selectedProjectSlug,
+    rightPanelSurface,
+    view: route.view,
+  });
   const agentFileContext = useAgentFileContext({
     draft: fileWorkspace.draft,
     openProjectFile: route.openProjectFile,
@@ -90,96 +89,23 @@ export function App() {
   const openProjectFileWithAgentContext = (path: string) => {
     agentFileContext.openProjectFileWithAgentContext(path, isAgentPanelOpen);
   };
-  const applyChatFileEdit = (edit: ChatMessageFileEdit) => {
-    if (!edit.proposedContent) {
-      toastWorkspace.setNotice("This chat edit does not include draft content to apply.");
+  const applyChatFileEdit = async (edit: ChatMessageFileEdit) => {
+    const decision = await resolveChatFileEditApplication({ draft: fileWorkspace.draft, edit, selected: fileWorkspace.selected });
+
+    if (decision.kind === "open-file") {
+      route.openProjectFile(decision.path);
+      toastWorkspace.setNotice(decision.message);
       return;
     }
 
-    if (fileWorkspace.selected?.path !== edit.path) {
-      route.openProjectFile(edit.path);
-      toastWorkspace.setNotice(`Opened ${edit.path}. Apply the chat edit again after the file loads.`);
+    if (decision.kind === "notice") {
+      toastWorkspace.setNotice(decision.message);
       return;
     }
 
-    if (edit.contentHashBefore && fileWorkspace.selected.contentHash !== edit.contentHashBefore) {
-      toastWorkspace.setNotice("The saved file changed after this chat edit was proposed. Ask chat to regenerate the edit.");
-      return;
-    }
-
-    fileWorkspace.setDraft(edit.proposedContent);
-    toastWorkspace.setNotice("Applied the chat edit to the unsaved editor draft. Review and save when ready.");
+    fileWorkspace.setDraft(decision.content);
+    toastWorkspace.setNotice(decision.message);
   };
-  const openAgentChatPanel = () => {
-    setChatPanelDismissed(false);
-    rightPanelSurface.openPanel(agentChatPanel);
-  };
-  const selectProjectChatConversation = (conversationId: string) => {
-    openAgentChatPanel();
-    writeAgentChatConversationId(project.selectedProjectSlug, conversationId);
-    void projectChat.openConversation(conversationId);
-  };
-  const toggleAgentPanel = () => {
-    if (rightPanelSurface.rightPanel?.kind === agentChatPanel.kind) {
-      if (route.view === "chat") setChatPanelDismissed(true);
-      rightPanelSurface.closePanel();
-      return;
-    }
-
-    openAgentChatPanel();
-  };
-
-  useEffect(() => {
-    if (!project.selectedProjectSlug || route.view !== "chat") {
-      projectChatVisitKeyRef.current = null;
-      if (chatPanelDismissed) setChatPanelDismissed(false);
-      return;
-    }
-
-    if (projectChatVisitKeyRef.current !== project.selectedProjectSlug) {
-      projectChatVisitKeyRef.current = project.selectedProjectSlug;
-      if (chatPanelDismissed) setChatPanelDismissed(false);
-      openAgentChatPanel();
-      return;
-    }
-
-    if (!chatPanelDismissed && !rightPanelSurface.rightPanel) {
-      openAgentChatPanel();
-    }
-  }, [chatPanelDismissed, project.selectedProjectSlug, rightPanelSurface.rightPanel, route.view]);
-
-  useEffect(() => {
-    const projectSlug = project.selectedProjectSlug;
-    const conversationId = projectChat.activeConversation?.id ?? null;
-    const previous = mirroredConversationRef.current;
-
-    if (!projectSlug) {
-      mirroredConversationRef.current = { projectSlug: null, conversationId: null };
-      return;
-    }
-
-    if (previous.projectSlug !== projectSlug) {
-      mirroredConversationRef.current = { projectSlug, conversationId: null };
-      return;
-    }
-
-    if (conversationId) {
-      writeAgentChatConversationId(projectSlug, conversationId);
-    } else if (previous.conversationId) {
-      writeAgentChatConversationId(projectSlug, null);
-    }
-
-    mirroredConversationRef.current = { projectSlug, conversationId };
-  }, [project.selectedProjectSlug, projectChat.activeConversation?.id]);
-
-  useEffect(() => {
-    if (!isAgentPanelOpen || !project.selectedProjectSlug) return;
-
-    const storedConversationId = readAgentChatConversationId(project.selectedProjectSlug);
-    if (!storedConversationId || projectChat.activeConversation?.id === storedConversationId) return;
-
-    void projectChat.openConversation(storedConversationId);
-  }, [isAgentPanelOpen, project.selectedProjectSlug, projectChat.activeConversation?.id]);
 
   if (!project.selectedProjectSlug || !project.selectedProject) {
     return (
@@ -201,12 +127,6 @@ export function App() {
   const appShellClassName = `${sidebarCollapsed ? "app-shell sidebar-collapsed" : "app-shell"}${
     rightPanelSurface.rightPanel ? ` right-panel-open right-panel-${rightPanelSurface.rightPanel.kind}` : ""
   }`;
-  const handleRightPanelClose = () => {
-    if (route.view === "chat" && rightPanelSurface.rightPanel) {
-      setChatPanelDismissed(true);
-    }
-    rightPanelSurface.closePanel();
-  };
   return (
     <main className={appShellClassName} style={appStyle}>
       <GlobalFileSearch
@@ -234,7 +154,7 @@ export function App() {
         {!sidebarCollapsed ? (
           <SimplifiedNavigator
             currentView={route.view}
-            loading={fileWorkspace.loading}
+            loading={fileWorkspace.treeLoading}
             projectFiles={fileWorkspace.projectFiles}
             selectedPath={fileWorkspace.selected?.path ?? null}
             onDeleteHumanInputFile={(path) => void fileWorkspace.deleteHumanInputFile(path)}
@@ -308,7 +228,7 @@ export function App() {
       </section>
       {rightPanelSurface.rightPanel ? (
         <RightPanelSurface
-          onClose={handleRightPanelClose}
+          onClose={closeAgentPanel}
           panel={rightPanelSurface.rightPanel}
           resize={
             rightPanelWidth.isResizable

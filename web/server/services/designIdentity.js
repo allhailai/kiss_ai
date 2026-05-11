@@ -34,15 +34,32 @@ export function createDesignIdentityService() {
             return;
           }
 
+          const parsedOutput = safeParseLintOutput(stdout);
           resolve({
             available: true,
-            ok: true,
-            output: stdout ? JSON.parse(stdout) : null,
-            message: "DESIGN.md lint passed.",
+            ok: parsedOutput.ok,
+            output: parsedOutput.output,
+            message: parsedOutput.ok ? "DESIGN.md lint passed." : "DESIGN.md lint output could not be parsed.",
           });
         },
       );
     });
+  }
+
+  function safeParseLintOutput(stdout) {
+    if (!stdout) return { ok: true, output: null };
+
+    try {
+      return { ok: true, output: JSON.parse(stdout) };
+    } catch {
+      return {
+        ok: false,
+        output: {
+          raw: stdout,
+          warning: "DESIGN.md lint output was not JSON.",
+        },
+      };
+    }
   }
 
   return { lintDesignIdentity, parseDesignIdentity };

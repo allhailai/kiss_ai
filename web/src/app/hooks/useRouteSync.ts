@@ -1,30 +1,35 @@
 import { useCallback, useEffect, useRef } from "react";
 import { buildRouteHash, parseRouteHash } from "../../navigation/routes";
 import type { RouteState, View } from "../../navigation/views";
+import { errorMessage } from "../../domain/errors";
 
 type UseRouteSyncOptions = {
   applyRoute: (route: RouteState) => Promise<void>;
   canLeaveCurrentRoute?: (nextRoute: RouteState) => boolean;
   currentRoute: RouteState;
+  onRouteError?: (message: string) => void;
   selectedProjectSlug: string | null;
   setSelectedProjectSlug: (projectSlug: string | null) => void;
 };
 
-function applyRouteSafely(applyRoute: (route: RouteState) => Promise<void>, route: RouteState) {
+function applyRouteSafely(applyRoute: (route: RouteState) => Promise<void>, route: RouteState, onRouteError?: (message: string) => void) {
   applyRoute(route).catch((error: unknown) => {
     console.error("[kiss_ai UI warning] Route sync failed.", error);
+    onRouteError?.(errorMessage(error, "Could not load this route."));
   });
 }
 
-export function useRouteSync({ applyRoute, canLeaveCurrentRoute, currentRoute, selectedProjectSlug, setSelectedProjectSlug }: UseRouteSyncOptions) {
+export function useRouteSync({ applyRoute, canLeaveCurrentRoute, currentRoute, onRouteError, selectedProjectSlug, setSelectedProjectSlug }: UseRouteSyncOptions) {
   const applyRouteRef = useRef(applyRoute);
   const canLeaveCurrentRouteRef = useRef(canLeaveCurrentRoute);
   const currentRouteRef = useRef(currentRoute);
+  const onRouteErrorRef = useRef(onRouteError);
   const selectedProjectSlugRef = useRef(selectedProjectSlug);
 
   applyRouteRef.current = applyRoute;
   canLeaveCurrentRouteRef.current = canLeaveCurrentRoute;
   currentRouteRef.current = currentRoute;
+  onRouteErrorRef.current = onRouteError;
   selectedProjectSlugRef.current = selectedProjectSlug;
 
   const navigateTo = useCallback(
@@ -42,7 +47,7 @@ export function useRouteSync({ applyRoute, canLeaveCurrentRoute, currentRoute, s
 
       if (window.location.hash === nextHash) {
         if (currentHash !== nextHash) {
-          applyRouteSafely(applyRouteRef.current, nextRoute);
+          applyRouteSafely(applyRouteRef.current, nextRoute, onRouteErrorRef.current);
         }
         return;
       }
@@ -94,7 +99,7 @@ export function useRouteSync({ applyRoute, canLeaveCurrentRoute, currentRoute, s
         return;
       }
 
-      applyRouteSafely(applyRouteRef.current, nextRoute);
+      applyRouteSafely(applyRouteRef.current, nextRoute, onRouteErrorRef.current);
     };
 
     syncRoute();

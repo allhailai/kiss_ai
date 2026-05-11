@@ -1,14 +1,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { MAX_STORED_MESSAGE_BYTES } from "../contracts/chatLimits.js";
+import { normalizeChatContext } from "./chatContext.js";
 
 const conversationVersion = 1;
 const conversationIdPattern = /^[a-zA-Z0-9_-]+$/;
 const maxTitleLength = 120;
 const maxSummaryLength = 500;
-const maxMessageContentBytes = 400 * 1024;
-const maxContextRefs = 20;
-const maxActiveFiles = 10;
 
 function nowIso() {
   return new Date().toISOString();
@@ -38,55 +37,6 @@ function titleFromContent(content) {
   return firstLine.length > 72 ? `${firstLine.slice(0, 69)}...` : firstLine;
 }
 
-function normalizeContextRef(value) {
-  const source = value && typeof value === "object" ? value : {};
-  const filePath = trimText(source.path, 300);
-  if (!filePath) return null;
-
-  return {
-    path: filePath,
-    label: trimText(source.label, 160) || undefined,
-    kind: trimText(source.kind, 40) || undefined,
-  };
-}
-
-function normalizeActiveFile(value) {
-  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const filePath = trimText(source.path, 300);
-  if (!filePath) return null;
-
-  return {
-    path: filePath,
-    label: trimText(source.label, 160) || undefined,
-    kind: trimText(source.kind, 40) || undefined,
-    editable: typeof source.editable === "boolean" ? source.editable : undefined,
-    annotation: typeof source.annotation === "boolean" ? source.annotation : undefined,
-    contentHash: trimText(source.contentHash, 160) || undefined,
-    draftState: ["saved", "unsaved", "unknown"].includes(source.draftState) ? source.draftState : "unknown",
-    role: source.role === "primary" || source.role === "secondary" ? source.role : undefined,
-  };
-}
-
-function normalizeCurrentFile(value) {
-  return normalizeActiveFile(value);
-}
-
-function normalizeContext(value) {
-  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const currentFile = normalizeCurrentFile(source.currentFile);
-  const editableFileSource = Array.isArray(source.editableFiles) ? source.editableFiles : source.activeFiles;
-  const sourceFileSource = Array.isArray(source.sourceFiles) ? source.sourceFiles : source.fileRefs;
-  const editableFiles = Array.isArray(editableFileSource) ? editableFileSource.map(normalizeActiveFile).filter(Boolean).slice(0, maxActiveFiles) : [];
-  const sourceFiles = Array.isArray(sourceFileSource) ? sourceFileSource.map(normalizeContextRef).filter(Boolean).slice(0, maxContextRefs) : [];
-  if (!currentFile && !editableFiles.length && !sourceFiles.length) return undefined;
-
-  return {
-    ...(currentFile ? { currentFile } : {}),
-    ...(editableFiles.length ? { editableFiles } : {}),
-    ...(sourceFiles.length ? { sourceFiles } : {}),
-  };
-}
-
 function normalizeMessage(value, fallback = {}) {
   const source = value && typeof value === "object" ? value : {};
   const createdAt = typeof source.createdAt === "string" ? source.createdAt : fallback.createdAt ?? nowIso();
@@ -104,7 +54,7 @@ function normalizeMessage(value, fallback = {}) {
     updatedAt,
     modelId: typeof source.modelId === "string" && source.modelId.trim() ? source.modelId.trim() : null,
     status,
-    context: normalizeContext(source.context),
+    context: normalizeChatContext(source.context, { maxDraftContentLength: MAX_STORED_MESSAGE_BYTES }),
     metadata,
   };
 }
@@ -175,6 +125,22 @@ function normalizeIndex(value) {
 
 export function createConversationService({ httpError, projectPath }) {
   const subscribers = new Map();
+  const mutationQueues = new Map();
+
+  async function withProjectMutation(project, operation) {
+    const key = project.slug ?? project.path;
+    const previous = mutationQueues.get(key) ?? Promise.resolve();
+    const queued = previous.catch(() => undefined).then(operation);
+    mutationQueues.set(key, queued);
+
+    try {
+      return await queued;
+    } finally {
+      if (mutationQueues.get(key) === queued) {
+        mutationQueues.delete(key);
+      }
+    }
+  }
 
   function requireConversationId(conversationId) {
     const id = String(conversationId ?? "").trim();
@@ -261,7 +227,7 @@ export function createConversationService({ httpError, projectPath }) {
     return normalizeConversation(project, source, { id, title: record.title, createdAt: record.createdAt, updatedAt: record.updatedAt });
   }
 
-  async function createConversation(project, body = {}) {
+  async function createConversationUnlocked(project, body = {}) {
     const id = createId("conv");
     const createdAt = nowIso();
     const file = `conversations/${datestamp()}_${id}.json`;
@@ -286,7 +252,11 @@ export function createConversationService({ httpError, projectPath }) {
     return conversation;
   }
 
-  async function updateConversation(project, conversationId, body = {}) {
+  async function createConversation(project, body = {}) {
+    return await withProjectMutation(project, () => createConversationUnlocked(project, body));
+  }
+
+  async function updateConversationUnlocked(project, conversationId, body = {}) {
     const conversation = await readConversation(project, conversationId);
     const next = {
       ...conversation,
@@ -308,7 +278,11 @@ export function createConversationService({ httpError, projectPath }) {
     return next;
   }
 
-  async function writeConversation(project, conversation, options = {}) {
+  async function updateConversation(project, conversationId, body = {}) {
+    return await withProjectMutation(project, () => updateConversationUnlocked(project, conversationId, body));
+  }
+
+  async function writeConversationUnlocked(project, conversation, options = {}) {
     const archived = options.archived;
     const next = normalizeConversation(project, { ...conversation, updatedAt: conversation.updatedAt ?? nowIso() }, { id: conversation.id });
     const index = await readIndex(project.path);
@@ -327,11 +301,15 @@ export function createConversationService({ httpError, projectPath }) {
     return next;
   }
 
-  async function appendMessage(project, conversationId, messageInput) {
+  async function writeConversation(project, conversation, options = {}) {
+    return await withProjectMutation(project, () => writeConversationUnlocked(project, conversation, options));
+  }
+
+  async function appendMessageUnlocked(project, conversationId, messageInput) {
     const conversation = await readConversation(project, conversationId);
     const message = normalizeMessage(messageInput);
 
-    if (Buffer.byteLength(message.content, "utf8") > maxMessageContentBytes) {
+    if (Buffer.byteLength(message.content, "utf8") > MAX_STORED_MESSAGE_BYTES) {
       throw httpError("Chat message is too large.", 413, "chat_message_too_large");
     }
 
@@ -344,10 +322,14 @@ export function createConversationService({ httpError, projectPath }) {
       messages: [...conversation.messages, message],
     };
 
-    return await writeConversation(project, next);
+    return await writeConversationUnlocked(project, next);
   }
 
-  async function editUserMessage(project, conversationId, messageId, content) {
+  async function appendMessage(project, conversationId, messageInput) {
+    return await withProjectMutation(project, () => appendMessageUnlocked(project, conversationId, messageInput));
+  }
+
+  async function editUserMessageUnlocked(project, conversationId, messageId, content) {
     const conversation = await readConversation(project, conversationId);
     const targetMessageId = String(messageId ?? "").trim();
     const targetIndex = conversation.messages.findIndex((message) => message.id === targetMessageId);
@@ -361,11 +343,11 @@ export function createConversationService({ httpError, projectPath }) {
       throw httpError("Only user messages can be edited.", 400, "chat_message_not_editable");
     }
 
-    const nextContent = trimText(content, maxMessageContentBytes);
+    const nextContent = trimText(content, MAX_STORED_MESSAGE_BYTES);
     if (!nextContent) {
       throw httpError("Chat requires a message.", 400, "chat_message_required");
     }
-    if (Buffer.byteLength(nextContent, "utf8") > maxMessageContentBytes) {
+    if (Buffer.byteLength(nextContent, "utf8") > MAX_STORED_MESSAGE_BYTES) {
       throw httpError("Chat message is too large.", 413, "chat_message_too_large");
     }
 
@@ -393,7 +375,11 @@ export function createConversationService({ httpError, projectPath }) {
       messages: [...conversation.messages.slice(0, targetIndex), editedMessage],
     };
 
-    return await writeConversation(project, next);
+    return await writeConversationUnlocked(project, next);
+  }
+
+  async function editUserMessage(project, conversationId, messageId, content) {
+    return await withProjectMutation(project, () => editUserMessageUnlocked(project, conversationId, messageId, content));
   }
 
   return {

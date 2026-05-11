@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import type { ProjectFile } from "../../contracts/api";
 import { errorMessage } from "../../domain/errors";
 import { designIdentityFilePath } from "../../domain/projectPaths";
@@ -31,9 +31,14 @@ export function useRouteDrivenData({
   setRouteContext: (context: Record<string, string>) => void;
   setView: (view: View) => void;
 }) {
+  const routeRequestIdRef = useRef(0);
+
   return useCallback(
     async (route: RouteState) => {
       if (!route.projectSlug || route.projectSlug !== selectedProjectSlug) return;
+
+      const requestId = (routeRequestIdRef.current += 1);
+      const isCurrentRouteRequest = () => routeRequestIdRef.current === requestId;
 
       try {
         const nextView = route.view;
@@ -53,28 +58,36 @@ export function useRouteDrivenData({
         } else {
           setFiles([]);
         }
+        if (!isCurrentRouteRequest()) return;
 
         if (nextView === "dashboard") {
           await refreshDesign();
         } else if (nextView === "design") {
+          if (!isCurrentRouteRequest()) return;
           setFiles([designProjectFile]);
           await refreshDesign();
+          if (!isCurrentRouteRequest()) return;
           await selectFile(route.filePath ?? designIdentityFilePath);
         }
+        if (!isCurrentRouteRequest()) return;
 
         if (nextView === "rebuild") {
           await refreshRebuild();
         }
+        if (!isCurrentRouteRequest()) return;
 
         if (nextView === "build-log") {
           await refreshBuildLog();
         }
+        if (!isCurrentRouteRequest()) return;
 
         if (route.filePath && nextView !== "design") {
           await selectFile(route.filePath);
         }
       } catch (error) {
-        setNotice(errorMessage(error, "Could not load this view."));
+        if (isCurrentRouteRequest()) {
+          setNotice(errorMessage(error, "Could not load this view."));
+        }
       }
     },
     [

@@ -1,30 +1,7 @@
 import type { BuildLogState, BuildLogTab, ProjectStatus, RebuildState } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
+import { humanAttentionItemText } from "../../domain/humanAttention";
 import { humanAttentionQueuePath } from "../../domain/projectPaths";
-
-function attentionItemText(item: unknown) {
-  if (!item || typeof item !== "object") return String(item);
-
-  const source = item as Record<string, unknown>;
-  const severity = typeof source.severity === "string" ? source.severity : "attention";
-  const category = typeof source.category === "string" ? source.category : "review";
-  const summary =
-    typeof source.summary === "string"
-      ? source.summary
-      : typeof source.issue === "string"
-        ? source.issue
-        : typeof source.message === "string"
-          ? source.message
-          : "Review needed.";
-  const nextAction =
-    typeof source.next_human_action === "string"
-      ? source.next_human_action
-      : typeof source.nextAction === "string"
-        ? source.nextAction
-        : "";
-
-  return `${severity}/${category}: ${summary}${nextAction ? ` Next: ${nextAction}` : ""}`;
-}
 
 function MarkdownBlock({ content, emptyMessage = "No build log content found yet." }: { content: string; emptyMessage?: string }) {
   if (!content.trim()) {
@@ -132,7 +109,7 @@ export function BuildLogWorkspace({
           {status?.humanAttentionItems?.length ? (
             <ul>
               {status.humanAttentionItems.slice(0, 5).map((item, index) => (
-                <li key={index}>{attentionItemText(item)}</li>
+                <li key={index}>{humanAttentionItemText(item)}</li>
               ))}
             </ul>
           ) : null}

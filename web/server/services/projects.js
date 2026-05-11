@@ -263,15 +263,20 @@ export function createProjectService({
   }
 
   async function gitInitProject(projectRoot) {
-    await execFileText("git", ["init"], { cwd: projectRoot });
-    await execFileText("git", ["add", "--all"], { cwd: projectRoot });
-    await execFileText("git", ["-c", "user.name=kiss_ai", "-c", "user.email=kiss_ai@local", "commit", "-m", "Initialize kiss_ai project"], {
-      cwd: projectRoot,
-    });
+    try {
+      await execFileText("git", ["init"], { cwd: projectRoot });
+      await execFileText("git", ["add", "--all"], { cwd: projectRoot });
+      await execFileText("git", ["-c", "user.name=kiss_ai", "-c", "user.email=kiss_ai@local", "commit", "-m", "Initialize kiss_ai project"], {
+        cwd: projectRoot,
+      });
 
-    const status = await execFileText("git", ["status", "--short"], { cwd: projectRoot });
-    if (status) {
-      throw new Error("Project setup completed, but the new Git repository is not clean.");
+      const status = await execFileText("git", ["status", "--short"], { cwd: projectRoot });
+      if (status) {
+        throw httpError("Project setup completed, but the new Git repository is not clean.", 500, "project_git_dirty");
+      }
+    } catch (error) {
+      if (error?.statusCode) throw error;
+      throw httpError("Could not initialize the new project Git repository.", 500, "project_git_init_failed");
     }
   }
 

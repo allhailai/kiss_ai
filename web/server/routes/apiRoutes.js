@@ -15,6 +15,7 @@ export function registerApiRoutes(app, deps) {
     displayProjectName: deps.displayProjectName,
     getHumanAttentionItems: deps.getHumanAttentionItems,
     gitStatus: deps.gitStatus,
+    httpError: deps.httpError,
     listCursorModels: deps.listCursorModels,
     listMarkdownFiles: deps.listMarkdownFiles,
     pickRebuildModelId: deps.pickRebuildModelId,
@@ -25,6 +26,7 @@ export function registerApiRoutes(app, deps) {
   registerChatRoutes(app, {
     createConversation: deps.createConversation,
     editChatMessage: deps.editChatMessage,
+    httpError: deps.httpError,
     listConversations: deps.listConversations,
     readConversation: deps.readConversation,
     sendChatMessage: deps.sendChatMessage,
@@ -55,6 +57,7 @@ export function registerApiRoutes(app, deps) {
 
   registerRebuildRoutes(app, {
     getRebuildState: deps.getRebuildState,
+    httpError: deps.httpError,
     startHumanAttentionResolution: deps.startHumanAttentionResolution,
     startRebuild: deps.startRebuild,
     subscribeToRebuild: deps.subscribeToRebuild,

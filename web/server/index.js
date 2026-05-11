@@ -2,7 +2,6 @@ import express from "express";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import fs from "node:fs/promises";
 import path from "node:path";
 import { createRebuildStore } from "./agentRuns.js";
 import { runCursorAgent } from "./agentRuntimes/cursorSdk.js";
@@ -14,6 +13,7 @@ import { createChatAgentService } from "./services/chatAgent.js";
 import { createConversationService } from "./services/conversations.js";
 import { createCursorModelService } from "./services/cursorModels.js";
 import { createDesignIdentityService } from "./services/designIdentity.js";
+import { createHarnessStateService } from "./services/harnessState.js";
 import { apiErrorHandler, httpError } from "./services/httpErrors.js";
 import { createProjectFileService } from "./services/projectFiles.js";
 import { createProjectService } from "./services/projects.js";
@@ -24,6 +24,7 @@ const PROJECTS_ROOT = path.resolve(process.env.KISS_AI_PROJECTS_ROOT ?? path.res
 const PORT = Number(process.env.KISS_AI_UI_PORT ?? 8787);
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+const JSON_BODY_LIMIT_BYTES = Math.ceil(MAX_UPLOAD_BYTES * 1.5);
 const MAX_SEARCH_RESULTS = 25;
 const REBUILD_STATE_DIR = path.join(WEB_ROOT, ".runtime", "rebuild");
 const FRAMEWORK_ROOT = path.resolve(process.env.KISS_AI_FRAMEWORK_ROOT ?? path.join(PROJECTS_ROOT, "_kiss_ai", "framework"));
@@ -74,7 +75,7 @@ const treeRoots = new Map([
 ]);
 
 const app = express();
-app.use(express.json({ limit: "60mb" }));
+app.use(express.json({ limit: JSON_BODY_LIMIT_BYTES }));
 
 const rebuildStore = createRebuildStore({ stateDir: REBUILD_STATE_DIR, projectSlugPattern });
 const {
@@ -87,61 +88,8 @@ const {
   subscribe: subscribeToRebuild,
 } = rebuildStore;
 
-async function readProjectHarness(projectRoot) {
-  try {
-    return JSON.parse(await fs.readFile(path.join(projectRoot, ".harness-state.json"), "utf8"));
-  } catch {
-    return {};
-  }
-}
-
-function hashStableValue(value) {
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
-}
-
 function hashText(value) {
   return createHash("sha256").update(String(value)).digest("hex");
-}
-
-function normalizeHumanAttentionItem(item) {
-  if (!item || typeof item !== "object" || Array.isArray(item)) {
-    return {
-      id: `legacy_${hashStableValue({ value: String(item) })}`,
-      severity: "warning",
-      category: "review",
-      summary: String(item),
-      resolution_options: [],
-    };
-  }
-
-  const source = item;
-  const summary =
-    typeof source.summary === "string"
-      ? source.summary
-      : typeof source.issue === "string"
-        ? source.issue
-        : typeof source.message === "string"
-          ? source.message
-          : "Review needed.";
-  const legacyId = hashStableValue({
-    severity: source.severity,
-    category: source.category,
-    summary,
-    next_human_action: source.next_human_action ?? source.nextAction,
-    default_action_taken: source.default_action_taken,
-  });
-
-  return {
-    ...source,
-    id: typeof source.id === "string" && source.id.trim() ? source.id : `legacy_${legacyId}`,
-    summary,
-    resolution_options: Array.isArray(source.resolution_options) ? source.resolution_options : [],
-  };
-}
-
-function getHumanAttentionItems(harness) {
-  const items = harness?.extensions?.human_attention?.open_items;
-  return Array.isArray(items) ? items.map(normalizeHumanAttentionItem) : [];
 }
 
 function humanizePathSegment(pathSegment) {
@@ -211,6 +159,8 @@ const { buildLogTabState } = createBuildLogService({
   projectPath,
   readTextFile,
 });
+
+const { getHumanAttentionItems, readProjectHarness } = createHarnessStateService({ httpError });
 
 const { attachProject, createProjectFromTemplate, discoverProjects } = createProjectService({
   PROJECTS_ROOT,

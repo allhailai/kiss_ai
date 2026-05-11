@@ -32,6 +32,7 @@ export const designProjectFile: ProjectFile = {
   kind: "design",
   editable: true,
   annotation: false,
+  chatContextReadable: false,
 };
 
 export function viewForProjectPath(path: string): View | null {

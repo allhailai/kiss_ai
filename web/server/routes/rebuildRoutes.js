@@ -1,7 +1,9 @@
 import { openSseStream } from "../utils/sse.js";
+import { parseRequestBody, resolveHumanAttentionBodySchema, startRebuildBodySchema } from "./requestSchemas.js";
 
 export function registerRebuildRoutes(app, {
   getRebuildState,
+  httpError,
   startHumanAttentionResolution,
   startRebuild,
   subscribeToRebuild,
@@ -16,12 +18,13 @@ export function registerRebuildRoutes(app, {
 
   app.get("/api/projects/:projectSlug/rebuild/events", async (request, response, next) => {
     try {
+      const snapshot = await getRebuildState(request.project.slug);
       const stream = openSseStream(request, response);
       const unsubscribe = subscribeToRebuild(request.project.slug, ({ state, event }) => {
         stream.send("event", { state, event });
       });
 
-      stream.send("snapshot", await getRebuildState(request.project.slug));
+      stream.send("snapshot", snapshot);
       stream.closeWith(unsubscribe);
     } catch (error) {
       next(error);
@@ -30,7 +33,8 @@ export function registerRebuildRoutes(app, {
 
   app.post("/api/projects/:projectSlug/rebuild/start", async (request, response, next) => {
     try {
-      response.json(await startRebuild(request.project, request.body.modelId));
+      const body = parseRequestBody(startRebuildBodySchema, request.body, httpError);
+      response.json(await startRebuild(request.project, body.modelId));
     } catch (error) {
       next(error);
     }
@@ -38,7 +42,7 @@ export function registerRebuildRoutes(app, {
 
   app.post("/api/projects/:projectSlug/human-attention/resolve", async (request, response, next) => {
     try {
-      response.json(await startHumanAttentionResolution(request.project, request.body));
+      response.json(await startHumanAttentionResolution(request.project, parseRequestBody(resolveHumanAttentionBodySchema, request.body, httpError)));
     } catch (error) {
       next(error);
     }

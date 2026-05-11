@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../data/apiClient";
 import {
   type BuildLogState,
@@ -20,6 +20,14 @@ import { useRouteSync } from "./hooks/useRouteSync";
 import { useSelectedFile } from "./hooks/useSelectedFile";
 import { useSelectedProjectLifecycle } from "./hooks/useSelectedProjectLifecycle";
 import { useToasts } from "./hooks/useToasts";
+import type {
+  DesignWorkspaceController,
+  FileWorkspaceController,
+  ProjectController,
+  RebuildWorkspaceController,
+  RouteController,
+  ToastWorkspaceController,
+} from "./workspaceControllers";
 
 export function useProjectWorkspace() {
   const [view, setView] = useState<View>("build-log");
@@ -36,8 +44,14 @@ export function useProjectWorkspace() {
   const [design, setDesign] = useState<DesignState | null>(null);
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([designProjectFile]);
-  const [loading, setLoading] = useState(false);
+  const [treeLoading, setTreeLoading] = useState(false);
+  const [fileLoading, setFileLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [reverting, setReverting] = useState(false);
+  const [inputMutationLoading, setInputMutationLoading] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
+  const selectedProjectSlugRef = useRef(selectedProjectSlug);
+  const treeRequestIdRef = useRef(0);
   const { toasts, setNotice, dismissToast } = useToasts();
   const {
     clearRebuildModels,
@@ -60,6 +74,10 @@ export function useProjectWorkspace() {
     return selectedProjectSlug;
   }, [selectedProjectSlug]);
 
+  useEffect(() => {
+    selectedProjectSlugRef.current = selectedProjectSlug;
+  }, [selectedProjectSlug]);
+
   const refreshProjects = useCallback(async () => {
     setProjectsError("");
     try {
@@ -73,23 +91,38 @@ export function useProjectWorkspace() {
   }, []);
 
   const refreshStatus = useCallback(async () => {
-    setStatus(await api.status(requireSelectedProjectSlug()));
+    const projectSlug = requireSelectedProjectSlug();
+    const next = await api.status(projectSlug);
+    if (selectedProjectSlugRef.current === projectSlug) {
+      setStatus(next);
+    }
   }, [requireSelectedProjectSlug]);
 
   const refreshBuildLog = useCallback(
     async (tabId?: string | null, path?: string | null, sectionId?: string | null) => {
-      setBuildLog(await api.buildLog(requireSelectedProjectSlug(), tabId, path, sectionId));
+      const projectSlug = requireSelectedProjectSlug();
+      const next = await api.buildLog(projectSlug, tabId, path, sectionId);
+      if (selectedProjectSlugRef.current === projectSlug) {
+        setBuildLog(next);
+      }
     },
     [requireSelectedProjectSlug],
   );
 
   const refreshDesign = useCallback(async () => {
-    setDesign(await api.design(requireSelectedProjectSlug()));
+    const projectSlug = requireSelectedProjectSlug();
+    const next = await api.design(projectSlug);
+    if (selectedProjectSlugRef.current === projectSlug) {
+      setDesign(next);
+    }
   }, [requireSelectedProjectSlug]);
 
   const refreshRebuild = useCallback(async () => {
-    const next = await api.rebuildState(requireSelectedProjectSlug());
-    setRebuild(next);
+    const projectSlug = requireSelectedProjectSlug();
+    const next = await api.rebuildState(projectSlug);
+    if (selectedProjectSlugRef.current === projectSlug) {
+      setRebuild(next);
+    }
     return next;
   }, [requireSelectedProjectSlug]);
 
@@ -102,17 +135,25 @@ export function useProjectWorkspace() {
       api.tree(projectSlug, "outputs"),
     ]);
 
-    setProjectFiles(uniqueFiles([...requirements.files, ...human.files, ...inputsAi.files, ...outputs.files, designProjectFile]));
+    if (selectedProjectSlugRef.current === projectSlug) {
+      setProjectFiles(uniqueFiles([...requirements.files, ...human.files, ...inputsAi.files, ...outputs.files, designProjectFile]));
+    }
   }, [requireSelectedProjectSlug]);
 
   const loadTree = useCallback(
     async (section: string) => {
       const projectSlug = requireSelectedProjectSlug();
-      setLoading(true);
+      const requestId = (treeRequestIdRef.current += 1);
+      setTreeLoading(true);
       try {
-        setFiles((await api.tree(projectSlug, section)).files);
+        const next = await api.tree(projectSlug, section);
+        if (selectedProjectSlugRef.current === projectSlug && treeRequestIdRef.current === requestId) {
+          setFiles(next.files);
+        }
       } finally {
-        setLoading(false);
+        if (treeRequestIdRef.current === requestId) {
+          setTreeLoading(false);
+        }
       }
     },
     [requireSelectedProjectSlug],
@@ -120,12 +161,17 @@ export function useProjectWorkspace() {
 
   const loadAnnotationTree = useCallback(async () => {
     const projectSlug = requireSelectedProjectSlug();
-    setLoading(true);
+    const requestId = (treeRequestIdRef.current += 1);
+    setTreeLoading(true);
     try {
       const [inputsAi, outputs] = await Promise.all([api.tree(projectSlug, "inputs-ai"), api.tree(projectSlug, "outputs")]);
-      setFiles(uniqueFiles([...inputsAi.files, ...outputs.files]));
+      if (selectedProjectSlugRef.current === projectSlug && treeRequestIdRef.current === requestId) {
+        setFiles(uniqueFiles([...inputsAi.files, ...outputs.files]));
+      }
     } finally {
-      setLoading(false);
+      if (treeRequestIdRef.current === requestId) {
+        setTreeLoading(false);
+      }
     }
   }, [requireSelectedProjectSlug]);
 
@@ -145,8 +191,10 @@ export function useProjectWorkspace() {
     refreshDesign,
     refreshProjectFiles,
     refreshStatus,
-    setLoading,
+    setFileLoading,
     setNotice,
+    setReverting,
+    setSaving,
   });
 
   const currentRoute = useMemo(
@@ -187,7 +235,7 @@ export function useProjectWorkspace() {
     setView,
   });
 
-  const { navigateTo } = useRouteSync({ applyRoute, canLeaveCurrentRoute, currentRoute, selectedProjectSlug, setSelectedProjectSlug });
+  const { navigateTo } = useRouteSync({ applyRoute, canLeaveCurrentRoute, currentRoute, onRouteError: setNotice, selectedProjectSlug, setSelectedProjectSlug });
 
   const replaceRouteContext = useCallback(
     (patch: Record<string, string | null | undefined>) => {
@@ -242,7 +290,7 @@ export function useProjectWorkspace() {
     refreshProjectFiles,
     requireSelectedProjectSlug,
     selected,
-    setLoading,
+    setInputMutationLoading,
     setNotice,
     view,
   });
@@ -323,6 +371,7 @@ export function useProjectWorkspace() {
     refreshStatus,
     selectedProjectSlug,
     setRebuild,
+    setNotice,
   });
 
   const project = {
@@ -336,29 +385,34 @@ export function useProjectWorkspace() {
     selectProject,
     selectedProject,
     selectedProjectSlug,
-  };
+  } satisfies ProjectController;
   const route = {
     navigateTo,
     openProjectFile,
     replaceRouteContext,
     routeContext,
     view,
-  };
+  } satisfies RouteController;
   const fileWorkspace = {
     deleteHumanInputFile,
     draft,
+    fileLoading,
     files,
     hasUnsavedChanges,
-    loading,
+    inputMutationLoading,
+    loading: treeLoading || fileLoading || saving || reverting || inputMutationLoading,
     projectFiles,
     refreshSelectedFile,
     revertSelected,
+    reverting,
     saveSelected,
+    saving,
     selected,
     selectedDiff,
     setDraft,
+    treeLoading,
     uploadHumanInputFiles,
-  };
+  } satisfies FileWorkspaceController;
   const rebuildWorkspace = {
     buildLog,
     models: rebuildModels,
@@ -372,16 +426,16 @@ export function useProjectWorkspace() {
     setSelectedModelId: setSelectedRebuildModelId,
     startRebuild,
     status,
-  };
+  } satisfies RebuildWorkspaceController;
   const designWorkspace = {
     design,
     refreshDesign,
-  };
+  } satisfies DesignWorkspaceController;
   const toastWorkspace = {
     dismissToast,
     setNotice,
     toasts,
-  };
+  } satisfies ToastWorkspaceController;
 
   return {
     project,
@@ -390,50 +444,5 @@ export function useProjectWorkspace() {
     rebuildWorkspace,
     designWorkspace,
     toastWorkspace,
-    view,
-    routeContext,
-    projectsRoot,
-    projects,
-    selectedProjectSlug,
-    selectedProject,
-    projectsError,
-    status,
-    buildLog,
-    rebuild,
-    rebuildModels,
-    selectedRebuildModelId,
-    design,
-    files,
-    projectFiles,
-    selected,
-    selectedDiff,
-    draft,
-    hasUnsavedChanges,
-    toasts,
-    loading,
-    creatingProject,
-    setDraft,
-    setSelectedRebuildModelId,
-    dismissToast,
-    refreshProjects,
-    refreshStatus,
-    refreshBuildLog,
-    refreshDesign,
-    refreshRebuild,
-    refreshRebuildModels,
-    navigateTo,
-    replaceRouteContext,
-    openProjectFile,
-    uploadHumanInputFiles,
-    deleteHumanInputFile,
-    selectProject,
-    clearSelectedProject,
-    createProject,
-    saveSelected,
-    refreshSelectedFile,
-    revertSelected,
-    startRebuild,
-    resolveHumanAttention,
-    setNotice,
   };
 }

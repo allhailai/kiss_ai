@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { BuildLogState, DesignState, ProjectFile, ProjectStatus, ProjectSummary, RebuildState } from "../../contracts/api";
+import { errorMessage } from "../../domain/errors";
 import { designProjectFile, selectedProjectStorageKey } from "../../navigation/views";
 
 type UseSelectedProjectLifecycleOptions = {
@@ -38,6 +39,8 @@ export function useSelectedProjectLifecycle({
   setStatus,
 }: UseSelectedProjectLifecycleOptions) {
   useEffect(() => {
+    let cancelled = false;
+
     if (!selectedProjectSlug) {
       window.localStorage.removeItem(selectedProjectStorageKey);
       setStatus(null);
@@ -52,9 +55,19 @@ export function useSelectedProjectLifecycle({
     }
 
     window.localStorage.setItem(selectedProjectStorageKey, selectedProjectSlug);
-    void refreshStatus();
-    void refreshRebuildModels();
-    void refreshProjectFiles();
+    void (async () => {
+      try {
+        await Promise.all([refreshStatus(), refreshRebuildModels(), refreshProjectFiles()]);
+      } catch (error) {
+        if (!cancelled) {
+          setNotice(errorMessage(error, "Could not load the selected project."));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     clearSelectedFile,
     clearRebuildModels,

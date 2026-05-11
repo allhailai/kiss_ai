@@ -1,0 +1,2 @@
+export const MAX_USER_MESSAGE_BYTES = 120 * 1024;
+export const MAX_STORED_MESSAGE_BYTES = 400 * 1024;

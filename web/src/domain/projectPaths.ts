@@ -1,8 +1,11 @@
-import type { RequirementAutoUpdatePath } from "../contracts/api";
-
 export const designIdentityFilePath = "human_design_identity.md";
 export const openQuestionsFilePath = "human_open_questions.md";
 export const humanAttentionQueuePath = "change_logs/human_attention_queue.md";
+
+export type RequirementAutoUpdatePath =
+  | "human_goal_requirements.md"
+  | "human_input_requirements.md"
+  | "human_output_requirements.md";
 
 export const requirementAutoUpdatePaths: RequirementAutoUpdatePath[] = [
   "human_goal_requirements.md",

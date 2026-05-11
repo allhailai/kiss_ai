@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import type { FileContent } from "../../contracts/api";
 import { api } from "../../data/apiClient";
+import { errorMessage } from "../../domain/errors";
 import { projectPathPrefixes } from "../../domain/projectPaths";
 
 export function useHumanInputs({
@@ -9,7 +10,7 @@ export function useHumanInputs({
   refreshProjectFiles,
   requireSelectedProjectSlug,
   selected,
-  setLoading,
+  setInputMutationLoading,
   setNotice,
   view,
 }: {
@@ -18,7 +19,7 @@ export function useHumanInputs({
   refreshProjectFiles: () => Promise<void>;
   requireSelectedProjectSlug: () => string;
   selected: FileContent | null;
-  setLoading: (loading: boolean) => void;
+  setInputMutationLoading: (loading: boolean) => void;
   setNotice: (message: string) => void;
   view: string;
 }) {
@@ -26,7 +27,7 @@ export function useHumanInputs({
     async (files: File[]) => {
       if (!files.length) return;
 
-      setLoading(true);
+      setInputMutationLoading(true);
       setNotice("");
       try {
         const response = await api.uploadHumanInputs(requireSelectedProjectSlug(), files);
@@ -36,13 +37,13 @@ export function useHumanInputs({
           `Uploaded ${response.files.length.toLocaleString()} file${response.files.length === 1 ? "" : "s"} to ${projectPathPrefixes.humanInput}.`,
         );
       } catch (error) {
-        setNotice(error instanceof Error ? error.message : "Could not upload files.");
+        setNotice(errorMessage(error, "Could not upload files."));
         throw error;
       } finally {
-        setLoading(false);
+        setInputMutationLoading(false);
       }
     },
-    [loadTree, refreshProjectFiles, requireSelectedProjectSlug, setLoading, setNotice, view],
+    [loadTree, refreshProjectFiles, requireSelectedProjectSlug, setInputMutationLoading, setNotice, view],
   );
 
   const deleteHumanInputFile = useCallback(
@@ -50,7 +51,7 @@ export function useHumanInputs({
       const confirmed = window.confirm(`Delete ${path} from ${projectPathPrefixes.humanInput}? This cannot be undone.`);
       if (!confirmed) return;
 
-      setLoading(true);
+      setInputMutationLoading(true);
       setNotice("");
       try {
         const response = await api.deleteHumanInput(requireSelectedProjectSlug(), path);
@@ -59,13 +60,13 @@ export function useHumanInputs({
         if (view === "inputs") await loadTree("human");
         setNotice(`Deleted ${response.path}.`);
       } catch (error) {
-        setNotice(error instanceof Error ? error.message : "Could not delete the file.");
+        setNotice(errorMessage(error, "Could not delete the file."));
         throw error;
       } finally {
-        setLoading(false);
+        setInputMutationLoading(false);
       }
     },
-    [clearSelectedFile, loadTree, refreshProjectFiles, requireSelectedProjectSlug, selected?.path, setLoading, setNotice, view],
+    [clearSelectedFile, loadTree, refreshProjectFiles, requireSelectedProjectSlug, selected?.path, setInputMutationLoading, setNotice, view],
   );
 
   return { deleteHumanInputFile, uploadHumanInputFiles };

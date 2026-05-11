@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { RebuildState } from "../../contracts/api";
 import { api } from "../../data/apiClient";
+import { errorMessage } from "../../domain/errors";
 import { isTerminalRebuildStatus } from "../../domain/rebuild";
 
 type UseRebuildSyncOptions = {
@@ -11,6 +12,7 @@ type UseRebuildSyncOptions = {
   refreshStatus: () => Promise<void>;
   selectedProjectSlug: string | null;
   setRebuild: (rebuild: RebuildState) => void;
+  setNotice: (message: string) => void;
 };
 
 export function useRebuildSync({
@@ -21,8 +23,27 @@ export function useRebuildSync({
   refreshStatus,
   selectedProjectSlug,
   setRebuild,
+  setNotice,
 }: UseRebuildSyncOptions) {
   const lastLiveEventAtRef = useRef(0);
+  const lastRefreshErrorAtRef = useRef(0);
+
+  const reportRefreshError = (error: unknown) => {
+    const now = Date.now();
+    if (now - lastRefreshErrorAtRef.current < 10000) return;
+
+    lastRefreshErrorAtRef.current = now;
+    setNotice(errorMessage(error, "Could not refresh rebuild status."));
+  };
+
+  const refreshSafely = async <T,>(refresh: () => Promise<T>) => {
+    try {
+      return await refresh();
+    } catch (error) {
+      reportRefreshError(error);
+      return null;
+    }
+  };
 
   useEffect(() => {
     if (!rebuild?.running) return;
@@ -30,18 +51,18 @@ export function useRebuildSync({
     const interval = window.setInterval(() => {
       void (async () => {
         if (typeof EventSource !== "undefined" && Date.now() - lastLiveEventAtRef.current < 7500) return;
-        const next = await refreshRebuild();
-        void refreshStatus();
+        const next = await refreshSafely(refreshRebuild);
+        void refreshSafely(refreshStatus);
 
-        if (!next.running && isTerminalRebuildStatus(next.status)) {
-          void refreshBuildLog();
-          void refreshProjectFiles();
+        if (next && !next.running && isTerminalRebuildStatus(next.status)) {
+          void refreshSafely(refreshBuildLog);
+          void refreshSafely(refreshProjectFiles);
         }
       })();
     }, 5000);
 
     return () => window.clearInterval(interval);
-  }, [rebuild?.running, refreshBuildLog, refreshProjectFiles, refreshRebuild, refreshStatus]);
+  }, [rebuild?.running, refreshBuildLog, refreshProjectFiles, refreshRebuild, refreshStatus, setNotice]);
 
   useEffect(() => {
     if (!selectedProjectSlug || !rebuild?.running || typeof EventSource === "undefined") return;
@@ -58,9 +79,9 @@ export function useRebuildSync({
         if (next) {
           setRebuild(next);
           if (!next.running && isTerminalRebuildStatus(next.status)) {
-            void refreshStatus();
-            void refreshBuildLog();
-            void refreshProjectFiles();
+            void refreshSafely(refreshStatus);
+            void refreshSafely(refreshBuildLog);
+            void refreshSafely(refreshProjectFiles);
           }
         }
       } catch {
@@ -75,5 +96,5 @@ export function useRebuildSync({
     };
 
     return () => eventSource.close();
-  }, [rebuild?.running, refreshBuildLog, refreshProjectFiles, refreshStatus, selectedProjectSlug, setRebuild]);
+  }, [rebuild?.running, refreshBuildLog, refreshProjectFiles, refreshStatus, selectedProjectSlug, setRebuild, setNotice]);
 }

@@ -1,4 +1,4 @@
-import type { AgentContextFile, AgentEditableTargetFile, AgentSourceContextRef } from "./agents";
+import type { AgentContextDraftState, AgentContextFile, AgentEditableTargetFile, AgentSourceContextRef } from "./agents";
 
 export type {
   AgentContextDraftState,
@@ -102,6 +102,7 @@ export type ProjectFile = {
   kind: "human" | "ai" | "output" | "log" | "design";
   editable: boolean;
   annotation: boolean;
+  chatContextReadable?: boolean;
   modifiedAt?: string | null;
   previewable?: boolean;
 };
@@ -145,6 +146,12 @@ export type DeleteHumanInputResponse = {
 
 export type FileSearchResponse = {
   files: ProjectFile[];
+};
+
+export type WriteFileRequest = {
+  path: string;
+  content: string;
+  expectedContentHash: string;
 };
 
 export type RebuildState = {
@@ -214,8 +221,6 @@ export type ChatMessage = {
     currentFile?: AgentContextFile;
     editableFiles?: AgentEditableTargetFile[];
     sourceFiles?: AgentSourceContextRef[];
-    activeFiles?: AgentContextFile[];
-    fileRefs?: ChatContextRef[];
   };
   metadata?: ChatMessageMetadata;
 };
@@ -226,6 +231,8 @@ export type ChatMessageFileEdit = {
   proposedContent?: string;
   contentHashBefore?: string;
   contentHashAfter?: string;
+  draftStateBefore?: AgentContextDraftState;
+  draftContentHashBefore?: string;
   appliedAt?: string;
   status: "proposed" | "applied" | "rejected" | "failed";
 };
@@ -280,8 +287,6 @@ export type SendChatMessageRequest = {
     currentFile?: AgentContextFile;
     editableFiles?: AgentEditableTargetFile[];
     sourceFiles?: AgentSourceContextRef[];
-    activeFiles?: AgentContextFile[];
-    fileRefs?: ChatContextRef[];
   };
 };
 
@@ -365,65 +370,3 @@ export type DesignState = {
   };
 };
 
-export type AiAssistProposal = {
-  filePath: string;
-  contentHash: string;
-  modelId: string;
-  generatedAt: string;
-  summary: string;
-  rationale: string;
-  affectedSections: string[];
-  proposedContent: string;
-  risks: string[];
-  questionsOrAssumptions: string[];
-};
-
-export type AiAssistRequest = {
-  modelId: string;
-  path: string;
-  annotation: string;
-  contentHash?: string;
-  feedback?: string;
-  previousProposal?: AiAssistProposal;
-};
-
-export type RequirementAutoUpdatePath =
-  | "human_goal_requirements.md"
-  | "human_input_requirements.md"
-  | "human_output_requirements.md";
-
-export type RequirementsAutoUpdateProposal = {
-  filePath: RequirementAutoUpdatePath;
-  contentHash: string;
-  modelId: string;
-  generatedAt: string;
-  summary: string;
-  rationale: string;
-  affectedSections: string[];
-  proposedContent: string;
-  risks: string[];
-  questionsOrAssumptions: string[];
-};
-
-export type RequirementsAutoUpdateProposeRequest = {
-  modelId: string;
-  sourcePath: RequirementAutoUpdatePath;
-  selectedPaths: RequirementAutoUpdatePath[];
-  instruction?: string;
-  contentHashes: Record<RequirementAutoUpdatePath, string>;
-};
-
-export type RequirementsAutoUpdateProposeResponse = {
-  modelId: string;
-  generatedAt: string;
-  proposals: RequirementsAutoUpdateProposal[];
-};
-
-export type RequirementsAutoUpdateAcceptRequest = {
-  proposals: Pick<RequirementsAutoUpdateProposal, "filePath" | "contentHash" | "proposedContent">[];
-};
-
-export type RequirementsAutoUpdateAcceptResponse = {
-  acceptedAt: string;
-  files: FileContent[];
-};

@@ -40,6 +40,16 @@ export function createProjectFileService({
     return relativePath.split("/").some((segment) => segment.startsWith("."));
   }
 
+  function isChatContextReadablePath(relativePath, previewable = true) {
+    if (!previewable) return false;
+    return (
+      /^human_[^/]+\.md$/i.test(relativePath) ||
+      relativePath.startsWith("inputs_human/") ||
+      relativePath.startsWith("inputs_ai/") ||
+      relativePath.startsWith("outputs_ai/")
+    );
+  }
+
   function hasTraversalSegment(relativePath) {
     return String(relativePath ?? "")
       .replaceAll("\\", "/")
@@ -47,7 +57,7 @@ export function createProjectFileService({
       .some((segment) => segment === "..");
   }
 
-  function projectFileItem(projectRoot, rootRelative, relative, meta, stat) {
+  function projectFileItem(rootRelative, relative, meta, stat) {
     const previewable = isPreviewablePath(relative);
 
     return {
@@ -56,6 +66,7 @@ export function createProjectFileService({
       kind: meta.kind,
       editable: meta.editable && previewable,
       annotation: meta.annotation,
+      chatContextReadable: isChatContextReadablePath(meta.path, previewable),
       modifiedAt: stat.mtime.toISOString(),
       previewable,
     };
@@ -68,6 +79,14 @@ export function createProjectFileService({
     } catch {
       return false;
     }
+  }
+
+  async function rejectSymlinkEntry(absolutePath) {
+    const stat = await fs.lstat(absolutePath);
+    if (stat.isSymbolicLink()) {
+      throw httpError("Symlinked project paths cannot be managed in the lab UI.", 403, "path_symlink");
+    }
+    return stat;
   }
 
   function projectPath(projectRoot, relativePath) {
@@ -83,6 +102,57 @@ export function createProjectFileService({
     }
 
     return { absolute, relative: path.relative(projectRoot, absolute).replaceAll(path.sep, "/") };
+  }
+
+  async function resolveProjectFileTarget(projectRoot, relativePath, { allowMissing = false } = {}) {
+    const target = projectPath(projectRoot, relativePath);
+    const projectRootReal = await fs.realpath(projectRoot);
+    const parentReal = await fs.realpath(path.dirname(target.absolute));
+
+    if (!isPathInsideRoot(projectRootReal, parentReal)) {
+      throw httpError("Path escapes the project root.", 403, "path_escape");
+    }
+
+    try {
+      const linkStat = await fs.lstat(target.absolute);
+      if (linkStat.isSymbolicLink()) {
+        throw httpError("Symlinked project files cannot be managed in the lab UI.", 403, "path_symlink");
+      }
+
+      const targetReal = await fs.realpath(target.absolute);
+      if (!isPathInsideRoot(projectRootReal, targetReal)) {
+        throw httpError("Path escapes the project root.", 403, "path_escape");
+      }
+    } catch (error) {
+      if (error?.statusCode) throw error;
+      if (error?.code === "ENOENT" && allowMissing) return target;
+      throw error;
+    }
+
+    return target;
+  }
+
+  async function resolveProjectDirectory(projectRoot, relativePath, { allowMissing = false } = {}) {
+    const target = projectPath(projectRoot, relativePath);
+    const projectRootReal = await fs.realpath(projectRoot);
+
+    try {
+      const linkStat = await fs.lstat(target.absolute);
+      if (linkStat.isSymbolicLink()) {
+        throw httpError("Symlinked project directories cannot be managed in the lab UI.", 403, "path_symlink");
+      }
+
+      const targetReal = await fs.realpath(target.absolute);
+      if (!isPathInsideRoot(projectRootReal, targetReal)) {
+        throw httpError("Path escapes the project root.", 403, "path_escape");
+      }
+    } catch (error) {
+      if (error?.statusCode) throw error;
+      if (error?.code === "ENOENT" && allowMissing) return target;
+      throw error;
+    }
+
+    return target;
   }
 
   function classifyPath(projectRoot, relativePath) {
@@ -117,17 +187,21 @@ export function createProjectFileService({
   }
 
   async function readProjectJson(projectRoot, relativePath, fallback = null) {
+    const { absolute } = await resolveProjectFileTarget(projectRoot, relativePath, { allowMissing: fallback !== undefined });
     try {
-      const { absolute } = projectPath(projectRoot, relativePath);
       return JSON.parse(await fs.readFile(absolute, "utf8"));
-    } catch {
-      return fallback;
+    } catch (error) {
+      if (error?.code === "ENOENT") return fallback;
+      if (error instanceof SyntaxError) {
+        throw httpError(`Could not parse ${relativePath}. Fix or remove the corrupt JSON file.`, 500, "corrupt_project_json");
+      }
+      throw error;
     }
   }
 
   async function readTextFile(projectRoot, relativePath) {
     const meta = classifyPath(projectRoot, relativePath);
-    const { absolute } = projectPath(projectRoot, meta.path);
+    const { absolute } = await resolveProjectFileTarget(projectRoot, meta.path);
     const stat = await fs.stat(absolute);
 
     if (meta.previewable === false) {
@@ -147,7 +221,7 @@ export function createProjectFileService({
     };
   }
 
-  async function writeTextFile(projectRoot, relativePath, content) {
+  async function writeTextFile(projectRoot, relativePath, content, { expectedContentHash = null } = {}) {
     const meta = classifyPath(projectRoot, relativePath);
 
     if (!meta.editable) {
@@ -158,13 +232,32 @@ export function createProjectFileService({
       throw httpError("This file type is saved in the project but cannot be edited in the lab UI.", 415, "file_not_previewable");
     }
 
-    const { absolute } = projectPath(projectRoot, meta.path);
+    const { absolute } = await resolveProjectFileTarget(projectRoot, meta.path, { allowMissing: true });
+    let currentContent = "";
+    try {
+      currentContent = await fs.readFile(absolute, "utf8");
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+
+    if (!expectedContentHash) {
+      throw httpError("Saving requires the content hash from the loaded file.", 428, "file_hash_required");
+    }
+
+    if (hashText(currentContent) !== expectedContentHash) {
+      throw httpError("This file changed after it was loaded. Refresh the file before saving.", 409, "file_changed");
+    }
+
+    if (Buffer.byteLength(content, "utf8") > MAX_FILE_BYTES) {
+      throw httpError("File is too large to save in the lab UI.", 413, "file_too_large");
+    }
+
     await fs.writeFile(absolute, content, "utf8");
     return readTextFile(projectRoot, meta.path);
   }
 
   async function listMarkdownFiles(projectRoot, rootRelative, kind, editable, annotation) {
-    const root = projectPath(projectRoot, rootRelative);
+    const root = await resolveProjectDirectory(projectRoot, rootRelative, { allowMissing: true });
     const files = [];
 
     async function walk(currentAbsolute) {
@@ -175,6 +268,7 @@ export function createProjectFileService({
 
         const absolute = path.join(currentAbsolute, entry.name);
         const relative = path.relative(projectRoot, absolute).replaceAll(path.sep, "/");
+        await rejectSymlinkEntry(absolute);
 
         if (entry.isDirectory()) {
           await walk(absolute);
@@ -190,6 +284,7 @@ export function createProjectFileService({
           kind,
           editable,
           annotation,
+          chatContextReadable: isChatContextReadablePath(relative),
           modifiedAt: stat.mtime.toISOString(),
           previewable: true,
         });
@@ -206,7 +301,7 @@ export function createProjectFileService({
   }
 
   async function listProjectFiles(projectRoot, rootRelative) {
-    const root = projectPath(projectRoot, rootRelative);
+    const root = await resolveProjectDirectory(projectRoot, rootRelative, { allowMissing: true });
     const files = [];
 
     async function walk(currentAbsolute) {
@@ -217,6 +312,7 @@ export function createProjectFileService({
 
         const absolute = path.join(currentAbsolute, entry.name);
         const relative = path.relative(projectRoot, absolute).replaceAll(path.sep, "/");
+        await rejectSymlinkEntry(absolute);
 
         if (entry.isDirectory()) {
           await walk(absolute);
@@ -227,7 +323,7 @@ export function createProjectFileService({
 
         const meta = classifyPath(projectRoot, relative);
         const stat = await fs.stat(absolute);
-        files.push(projectFileItem(projectRoot, root.relative, relative, meta, stat));
+        files.push(projectFileItem(root.relative, relative, meta, stat));
       }
     }
 
@@ -273,13 +369,14 @@ export function createProjectFileService({
         throw httpError(`Uploaded file ${name} is too large.`, 413, "upload_too_large");
       }
 
-      const { absolute, relative } = projectPath(projectRoot, `inputs_human/${name}`);
-      await fs.mkdir(path.dirname(absolute), { recursive: true });
+      const target = projectPath(projectRoot, `inputs_human/${name}`);
+      await fs.mkdir(path.dirname(target.absolute), { recursive: true });
+      const { absolute, relative } = await resolveProjectFileTarget(projectRoot, target.relative, { allowMissing: true });
       await fs.writeFile(absolute, buffer);
 
       const meta = classifyPath(projectRoot, relative);
       const stat = await fs.stat(absolute);
-      uploaded.push(projectFileItem(projectRoot, "inputs_human", relative, meta, stat));
+      uploaded.push(projectFileItem("inputs_human", relative, meta, stat));
     }
 
     return { files: uploaded };
@@ -306,7 +403,7 @@ export function createProjectFileService({
       throw httpError("Hidden project files cannot be managed in the lab UI.", 403, "hidden_file");
     }
 
-    const { absolute } = projectPath(projectRoot, meta.path);
+    const { absolute } = await resolveProjectFileTarget(projectRoot, meta.path);
     const stat = await fs.stat(absolute);
 
     if (!stat.isFile()) {
@@ -344,7 +441,7 @@ export function createProjectFileService({
   }
 
   async function listSearchDirectoryFiles(projectRoot, rootRelative) {
-    const root = projectPath(projectRoot, rootRelative.replace(/\/+$/, ""));
+    const root = await resolveProjectDirectory(projectRoot, rootRelative.replace(/\/+$/, ""), { allowMissing: true });
     const files = [];
 
     async function walk(currentAbsolute) {
@@ -355,6 +452,7 @@ export function createProjectFileService({
 
         const absolute = path.join(currentAbsolute, entry.name);
         const relative = path.relative(projectRoot, absolute).replaceAll(path.sep, "/");
+        await rejectSymlinkEntry(absolute);
         if (isHiddenProjectPath(relative)) continue;
 
         if (entry.isDirectory()) {
@@ -372,6 +470,7 @@ export function createProjectFileService({
           kind: meta.kind,
           editable: meta.editable,
           annotation: meta.annotation,
+          chatContextReadable: isChatContextReadablePath(meta.path),
           modifiedAt: stat.mtime.toISOString(),
         });
       }
@@ -393,6 +492,7 @@ export function createProjectFileService({
 
     for (const entry of entries) {
       if (entry.name.startsWith(".")) continue;
+      await rejectSymlinkEntry(path.join(root.absolute, entry.name));
       if (!entry.isFile() || !fileMatchesPattern(entry.name, pattern)) continue;
 
       const meta = classifyPath(projectRoot, entry.name);
@@ -403,6 +503,7 @@ export function createProjectFileService({
         kind: meta.kind,
         editable: meta.editable,
         annotation: meta.annotation,
+        chatContextReadable: isChatContextReadablePath(meta.path),
         modifiedAt: stat.mtime.toISOString(),
       });
     }
@@ -481,6 +582,7 @@ export function createProjectFileService({
 
   async function gitFileDiff(projectRoot, relativePath) {
     const meta = classifyPath(projectRoot, relativePath);
+    await resolveProjectFileTarget(projectRoot, meta.path);
 
     return new Promise((resolve) => {
       execFile("git", ["diff", "--unified=0", "--", meta.path], { cwd: projectRoot }, (error, stdout) => {
@@ -505,10 +607,12 @@ export function createProjectFileService({
       throw httpError("This file type is saved in the project but cannot be restored in the lab UI.", 415, "file_not_previewable");
     }
 
+    await resolveProjectFileTarget(projectRoot, meta.path);
+
     await new Promise((resolve, reject) => {
       execFile("git", ["restore", "--source=HEAD", "--staged", "--worktree", "--", meta.path], { cwd: projectRoot }, (error) => {
         if (error) {
-          reject(error);
+          reject(httpError("Could not restore this file from Git HEAD.", 500, "git_restore_failed"));
           return;
         }
 

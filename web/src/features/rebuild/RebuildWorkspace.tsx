@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { HumanAttentionItem, ProjectStatus, RebuildModel, RebuildState, ResolutionAttempt, ResolutionOption } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
+import { humanAttentionItemText } from "../../domain/humanAttention";
 import { formatModelLabel, modelTierLabels } from "../../domain/modelLabels";
 import { humanAttentionQueuePath } from "../../domain/projectPaths";
 import { AgentTranscript } from "../../shared/agents/AgentTranscript";
@@ -32,16 +33,6 @@ function getLatestLogTimestamp(entry: string | null) {
 
 function getLatestLogText(entry: string | null) {
   return entry?.replace(/^\[[^\]]+\]\s*/, "").trim() || "No log entries yet.";
-}
-
-function attentionItemText(item: HumanAttentionItem) {
-  const severity = item.severity ?? "attention";
-  const category = item.category ?? "review";
-  const summary =
-    item.summary || (typeof item.issue === "string" ? item.issue : typeof item.message === "string" ? item.message : "Review needed.");
-  const nextAction = item.next_human_action ?? item.nextAction ?? "";
-
-  return `${severity}/${category}: ${summary}${nextAction ? ` Next: ${nextAction}` : ""}`;
 }
 
 function latestResolutionAttempt(item: HumanAttentionItem): ResolutionAttempt | null {
@@ -158,7 +149,7 @@ export function RebuildWorkspace({
                   return (
                     <article className="attention-resolution-item" key={item.id}>
                       <div>
-                        <strong>{attentionItemText(item)}</strong>
+                        <strong>{humanAttentionItemText(item)}</strong>
                         {attempt?.summary ? (
                           <p className="attention-resolution-attempt">
                             Last attempt: {attempt.outcome ?? "incomplete"} - {attempt.summary}

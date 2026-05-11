@@ -12,6 +12,7 @@ function contextRefFromProjectFile(file: ProjectFile): ChatContextRef {
 
 function editableTargetFromProjectFile(file: ProjectFile, selected: FileContent | null, draft: string): AgentContextFile {
   const selectedFile = selected?.path === file.path ? selected : null;
+  const draftState = selectedFile ? (draft !== selectedFile.content ? "unsaved" : "saved") : "unknown";
   return {
     path: file.path,
     label: file.name || fileBasename(file.path),
@@ -19,7 +20,8 @@ function editableTargetFromProjectFile(file: ProjectFile, selected: FileContent 
     editable: file.editable,
     annotation: file.annotation,
     contentHash: selectedFile?.contentHash,
-    draftState: selectedFile ? (draft !== selectedFile.content ? "unsaved" : "saved") : "unknown",
+    ...(draftState === "unsaved" ? { draftContent: draft } : {}),
+    draftState,
     role: "primary",
   };
 }
@@ -34,6 +36,7 @@ function currentFileFromSelectedFile(selected: FileContent | null, draft: string
     editable: selected.editable,
     annotation: selected.annotation,
     contentHash: selected.contentHash,
+    ...(draft !== selected.content ? { draftContent: draft } : {}),
     draftState: draft !== selected.content ? "unsaved" : "saved",
     role: "primary",
   };
@@ -97,7 +100,7 @@ export function useAgentFileContext({
 
   const addSourceFile = (path: string) => {
     const file = projectFiles.find((candidate) => candidate.path === path);
-    if (!file) return;
+    if (!file?.chatContextReadable) return;
     const sourceFile = contextRefFromProjectFile(file);
     setSourceFiles((current) => {
       if (current.some((candidate) => candidate.path === sourceFile.path)) return current;

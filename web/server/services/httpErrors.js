@@ -12,7 +12,8 @@ export function httpError(message, statusCode = 400, code = null) {
 }
 
 export function apiErrorHandler(error, _request, response, _next) {
-  const statusCode = Number(error?.statusCode ?? 500);
+  const candidateStatusCode = Number(error?.statusCode ?? 500);
+  const statusCode = Number.isFinite(candidateStatusCode) && candidateStatusCode >= 400 && candidateStatusCode < 600 ? candidateStatusCode : 500;
   response.status(statusCode).json({
     code: typeof error?.code === "string" ? error.code : undefined,
     error: error instanceof Error ? error.message : "Unknown API error.",

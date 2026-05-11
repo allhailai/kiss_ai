@@ -1,4 +1,4 @@
-import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { ChatConversationEvent, Conversation } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 
@@ -48,11 +48,31 @@ export function useConversationStream({
 }) {
   const pendingDeltasRef = useRef<Array<Extract<ChatConversationEvent, { type: "message_delta" }>>>([]);
   const deltaFrameRef = useRef<number | null>(null);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
   useEffect(() => {
     if (!projectSlug || !conversationId || typeof EventSource === "undefined") return;
 
+    let closed = false;
+    let reconnectTimeoutId: number | null = null;
+    let pollTimeoutId: number | null = null;
     const eventSource = api.openConversationEventSource(projectSlug, conversationId);
+    const pollConversation = async () => {
+      try {
+        const conversation = await api.conversation(projectSlug, conversationId);
+        if (closed) return;
+
+        setActiveConversation(conversation);
+        void refreshConversations();
+
+        const latestMessage = conversation.messages.at(-1);
+        if (latestMessage?.role === "assistant" && latestMessage.status !== "streaming") {
+          setSending(false);
+        }
+      } catch {
+        // Reconnect remains the primary recovery path.
+      }
+    };
     const flushDeltas = () => {
       deltaFrameRef.current = null;
       const deltas = pendingDeltasRef.current;
@@ -75,6 +95,7 @@ export function useConversationStream({
       try {
         const payload = JSON.parse(event.data) as ChatConversationEvent;
         if (payload.type === "snapshot") {
+          setReconnectAttempt(0);
           pendingDeltasRef.current = [];
           setActiveConversation((current) => {
             if (current?.id === payload.conversation.id && payload.conversation.messages.length < current.messages.length) {
@@ -89,6 +110,7 @@ export function useConversationStream({
             deltaFrameRef.current = window.requestAnimationFrame(flushDeltas);
           }
         } else if (payload.type === "message_complete") {
+          setReconnectAttempt(0);
           flushDeltas();
           setActiveConversation(payload.conversation);
           setSending(false);
@@ -108,15 +130,31 @@ export function useConversationStream({
     eventSource.addEventListener("chat_error", handleEvent);
     eventSource.onerror = () => {
       eventSource.close();
+      if (closed) return;
+
+      void pollConversation();
+      const nextAttempt = reconnectAttempt + 1;
+      const reconnectDelayMs = Math.min(1000 * 2 ** reconnectAttempt, 10000);
+      reconnectTimeoutId = window.setTimeout(() => setReconnectAttempt(nextAttempt), reconnectDelayMs);
+
+      if (nextAttempt >= 5) {
+        pollTimeoutId = window.setTimeout(() => {
+          void pollConversation().finally(() => setSending(false));
+          onNotice("Live chat updates disconnected. The latest saved conversation was refreshed.");
+        }, 15000);
+      }
     };
 
     return () => {
+      closed = true;
       eventSource.close();
+      if (reconnectTimeoutId !== null) window.clearTimeout(reconnectTimeoutId);
+      if (pollTimeoutId !== null) window.clearTimeout(pollTimeoutId);
       pendingDeltasRef.current = [];
       if (deltaFrameRef.current !== null) {
         window.cancelAnimationFrame(deltaFrameRef.current);
         deltaFrameRef.current = null;
       }
     };
-  }, [conversationId, onConversationTruncated, onNotice, projectSlug, refreshConversations, setActiveConversation, setSending]);
+  }, [conversationId, onConversationTruncated, onNotice, projectSlug, reconnectAttempt, refreshConversations, setActiveConversation, setSending]);
 }

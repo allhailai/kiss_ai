@@ -1,3 +1,5 @@
+import { createProjectBodySchema, parseRequestBody } from "./requestSchemas.js";
+
 export function registerProjectRoutes(app, {
   PROJECTS_ROOT,
   buildLogTabState,
@@ -11,6 +13,7 @@ export function registerProjectRoutes(app, {
   pickRebuildModelId,
   readProjectJson,
   resolveCursorApiKey,
+  httpError,
 }) {
   app.get("/api/projects", async (_request, response, next) => {
     try {
@@ -25,7 +28,7 @@ export function registerProjectRoutes(app, {
 
   app.post("/api/projects", async (request, response, next) => {
     try {
-      response.status(201).json(await createProjectFromTemplate(request.body));
+      response.status(201).json(await createProjectFromTemplate(parseRequestBody(createProjectBodySchema, request.body, httpError)));
     } catch (error) {
       next(error);
     }

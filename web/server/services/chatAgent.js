@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { MAX_USER_MESSAGE_BYTES } from "../contracts/chatLimits.js";
+import { normalizeChatContext } from "./chatContext.js";
 
 const maxPromptFileBytes = 24 * 1024;
 const maxPromptHistoryMessages = 40;
-const maxUserMessageBytes = 120 * 1024;
 const maxContextRefs = 20;
 const maxActiveFiles = 10;
 
@@ -20,64 +21,25 @@ function trimForPrompt(value, maxBytes = maxPromptFileBytes) {
   return `${text.slice(0, maxBytes)}\n\n[Truncated for prompt size.]`;
 }
 
-function normalizeContextRef(value) {
-  const source = value && typeof value === "object" ? value : {};
-  const filePath = String(source.path ?? "").trim();
-  if (!filePath) return null;
-  return {
-    path: filePath,
-    label: typeof source.label === "string" ? source.label.trim() : "",
-    kind: typeof source.kind === "string" ? source.kind.trim() : "",
-  };
-}
-
-function normalizeActiveFile(value) {
-  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const filePath = String(source.path ?? "").trim();
-  if (!filePath) return null;
-  return {
-    path: filePath,
-    label: typeof source.label === "string" ? source.label.trim() : undefined,
-    kind: typeof source.kind === "string" ? source.kind.trim() : undefined,
-    editable: typeof source.editable === "boolean" ? source.editable : undefined,
-    annotation: typeof source.annotation === "boolean" ? source.annotation : undefined,
-    contentHash: typeof source.contentHash === "string" ? source.contentHash.trim() : undefined,
-    draftState: ["saved", "unsaved", "unknown"].includes(source.draftState) ? source.draftState : "unknown",
-    role: source.role === "primary" || source.role === "secondary" ? source.role : undefined,
-  };
-}
-
-function normalizeCurrentFile(value) {
-  return normalizeActiveFile(value);
+function hashText(value) {
+  return createHash("sha256").update(String(value)).digest("hex");
 }
 
 function requireSendRequest(body, httpError) {
   const modelId = String(body?.modelId ?? "").trim();
   const content = String(body?.content ?? "").trim();
-  const contextSource = body?.context && typeof body.context === "object" && !Array.isArray(body.context) ? body.context : {};
-  const currentFile = normalizeCurrentFile(contextSource.currentFile);
-  const editableFileSource = Array.isArray(contextSource.editableFiles) ? contextSource.editableFiles : contextSource.activeFiles;
-  const sourceFileSource = Array.isArray(contextSource.sourceFiles) ? contextSource.sourceFiles : contextSource.fileRefs;
-  const editableFiles = Array.isArray(editableFileSource) ? editableFileSource.map(normalizeActiveFile).filter(Boolean).slice(0, maxActiveFiles) : [];
-  const sourceFiles = Array.isArray(sourceFileSource) ? sourceFileSource.map(normalizeContextRef).filter(Boolean).slice(0, maxContextRefs) : [];
+  const context = normalizeChatContext(body?.context, { maxDraftContentLength: 120_000 });
 
   if (!modelId) throw httpError("Chat requires a model.");
   if (!content) throw httpError("Chat requires a message.");
-  if (Buffer.byteLength(content, "utf8") > maxUserMessageBytes) {
+  if (Buffer.byteLength(content, "utf8") > MAX_USER_MESSAGE_BYTES) {
     throw httpError("Chat message is too large.", 413, "chat_message_too_large");
   }
 
   return {
     modelId,
     content,
-    context:
-      currentFile || editableFiles.length || sourceFiles.length
-        ? {
-            ...(currentFile ? { currentFile } : {}),
-            ...(editableFiles.length ? { editableFiles } : {}),
-            ...(sourceFiles.length ? { sourceFiles } : {}),
-          }
-        : undefined,
+    context,
   };
 }
 
@@ -86,7 +48,7 @@ function requireEditRequest(body, httpError) {
   const content = String(body?.content ?? "").trim();
 
   if (!content) throw httpError("Chat requires a message.");
-  if (Buffer.byteLength(content, "utf8") > maxUserMessageBytes) {
+  if (Buffer.byteLength(content, "utf8") > MAX_USER_MESSAGE_BYTES) {
     throw httpError("Chat message is too large.", 413, "chat_message_too_large");
   }
 
@@ -155,7 +117,17 @@ async function readActiveContextFiles({ project, readTextFile, activeFiles }) {
   return await Promise.all(activeFiles.map(async (ref) => {
     try {
       const file = await readTextFile(project.path, ref.path);
+      if (!file.editable) {
+        return {
+          path: file.path,
+          label: ref.label || file.path,
+          intent: "editable_target",
+          error: "This path is not editable in the lab UI.",
+        };
+      }
+
       const expectedHash = typeof ref.contentHash === "string" && ref.contentHash ? ref.contentHash : null;
+      const hasUnsavedDraft = ref.draftState === "unsaved" && typeof ref.draftContent === "string";
       return {
         path: file.path,
         label: ref.label || file.path,
@@ -168,7 +140,8 @@ async function readActiveContextFiles({ project, readTextFile, activeFiles }) {
         draftState: ref.draftState ?? "unknown",
         role: ref.role ?? "secondary",
         intent: "editable_target",
-        content: trimForPrompt(file.content),
+        contentSource: hasUnsavedDraft ? "unsaved_draft" : "saved_file",
+        content: trimForPrompt(hasUnsavedDraft ? ref.draftContent : file.content),
       };
     } catch (error) {
       return {
@@ -187,6 +160,7 @@ async function readCurrentFileContext({ project, readTextFile, currentFile }) {
   try {
     const file = await readTextFile(project.path, currentFile.path);
     const expectedHash = typeof currentFile.contentHash === "string" && currentFile.contentHash ? currentFile.contentHash : null;
+    const hasUnsavedDraft = currentFile.draftState === "unsaved" && typeof currentFile.draftContent === "string";
 
     return {
       path: file.path,
@@ -201,7 +175,8 @@ async function readCurrentFileContext({ project, readTextFile, currentFile }) {
       role: currentFile.role ?? "primary",
       intent: "current_file_context",
       editableIntent: false,
-      content: trimForPrompt(file.content),
+      contentSource: hasUnsavedDraft ? "unsaved_draft" : "saved_file",
+      content: trimForPrompt(hasUnsavedDraft ? currentFile.draftContent : file.content),
     };
   } catch (error) {
     return {
@@ -227,11 +202,14 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
   const fileRefs = conversation.messages.flatMap((message) => message.context?.sourceFiles ?? message.context?.fileRefs ?? []);
   const uniqueEditableFiles = uniqueByPath(activeFiles, maxActiveFiles);
   const uniqueSourceFiles = uniqueByPath(fileRefs, maxContextRefs);
-  const [currentFileContext, editableTargetFiles, sourceContextFiles] = await Promise.all([
+  const [currentFileContext, editableTargetFileResults, sourceContextFiles] = await Promise.all([
     readCurrentFileContext({ project, readTextFile, currentFile }),
     readActiveContextFiles({ project, readTextFile, activeFiles: uniqueEditableFiles }),
     readSourceContextFiles({ project, readTextFile, fileRefs: uniqueSourceFiles }),
   ]);
+  const editableTargetFiles = editableTargetFileResults.filter((file) => !file.error && file.editable);
+  const rejectedEditableTargetFiles = editableTargetFileResults.filter((file) => file.error);
+  const authorizedEditablePaths = new Set(editableTargetFiles.map((file) => file.path));
   const history = conversation.messages.slice(-maxPromptHistoryMessages).map(formatHistoryMessage);
   const projectName = displayProjectName(harness.project_name ?? project.name, harness.project_slug ?? project.slug);
 
@@ -257,23 +235,25 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     },
     currentFileContext,
     editableTargetFiles,
+    rejectedEditableTargetFiles,
     sourceContextFiles,
   };
 
-  return [
+  const prompt = [
     "You are the project chat assistant for a local kiss_ai research project.",
     "",
     "Rules:",
     "- Answer the user's latest message using this conversation and supplied project context first.",
     "- Treat a new conversation as fresh context; do not assume access to previous conversations.",
     "- Treat currentFileContext as read-only context for the file the user is viewing. It does not grant edit permission.",
-    "- You may propose or prepare updates for files listed in editableTargetFiles; do not directly edit files, run modifying commands, write logs, or create artifacts.",
+    "- Context entries with contentSource=unsaved_draft reflect the user's current unsaved editor draft and should be treated as newer than saved file content.",
+    "- You may propose or prepare updates for files listed in editableTargetFiles; base proposals on the provided content field, do not directly edit files, run modifying commands, write logs, or create artifacts.",
     "- Treat sourceContextFiles as read-only sources to consider. Do not treat them as editable targets unless the same path also appears in editableTargetFiles.",
     "- When the user asks for file changes, propose edits only for editableTargetFiles and keep the response proposal-only.",
     "- For each proposed file edit, include a tagged block: <file_edit><path>relative/path.md</path><summary>short summary</summary><proposedContent>full replacement file content</proposedContent></file_edit>.",
     "- The web UI may apply tagged file_edit proposals to the unsaved editor draft. Never write files directly.",
-    "- User-selected sourceContextFiles are guidance, not an exclusive boundary. You may inspect other project files when useful.",
-    "- If you rely on project context outside currentFileContext, editableTargetFiles, or sourceContextFiles, briefly explain or cite what additional context you used.",
+    "- User-selected sourceContextFiles are the only ad hoc file contents included beyond the standard requirement files in the project payload.",
+    "- If needed context is missing from currentFileContext, editableTargetFiles, sourceContextFiles, or the standard requirement files, say what is missing.",
     "- Stay inside the current project. User-selected source context files are limited to human_*.md, inputs_human/, inputs_ai/, and outputs_ai/.",
     "- Do not expose hidden chain-of-thought. Provide concise reasoning summaries when useful.",
     "- If context is missing, say what is missing and suggest the next best step.",
@@ -283,6 +263,8 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     "Project and conversation payload:",
     JSON.stringify(payload, null, 2),
   ].join("\n");
+
+  return { authorizedEditablePaths, prompt };
 }
 
 function summarizeAssistantText(text) {
@@ -291,9 +273,10 @@ function summarizeAssistantText(text) {
   return compact.length > 240 ? `${compact.slice(0, 237)}...` : compact;
 }
 
-function firstTagContent(text, tagName) {
-  const pattern = new RegExp(`<${tagName}>\\s*([\\s\\S]*?)\\s*<\\/${tagName}>`, "i");
-  return String(text ?? "").match(pattern)?.[1]?.trim() ?? "";
+function firstTagContent(text, tagName, { trim = true } = {}) {
+  const pattern = new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, "i");
+  const value = String(text ?? "").match(pattern)?.[1] ?? "";
+  return trim ? value.trim() : value;
 }
 
 function allTagContent(text, tagName) {
@@ -301,7 +284,7 @@ function allTagContent(text, tagName) {
   return [...String(text ?? "").matchAll(pattern)].map((match) => match[1]?.trim() ?? "");
 }
 
-function extractFileEditProposals(rawText, conversation) {
+export function extractFileEditProposals(rawText, conversation, authorizedEditablePaths = null) {
   const editableTargets = new Map(
     conversation.messages
       .flatMap((message) => message.context?.editableFiles ?? message.context?.activeFiles ?? [])
@@ -313,7 +296,8 @@ function extractFileEditProposals(rawText, conversation) {
     .map((editText) => {
       const path = firstTagContent(editText, "path");
       const target = editableTargets.get(path);
-      const proposedContent = firstTagContent(editText, "proposedContent");
+      const proposedContent = firstTagContent(editText, "proposedContent", { trim: false });
+      if (authorizedEditablePaths && !authorizedEditablePaths.has(path)) return null;
       if (!path || !target || !proposedContent) return null;
 
       return {
@@ -321,6 +305,10 @@ function extractFileEditProposals(rawText, conversation) {
         summary: firstTagContent(editText, "summary") || `Proposed edit for ${path}.`,
         proposedContent,
         contentHashBefore: target.contentHash,
+        draftStateBefore: target.draftState,
+        ...(target.draftState === "unsaved" && typeof target.draftContent === "string"
+          ? { draftContentHashBefore: hashText(target.draftContent) }
+          : {}),
         status: "proposed",
       };
     })
@@ -352,7 +340,7 @@ export function createChatAgentService({
     void (async () => {
       const assistantTextChunks = [];
       try {
-        const prompt = await createChatPrompt({
+        const { authorizedEditablePaths, prompt } = await createChatPrompt({
           project,
           conversation: conversationWithUser,
           displayProjectName,
@@ -379,7 +367,7 @@ export function createChatAgentService({
         });
 
         const assistantText = assistantTextChunks.join("");
-        const fileEdits = extractFileEditProposals(assistantText, conversationWithUser);
+        const fileEdits = extractFileEditProposals(assistantText, conversationWithUser, authorizedEditablePaths);
         const finalConversation = await appendMessage(project, conversationId, {
           id: assistantMessageId,
           role: "assistant",

@@ -81,6 +81,7 @@ export function RightPanelAgentChat({
     const selectedPaths = new Set(contextRefs.map((file) => file.path));
     const query = filePickerQuery.trim().toLowerCase();
     return projectFiles
+      .filter((file) => file.chatContextReadable)
       .filter((file) => !selectedPaths.has(file.path))
       .filter((file) => {
         if (!query) return true;

@@ -62,7 +62,8 @@ export function createBuildLogService({
 
   async function readBuildLogFile(projectRoot, relativePath, fallbackTitle) {
     const { absolute } = projectPath(projectRoot, relativePath);
-    const [file, stat] = await Promise.all([readTextFile(projectRoot, relativePath), fs.stat(absolute)]);
+    const file = await readTextFile(projectRoot, relativePath);
+    const stat = await fs.stat(absolute);
     const name = path.basename(file.path);
     const sections = parseMarkdownSections(file.content);
 
@@ -102,7 +103,8 @@ export function createBuildLogService({
         .map(async (entry) => {
           const relativePath = `change_logs/summaries/${entry.name}`;
           const { absolute } = projectPath(projectRoot, relativePath);
-          const [file, stat] = await Promise.all([readTextFile(projectRoot, relativePath), fs.stat(absolute)]);
+          const file = await readTextFile(projectRoot, relativePath);
+          const stat = await fs.stat(absolute);
           const sections = parseMarkdownSections(file.content);
 
           return {

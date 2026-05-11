@@ -41,7 +41,7 @@ export function GlobalFileSearch({
 
     const timeoutId = window.setTimeout(() => {
       api
-        .searchPathFiles(projectSlug, trimmedQuery, controller.signal)
+        .searchFiles(projectSlug, trimmedQuery, controller.signal)
         .then((response) => {
           if (cancelled) return;
           setResults(response.files);

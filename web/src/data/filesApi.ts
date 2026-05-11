@@ -1,4 +1,12 @@
-import type { DeleteHumanInputResponse, FileContent, FileDiff, FileSearchResponse, TreeResponse, UploadHumanInputsResponse } from "../contracts/api";
+import type {
+  DeleteHumanInputResponse,
+  FileContent,
+  FileDiff,
+  FileSearchResponse,
+  TreeResponse,
+  UploadHumanInputsResponse,
+  WriteFileRequest,
+} from "../contracts/api";
 import { projectBase, request } from "./request";
 
 function fileToBase64(file: File) {
@@ -15,7 +23,7 @@ function fileToBase64(file: File) {
 
 function searchProjectFiles(projectSlug: string, query: string, signal?: AbortSignal) {
   const params = new URLSearchParams({ q: query });
-  return request<FileSearchResponse>(`${projectBase(projectSlug)}/search/paths?${params}`, { signal });
+  return request<FileSearchResponse>(`${projectBase(projectSlug)}/search/files?${params}`, { signal });
 }
 
 function filePathQuery(path: string) {
@@ -43,14 +51,13 @@ export const filesApi = {
       method: "DELETE",
       body: JSON.stringify({ path }),
     }),
-  searchPathFiles: searchProjectFiles,
   searchFiles: searchProjectFiles,
   file: (projectSlug: string, path: string) => request<FileContent>(`${projectBase(projectSlug)}/file?${filePathQuery(path)}`),
   fileDiff: (projectSlug: string, path: string) => request<FileDiff>(`${projectBase(projectSlug)}/file/diff?${filePathQuery(path)}`),
-  saveFile: (projectSlug: string, path: string, content: string) =>
+  saveFile: (projectSlug: string, path: string, content: string, expectedContentHash: string) =>
     request<FileContent>(`${projectBase(projectSlug)}/file`, {
       method: "PUT",
-      body: JSON.stringify({ path, content }),
+      body: JSON.stringify({ path, content, expectedContentHash } satisfies WriteFileRequest),
     }),
   revertFile: (projectSlug: string, path: string) =>
     request<FileContent>(`${projectBase(projectSlug)}/file/revert`, {
