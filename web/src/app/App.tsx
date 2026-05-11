@@ -9,7 +9,6 @@ import { panelWidthContextKey, projectChatDefaultPanelWidth, useRightPanelWidth 
 import { type View } from "../navigation/views";
 import { BuildLogWorkspace } from "../features/buildLog/BuildLogWorkspace";
 import { ProjectChatConversationHistory } from "../features/chat/ProjectChatConversationHistory";
-import { ProjectChatPanel } from "../features/chat/ProjectChatPanel";
 import { useProjectChat } from "../features/chat/useProjectChat";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { DesignWorkspace } from "../features/design/DesignWorkspace";
@@ -41,14 +40,13 @@ const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: str
   },
 };
 
-const projectChatPanel = { kind: "project-chat", title: "Project Chat" } as const;
 const agentChatPanel = { kind: "agent-chat", title: "Agent Chat" } as const;
 
 export function App() {
   const workspace = useProjectWorkspace();
   const { designWorkspace, fileWorkspace, project, rebuildWorkspace, route, toastWorkspace } = workspace;
   const rightPanelSurface = useRightPanelSurface();
-  const [projectChatPanelDismissed, setProjectChatPanelDismissed] = useState(false);
+  const [chatPanelDismissed, setChatPanelDismissed] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const projectChatVisitKeyRef = useRef<string | null>(null);
   const themeStyle = useMemo(() => buildThemeStyle(designWorkspace.design), [designWorkspace.design]);
@@ -104,15 +102,15 @@ export function App() {
     fileWorkspace.setDraft(edit.proposedContent);
     toastWorkspace.setNotice("Applied the chat edit to the unsaved editor draft. Review and save when ready.");
   };
-  const openProjectChatPanel = () => {
-    setProjectChatPanelDismissed(false);
-    rightPanelSurface.openPanel(projectChatPanel);
+  const openAgentChatPanel = () => {
+    setChatPanelDismissed(false);
+    rightPanelSurface.openPanel(agentChatPanel);
     if (route.view === "chat" && !route.routeContext[panelWidthContextKey]) {
       route.replaceRouteContext({ [panelWidthContextKey]: projectChatDefaultPanelWidth });
     }
   };
   const selectProjectChatConversation = (conversationId: string) => {
-    openProjectChatPanel();
+    openAgentChatPanel();
     navigateTo("chat", null, {
       ...route.routeContext,
       conversation: conversationId,
@@ -121,6 +119,7 @@ export function App() {
   };
   const toggleAgentPanel = () => {
     if (rightPanelSurface.rightPanel?.kind === agentChatPanel.kind) {
+      if (route.view === "chat") setChatPanelDismissed(true);
       rightPanelSurface.closePanel();
       return;
     }
@@ -131,21 +130,21 @@ export function App() {
   useEffect(() => {
     if (!project.selectedProjectSlug || route.view !== "chat") {
       projectChatVisitKeyRef.current = null;
-      if (projectChatPanelDismissed) setProjectChatPanelDismissed(false);
+      if (chatPanelDismissed) setChatPanelDismissed(false);
       return;
     }
 
     if (projectChatVisitKeyRef.current !== project.selectedProjectSlug) {
       projectChatVisitKeyRef.current = project.selectedProjectSlug;
-      if (projectChatPanelDismissed) setProjectChatPanelDismissed(false);
-      openProjectChatPanel();
+      if (chatPanelDismissed) setChatPanelDismissed(false);
+      openAgentChatPanel();
       return;
     }
 
-    if (!projectChatPanelDismissed && !rightPanelSurface.rightPanel) {
-      openProjectChatPanel();
+    if (!chatPanelDismissed && !rightPanelSurface.rightPanel) {
+      openAgentChatPanel();
     }
-  }, [projectChatPanelDismissed, project.selectedProjectSlug, rightPanelSurface.rightPanel, route.routeContext, route.view]);
+  }, [chatPanelDismissed, project.selectedProjectSlug, rightPanelSurface.rightPanel, route.routeContext, route.view]);
 
   useEffect(() => {
     if (route.view !== "chat") return;
@@ -153,7 +152,7 @@ export function App() {
     const conversationId = route.routeContext.conversation;
     if (!conversationId || projectChat.activeConversation?.id === conversationId) return;
 
-    openProjectChatPanel();
+    openAgentChatPanel();
     void projectChat.openConversation(conversationId);
   }, [projectChat.activeConversation?.id, route.routeContext.conversation, route.view]);
 
@@ -178,8 +177,8 @@ export function App() {
     rightPanelSurface.rightPanel ? ` right-panel-open right-panel-${rightPanelSurface.rightPanel.kind}` : ""
   }`;
   const handleRightPanelClose = () => {
-    if (route.view === "chat" && rightPanelSurface.rightPanel?.kind === "project-chat") {
-      setProjectChatPanelDismissed(true);
+    if (route.view === "chat" && rightPanelSurface.rightPanel) {
+      setChatPanelDismissed(true);
     }
     rightPanelSurface.closePanel();
   };
@@ -299,31 +298,22 @@ export function App() {
               : undefined
           }
         >
-          {rightPanelSurface.rightPanel.kind === "agent-chat" ? (
-            <RightPanelAgentChat
-              activeFiles={agentFileContext.editableFiles}
-              chat={projectChat}
-              contextRefs={agentFileContext.sourceFiles}
-              currentFile={agentFileContext.currentFile}
-              highlightedContext={agentFileContext.highlightedContext}
-              models={rebuildWorkspace.models}
-              onAddContextRef={agentFileContext.addSourceFile}
-              onApplyFileEdit={applyChatFileEdit}
-              onContextRefsChange={agentFileContext.setSourceFiles}
-              onModelChange={rebuildWorkspace.setSelectedModelId}
-              onModifyCurrentFile={() => agentFileContext.currentFile && agentFileContext.addEditableFile(agentFileContext.currentFile.path)}
-              onRemoveActiveFile={agentFileContext.removeEditableFile}
-              projectFiles={fileWorkspace.projectFiles}
-              selectedModelId={rebuildWorkspace.selectedModelId}
-            />
-          ) : (
-            <ProjectChatPanel
-              chat={projectChat}
-              models={rebuildWorkspace.models}
-              selectedModelId={rebuildWorkspace.selectedModelId}
-              onModelChange={rebuildWorkspace.setSelectedModelId}
-            />
-          )}
+          <RightPanelAgentChat
+            activeFiles={agentFileContext.editableFiles}
+            chat={projectChat}
+            contextRefs={agentFileContext.sourceFiles}
+            currentFile={agentFileContext.currentFile}
+            highlightedContext={agentFileContext.highlightedContext}
+            models={rebuildWorkspace.models}
+            onAddContextRef={agentFileContext.addSourceFile}
+            onApplyFileEdit={applyChatFileEdit}
+            onContextRefsChange={agentFileContext.setSourceFiles}
+            onModelChange={rebuildWorkspace.setSelectedModelId}
+            onModifyCurrentFile={() => agentFileContext.currentFile && agentFileContext.addEditableFile(agentFileContext.currentFile.path)}
+            onRemoveActiveFile={agentFileContext.removeEditableFile}
+            projectFiles={fileWorkspace.projectFiles}
+            selectedModelId={rebuildWorkspace.selectedModelId}
+          />
         </RightPanelSurface>
       ) : null}
     </main>

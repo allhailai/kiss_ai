@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 
-export type RightPanelKind = "agent-chat" | "project-chat";
+export type RightPanelKind = "agent-chat";
 
 export type RightPanelState = {
   kind: RightPanelKind;
