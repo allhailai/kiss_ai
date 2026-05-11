@@ -303,14 +303,12 @@ export function App() {
             <RightPanelAgentChat
               activeFiles={agentFileContext.editableFiles}
               chat={projectChat}
-              chooserFile={agentFileContext.chooserFile}
               contextRefs={agentFileContext.sourceFiles}
               currentFile={agentFileContext.currentFile}
               highlightedContext={agentFileContext.highlightedContext}
               models={rebuildWorkspace.models}
               onAddContextRef={agentFileContext.addSourceFile}
               onApplyFileEdit={applyChatFileEdit}
-              onCloseChooser={agentFileContext.closeChooser}
               onContextRefsChange={agentFileContext.setSourceFiles}
               onModelChange={rebuildWorkspace.setSelectedModelId}
               onModifyCurrentFile={() => agentFileContext.currentFile && agentFileContext.addEditableFile(agentFileContext.currentFile.path)}

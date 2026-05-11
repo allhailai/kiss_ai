@@ -56,14 +56,9 @@ export function useAgentFileContext({
   selected: FileContent | null;
 }) {
   const [editableFiles, setEditableFiles] = useState<AgentContextFile[]>([]);
-  const [chooserPath, setChooserPath] = useState<string | null>(null);
   const [sourceFiles, setSourceFiles] = useState<ChatContextRef[]>([]);
   const [highlightedContext, setHighlightedContext] = useState<{ path: string; target: "active" | "context" } | null>(null);
   const highlightTimeoutRef = useRef<number | null>(null);
-  const chooserFile = useMemo(() => {
-    if (!chooserPath) return null;
-    return projectFiles.find((file) => file.path === chooserPath) ?? null;
-  }, [chooserPath, projectFiles]);
   const currentFile = useMemo(() => currentFileFromSelectedFile(selected, draft), [draft, selected]);
 
   const setHighlight = (path: string, target: "active" | "context") => {
@@ -83,11 +78,9 @@ export function useAgentFileContext({
       return;
     }
     if (sourceFiles.some((ref) => ref.path === path)) {
-      setChooserPath(path);
       setHighlight(path, "context");
       return;
     }
-    setChooserPath(path);
   };
 
   const openProjectFileWithAgentContext = (path: string, enabled: boolean) => {
@@ -103,7 +96,6 @@ export function useAgentFileContext({
       if (current.some((candidate) => candidate.path === editableFile.path)) return current;
       return [...current, editableFile];
     });
-    setChooserPath(null);
     setHighlight(path, "active");
   };
 
@@ -115,7 +107,6 @@ export function useAgentFileContext({
       if (current.some((candidate) => candidate.path === sourceFile.path)) return current;
       return [...current, sourceFile];
     });
-    setChooserPath(null);
     setHighlight(path, "context");
   };
 
@@ -127,7 +118,6 @@ export function useAgentFileContext({
 
   useEffect(() => {
     setEditableFiles([]);
-    setChooserPath(null);
     setSourceFiles([]);
     setHighlightedContext(null);
   }, [projectSlug]);
@@ -154,8 +144,6 @@ export function useAgentFileContext({
   return {
     addEditableFile,
     addSourceFile,
-    chooserFile,
-    closeChooser: () => setChooserPath(null),
     currentFile,
     editableFiles,
     highlightedContext,
