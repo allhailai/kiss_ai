@@ -5,7 +5,7 @@ import { useProjectWorkspace } from "./useProjectWorkspace";
 import { RightPanelSurface } from "./RightPanelSurface";
 import { RightPanelToggle } from "./RightPanelToggle";
 import { useRightPanelSurface } from "./hooks/useRightPanelSurface";
-import { panelWidthContextKey, projectChatDefaultPanelWidth, useRightPanelWidth } from "./hooks/useRightPanelWidth";
+import { useRightPanelWidth } from "./hooks/useRightPanelWidth";
 import { type View } from "../navigation/views";
 import { BuildLogWorkspace } from "../features/buildLog/BuildLogWorkspace";
 import { ProjectChatConversationHistory } from "../features/chat/ProjectChatConversationHistory";
@@ -52,8 +52,6 @@ export function App() {
   const themeStyle = useMemo(() => buildThemeStyle(designWorkspace.design), [designWorkspace.design]);
   const rightPanelWidth = useRightPanelWidth({
     panelKind: rightPanelSurface.rightPanel?.kind ?? null,
-    replaceRouteContext: route.replaceRouteContext,
-    routeContext: route.routeContext,
     view: route.view,
   });
   const appStyle = useMemo(
@@ -105,16 +103,11 @@ export function App() {
   const openAgentChatPanel = () => {
     setChatPanelDismissed(false);
     rightPanelSurface.openPanel(agentChatPanel);
-    if (route.view === "chat" && !route.routeContext[panelWidthContextKey]) {
-      route.replaceRouteContext({ [panelWidthContextKey]: projectChatDefaultPanelWidth });
-    }
   };
   const selectProjectChatConversation = (conversationId: string) => {
     openAgentChatPanel();
     navigateTo("chat", null, {
-      ...route.routeContext,
       conversation: conversationId,
-      [panelWidthContextKey]: route.routeContext[panelWidthContextKey] || projectChatDefaultPanelWidth,
     });
   };
   const toggleAgentPanel = () => {
@@ -144,7 +137,7 @@ export function App() {
     if (!chatPanelDismissed && !rightPanelSurface.rightPanel) {
       openAgentChatPanel();
     }
-  }, [chatPanelDismissed, project.selectedProjectSlug, rightPanelSurface.rightPanel, route.routeContext, route.view]);
+  }, [chatPanelDismissed, project.selectedProjectSlug, rightPanelSurface.rightPanel, route.view]);
 
   useEffect(() => {
     if (route.view !== "chat") return;
