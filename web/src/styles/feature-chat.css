@@ -452,7 +452,8 @@
 
 .chat-context-trigger,
 .chat-model-trigger,
-.chat-composer-actions > button[type="submit"] {
+.chat-composer-actions > button[type="submit"],
+.chat-composer-secondary-action {
   border-radius: 999px;
   font-size: 0.82rem;
   font-weight: 800;
@@ -656,10 +657,16 @@
   background: color-mix(in srgb, var(--color-background) 76%, white);
 }
 
-.chat-composer-actions > button[type="submit"] {
+.chat-composer-actions > button[type="submit"],
+.chat-composer-secondary-action {
   padding: 8px 12px;
   background: var(--color-accent);
   color: white;
+}
+
+.chat-composer-secondary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .chat-markdown {

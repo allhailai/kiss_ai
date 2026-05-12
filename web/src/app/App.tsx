@@ -71,6 +71,7 @@ export function App() {
     selectedModelId: rebuildWorkspace.selectedModelId,
     projectFiles: fileWorkspace.projectFiles,
     onNotice: toastWorkspace.setNotice,
+    onProposalApplied: fileWorkspace.refreshSelectedFile,
   });
   const navigateTo = (view: View, filePath?: string | null, context?: Record<string, string>) => route.navigateTo(view, filePath, context);
   const { closeAgentPanel, isAgentPanelOpen, selectProjectChatConversation, toggleAgentPanel } = useAgentChatPanel({

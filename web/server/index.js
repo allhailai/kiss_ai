@@ -15,6 +15,7 @@ import { createCursorModelService } from "./services/cursorModels.js";
 import { createDesignIdentityService } from "./services/designIdentity.js";
 import { createHarnessStateService } from "./services/harnessState.js";
 import { apiErrorHandler, httpError } from "./services/httpErrors.js";
+import { createProjectAgentLock } from "./services/projectAgentLock.js";
 import { createProjectFileService } from "./services/projectFiles.js";
 import { createProjectService } from "./services/projects.js";
 
@@ -87,6 +88,7 @@ const {
   setRebuildState,
   subscribe: subscribeToRebuild,
 } = rebuildStore;
+const projectAgentLock = createProjectAgentLock({ httpError });
 
 function hashText(value) {
   return createHash("sha256").update(String(value)).digest("hex");
@@ -130,6 +132,7 @@ const {
   deleteHumanInputFile,
   fileExists,
   gitFileDiff,
+  gitFileDiffText,
   gitStatus,
   isPathInsideRoot,
   listMarkdownFiles,
@@ -198,12 +201,14 @@ const {
   projectPath,
 });
 
-const { editChatMessage, sendChatMessage } = createChatAgentService({
+const { applyEditProposal, editChatMessage, generateEditProposal, sendChatMessage, updateEditProposal } = createChatAgentService({
   appendMessage: appendConversationMessage,
   displayProjectName,
   editUserMessage,
   httpError,
+  projectAgentLock,
   listCursorModels,
+  gitFileDiffText,
   notifyConversation,
   pickRebuildModelId,
   readConversation,
@@ -225,6 +230,7 @@ const { startHumanAttentionResolution, startRebuild } = createAgentJobService({
   httpError,
   listCursorModels,
   pickRebuildModelId,
+  projectAgentLock,
   readProjectHarness,
   resolveCursorApiKey,
   runCursorAgent,
@@ -272,7 +278,9 @@ registerApiRoutes(app, {
   resolveCursorApiKey,
   restoreFileFromHead,
   searchFiles,
+  applyEditProposal,
   editChatMessage,
+  generateEditProposal,
   sendChatMessage,
   startHumanAttentionResolution,
   startRebuild,
@@ -280,6 +288,7 @@ registerApiRoutes(app, {
   subscribeToRebuild,
   treeRoots,
   updateConversation,
+  updateEditProposal,
   uploadHumanInputFiles,
   writeTextFile,
 });

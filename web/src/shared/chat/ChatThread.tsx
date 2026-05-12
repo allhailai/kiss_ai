@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
-import type { ChatMessage, ChatMessageFileEdit } from "../../contracts/api";
+import type { ChatMessage, ChatMessageFileEdit, EditProposal } from "../../contracts/api";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 
 export function ChatThread({
@@ -9,11 +9,13 @@ export function ChatThread({
   editingMessageId = null,
   emptyTitle,
   emptyDescription,
+  editProposals = [],
   messages,
   onCancelEdit = () => undefined,
   onEditDraftChange = () => undefined,
   onApplyFileEdit,
   onJumpToLatest,
+  onViewEditProposal,
   onSaveEdit = () => undefined,
   onScroll,
   onStartEdit = () => undefined,
@@ -28,11 +30,13 @@ export function ChatThread({
   editingMessageId?: string | null;
   emptyTitle: string;
   emptyDescription: string;
+  editProposals?: EditProposal[];
   messages: ChatMessage[];
   onCancelEdit?: () => void;
   onEditDraftChange?: (value: string) => void;
   onApplyFileEdit?: (edit: ChatMessageFileEdit) => void | Promise<void>;
   onJumpToLatest?: () => void;
+  onViewEditProposal?: (proposalId: string) => void;
   onSaveEdit?: (message: ChatMessage) => void;
   onScroll?: () => void;
   onStartEdit?: (message: ChatMessage) => void;
@@ -71,11 +75,13 @@ export function ChatThread({
               isEditing={editingMessageId === message.id}
               key={message.id}
               message={message}
+              linkedEditProposals={editProposals.filter((proposal) => proposal.sourceMessageId === message.id)}
               onApplyFileEdit={onApplyFileEdit}
               onCancelEdit={onCancelEdit}
               onEditDraftChange={onEditDraftChange}
               onSaveEdit={onSaveEdit}
               onStartEdit={onStartEdit}
+              onViewEditProposal={onViewEditProposal}
             />
           ))
         ) : (

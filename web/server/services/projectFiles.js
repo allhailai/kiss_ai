@@ -596,6 +596,22 @@ export function createProjectFileService({
     });
   }
 
+  async function gitFileDiffText(projectRoot, relativePath) {
+    const meta = classifyPath(projectRoot, relativePath);
+    await resolveProjectFileTarget(projectRoot, meta.path);
+
+    return new Promise((resolve) => {
+      execFile("git", ["diff", "--", meta.path], { cwd: projectRoot }, (error, stdout) => {
+        if (error) {
+          resolve({ diff: "", diffError: `git diff unavailable for ${meta.path}: ${error.message}` });
+          return;
+        }
+
+        resolve({ diff: String(stdout ?? ""), diffError: "" });
+      });
+    });
+  }
+
   async function restoreFileFromHead(projectRoot, relativePath) {
     const meta = classifyPath(projectRoot, relativePath);
 
@@ -628,6 +644,7 @@ export function createProjectFileService({
     deleteHumanInputFile,
     fileExists,
     gitFileDiff,
+    gitFileDiffText,
     gitStatus,
     isPathInsideRoot,
     listMarkdownFiles,

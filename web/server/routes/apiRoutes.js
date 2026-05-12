@@ -24,14 +24,17 @@ export function registerApiRoutes(app, deps) {
   });
 
   registerChatRoutes(app, {
+    applyEditProposal: deps.applyEditProposal,
     createConversation: deps.createConversation,
     editChatMessage: deps.editChatMessage,
+    generateEditProposal: deps.generateEditProposal,
     httpError: deps.httpError,
     listConversations: deps.listConversations,
     readConversation: deps.readConversation,
     sendChatMessage: deps.sendChatMessage,
     subscribeToConversation: deps.subscribeToConversation,
     updateConversation: deps.updateConversation,
+    updateEditProposal: deps.updateEditProposal,
   });
 
   registerFileRoutes(app, {

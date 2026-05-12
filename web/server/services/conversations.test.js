@@ -78,6 +78,48 @@ describe("conversation service", () => {
     });
   });
 
+  it("persists edit proposals on conversations", async () => {
+    const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-conversations-"));
+    const project = { slug: "demo", path: projectRoot };
+    const service = createConversationService({ httpError, projectPath });
+    const conversation = await service.createConversation(project, { modelId: "model-a" });
+
+    const updated = await service.writeConversation(project, {
+      ...conversation,
+      editProposals: [
+        {
+          id: "proposal_1",
+          sourceMessageId: "msg_1",
+          status: "proposed",
+          createdAt: "2026-05-11T00:00:00.000Z",
+          updatedAt: "2026-05-11T00:00:00.000Z",
+          appliedAt: "2026-05-11T00:01:00.000Z",
+          conceptualDiffs: [
+            {
+              id: "diff_1",
+              filePath: "outputs_ai/report.md",
+              title: "Clarify caveat",
+              summary: "Add a short source-confidence caveat.",
+              status: "accepted",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(updated.editProposals).toMatchObject([
+      {
+        id: "proposal_1",
+        sourceMessageId: "msg_1",
+        appliedAt: "2026-05-11T00:01:00.000Z",
+        conceptualDiffs: [{ id: "diff_1", status: "accepted" }],
+      },
+    ]);
+    await expect(service.readConversation(project, conversation.id)).resolves.toMatchObject({
+      editProposals: [{ id: "proposal_1", sourceMessageId: "msg_1", appliedAt: "2026-05-11T00:01:00.000Z" }],
+    });
+  });
+
   it("serializes overlapping message appends for the same project", async () => {
     const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-conversations-"));
     const project = { slug: "demo", path: projectRoot };

@@ -87,6 +87,30 @@ Chat and rebuild workflows use a dual transport:
 
 Long-running server work should have an explicit lifecycle state. Rebuilds persist state under `.runtime/`; chat conversations persist messages under the project and should normalize stale streaming messages when recovered.
 
+## AI Edit Proposal Flow
+
+The right-panel chat can turn a user guidance message plus selected AI Editable files into per-file Proposed Changes. The frontend keeps shared conversation state and API orchestration in `app/hooks/useProjectChat.ts`; `features/agents/RightPanelAgentChat.tsx` owns the review UI for accepting or rejecting conceptual diffs.
+
+This section is the source map for the web implementation. The durable protocol contract lives in [`/opt/all_hail_ai/kiss_ai/docs/development/concepts/agent-protocol-edit-proposals.md`](/opt/all_hail_ai/kiss_ai/docs/development/concepts/agent-protocol-edit-proposals.md).
+
+Proposal requests use the chat route stack: `contracts/api.ts` defines request/response shapes, `data/chatApi.ts` transports them, `server/routes/chatRoutes.js` validates them, and `server/services/chatAgent.js` builds the agent prompts and persists proposal metadata on the conversation.
+
+The lifecycle is:
+
+```mermaid
+flowchart LR
+  editableFiles["AI Editable files"] --> propose["Generate proposal"]
+  propose --> review["Review conceptual diffs"]
+  review --> apply["Apply accepted diffs"]
+  apply --> applied["Applied, partial, or failed"]
+```
+
+Conceptual diffs are read-only in v1: users accept or reject them, then the server runs a constrained local Cursor agent to edit approved files directly on disk. Context files remain read-only unless the same path is also selected as AI Editable and has an accepted conceptual diff. Rejected conceptual diffs are sent to apply runs as explicit negative constraints.
+
+Applied proposal state remains in conversation-level `editProposals` and links back to the originating user message with `sourceMessageId`. The chat thread renders compact applied-proposal chips on those messages, while the large proposal review card hides fully applied proposals unless a chip reopens the read-only details.
+
+Only one Cursor agent task may run per project at a time. Chat, proposal, apply, rebuild, and human-attention resolution flows share the project agent lock; UI controls should reflect loading, sending, and proposal-update states.
+
 ## Quality Gate
 
 Run `npm run check` from `web/` before handing off substantive changes. It runs app TypeScript, server TypeScript, boundary checks, and Vitest.

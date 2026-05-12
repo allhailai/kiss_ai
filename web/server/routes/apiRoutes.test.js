@@ -211,14 +211,17 @@ describe("API routes", () => {
       next();
     });
     registerChatRoutes(app, {
+      applyEditProposal: async () => ({}),
       createConversation: async () => ({}),
       editChatMessage: async () => ({}),
+      generateEditProposal: async () => ({}),
       httpError,
       listConversations: async () => ({ conversations: [] }),
       readConversation: async () => ({ id: "conv_1", messages: [], projectSlug: "demo", version: 1 }),
       sendChatMessage: async () => ({}),
       subscribeToConversation: () => () => undefined,
       updateConversation: async () => ({}),
+      updateEditProposal: async () => ({}),
     });
     app.use(apiErrorHandler);
 

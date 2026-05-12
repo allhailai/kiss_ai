@@ -237,6 +237,29 @@ export type ChatMessageMetadata = Record<string, unknown> & {
   fileEdits?: ChatMessageFileEdit[];
 };
 
+export type ConceptualDiffStatus = "accepted" | "rejected";
+
+export type ConceptualDiff = {
+  id: string;
+  filePath: string;
+  title: string;
+  summary: string;
+  status: ConceptualDiffStatus;
+};
+
+export type EditProposalStatus = "proposed" | "applying" | "applied" | "partial" | "failed";
+
+export type EditProposal = {
+  id: string;
+  sourceMessageId?: string;
+  status: EditProposalStatus;
+  createdAt: string;
+  updatedAt: string;
+  appliedAt?: string;
+  conceptualDiffs: ConceptualDiff[];
+  notice?: string;
+};
+
 export type ConversationFileContext = {
   ai_editable_files: AgentEditableTargetFile[];
   context_files: AgentContextSourceFile[];
@@ -268,6 +291,7 @@ export type Conversation = {
   updatedAt: string;
   defaultModelId: string | null;
   fileContext: ConversationFileContext;
+  editProposals: EditProposal[];
   messages: ChatMessage[];
 };
 
@@ -296,6 +320,23 @@ export type SendChatMessageRequest = {
 export type EditChatMessageRequest = {
   modelId?: string;
   content: string;
+};
+
+export type GenerateEditProposalRequest = {
+  modelId: string;
+  content?: string;
+  fileContext: ConversationFileContext;
+};
+
+export type UpdateEditProposalRequest = {
+  conceptualDiffs: Array<{
+    id: string;
+    status: ConceptualDiffStatus;
+  }>;
+};
+
+export type ApplyEditProposalRequest = {
+  modelId: string;
 };
 
 export type ChatConversationEvent =

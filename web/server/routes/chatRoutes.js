@@ -1,16 +1,32 @@
 import { openSseStream } from "../utils/sse.js";
 import {
+  applyEditProposalBodySchema,
   createConversationBodySchema,
   chatMessageParamsSchema,
   conversationParamsSchema,
   editChatMessageBodySchema,
+  editProposalParamsSchema,
+  generateEditProposalBodySchema,
   parseRequestBody,
   parseRequestParams,
   sendChatMessageBodySchema,
   updateConversationBodySchema,
+  updateEditProposalBodySchema,
 } from "./requestSchemas.js";
 
-export function registerChatRoutes(app, { editChatMessage, httpError, listConversations, createConversation, readConversation, sendChatMessage, subscribeToConversation, updateConversation }) {
+export function registerChatRoutes(app, {
+  applyEditProposal,
+  editChatMessage,
+  generateEditProposal,
+  httpError,
+  listConversations,
+  createConversation,
+  readConversation,
+  sendChatMessage,
+  subscribeToConversation,
+  updateConversation,
+  updateEditProposal,
+}) {
   app.get("/api/projects/:projectSlug/conversations", async (request, response, next) => {
     try {
       response.json(await listConversations(request.project));
@@ -58,6 +74,33 @@ export function registerChatRoutes(app, { editChatMessage, httpError, listConver
     try {
       const { conversationId, messageId } = parseRequestParams(chatMessageParamsSchema, request.params, httpError);
       response.json(await editChatMessage(request.project, conversationId, messageId, parseRequestBody(editChatMessageBodySchema, request.body, httpError)));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/conversations/:conversationId/edit-proposals", async (request, response, next) => {
+    try {
+      const { conversationId } = parseRequestParams(conversationParamsSchema, request.params, httpError);
+      response.json(await generateEditProposal(request.project, conversationId, parseRequestBody(generateEditProposalBodySchema, request.body, httpError)));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/projects/:projectSlug/conversations/:conversationId/edit-proposals/:proposalId", async (request, response, next) => {
+    try {
+      const { conversationId, proposalId } = parseRequestParams(editProposalParamsSchema, request.params, httpError);
+      response.json(await updateEditProposal(request.project, conversationId, proposalId, parseRequestBody(updateEditProposalBodySchema, request.body, httpError)));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/conversations/:conversationId/edit-proposals/:proposalId/apply", async (request, response, next) => {
+    try {
+      const { conversationId, proposalId } = parseRequestParams(editProposalParamsSchema, request.params, httpError);
+      response.json(await applyEditProposal(request.project, conversationId, proposalId, parseRequestBody(applyEditProposalBodySchema, request.body, httpError)));
     } catch (error) {
       next(error);
     }

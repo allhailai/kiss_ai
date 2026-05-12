@@ -9,6 +9,8 @@ const conversationIdPattern = /^[a-zA-Z0-9_-]+$/;
 const maxTitleLength = 120;
 const maxSummaryLength = 500;
 const staleStreamingMessageMs = 10 * 60 * 1000;
+const maxEditProposals = 20;
+const maxConceptualDiffs = 100;
 
 function nowIso() {
   return new Date().toISOString();
@@ -68,6 +70,50 @@ function normalizeMessage(value, fallback = {}) {
   };
 }
 
+function normalizeConceptualDiff(value) {
+  const source = value && typeof value === "object" ? value : {};
+  const id = typeof source.id === "string" && source.id.trim() ? source.id.trim().slice(0, 80) : createId("diff");
+  const filePath = trimText(source.filePath, 300);
+  const title = trimText(source.title, 160);
+  const summary = trimText(source.summary, 1200);
+  const status = source.status === "rejected" ? "rejected" : "accepted";
+
+  if (!filePath || !title || !summary) return null;
+
+  return {
+    id,
+    filePath,
+    title,
+    summary,
+    status,
+  };
+}
+
+function normalizeEditProposal(value) {
+  const source = value && typeof value === "object" ? value : {};
+  const id = typeof source.id === "string" && source.id.trim() ? source.id.trim().slice(0, 80) : createId("proposal");
+  const timestamp = nowIso();
+  const status = ["proposed", "applying", "applied", "partial", "failed"].includes(source.status) ? source.status : "proposed";
+  const conceptualDiffs = Array.isArray(source.conceptualDiffs)
+    ? source.conceptualDiffs.map(normalizeConceptualDiff).filter(Boolean).slice(0, maxConceptualDiffs)
+    : [];
+
+  return {
+    id,
+    ...(typeof source.sourceMessageId === "string" && source.sourceMessageId.trim() ? { sourceMessageId: source.sourceMessageId.trim().slice(0, 80) } : {}),
+    status,
+    createdAt: typeof source.createdAt === "string" ? source.createdAt : timestamp,
+    updatedAt: typeof source.updatedAt === "string" ? source.updatedAt : timestamp,
+    ...(typeof source.appliedAt === "string" && source.appliedAt.trim() ? { appliedAt: source.appliedAt } : {}),
+    conceptualDiffs,
+    ...(typeof source.notice === "string" && source.notice.trim() ? { notice: trimText(source.notice, 1200) } : {}),
+  };
+}
+
+function normalizeEditProposals(value) {
+  return Array.isArray(value) ? value.map(normalizeEditProposal).filter(Boolean).slice(-maxEditProposals) : [];
+}
+
 function normalizeConversation(project, value, fallback = {}) {
   const source = value && typeof value === "object" ? value : {};
   const id = typeof source.id === "string" && conversationIdPattern.test(source.id) ? source.id : fallback.id;
@@ -86,6 +132,7 @@ function normalizeConversation(project, value, fallback = {}) {
     updatedAt,
     defaultModelId: typeof source.defaultModelId === "string" && source.defaultModelId.trim() ? source.defaultModelId.trim() : null,
     fileContext: normalizeConversationFileContext(source.fileContext, { maxDraftContentLength: MAX_STORED_MESSAGE_BYTES }),
+    editProposals: normalizeEditProposals(source.editProposals),
     messages,
   };
 }
@@ -277,6 +324,7 @@ export function createConversationService({ httpError, projectPath }) {
         body?.fileContext === undefined
           ? conversation.fileContext
           : normalizeConversationFileContext(body.fileContext, { maxDraftContentLength: MAX_STORED_MESSAGE_BYTES }),
+      editProposals: body?.editProposals === undefined ? conversation.editProposals : normalizeEditProposals(body.editProposals),
       updatedAt: nowIso(),
     };
     const index = await readIndex(project.path);

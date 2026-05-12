@@ -64,12 +64,14 @@ export function useProjectChat({
   selectedModelId,
   projectFiles,
   onNotice,
+  onProposalApplied,
 }: {
   preferredConversationId?: string | null;
   projectSlug: string | null;
   selectedModelId: string;
   projectFiles: ProjectFile[];
   onNotice: (message: string) => void;
+  onProposalApplied?: () => Promise<void> | void;
 }) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
@@ -81,6 +83,7 @@ export function useProjectChat({
   const [editDraft, setEditDraft] = useState("");
   const [aiEditableFiles, setAiEditableFilesState] = useState<AgentContextFile[]>([]);
   const [contextFiles, setContextFilesState] = useState<ChatContextFile[]>([]);
+  const [proposalUpdating, setProposalUpdating] = useState(false);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const threadRef = useRef<HTMLDivElement | null>(null);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -204,7 +207,7 @@ export function useProjectChat({
   };
 
   const startDraftConversation = () => {
-    if (sending) return;
+    if (loading || sending || proposalUpdating) return;
     setActiveConversation(null);
     setMessageDraft("");
     applyConversationFileContext(emptyConversationFileContext());
@@ -244,6 +247,71 @@ export function useProjectChat({
       onNotice(errorMessage(error, "Could not send the chat message."));
       setSending(false);
       return false;
+    }
+  };
+
+  const generateEditProposal = async (fileContext: ConversationFileContextState, content = "") => {
+    if (!projectSlug || loading || sending || proposalUpdating) return false;
+    setSending(true);
+    onNotice("");
+    try {
+      let conversation = await ensureConversation();
+      const nextContext = applyConversationFileContext(fileContext);
+      conversation = await persistConversationFileContext(conversation.id, nextContext);
+      const next = await api.generateEditProposal(projectSlug, conversation.id, {
+        modelId: selectedModelId,
+        content: content.trim() || undefined,
+        fileContext: nextContext,
+      });
+      setActiveConversation(next);
+      await refreshConversations();
+      const latestProposal = next.editProposals.at(-1);
+      if (latestProposal?.notice) onNotice(latestProposal.notice);
+      return true;
+    } catch (error) {
+      onNotice(errorMessage(error, "Could not generate proposed changes."));
+      return false;
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const updateEditProposal = async (proposalId: string, conceptualDiffs: Array<{ id: string; status: "accepted" | "rejected" }>) => {
+    if (!projectSlug || !activeConversation || loading || sending || proposalUpdating) return false;
+    setProposalUpdating(true);
+    onNotice("");
+    try {
+      const next = await api.updateEditProposal(projectSlug, activeConversation.id, proposalId, { conceptualDiffs });
+      setActiveConversation(next);
+      await refreshConversations();
+      return true;
+    } catch (error) {
+      onNotice(errorMessage(error, "Could not update the proposed changes."));
+      return false;
+    } finally {
+      setProposalUpdating(false);
+    }
+  };
+
+  const applyEditProposal = async (proposalId: string) => {
+    if (!projectSlug || !activeConversation || loading || sending || proposalUpdating) return false;
+    setSending(true);
+    onNotice("");
+    try {
+      const next = await api.applyEditProposal(projectSlug, activeConversation.id, proposalId, {
+        modelId: selectedModelId,
+      });
+      setActiveConversation(next);
+      await refreshConversations();
+      await onProposalApplied?.();
+      const proposal = next.editProposals.find((candidate) => candidate.id === proposalId);
+      onNotice(proposal?.notice || "Applied the proposal.");
+      return true;
+    } catch (error) {
+      onNotice(errorMessage(error, "Could not apply the proposal."));
+      return false;
+    } finally {
+      setSending(false);
     }
   };
 
@@ -395,12 +463,14 @@ export function useProjectChat({
     filteredConversations,
     handleComposerChange,
     handleThreadScroll,
+    generateEditProposal,
     loading,
     messageDraft,
     openConversation,
     saveEditedMessage,
     scrollToLatest,
     sending,
+    proposalUpdating,
     setAiEditableFiles,
     setContextFiles,
     setSelectedContextFiles: setContextFiles,
@@ -412,6 +482,8 @@ export function useProjectChat({
     threadRef,
     composerTextareaRef,
     sendMessage,
+    applyEditProposal,
+    updateEditProposal,
   };
 }
 

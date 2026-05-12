@@ -11,6 +11,7 @@ export function createAgentJobService({
   httpError,
   listCursorModels,
   pickRebuildModelId,
+  projectAgentLock,
   readProjectHarness,
   resolveCursorApiKey,
   runCursorAgent,
@@ -189,87 +190,96 @@ export function createAgentJobService({
       return rebuildState;
     }
 
-    const cursorApiKey = await resolveCursorApiKey();
+    const releaseProjectAgent = projectAgentLock.acquire(project, runKind);
 
-    if (!cursorApiKey.available) {
-      await setRebuildState(project.slug, {
-        ...rebuildState,
-        running: false,
-        status: "blocked",
-        message: noApiKeyMessage,
-        finishedAt: new Date().toISOString(),
-        runKind,
-        attentionContext,
-      });
-      await appendRunEvent(project.slug, {
-        type: "error",
-        title: `${jobName} blocked`,
-        text: (await getRebuildState(project.slug)).message,
-        status: "blocked",
-        runtime: "cursor",
-      });
-      return await getRebuildState(project.slug);
-    }
+    try {
+      const cursorApiKey = await resolveCursorApiKey();
 
-    const models = await listCursorModels(cursorApiKey.apiKey);
-
-    if (!models.length) {
-      await setRebuildState(project.slug, {
-        ...rebuildState,
-        running: false,
-        status: "blocked",
-        message: noModelsMessage,
-        finishedAt: new Date().toISOString(),
-        runKind,
-        attentionContext,
-      });
-      await appendRunEvent(project.slug, {
-        type: "error",
-        title: `${jobName} blocked`,
-        text: (await getRebuildState(project.slug)).message,
-        status: "blocked",
-        runtime: "cursor",
-      });
-      return await getRebuildState(project.slug);
-    }
-
-    const modelId = pickRebuildModelId(models, requestedModelId);
-
-    await setRebuildState(project.slug, {
-      running: true,
-      runId: null,
-      agentId: null,
-      runtime: "cursor",
-      status: "running",
-      startedAt: new Date().toISOString(),
-      finishedAt: null,
-      modelId,
-      message: startMessage,
-      activeAssistantMessageId: null,
-      events: [],
-      log: [],
-      runKind,
-      attentionContext,
-    });
-
-    await appendRunLog(project.slug, `Using Cursor API key from ${cursorApiKey.source}.`);
-    await appendRunLog(project.slug, `Using Cursor model: ${modelId}.`);
-
-    runAgentJob({ project, apiKey: cursorApiKey.apiKey, modelId, prompt, jobName }).catch((error) => {
-      void (async () => {
-        const current = await getRebuildState(project.slug);
+      if (!cursorApiKey.available) {
         await setRebuildState(project.slug, {
-          ...current,
+          ...rebuildState,
           running: false,
-          status: "error",
+          status: "blocked",
+          message: noApiKeyMessage,
           finishedAt: new Date().toISOString(),
-          message: error instanceof Error ? error.message : `Unknown ${jobName.toLowerCase()} error.`,
+          runKind,
+          attentionContext,
         });
-        await appendRunLog(project.slug, (await getRebuildState(project.slug)).message);
-      })();
-    });
+        await appendRunEvent(project.slug, {
+          type: "error",
+          title: `${jobName} blocked`,
+          text: (await getRebuildState(project.slug)).message,
+          status: "blocked",
+          runtime: "cursor",
+        });
+        releaseProjectAgent();
+        return await getRebuildState(project.slug);
+      }
 
-    return await getRebuildState(project.slug);
+      const models = await listCursorModels(cursorApiKey.apiKey);
+
+      if (!models.length) {
+        await setRebuildState(project.slug, {
+          ...rebuildState,
+          running: false,
+          status: "blocked",
+          message: noModelsMessage,
+          finishedAt: new Date().toISOString(),
+          runKind,
+          attentionContext,
+        });
+        await appendRunEvent(project.slug, {
+          type: "error",
+          title: `${jobName} blocked`,
+          text: (await getRebuildState(project.slug)).message,
+          status: "blocked",
+          runtime: "cursor",
+        });
+        releaseProjectAgent();
+        return await getRebuildState(project.slug);
+      }
+
+      const modelId = pickRebuildModelId(models, requestedModelId);
+
+      await setRebuildState(project.slug, {
+        running: true,
+        runId: null,
+        agentId: null,
+        runtime: "cursor",
+        status: "running",
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        modelId,
+        message: startMessage,
+        activeAssistantMessageId: null,
+        events: [],
+        log: [],
+        runKind,
+        attentionContext,
+      });
+
+      await appendRunLog(project.slug, `Using Cursor API key from ${cursorApiKey.source}.`);
+      await appendRunLog(project.slug, `Using Cursor model: ${modelId}.`);
+
+      runAgentJob({ project, apiKey: cursorApiKey.apiKey, modelId, prompt, jobName, releaseProjectAgent }).catch((error) => {
+        void (async () => {
+          const current = await getRebuildState(project.slug);
+          await setRebuildState(project.slug, {
+            ...current,
+            running: false,
+            status: "error",
+            finishedAt: new Date().toISOString(),
+            message: error instanceof Error ? error.message : `Unknown ${jobName.toLowerCase()} error.`,
+          });
+          await appendRunLog(project.slug, (await getRebuildState(project.slug)).message);
+        })();
+      });
+
+      return await getRebuildState(project.slug);
+    } catch (error) {
+      releaseProjectAgent();
+      throw error;
+    }
   }
 
   async function startRebuild(project, requestedModelId) {
@@ -303,7 +313,7 @@ export function createAgentJobService({
     });
   }
 
-  async function runAgentJob({ project, apiKey, modelId, prompt, jobName }) {
+  async function runAgentJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent }) {
     activeRebuilds.add(project.slug);
 
     try {
@@ -368,6 +378,7 @@ export function createAgentJobService({
       });
     } finally {
       activeRebuilds.delete(project.slug);
+      releaseProjectAgent();
     }
   }
 

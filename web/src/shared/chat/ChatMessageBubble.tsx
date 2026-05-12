@@ -1,32 +1,44 @@
 import { memo, useState } from "react";
-import type { ChatMessage, ChatMessageFileEdit } from "../../contracts/api";
+import type { ChatMessage, ChatMessageFileEdit, EditProposal } from "../../contracts/api";
 import { formatChatDateTime, renderMessageContent } from "./chatRendering";
+
+function linkedProposalLabel(proposal: EditProposal) {
+  const count = proposal.conceptualDiffs.length;
+  const plural = count === 1 ? "" : "s";
+  if (proposal.status === "partial") return `Partially applied proposal · ${count} change${plural} · View`;
+  return `Applied proposal · ${count} change${plural} · View`;
+}
 
 function ChatMessageBubbleComponent({
   disabled,
   editDraft,
   editable = true,
   isEditing,
+  linkedEditProposals = [],
   message,
   onCancelEdit,
   onEditDraftChange,
   onApplyFileEdit,
   onSaveEdit,
   onStartEdit,
+  onViewEditProposal,
 }: {
   disabled: boolean;
   editDraft: string;
   editable?: boolean;
   isEditing: boolean;
+  linkedEditProposals?: EditProposal[];
   message: ChatMessage;
   onCancelEdit: () => void;
   onEditDraftChange: (value: string) => void;
   onApplyFileEdit?: (edit: ChatMessageFileEdit) => void | Promise<void>;
   onSaveEdit: (message: ChatMessage) => void;
   onStartEdit: (message: ChatMessage) => void;
+  onViewEditProposal?: (proposalId: string) => void;
 }) {
   const canEdit = editable && message.role === "user";
   const fileEdits = message.metadata?.fileEdits ?? [];
+  const viewableEditProposals = linkedEditProposals.filter((proposal) => proposal.status === "applied" || proposal.status === "partial");
   const [applyingEditKey, setApplyingEditKey] = useState<string | null>(null);
   const currentFilePath = message.context?.currentFile?.path;
   const currentFileIsEditable = Boolean(
@@ -131,6 +143,21 @@ function ChatMessageBubbleComponent({
               </button>
             );
           })}
+        </div>
+      ) : null}
+      {viewableEditProposals.length ? (
+        <div className="chat-message-context" aria-label="Applied edit proposals">
+          {viewableEditProposals.map((proposal) => (
+            <button
+              className="chat-context-chip"
+              disabled={disabled}
+              key={proposal.id}
+              onClick={() => onViewEditProposal?.(proposal.id)}
+              type="button"
+            >
+              {linkedProposalLabel(proposal)}
+            </button>
+          ))}
         </div>
       ) : null}
       {message.status === "streaming" ? <span className="agent-event-status">Streaming</span> : null}

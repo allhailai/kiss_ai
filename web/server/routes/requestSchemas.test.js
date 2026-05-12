@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import { MAX_USER_MESSAGE_BYTES } from "../contracts/chatLimits.js";
 import { httpError } from "../services/httpErrors.js";
 import {
+  applyEditProposalBodySchema,
   buildLogQuerySchema,
   conversationParamsSchema,
+  editProposalParamsSchema,
   filePathQuerySchema,
+  generateEditProposalBodySchema,
   parseRequestBody,
   parseRequestParams,
   parseRequestQuery,
@@ -12,6 +15,7 @@ import {
   sendChatMessageBodySchema,
   treeSectionParamsSchema,
   updateConversationBodySchema,
+  updateEditProposalBodySchema,
   writeFileBodySchema,
 } from "./requestSchemas.js";
 
@@ -83,6 +87,44 @@ describe("request schemas", () => {
         httpError,
       ),
     ).toThrow("Invalid request body.");
+  });
+
+  it("validates edit proposal requests", () => {
+    expect(
+      parseRequestBody(
+        generateEditProposalBodySchema,
+        {
+          modelId: "gpt-test",
+          content: "Please make the goal more concrete.",
+          fileContext: {
+            ai_editable_files: [{ path: "outputs_ai/wiki/page.md", draftState: "saved" }],
+            context_files: [{ path: "inputs_human/source.md" }],
+          },
+        },
+        httpError,
+      ),
+    ).toMatchObject({
+      modelId: "gpt-test",
+      content: "Please make the goal more concrete.",
+      fileContext: {
+        ai_editable_files: [{ path: "outputs_ai/wiki/page.md" }],
+      },
+    });
+
+    expect(
+      parseRequestBody(
+        updateEditProposalBodySchema,
+        {
+          conceptualDiffs: [{ id: "diff_1", status: "rejected" }],
+        },
+        httpError,
+      ),
+    ).toEqual({ conceptualDiffs: [{ id: "diff_1", status: "rejected" }] });
+    expect(parseRequestBody(applyEditProposalBodySchema, { modelId: "gpt-test" }, httpError)).toEqual({ modelId: "gpt-test" });
+    expect(parseRequestParams(editProposalParamsSchema, { conversationId: "conv_1", proposalId: "proposal_1" }, httpError)).toEqual({
+      conversationId: "conv_1",
+      proposalId: "proposal_1",
+    });
   });
 
   it("requires write requests to include a loaded content hash", () => {

@@ -1,4 +1,13 @@
-import type { Conversation, ConversationsResponse, EditChatMessageRequest, SendChatMessageRequest, UpdateConversationRequest } from "../contracts/api";
+import type {
+  ApplyEditProposalRequest,
+  Conversation,
+  ConversationsResponse,
+  EditChatMessageRequest,
+  GenerateEditProposalRequest,
+  SendChatMessageRequest,
+  UpdateConversationRequest,
+  UpdateEditProposalRequest,
+} from "../contracts/api";
 import { projectBase, request } from "./request";
 
 export const chatApi = {
@@ -23,6 +32,27 @@ export const chatApi = {
   editChatMessage: (projectSlug: string, conversationId: string, messageId: string, body: EditChatMessageRequest) =>
     request<Conversation>(
       `${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/edit`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+    ),
+  generateEditProposal: (projectSlug: string, conversationId: string, body: GenerateEditProposalRequest) =>
+    request<Conversation>(`${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/edit-proposals`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateEditProposal: (projectSlug: string, conversationId: string, proposalId: string, body: UpdateEditProposalRequest) =>
+    request<Conversation>(
+      `${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/edit-proposals/${encodeURIComponent(proposalId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      },
+    ),
+  applyEditProposal: (projectSlug: string, conversationId: string, proposalId: string, body: ApplyEditProposalRequest) =>
+    request<Conversation>(
+      `${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/edit-proposals/${encodeURIComponent(proposalId)}/apply`,
       {
         method: "POST",
         body: JSON.stringify(body),

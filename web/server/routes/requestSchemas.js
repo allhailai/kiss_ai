@@ -79,6 +79,27 @@ export const editChatMessageBodySchema = z.object({
   content: maxUtf8Bytes(MAX_USER_MESSAGE_BYTES, "Chat message is too large.").transform((value) => value.trim()).pipe(z.string().min(1)),
 });
 
+export const generateEditProposalBodySchema = z.object({
+  modelId: z.string().trim().min(1).max(160),
+  content: maxUtf8Bytes(MAX_USER_MESSAGE_BYTES, "Chat message is too large.").transform((value) => value.trim()).pipe(z.string().min(1)).optional(),
+  fileContext: conversationFileContextSchema.refine((value) => (value.ai_editable_files?.length ?? 0) > 0, {
+    message: "At least one AI Editable file is required.",
+  }),
+});
+
+export const updateEditProposalBodySchema = z.object({
+  conceptualDiffs: z.array(
+    z.object({
+      id: z.string().trim().min(1).max(80),
+      status: z.enum(["accepted", "rejected"]),
+    }),
+  ),
+});
+
+export const applyEditProposalBodySchema = z.object({
+  modelId: z.string().trim().min(1).max(160),
+});
+
 export const startRebuildBodySchema = z.object({
   modelId: z.string().trim().min(1).max(160),
 });
@@ -142,6 +163,10 @@ export const conversationParamsSchema = z.object({
 
 export const chatMessageParamsSchema = conversationParamsSchema.extend({
   messageId: z.string().trim().min(1).max(160),
+});
+
+export const editProposalParamsSchema = conversationParamsSchema.extend({
+  proposalId: z.string().trim().regex(/^[a-zA-Z0-9_-]+$/, "Invalid edit proposal id."),
 });
 
 function parseRequestPart(schema, value, httpError, label) {

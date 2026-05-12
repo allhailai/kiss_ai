@@ -42,6 +42,7 @@ export function ChatComposer({
   onSubmit,
   placeholder = "Ask about this project... Enter to send, Shift+Enter for a new line",
   selectedModelId,
+  secondaryAction,
   showContextControls = true,
   submitLabel = "Send",
   textareaRef,
@@ -58,6 +59,11 @@ export function ChatComposer({
   onSubmit: () => void;
   placeholder?: string;
   selectedModelId: string;
+  secondaryAction?: {
+    disabled: boolean;
+    label: string;
+    onClick: () => void;
+  };
   showContextControls?: boolean;
   submitLabel?: string;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -370,6 +376,11 @@ export function ChatComposer({
           <button disabled={disabled || !draft.trim() || !selectedModelId} type="submit">
             {disabled ? "Sending..." : submitLabel}
           </button>
+          {secondaryAction ? (
+            <button className="chat-composer-secondary-action" disabled={secondaryAction.disabled} onClick={secondaryAction.onClick} type="button">
+              {secondaryAction.label}
+            </button>
+          ) : null}
         </div>
       </div>
     </form>
