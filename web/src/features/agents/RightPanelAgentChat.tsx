@@ -540,6 +540,7 @@ export function RightPanelAgentChat({
           disabled: controlsDisabled || !draft.trim() || !requestAiEditableFiles.length || !selectedModelId,
           label: chat.sending ? "Working..." : "Propose edits",
           onClick: proposeEdits,
+          title: !requestAiEditableFiles.length ? "Add AI Editable files to allow the agent to propose edits." : undefined,
         }}
         selectedModelId={selectedModelId}
         showContextControls={false}

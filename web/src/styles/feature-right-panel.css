@@ -587,10 +587,10 @@
   min-width: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
+  align-items: center;
   gap: 7px;
   margin: 0 12px;
-  padding: 8px 36px 8px 9px;
+  padding: 6px 34px 6px 9px;
   border: 1px solid color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
   border-radius: 12px;
   background: color-mix(in srgb, var(--color-surface) 92%, var(--color-background));
@@ -598,11 +598,13 @@
 
 .agent-current-file-main {
   min-width: 0;
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .agent-current-file code {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   border: 0;
@@ -615,14 +617,15 @@
 }
 
 .agent-current-file-actions {
+  flex: 0 0 auto;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .agent-current-file-action-button {
-  padding: 5px 8px;
+  padding: 4px 7px;
   border: 1px solid color-mix(in srgb, var(--color-accent) 44%, var(--color-border));
   border-radius: 999px;
   background: transparent;
@@ -653,7 +656,8 @@
 .agent-current-file-help {
   position: absolute;
   right: 9px;
-  bottom: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   flex: 0 0 auto;
 }
 
@@ -926,28 +930,28 @@
 
 .right-panel-surface .chat-composer-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(110px, 1fr) auto auto;
   align-items: center;
-  justify-content: stretch;
-  gap: 8px;
+  justify-content: start;
+  gap: 6px;
 }
 
 .right-panel-surface .chat-model-picker {
   min-width: 0;
-  width: 100%;
+  width: auto;
 }
 
 .right-panel-surface .chat-model-trigger {
-  width: 100%;
+  width: auto;
   min-width: 0;
-  max-width: none;
-  justify-content: space-between;
+  max-width: 180px;
+  justify-content: flex-start;
 }
 
 .right-panel-surface .chat-model-popover {
   right: auto;
   left: 0;
-  width: min(100%, calc(100vw - 32px));
+  width: min(300px, calc(100vw - 32px));
 }
 
 .right-panel-surface .chat-model-trigger-label {
@@ -957,12 +961,11 @@
 }
 
 .right-panel-surface .chat-composer-actions button[type="submit"] {
-  justify-self: end;
+  justify-self: start;
   white-space: nowrap;
 }
 
 .right-panel-surface .chat-composer-secondary-action {
-  grid-column: 2;
-  justify-self: end;
+  justify-self: start;
   white-space: nowrap;
 }

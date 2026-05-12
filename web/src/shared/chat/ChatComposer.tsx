@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from "react";
 import type { ChatContextFile, ProjectFile, RebuildModel } from "../../contracts/api";
 import { fileBasename } from "../../domain/files";
-import { formatModelLabel, modelTierLabels, modelTierOrder } from "../../domain/modelLabels";
+import { modelTierOrder } from "../../domain/modelLabels";
 
 const composerMaxRows = 8;
+const modelPriceLabels: Record<RebuildModel["tier"], string> = {
+  high: "High $$$",
+  medium: "Medium $$",
+  small: "Low $",
+};
 
 function contextLabel(file: ChatContextFile) {
   return file.label || file.path;
@@ -11,6 +16,10 @@ function contextLabel(file: ChatContextFile) {
 
 function fileLabel(file: ProjectFile) {
   return file.name || fileBasename(file.path);
+}
+
+function compactModelLabel(model: RebuildModel) {
+  return model.displayName || model.id;
 }
 
 function resizeComposer(textarea: HTMLTextAreaElement | null) {
@@ -63,6 +72,7 @@ export function ChatComposer({
     disabled: boolean;
     label: string;
     onClick: () => void;
+    title?: string;
   };
   showContextControls?: boolean;
   submitLabel?: string;
@@ -331,8 +341,7 @@ export function ChatComposer({
               onClick={() => setModelPickerOpen((open) => !open)}
               type="button"
             >
-              <span className="chat-model-trigger-label">{selectedModel ? formatModelLabel(selectedModel) : "Model"}</span>
-              {selectedModel ? <small>{modelTierLabels[selectedModel.tier]}</small> : null}
+              <span className="chat-model-trigger-label">{selectedModel ? compactModelLabel(selectedModel) : "Model"}</span>
               <span aria-hidden="true" className="chat-model-trigger-chevron">
                 ▾
               </span>
@@ -343,7 +352,7 @@ export function ChatComposer({
                   tieredModels.map(({ tier, models: tierModels }) => {
                     return (
                       <div className={`chat-model-group chat-model-group-${tier}`} key={tier}>
-                        <p>{modelTierLabels[tier]}</p>
+                        <p>{modelPriceLabels[tier]}</p>
                         {tierModels.map((model) => {
                           const optionIndex = modelOptions.findIndex((option) => option.id === model.id);
                           const isActive = optionIndex === activeModelIndex;
@@ -360,7 +369,7 @@ export function ChatComposer({
                               role="option"
                               type="button"
                             >
-                              <strong>{formatModelLabel(model)}</strong>
+                              <strong>{compactModelLabel(model)}</strong>
                             </button>
                           );
                         })}
@@ -377,7 +386,13 @@ export function ChatComposer({
             {disabled ? "Sending..." : submitLabel}
           </button>
           {secondaryAction ? (
-            <button className="chat-composer-secondary-action" disabled={secondaryAction.disabled} onClick={secondaryAction.onClick} type="button">
+            <button
+              className="chat-composer-secondary-action"
+              disabled={secondaryAction.disabled}
+              onClick={secondaryAction.onClick}
+              title={secondaryAction.title}
+              type="button"
+            >
               {secondaryAction.label}
             </button>
           ) : null}
