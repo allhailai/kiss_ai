@@ -78,7 +78,7 @@ export function useSelectedFile({
   );
 
   const saveSelected = useCallback(async () => {
-    if (!selected) return;
+    if (!selected) return null;
     const projectSlug = requireSelectedProjectSlug();
     const requestId = (fileRequestIdRef.current += 1);
 
@@ -87,7 +87,7 @@ export function useSelectedFile({
     try {
       const saved = await api.saveFile(projectSlug, selected.path, draft, selected.contentHash);
       const diff = await api.fileDiff(projectSlug, saved.path);
-      if (fileRequestIdRef.current !== requestId) return;
+      if (fileRequestIdRef.current !== requestId) return null;
 
       setSelected(saved);
       setSelectedDiff(diff);
@@ -99,10 +99,12 @@ export function useSelectedFile({
 
       await refreshStatus();
       setNotice(`Saved ${saved.path}.`);
+      return saved;
     } catch (error) {
       if (fileRequestIdRef.current === requestId) {
         setNotice(errorMessage(error, "Could not save the selected file."));
       }
+      return null;
     } finally {
       if (fileRequestIdRef.current === requestId) {
         setSaving(false);

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { ChatConversationEvent, Conversation } from "../../contracts/api";
 import { api } from "../../data/apiClient";
+import { hasSettledAssistantReply } from "../../domain/conversation";
 
 function applyStreamingDelta(conversation: Conversation, messageId: string, delta: string, updatedAt: string): Conversation {
   const existingIndex = conversation.messages.findIndex((message) => message.id === messageId);
@@ -27,11 +28,6 @@ function applyStreamingDelta(conversation: Conversation, messageId: string, delt
   }
 
   return { ...conversation, messages, updatedAt };
-}
-
-function hasSettledAssistantReply(conversation: Conversation) {
-  const latestMessage = conversation.messages.at(-1);
-  return latestMessage?.role === "assistant" && latestMessage.status !== "streaming";
 }
 
 export function useConversationStream({

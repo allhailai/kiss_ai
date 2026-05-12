@@ -18,8 +18,6 @@ export type ProjectController = {
 export type RouteController = {
   navigateTo: (view: View, filePath?: string | null, context?: Record<string, string>) => void;
   openProjectFile: (path: string) => void;
-  replaceRouteContext: (patch: Record<string, string | null | undefined>) => void;
-  routeContext: Record<string, string>;
   view: View;
 };
 
@@ -27,7 +25,6 @@ export type FileWorkspaceController = {
   deleteHumanInputFile: (path: string) => Promise<void>;
   draft: string;
   fileLoading: boolean;
-  files: ProjectFile[];
   hasUnsavedChanges: boolean;
   inputMutationLoading: boolean;
   loading: boolean;
@@ -35,7 +32,7 @@ export type FileWorkspaceController = {
   refreshSelectedFile: () => Promise<void>;
   revertSelected: () => Promise<void>;
   reverting: boolean;
-  saveSelected: () => Promise<void>;
+  saveSelected: () => Promise<FileContent | null>;
   saving: boolean;
   selected: FileContent | null;
   selectedDiff: FileDiff | null;

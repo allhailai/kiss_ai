@@ -1,8 +1,7 @@
 import { useCallback, useRef } from "react";
-import type { ProjectFile } from "../../contracts/api";
 import { errorMessage } from "../../domain/errors";
 import { designIdentityFilePath } from "../../domain/projectPaths";
-import { designProjectFile, type RouteState, type View } from "../../navigation/views";
+import { type RouteState, type View } from "../../navigation/views";
 
 export function useRouteDrivenData({
   clearSelectedFile,
@@ -12,7 +11,6 @@ export function useRouteDrivenData({
   refreshRebuild,
   selectFile,
   selectedProjectSlug,
-  setFiles,
   setNotice,
   setRouteContext,
   setView,
@@ -24,7 +22,6 @@ export function useRouteDrivenData({
   refreshRebuild: () => Promise<unknown>;
   selectFile: (path: string) => Promise<void>;
   selectedProjectSlug: string | null;
-  setFiles: (files: ProjectFile[]) => void;
   setNotice: (message: string) => void;
   setRouteContext: (context: Record<string, string>) => void;
   setView: (view: View) => void;
@@ -51,8 +48,6 @@ export function useRouteDrivenData({
           await loadTree("human");
         } else if (nextView === "outputs") {
           await loadTree("outputs");
-        } else {
-          setFiles([]);
         }
         if (!isCurrentRouteRequest()) return;
 
@@ -60,7 +55,6 @@ export function useRouteDrivenData({
           await refreshDesign();
         } else if (nextView === "design") {
           if (!isCurrentRouteRequest()) return;
-          setFiles([designProjectFile]);
           await refreshDesign();
           if (!isCurrentRouteRequest()) return;
           await selectFile(route.filePath ?? designIdentityFilePath);
@@ -94,7 +88,6 @@ export function useRouteDrivenData({
       refreshRebuild,
       selectFile,
       selectedProjectSlug,
-      setFiles,
       setNotice,
       setRouteContext,
       setView,

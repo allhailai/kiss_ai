@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type SetStateAction } from "react";
 import type { AgentContextFile, ChatContextFile, ChatMessage, Conversation, ConversationSummary, ProjectFile } from "../../contracts/api";
 import { api } from "../../data/apiClient";
+import { hasSettledAssistantReply } from "../../domain/conversation";
 import { errorMessage } from "../../domain/errors";
+import { uniqueByPathPreserveFirst } from "../../domain/files";
 import { useConversationStream } from "./useConversationStream";
 
 type ChatSendContext = {
@@ -24,20 +26,11 @@ function emptyConversationFileContext(): ConversationFileContextState {
   return { ai_editable_files: [], context_files: [] };
 }
 
-function uniqueByPath<T extends { path: string }>(files: T[]) {
-  const seen = new Set<string>();
-  return files.filter((file) => {
-    if (seen.has(file.path)) return false;
-    seen.add(file.path);
-    return true;
-  });
-}
-
 function conversationFileContextFromConversation(conversation: Conversation | null): ConversationFileContextState {
   if (!conversation?.fileContext) return emptyConversationFileContext();
   return {
-    ai_editable_files: uniqueByPath(conversation.fileContext.ai_editable_files ?? []),
-    context_files: uniqueByPath(conversation.fileContext.context_files ?? []),
+    ai_editable_files: uniqueByPathPreserveFirst(conversation.fileContext.ai_editable_files ?? []),
+    context_files: uniqueByPathPreserveFirst(conversation.fileContext.context_files ?? []),
   };
 }
 
@@ -51,11 +44,6 @@ function isChatContextFile(file: ProjectFile) {
 
 function isNearScrollBottom(element: HTMLElement) {
   return element.scrollHeight - element.scrollTop - element.clientHeight < 120;
-}
-
-function hasSettledAssistantReply(conversation: Conversation) {
-  const latestMessage = conversation.messages.at(-1);
-  return latestMessage?.role === "assistant" && latestMessage.status !== "streaming";
 }
 
 export function useProjectChat({
@@ -113,8 +101,8 @@ export function useProjectChat({
 
   const applyConversationFileContext = (fileContext: ConversationFileContextState) => {
     const next = {
-      ai_editable_files: uniqueByPath(fileContext.ai_editable_files),
-      context_files: uniqueByPath(fileContext.context_files),
+      ai_editable_files: uniqueByPathPreserveFirst(fileContext.ai_editable_files),
+      context_files: uniqueByPathPreserveFirst(fileContext.context_files),
     };
     fileContextRef.current = next;
     setAiEditableFilesState(next.ai_editable_files);
@@ -126,8 +114,8 @@ export function useProjectChat({
     async (conversationId: string, fileContext: ConversationFileContextState) => {
       if (!projectSlug) throw new Error("Select a project first.");
       const nextContext = {
-        ai_editable_files: uniqueByPath(fileContext.ai_editable_files),
-        context_files: uniqueByPath(fileContext.context_files),
+        ai_editable_files: uniqueByPathPreserveFirst(fileContext.ai_editable_files),
+        context_files: uniqueByPathPreserveFirst(fileContext.context_files),
       };
       const updated = await api.updateConversation(projectSlug, conversationId, { fileContext: nextContext });
       setActiveConversation(updated);
@@ -206,11 +194,11 @@ export function useProjectChat({
     return conversation;
   };
 
-  const startDraftConversation = () => {
+  const startDraftConversation = (initialFileContext: ConversationFileContextState = emptyConversationFileContext()) => {
     if (loading || sending || proposalUpdating) return;
     setActiveConversation(null);
     setMessageDraft("");
-    applyConversationFileContext(emptyConversationFileContext());
+    applyConversationFileContext(initialFileContext);
     setShowJumpToLatest(false);
     forceScrollToLatestRef.current = true;
     shouldStickToLatestRef.current = true;
@@ -336,13 +324,12 @@ export function useProjectChat({
       forceScrollToLatestRef.current = true;
       shouldStickToLatestRef.current = true;
       setActiveConversation(next);
-      if (hasSettledAssistantReply(next)) setSending(false);
       setEditingMessageId(null);
       setEditDraft("");
       await refreshConversations();
-      setSending(false);
     } catch (error) {
       onNotice(errorMessage(error, "Could not edit the chat message."));
+    } finally {
       setSending(false);
     }
   };

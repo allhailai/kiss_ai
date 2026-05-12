@@ -28,6 +28,8 @@ App-owned orchestration belongs in `app/`. If state drives more than one workflo
 
 Right-panel behavior is app shell state. Panel persistence, panel width, selected agent conversation mirroring, and file context selection belong in `app/`; the panel UI belongs in `features/agents/`.
 
+`app/useProjectWorkspace.ts` owns the shared `projectFiles` index used by navigation, editor link resolution, and agent file context selection. View-specific file content stays in the selected file state; features should not maintain a parallel project tree unless the data is truly local to that workflow.
+
 Shared UI components such as chat message rendering live under `shared/`, while feature directories own workflow-specific composition.
 
 ## Domain Layer
@@ -57,7 +59,7 @@ Editor modules may import domain helpers and API contract types. They should rec
 
 ## Feature Layer
 
-Use `features/<feature>/` for workflow UI. A feature component can own local UI state, but app-wide state and API orchestration should stay in `useProjectWorkspace.ts` and focused hooks under `app/hooks/`. Feature-local API calls are acceptable for isolated interactions, such as debounced search, when the result does not become shared workspace state.
+Use `features/<feature>/` for workflow UI. A feature component can own local UI state, but app-wide state and API orchestration should stay in `useProjectWorkspace.ts` and focused hooks under `app/hooks/`. Feature-local API calls are acceptable for isolated interactions, such as debounced search in `features/search/GlobalFileSearch.tsx`, when the result does not become shared workspace state.
 
 `features/navigation/` is shell-adjacent UI: it may consume `navigation/` metadata, but it should not import from `app/`, own route parsing, local storage behavior, or data loading.
 
@@ -114,6 +116,8 @@ Only one Cursor agent task may run per project at a time. Chat, proposal, apply,
 ## Quality Gate
 
 Run `npm run check` from `web/` before handing off substantive changes. It runs app TypeScript, server TypeScript, boundary checks, and Vitest.
+
+`scripts/check-boundaries.js` is the import boundary gate. Keep it aligned with this document when adding layers, moving workflow ownership, or allowing a deliberate exception.
 
 ## Adding A New Workflow
 

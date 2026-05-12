@@ -10,6 +10,7 @@ import {
 } from "../contracts/api";
 import { buildRouteHash, parseRouteHash } from "../navigation/routes";
 import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type View } from "../navigation/views";
+import { errorMessage } from "../domain/errors";
 import { useProjectDataLoaders } from "./hooks/useProjectDataLoaders";
 import { useHumanInputs } from "./hooks/useHumanInputs";
 import { useRebuildSync } from "./hooks/useRebuildSync";
@@ -42,7 +43,6 @@ export function useProjectWorkspace() {
   const [buildLog, setBuildLog] = useState<BuildLogState | null>(null);
   const [rebuild, setRebuild] = useState<RebuildState | null>(null);
   const [design, setDesign] = useState<DesignState | null>(null);
-  const [files, setFiles] = useState<ProjectFile[]>([]);
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([designProjectFile]);
   const [treeLoading, setTreeLoading] = useState(false);
   const [fileLoading, setFileLoading] = useState(false);
@@ -72,7 +72,7 @@ export function useProjectWorkspace() {
       setProjects(response.projects);
     } catch (error) {
       setProjects([]);
-      setProjectsError(error instanceof Error ? error.message : "Could not load projects.");
+      setProjectsError(errorMessage(error, "Could not load projects."));
     }
   }, []);
 
@@ -88,7 +88,6 @@ export function useProjectWorkspace() {
     selectedProjectSlug,
     setBuildLog,
     setDesign,
-    setFiles,
     setProjectFiles,
     setRebuild,
     setStatus,
@@ -148,39 +147,12 @@ export function useProjectWorkspace() {
     refreshRebuild,
     selectFile,
     selectedProjectSlug,
-    setFiles,
     setNotice,
     setRouteContext,
     setView,
   });
 
   const { navigateTo } = useRouteSync({ applyRoute, canLeaveCurrentRoute, currentRoute, onRouteError: setNotice, selectedProjectSlug, setSelectedProjectSlug });
-
-  const replaceRouteContext = useCallback(
-    (patch: Record<string, string | null | undefined>) => {
-      if (!selectedProjectSlug) return;
-
-      setRouteContext((current) => {
-        const currentRoute = parseRouteHash(window.location.hash);
-        const nextContext = { ...currentRoute.context, ...current };
-        for (const [key, value] of Object.entries(patch)) {
-          if (value) {
-            nextContext[key] = value;
-          } else {
-            delete nextContext[key];
-          }
-        }
-
-        const nextHash = buildRouteHash(selectedProjectSlug, currentRoute.view || view, currentRoute.filePath, nextContext);
-        if (window.location.hash !== nextHash) {
-          window.history.replaceState(null, "", nextHash);
-        }
-
-        return nextContext;
-      });
-    },
-    [selectedProjectSlug, view],
-  );
 
   const openProjectFile = useCallback(
     (path: string) => {
@@ -243,7 +215,7 @@ export function useProjectWorkspace() {
         setNotice(`Created ${project.name}.`);
         selectProject(project.slug);
       } catch (error) {
-        setNotice(error instanceof Error ? error.message : "Could not create the project.");
+        setNotice(errorMessage(error, "Could not create the project."));
         throw error;
       } finally {
         setCreatingProject(false);
@@ -273,7 +245,6 @@ export function useProjectWorkspace() {
     selectedProjectSlug,
     setBuildLog,
     setDesign,
-    setFiles,
     setNotice,
     setProjectFiles,
     setRebuild,
@@ -308,15 +279,12 @@ export function useProjectWorkspace() {
   const route = {
     navigateTo,
     openProjectFile,
-    replaceRouteContext,
-    routeContext,
     view,
   } satisfies RouteController;
   const fileWorkspace = {
     deleteHumanInputFile,
     draft,
     fileLoading,
-    files,
     hasUnsavedChanges,
     inputMutationLoading,
     loading: treeLoading || fileLoading || saving || reverting || inputMutationLoading,

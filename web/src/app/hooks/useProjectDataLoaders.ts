@@ -8,7 +8,6 @@ export function useProjectDataLoaders({
   selectedProjectSlug,
   setBuildLog,
   setDesign,
-  setFiles,
   setProjectFiles,
   setRebuild,
   setStatus,
@@ -17,7 +16,6 @@ export function useProjectDataLoaders({
   selectedProjectSlug: string | null;
   setBuildLog: (buildLog: BuildLogState | null) => void;
   setDesign: (design: DesignState | null) => void;
-  setFiles: (files: ProjectFile[]) => void;
   setProjectFiles: (files: ProjectFile[]) => void;
   setRebuild: (rebuild: RebuildState | null) => void;
   setStatus: (status: ProjectStatus | null) => void;
@@ -94,17 +92,14 @@ export function useProjectDataLoaders({
       const requestId = (treeRequestIdRef.current += 1);
       setTreeLoading(true);
       try {
-        const next = await api.tree(projectSlug, section);
-        if (selectedProjectSlugRef.current === projectSlug && treeRequestIdRef.current === requestId) {
-          setFiles(next.files);
-        }
+        await api.tree(projectSlug, section);
       } finally {
         if (treeRequestIdRef.current === requestId) {
           setTreeLoading(false);
         }
       }
     },
-    [requireSelectedProjectSlug, setFiles, setTreeLoading],
+    [requireSelectedProjectSlug, setTreeLoading],
   );
 
   return {

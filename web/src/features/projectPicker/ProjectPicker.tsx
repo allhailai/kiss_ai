@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import type { ProjectSummary } from "../../contracts/api";
+import { errorMessage } from "../../domain/errors";
 
 function slugifyProjectName(name: string) {
   return name
@@ -59,7 +60,7 @@ export function ProjectPicker({
       setProjectName("");
       setCreateError("");
     } catch (submitError) {
-      setCreateError(submitError instanceof Error ? submitError.message : "Could not create the project.");
+      setCreateError(errorMessage(submitError, "Could not create the project."));
     }
   };
 

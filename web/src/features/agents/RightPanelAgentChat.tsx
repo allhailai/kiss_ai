@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
 import type { AgentContextFile, ChatContextFile, ChatMessageFileEdit, Conversation, ConversationSummary, EditProposal, ProjectFile, RebuildModel } from "../../contracts/api";
-import { fileBasename } from "../../domain/files";
+import { fileBasename, uniqueByPathPreserveFirst } from "../../domain/files";
 import { ChatComposer } from "../../shared/chat/ChatComposer";
 import { ChatThread } from "../../shared/chat/ChatThread";
 import { formatChatDateTime } from "../../shared/chat/chatRendering";
@@ -24,7 +24,7 @@ type RightPanelChatController = {
   sending: boolean;
   setConversationFilter: (query: string) => void;
   showJumpToLatest: boolean;
-  startDraftConversation: () => void;
+  startDraftConversation: (initialFileContext?: { ai_editable_files: AgentContextFile[]; context_files: ChatContextFile[] }) => void;
   threadRef: RefObject<HTMLDivElement | null>;
   updateEditProposal: (proposalId: string, conceptualDiffs: Array<{ id: string; status: "accepted" | "rejected" }>) => Promise<boolean>;
 };
@@ -34,25 +34,12 @@ type VisibleEditableTarget = {
   isCurrent: boolean;
 };
 
-function contextFileLabel(file: AgentContextFile) {
-  return file.label || file.path;
-}
-
-function contextFileSelectionLabel(file: ChatContextFile) {
+function contextFileLabel(file: AgentContextFile | ChatContextFile) {
   return file.label || file.path;
 }
 
 function projectFileLabel(file: ProjectFile) {
   return file.name || fileBasename(file.path);
-}
-
-function uniqueEditableFiles(files: AgentContextFile[]) {
-  const seen = new Set<string>();
-  return files.filter((file) => {
-    if (seen.has(file.path)) return false;
-    seen.add(file.path);
-    return true;
-  });
 }
 
 function latestAttentionEditProposal(conversation: Conversation | null): EditProposal | null {
@@ -93,6 +80,7 @@ export function RightPanelAgentChat({
   chat,
   contextFiles,
   currentFile,
+  draftSeed,
   highlightedContext,
   models,
   onAddContextFile,
@@ -108,6 +96,7 @@ export function RightPanelAgentChat({
   chat: RightPanelChatController;
   contextFiles: ChatContextFile[];
   currentFile: AgentContextFile | null;
+  draftSeed: { id: string; draft: string } | null;
   highlightedContext: { path: string; target: "editable" | "context" } | null;
   models: RebuildModel[];
   onAddContextFile: (path: string) => void;
@@ -144,7 +133,7 @@ export function RightPanelAgentChat({
     return targets;
   }, [aiEditableFiles, currentFile]);
   const requestAiEditableFiles = useMemo(
-    () => uniqueEditableFiles(visibleEditableTargets.map((target) => target.file).filter((file) => file.editable === true)),
+    () => uniqueByPathPreserveFirst(visibleEditableTargets.map((target) => target.file).filter((file) => file.editable === true)),
     [visibleEditableTargets],
   );
   const selectedProposal = chat.activeConversation?.editProposals.find((proposal) => proposal.id === selectedProposalId) ?? null;
@@ -163,6 +152,15 @@ export function RightPanelAgentChat({
         return `${file.path} ${file.name} ${file.kind}`.toLowerCase().includes(query);
       });
   }, [contextFiles, filePickerOpen, filePickerQuery, projectFiles]);
+
+  useEffect(() => {
+    if (!draftSeed) return;
+
+    setDraft(draftSeed.draft);
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }, [draftSeed?.id]);
 
   const startNewConversation = () => {
     if (controlsDisabled) return;
@@ -472,7 +470,7 @@ export function RightPanelAgentChat({
                 }
                 key={file.path}
               >
-                <code title={file.path}>{contextFileSelectionLabel(file)}</code>
+                <code title={file.path}>{contextFileLabel(file)}</code>
                 <button aria-label={`Remove ${file.path} from context`} disabled={controlsDisabled} onClick={() => removeContextFile(file.path)} type="button">
                   x
                 </button>

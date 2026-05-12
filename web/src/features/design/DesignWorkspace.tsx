@@ -17,6 +17,7 @@ export function DesignWorkspace({
   selected,
   selectedDiff,
   draft,
+  hasUnsavedChanges,
   loading,
   onDraft,
   onRevert,
@@ -26,6 +27,7 @@ export function DesignWorkspace({
   selected: FileContent | null;
   selectedDiff: FileDiff | null;
   draft: string;
+  hasUnsavedChanges: boolean;
   loading: boolean;
   onDraft: (value: string) => void;
   onRevert: () => void;
@@ -36,7 +38,6 @@ export function DesignWorkspace({
   const savedChangedLineCount = countDiffRangeLines(selectedDiff?.ranges ?? []);
   const savedDeletedLineCount = countDeletedLines(selectedDiff?.deletions ?? []);
   const hasSavedDiff = savedChangedLineCount > 0 || savedDeletedLineCount > 0;
-  const hasUnsavedChanges = Boolean(selected && draft !== selected.content);
   const [activeDesignTab, setActiveDesignTab] = useState<"preview" | "edit">("preview");
   const savedDiffLabel =
     hasSavedDiff

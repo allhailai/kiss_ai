@@ -113,6 +113,7 @@ export function useAgentChatPanel({
   return {
     closeAgentPanel,
     isAgentPanelOpen,
+    openAgentChatPanel,
     selectProjectChatConversation,
     toggleAgentPanel,
   };

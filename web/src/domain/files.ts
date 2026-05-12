@@ -86,6 +86,15 @@ export function uniqueFiles(files: ProjectFile[]) {
   return [...new Map(files.map((file) => [file.path, file])).values()].sort((left, right) => left.path.localeCompare(right.path));
 }
 
+export function uniqueByPathPreserveFirst<T extends { path: string }>(files: T[]) {
+  const seen = new Set<string>();
+  return files.filter((file) => {
+    if (seen.has(file.path)) return false;
+    seen.add(file.path);
+    return true;
+  });
+}
+
 export function fileBasename(path: string) {
   return path.split("/").at(-1) ?? path;
 }

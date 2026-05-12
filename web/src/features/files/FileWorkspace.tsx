@@ -11,8 +11,11 @@ export function FileWorkspace({
   selected,
   selectedDiff,
   draft,
+  aiFileAssistDisabled = false,
+  hasUnsavedChanges,
   projectFiles,
   onDraft,
+  onAiFileAssist,
   onNotice,
   onOpenFile,
   onUploadFiles,
@@ -24,8 +27,11 @@ export function FileWorkspace({
   selected: FileContent | null;
   selectedDiff: FileDiff | null;
   draft: string;
+  aiFileAssistDisabled?: boolean;
+  hasUnsavedChanges: boolean;
   projectFiles: ProjectFile[];
   onDraft: (value: string) => void;
+  onAiFileAssist?: () => void;
   onNotice: (message: string) => void;
   onOpenFile: (path: string) => void;
   onUploadFiles?: (files: File[]) => Promise<void>;
@@ -43,8 +49,11 @@ export function FileWorkspace({
         selected={selected}
         selectedDiff={selectedDiff}
         draft={draft}
+        aiFileAssistDisabled={aiFileAssistDisabled}
+        hasUnsavedChanges={hasUnsavedChanges}
         projectFiles={projectFiles}
         onDraft={onDraft}
+        onAiFileAssist={onAiFileAssist}
         onNotice={onNotice}
         onOpenFile={onOpenFile}
         onRevert={onRevert}
@@ -137,8 +146,11 @@ function EditorPane({
   selected,
   selectedDiff,
   draft,
+  aiFileAssistDisabled,
+  hasUnsavedChanges,
   projectFiles,
   onDraft,
+  onAiFileAssist,
   onNotice,
   onOpenFile,
   onRevert,
@@ -147,8 +159,11 @@ function EditorPane({
   selected: FileContent | null;
   selectedDiff: FileDiff | null;
   draft: string;
+  aiFileAssistDisabled: boolean;
+  hasUnsavedChanges: boolean;
   projectFiles: ProjectFile[];
   onDraft: (value: string) => void;
+  onAiFileAssist?: () => void;
   onNotice: (message: string) => void;
   onOpenFile: (path: string) => void;
   onRevert: () => void;
@@ -166,13 +181,13 @@ function EditorPane({
   const savedChangedLineCount = countDiffRangeLines(selectedDiff?.ranges ?? []);
   const savedDeletedLineCount = countDeletedLines(selectedDiff?.deletions ?? []);
   const hasSavedDiff = savedChangedLineCount > 0 || savedDeletedLineCount > 0;
-  const hasUnsavedChanges = draft !== selected.content;
   const savedDiffLabel =
     hasSavedDiff
       ? `${(savedChangedLineCount + savedDeletedLineCount).toLocaleString()} saved Git diff ${
           savedChangedLineCount + savedDeletedLineCount === 1 ? "line" : "lines"
         }`
       : "No saved Git diff";
+  const showAiFileAssist = Boolean(onAiFileAssist && selected.editable && (hasUnsavedChanges || hasSavedDiff));
 
   return (
     <section className={selected.annotation ? "editor-pane annotation-mode" : "editor-pane"}>
@@ -184,6 +199,11 @@ function EditorPane({
           </h2>
         </div>
         <div className="editor-toolbar-actions">
+          {showAiFileAssist ? (
+            <button className="ai-assist-trigger" disabled={aiFileAssistDisabled} onClick={onAiFileAssist} type="button">
+              AI File Assist
+            </button>
+          ) : null}
           {hasSavedDiff ? (
             <button className="editor-secondary-button" disabled={!selected.editable} onClick={onRevert} type="button">
               Revert to Committed State

@@ -13,7 +13,6 @@ type UseSelectedProjectLifecycleOptions = {
   selectedProjectSlug: string | null;
   setBuildLog: (buildLog: BuildLogState | null) => void;
   setDesign: (design: DesignState | null) => void;
-  setFiles: (files: ProjectFile[]) => void;
   setNotice: (message: string) => void;
   setProjectFiles: (files: ProjectFile[]) => void;
   setRebuild: (rebuild: RebuildState | null) => void;
@@ -31,7 +30,6 @@ export function useSelectedProjectLifecycle({
   selectedProjectSlug,
   setBuildLog,
   setDesign,
-  setFiles,
   setNotice,
   setProjectFiles,
   setRebuild,
@@ -48,7 +46,6 @@ export function useSelectedProjectLifecycle({
       setRebuild(null);
       clearRebuildModels();
       setDesign(null);
-      setFiles([]);
       setProjectFiles([designProjectFile]);
       clearSelectedFile();
       return;
@@ -77,7 +74,6 @@ export function useSelectedProjectLifecycle({
     selectedProjectSlug,
     setBuildLog,
     setDesign,
-    setFiles,
     setNotice,
     setProjectFiles,
     setRebuild,

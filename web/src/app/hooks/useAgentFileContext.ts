@@ -63,9 +63,7 @@ function enrichEditableTarget(file: AgentContextFile, projectFiles: ProjectFile[
   };
 }
 
-function currentFileFromSelectedFile(selected: FileContent | null, draft: string): AgentContextFile | null {
-  if (!selected) return null;
-
+export function makeEditableTargetForFile(selected: FileContent, draft: string): AgentContextFile {
   return {
     path: selected.path,
     label: fileBasename(selected.path),
@@ -77,6 +75,12 @@ function currentFileFromSelectedFile(selected: FileContent | null, draft: string
     draftState: draft !== selected.content ? "unsaved" : "saved",
     role: "primary",
   };
+}
+
+function currentFileFromSelectedFile(selected: FileContent | null, draft: string): AgentContextFile | null {
+  if (!selected) return null;
+
+  return makeEditableTargetForFile(selected, draft);
 }
 
 export function useAgentFileContext({

@@ -21,9 +21,12 @@ import { RebuildWorkspace } from "../features/rebuild/RebuildWorkspace";
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
 import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
-import { useAgentFileContext } from "./hooks/useAgentFileContext";
+import { makeEditableTargetForFile, useAgentFileContext } from "./hooks/useAgentFileContext";
 import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
 import type { ChatMessageFileEdit } from "../contracts/api";
+
+const aiFileAssistPrompt =
+  "Review the saved annotations in this file. Interpret the Git diff as user guidance, then propose edits that integrate those annotations cleanly throughout the document while preserving the document's intent, structure, and voice.";
 
 const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: string }>> = {
   requirements: {
@@ -44,6 +47,7 @@ export function App() {
   const { designWorkspace, fileWorkspace, project, rebuildWorkspace, route, toastWorkspace } = workspace;
   const rightPanelSurface = useRightPanelSurface();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [agentDraftSeed, setAgentDraftSeed] = useState<{ id: string; draft: string } | null>(null);
   const themeStyle = useMemo(() => buildThemeStyle(designWorkspace.design), [designWorkspace.design]);
   const rightPanelWidth = useRightPanelWidth({
     panelKind: rightPanelSurface.rightPanel?.kind ?? null,
@@ -70,7 +74,7 @@ export function App() {
     onProposalApplied: fileWorkspace.refreshSelectedFile,
   });
   const navigateTo = (view: View, filePath?: string | null, context?: Record<string, string>) => route.navigateTo(view, filePath, context);
-  const { closeAgentPanel, isAgentPanelOpen, selectProjectChatConversation, toggleAgentPanel } = useAgentChatPanel({
+  const { closeAgentPanel, isAgentPanelOpen, openAgentChatPanel, selectProjectChatConversation, toggleAgentPanel } = useAgentChatPanel({
     projectChat,
     projectSlug: project.selectedProjectSlug,
     rightPanelSurface,
@@ -106,6 +110,19 @@ export function App() {
 
     fileWorkspace.setDraft(decision.content);
     toastWorkspace.setNotice(decision.message);
+  };
+  const assistCurrentFile = async () => {
+    const selected = fileWorkspace.selected;
+    if (!selected?.editable || projectChat.loading || projectChat.sending || projectChat.proposalUpdating) return;
+
+    const savedFile = fileWorkspace.hasUnsavedChanges ? await fileWorkspace.saveSelected() : selected;
+    if (!savedFile) return;
+
+    const editableTarget = makeEditableTargetForFile(savedFile, savedFile.content);
+    projectChat.startDraftConversation({ ai_editable_files: [editableTarget], context_files: [] });
+    openAgentChatPanel();
+    setAgentDraftSeed({ id: `${savedFile.path}:${Date.now()}`, draft: aiFileAssistPrompt });
+    toastWorkspace.setNotice(`Prepared AI File Assist for ${savedFile.path}.`);
   };
 
   if (!project.selectedProjectSlug || !project.selectedProject) {
@@ -194,8 +211,11 @@ export function App() {
             selected={fileWorkspace.selected}
             selectedDiff={fileWorkspace.selectedDiff}
             draft={fileWorkspace.draft}
+            hasUnsavedChanges={fileWorkspace.hasUnsavedChanges}
+            aiFileAssistDisabled={fileWorkspace.loading || projectChat.loading || projectChat.sending || projectChat.proposalUpdating}
             projectFiles={fileWorkspace.projectFiles}
             onDraft={fileWorkspace.setDraft}
+            onAiFileAssist={() => void assistCurrentFile()}
             onNotice={toastWorkspace.setNotice}
             onOpenFile={openProjectFileWithAgentContext}
             onUploadFiles={route.view === "inputs" ? fileWorkspace.uploadHumanInputFiles : undefined}
@@ -209,6 +229,7 @@ export function App() {
             selected={fileWorkspace.selected}
             selectedDiff={fileWorkspace.selectedDiff}
             draft={fileWorkspace.draft}
+            hasUnsavedChanges={fileWorkspace.hasUnsavedChanges}
             loading={fileWorkspace.loading}
             onDraft={fileWorkspace.setDraft}
             onRevert={() => void fileWorkspace.revertSelected()}
@@ -249,6 +270,7 @@ export function App() {
             chat={projectChat}
             contextFiles={agentFileContext.contextFiles}
             currentFile={agentFileContext.currentFile}
+            draftSeed={agentDraftSeed}
             highlightedContext={agentFileContext.highlightedContext}
             models={rebuildWorkspace.models}
             onAddContextFile={agentFileContext.addContextFile}
