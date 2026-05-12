@@ -337,19 +337,6 @@ export function RightPanelAgentChat({
             </section>
           ) : null}
         </div>
-        <button
-          aria-label="New AI Chat"
-          className="agent-new-conversation-button"
-          disabled={controlsDisabled}
-          onClick={startNewConversation}
-          title="New AI Chat"
-          type="button"
-        >
-          <span aria-hidden="true" className="agent-new-conversation-icon">
-            ✎
-          </span>
-          <span className="agent-new-conversation-label">New AI Chat</span>
-        </button>
       </div>
       <div className="right-panel-agent-thread">
         <ChatThread
@@ -536,6 +523,13 @@ export function RightPanelAgentChat({
         onRemoveContextFile={removeContextFile}
         onSubmit={() => void sendMessage()}
         placeholder="Ask the side-panel agent..."
+        modelAdjacentAction={{
+          ariaLabel: "New AI Chat",
+          disabled: controlsDisabled,
+          label: "New chat",
+          onClick: startNewConversation,
+          title: "New AI Chat",
+        }}
         secondaryAction={{
           disabled: controlsDisabled || !draft.trim() || !requestAiEditableFiles.length || !selectedModelId,
           label: chat.sending ? "Working..." : "Propose edits",

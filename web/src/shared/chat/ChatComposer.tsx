@@ -50,6 +50,7 @@ export function ChatComposer({
   onRemoveContextFile = () => undefined,
   onSubmit,
   placeholder = "Ask about this project... Enter to send, Shift+Enter for a new line",
+  modelAdjacentAction,
   selectedModelId,
   secondaryAction,
   showContextControls = true,
@@ -67,6 +68,13 @@ export function ChatComposer({
   onRemoveContextFile?: (path: string) => void;
   onSubmit: () => void;
   placeholder?: string;
+  modelAdjacentAction?: {
+    ariaLabel?: string;
+    disabled: boolean;
+    label: string;
+    onClick: () => void;
+    title?: string;
+  };
   selectedModelId: string;
   secondaryAction?: {
     disabled: boolean;
@@ -382,6 +390,21 @@ export function ChatComposer({
               </div>
             ) : null}
           </div>
+          {modelAdjacentAction ? (
+            <>
+              <button
+                aria-label={modelAdjacentAction.ariaLabel}
+                className="chat-composer-model-adjacent-action"
+                disabled={modelAdjacentAction.disabled}
+                onClick={modelAdjacentAction.onClick}
+                title={modelAdjacentAction.title}
+                type="button"
+              >
+                {modelAdjacentAction.label}
+              </button>
+              <span aria-hidden="true" className="chat-composer-action-spacer" />
+            </>
+          ) : null}
           <button disabled={disabled || !draft.trim() || !selectedModelId} type="submit">
             {disabled ? "Sending..." : submitLabel}
           </button>
