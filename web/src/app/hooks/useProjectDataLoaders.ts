@@ -107,24 +107,7 @@ export function useProjectDataLoaders({
     [requireSelectedProjectSlug, setFiles, setTreeLoading],
   );
 
-  const loadAnnotationTree = useCallback(async () => {
-    const projectSlug = requireSelectedProjectSlug();
-    const requestId = (treeRequestIdRef.current += 1);
-    setTreeLoading(true);
-    try {
-      const [inputsAi, outputs] = await Promise.all([api.tree(projectSlug, "inputs-ai"), api.tree(projectSlug, "outputs")]);
-      if (selectedProjectSlugRef.current === projectSlug && treeRequestIdRef.current === requestId) {
-        setFiles(uniqueFiles([...inputsAi.files, ...outputs.files]));
-      }
-    } finally {
-      if (treeRequestIdRef.current === requestId) {
-        setTreeLoading(false);
-      }
-    }
-  }, [requireSelectedProjectSlug, setFiles, setTreeLoading]);
-
   return {
-    loadAnnotationTree,
     loadTree,
     refreshBuildLog,
     refreshDesign,

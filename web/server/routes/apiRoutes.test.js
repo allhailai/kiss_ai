@@ -139,7 +139,6 @@ describe("API routes", () => {
       gitStatus: async () => [],
       httpError,
       listCursorModels: async () => [],
-      listMarkdownFiles: async () => [],
       pickRebuildModelId: () => null,
       readProjectJson: async () => ({}),
       resolveCursorApiKey: async () => ({ available: false, source: null, warnings: [] }),

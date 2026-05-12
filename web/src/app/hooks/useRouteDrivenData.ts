@@ -6,7 +6,6 @@ import { designProjectFile, type RouteState, type View } from "../../navigation/
 
 export function useRouteDrivenData({
   clearSelectedFile,
-  loadAnnotationTree,
   loadTree,
   refreshBuildLog,
   refreshDesign,
@@ -19,7 +18,6 @@ export function useRouteDrivenData({
   setView,
 }: {
   clearSelectedFile: () => void;
-  loadAnnotationTree: () => Promise<void>;
   loadTree: (section: string) => Promise<void>;
   refreshBuildLog: () => Promise<void>;
   refreshDesign: () => Promise<void>;
@@ -53,8 +51,6 @@ export function useRouteDrivenData({
           await loadTree("human");
         } else if (nextView === "outputs") {
           await loadTree("outputs");
-        } else if (nextView === "annotations") {
-          await loadAnnotationTree();
         } else {
           setFiles([]);
         }
@@ -92,7 +88,6 @@ export function useRouteDrivenData({
     },
     [
       clearSelectedFile,
-      loadAnnotationTree,
       loadTree,
       refreshBuildLog,
       refreshDesign,

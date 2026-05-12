@@ -17,7 +17,6 @@ export function registerApiRoutes(app, deps) {
     gitStatus: deps.gitStatus,
     httpError: deps.httpError,
     listCursorModels: deps.listCursorModels,
-    listMarkdownFiles: deps.listMarkdownFiles,
     pickRebuildModelId: deps.pickRebuildModelId,
     readProjectJson: deps.readProjectJson,
     resolveCursorApiKey: deps.resolveCursorApiKey,

@@ -30,16 +30,12 @@ const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: str
     title: "Human-Owned Requirements",
   },
   inputs: {
-    title: "Human Inputs",
-    explainer: `Human source material belongs under ${projectPathPrefixes.humanInput}. Drop files here to add source material to the project.`,
+    title: "Source Data",
+    explainer: `Human source material belongs under ${projectPathPrefixes.humanInput}. AI-acquired source material is listed under ${projectPathPrefixes.aiInput}.`,
   },
   outputs: {
     title: "Outputs",
     explainer: `Generated outputs are AI-managed. Saved edits under ${projectPathPrefixes.output} are treated as annotations for requirements and the next rebuild.`,
-  },
-  annotations: {
-    title: "Annotation Workspace",
-    explainer: "Add annotations",
   },
 };
 
@@ -138,6 +134,7 @@ export function App() {
         projectName={rebuildWorkspace.status?.projectName ?? project.selectedProject.name}
         projectSlug={project.selectedProjectSlug}
         onOpenFile={openProjectFileWithAgentContext}
+        onOpenDashboard={() => navigateTo("dashboard")}
         onOpenProjectHome={() => navigateTo("rebuild")}
         onSwitchProject={project.clearSelectedProject}
       />
@@ -182,7 +179,6 @@ export function App() {
           <Dashboard
             status={rebuildWorkspace.status}
             design={designWorkspace.design}
-            onOpenAnnotations={() => navigateTo("annotations")}
             onOpenDesign={() => navigateTo("design")}
           />
         ) : null}

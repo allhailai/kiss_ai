@@ -51,7 +51,7 @@ export function sectionForView(view: View): SimplifiedNavSectionId {
   if (view === "build-log") return "build-log";
   if (view === "chat") return "chat";
   if (view === "requirements" || view === "design") return "define";
-  if (view === "inputs" || view === "annotations") return "source-data";
+  if (view === "inputs") return "source-data";
   if (view === "outputs") return "results";
   return "build";
 }

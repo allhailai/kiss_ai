@@ -77,7 +77,6 @@ export function useProjectWorkspace() {
   }, []);
 
   const {
-    loadAnnotationTree,
     loadTree,
     refreshBuildLog,
     refreshDesign,
@@ -143,7 +142,6 @@ export function useProjectWorkspace() {
 
   const applyRoute = useRouteDrivenData({
     clearSelectedFile,
-    loadAnnotationTree,
     loadTree,
     refreshBuildLog,
     refreshDesign,

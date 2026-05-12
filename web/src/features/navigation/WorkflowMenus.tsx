@@ -156,11 +156,11 @@ export function SimplifiedNavigator({
 
           <button
             className={
-              currentView === "annotations" && !selectedPath
+              selectedPath?.startsWith(projectPathPrefixes.aiInput)
                 ? "simple-nav-item simple-nav-subheader active"
                 : "simple-nav-item simple-nav-subheader"
             }
-            onClick={() => onOpenView("annotations")}
+            onClick={() => onOpenView("inputs")}
             type="button"
           >
             <span>AI acquired</span>
@@ -169,7 +169,7 @@ export function SimplifiedNavigator({
           <FileTreeBlock
             emptyLabel="No AI-acquired Markdown files yet."
             files={aiInputFiles}
-            loading={loading && currentView === "annotations"}
+            loading={loading && currentView === "inputs"}
             onOpenFile={onOpenFile}
             selectedPath={selectedPath}
           />

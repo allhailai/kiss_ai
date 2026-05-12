@@ -4,12 +4,10 @@ import { formatLocalDateTime } from "../../domain/formatters";
 export function Dashboard({
   status,
   design,
-  onOpenAnnotations,
   onOpenDesign,
 }: {
   status: ProjectStatus | null;
   design: DesignState | null;
-  onOpenAnnotations: () => void;
   onOpenDesign: () => void;
 }) {
   return (
@@ -17,7 +15,7 @@ export function Dashboard({
       <header className="page-header">
         <span className="eyebrow">Project dashboard</span>
         <h2>Current project state</h2>
-        <p>Readiness, rebuild history, annotation status, and local runtime availability.</p>
+        <p>Readiness, rebuild history, and local runtime availability.</p>
       </header>
 
       <div className="card-grid">
@@ -29,7 +27,6 @@ export function Dashboard({
       </div>
 
       <div className="card-grid dashboard-action-grid">
-        <StatusCard label="Annotation files" value={String(status?.annotationFiles ?? 0)} onClick={onOpenAnnotations} />
         <StatusCard label="Design identity" value={design?.parsed.name ?? "Loading"} onClick={onOpenDesign} />
       </div>
 

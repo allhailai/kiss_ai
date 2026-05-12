@@ -64,9 +64,6 @@ export type ProjectStatus = {
   scalingMode: string | null;
   rebuildStatus: string | null;
   lintStatus: string | null;
-  annotationStatus: string | null;
-  annotationsLogged: number;
-  annotationFiles: number;
   unresolvedReviewItems: unknown[];
   blockedArtifacts: unknown[];
   staleOutputs: unknown[];

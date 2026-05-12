@@ -8,12 +8,14 @@ export function GlobalFileSearch({
   projectName,
   projectSlug,
   onOpenFile,
+  onOpenDashboard,
   onOpenProjectHome,
   onSwitchProject,
 }: {
   projectName: string;
   projectSlug: string;
   onOpenFile: (path: string) => void;
+  onOpenDashboard: () => void;
   onOpenProjectHome: () => void;
   onSwitchProject: () => void;
 }) {
@@ -50,10 +52,16 @@ export function GlobalFileSearch({
         })
         .catch((searchError) => {
           if (cancelled) return;
-          if (searchError instanceof DOMException && searchError.name === "AbortError") return;
+          if (
+            searchError instanceof DOMException &&
+            searchError.name === "AbortError"
+          )
+            return;
           setResults([]);
           setActiveResultIndex(-1);
-          setError(errorMessage(searchError, "Could not search project paths."));
+          setError(
+            errorMessage(searchError, "Could not search project paths."),
+          );
         })
         .finally(() => {
           if (!cancelled) {
@@ -90,7 +98,9 @@ export function GlobalFileSearch({
       event.preventDefault();
       if (!results.length) return;
       setIsOpen(true);
-      setActiveResultIndex((current) => (current <= 0 ? results.length - 1 : current - 1));
+      setActiveResultIndex((current) =>
+        current <= 0 ? results.length - 1 : current - 1,
+      );
       return;
     }
 
@@ -106,9 +116,17 @@ export function GlobalFileSearch({
 
   return (
     <header className="global-topbar">
-      <button className="project-header-title" onClick={onOpenProjectHome} type="button">
-        {projectName}
-      </button>
+      <div className="project-header-breadcrumb" aria-label="Project navigation">
+        <button className="project-header-projects-link" onClick={onSwitchProject} type="button">
+          Projects
+        </button>
+        <span aria-hidden="true" className="project-header-separator">
+          /
+        </span>
+        <button className="project-header-title" onClick={onOpenProjectHome} type="button">
+          {projectName}
+        </button>
+      </div>
       <div className="global-search" role="search">
         <label className="global-search-label" htmlFor="global-file-search">
           Search file paths
@@ -132,14 +150,24 @@ export function GlobalFileSearch({
           />
           {showResults ? (
             <div className="global-search-results" role="listbox">
-              {loading ? <p className="global-search-state">Searching...</p> : null}
-              {!loading && error ? <p className="global-search-state">{error}</p> : null}
-              {!loading && !error && results.length === 0 ? <p className="global-search-state">No matching paths found.</p> : null}
+              {loading ? (
+                <p className="global-search-state">Searching...</p>
+              ) : null}
+              {!loading && error ? (
+                <p className="global-search-state">{error}</p>
+              ) : null}
+              {!loading && !error && results.length === 0 ? (
+                <p className="global-search-state">No matching paths found.</p>
+              ) : null}
               {!loading && !error
                 ? results.map((file, index) => (
                     <button
                       aria-selected={index === activeResultIndex}
-                      className={index === activeResultIndex ? "global-search-result active" : "global-search-result"}
+                      className={
+                        index === activeResultIndex
+                          ? "global-search-result active"
+                          : "global-search-result"
+                      }
                       key={file.path}
                       onMouseEnter={() => setActiveResultIndex(index)}
                       onMouseDown={(event) => event.preventDefault()}
@@ -148,7 +176,9 @@ export function GlobalFileSearch({
                       title={file.path}
                       type="button"
                     >
-                      <strong>{humanizePathSegment(fileBasename(file.path))}</strong>
+                      <strong>
+                        {humanizePathSegment(fileBasename(file.path))}
+                      </strong>
                       <span>{file.path}</span>
                     </button>
                   ))
@@ -157,9 +187,34 @@ export function GlobalFileSearch({
           ) : null}
         </div>
       </div>
-      <button className="project-switch-button" onClick={onSwitchProject} type="button">
-        Projects
-      </button>
+      <div className="global-topbar-actions">
+        <button
+          aria-label="Open technical dashboard"
+          className="technical-dashboard-button"
+          onClick={onOpenDashboard}
+          title="Technical dashboard"
+          type="button"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path
+              d="M19.4 13.5c.1-.5.1-1 .1-1.5s0-1-.1-1.5l2-1.5-2-3.5-2.4 1a8.1 8.1 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A8.1 8.1 0 0 0 7 6.5l-2.4-1-2 3.5 2 1.5c-.1.5-.1 1-.1 1.5s0 1 .1 1.5l-2 1.5 2 3.5 2.4-1a8.1 8.1 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a8.1 8.1 0 0 0 2.6-1.5l2.4 1 2-3.5-2-1.5Z"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+            />
+            <circle
+              cx="12"
+              cy="12"
+              fill="none"
+              r="3.1"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            />
+          </svg>
+        </button>
+      </div>
     </header>
   );
 }
