@@ -77,7 +77,7 @@ function normalizeEditProposal(value) {
   const timestamp = nowIso();
   const status = ["proposed", "applying", "applied", "partial", "failed"].includes(source.status) ? source.status : "proposed";
   const conceptualDiffs = Array.isArray(source.conceptualDiffs)
-    ? source.conceptualDiffs.map(normalizeConceptualDiff).filter(Boolean).slice(0, maxConceptualDiffs)
+    ? source.conceptualDiffs.map((diff) => normalizeConceptualDiff(diff)).filter(Boolean).slice(0, maxConceptualDiffs)
     : [];
 
   return {

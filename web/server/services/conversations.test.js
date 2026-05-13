@@ -178,6 +178,44 @@ describe("conversation service", () => {
     });
   });
 
+  it("reads stored edit proposals without treating array indexes as path allowlists", async () => {
+    const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-conversations-"));
+    const project = { slug: "demo", path: projectRoot };
+    const service = createConversationService({ httpError, projectPath });
+    const conversation = await service.createConversation(project, { modelId: "model-a" });
+    const index = await fs.readFile(path.join(projectRoot, "conversations", "conversations.json"), "utf8").then(JSON.parse);
+    const record = index.conversations.find((candidate) => candidate.id === conversation.id);
+
+    await fs.writeFile(
+      path.join(projectRoot, record.file),
+      JSON.stringify(
+        {
+          ...conversation,
+          editProposals: [
+            {
+              id: "proposal_1",
+              conceptualDiffs: [
+                {
+                  id: "diff_1",
+                  filePath: "outputs_ai/report.md",
+                  title: "Stored proposal",
+                  summary: "This persisted diff should load without an editable allowlist.",
+                },
+              ],
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    await expect(service.readConversation(project, conversation.id)).resolves.toMatchObject({
+      editProposals: [{ conceptualDiffs: [{ id: "diff_1", filePath: "outputs_ai/report.md" }] }],
+    });
+  });
+
   it("serializes overlapping message appends for the same project", async () => {
     const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-conversations-"));
     const project = { slug: "demo", path: projectRoot };
