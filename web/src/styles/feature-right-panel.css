@@ -166,7 +166,7 @@
   height: 100%;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 8px;
+  gap: 5px;
   overflow: hidden;
   padding-right: 50px;
 }
@@ -185,21 +185,23 @@
 .right-panel-mode-switch {
   display: inline-flex;
   justify-self: start;
-  gap: 3px;
-  padding: 3px;
+  gap: 2px;
+  padding: 1px;
   border: 1px solid var(--color-border);
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-background) 78%, white);
 }
 
 .right-panel-mode-switch button {
-  padding: 5px 9px;
+  min-height: 20px;
+  padding: 2px 7px;
   border: 0;
   border-radius: 999px;
   background: transparent;
   color: var(--color-secondary);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 900;
+  line-height: 1;
 }
 
 .right-panel-mode-switch button.active,
@@ -215,27 +217,27 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
-  display: grid;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 9px;
   overflow: hidden;
   padding: 0 50px 0 0;
 }
 
 .requirements-sync-panel-header,
-.requirements-sync-panel-controls,
 .requirements-sync-panel-review {
   min-width: 0;
 }
 
 .requirements-sync-panel-header {
   display: grid;
-  gap: 5px;
+  gap: 4px;
   padding: 0 12px;
 }
 
 .requirements-sync-panel-header h2,
-.requirements-sync-panel-header p {
+.requirements-sync-panel-header p,
+.requirements-sync-panel-description {
   margin: 0;
 }
 
@@ -254,17 +256,17 @@
   line-height: 1.35;
 }
 
-.requirements-sync-panel-controls {
+.requirements-sync-panel-description {
   display: grid;
-  gap: 7px;
-  padding: 0 12px;
-}
-
-.requirements-auto-update-model-note {
-  display: grid;
-  gap: 2px;
+  gap: 3px;
+  padding-left: 16px;
   color: var(--color-secondary);
   font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.requirements-sync-panel-description strong {
+  color: var(--color-primary);
 }
 
 .requirements-auto-update-stepper {
@@ -305,8 +307,7 @@
 }
 
 .requirements-sync-signals,
-.requirements-sync-empty,
-.requirements-sync-instruction {
+.requirements-sync-empty {
   display: grid;
   gap: 6px;
   padding: 9px 10px;
@@ -327,27 +328,14 @@
   line-height: 1.35;
 }
 
-.requirements-sync-instruction textarea {
-  min-height: 58px;
-  resize: vertical;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 8px 10px;
-  color: var(--color-primary);
-}
-
 .requirements-sync-panel .requirements-auto-update-stepper,
-.requirements-sync-panel .requirements-sync-signals,
-.requirements-sync-panel .requirements-sync-instruction {
+.requirements-sync-panel .requirements-sync-signals {
   margin: 0 12px;
-}
-
-.requirements-sync-panel .requirements-sync-instruction textarea {
-  min-height: 52px;
 }
 
 .requirements-sync-panel-review {
   min-height: 0;
+  flex: 1 1 auto;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
@@ -360,6 +348,47 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+}
+
+.requirements-sync-generate-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.requirements-sync-generate-actions .chat-model-popover {
+  top: calc(100% + 8px);
+  right: 0;
+  bottom: auto;
+  left: auto;
+}
+
+.requirements-sync-generate-button {
+  min-height: 32px;
+  padding: 6px 13px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 48%, var(--color-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 92%, black);
+  color: white;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-accent) 22%, transparent);
+  font-size: 0.82rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.requirements-sync-generate-button:hover,
+.requirements-sync-generate-button:focus-visible {
+  background: color-mix(in srgb, var(--color-accent) 84%, black);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 24%, transparent);
+  outline-offset: 2px;
+}
+
+.requirements-sync-generate-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
 }
 
 .requirements-sync-panel-review-heading p {
@@ -432,22 +461,13 @@
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2px 8px;
+  gap: 8px;
   padding: 0;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: inherit;
   text-align: left;
-}
-
-.agent-conversation-title-trigger span:first-child {
-  color: var(--color-secondary);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  line-height: 1.1;
-  text-transform: uppercase;
 }
 
 .agent-conversation-title-trigger strong {
@@ -461,7 +481,6 @@
 
 .agent-conversation-title-chevron {
   grid-column: 2;
-  grid-row: 1 / span 2;
   align-self: center;
   color: var(--color-secondary);
   font-size: 0.72rem;

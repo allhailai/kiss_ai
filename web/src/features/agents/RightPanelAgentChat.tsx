@@ -292,7 +292,6 @@ export function RightPanelAgentChat({
             ref={titleTriggerRef}
             type="button"
           >
-            <span>AI Chat</span>
             <strong>{chat.activeConversation?.title || "New AI Chat"}</strong>
             <span aria-hidden="true" className="agent-conversation-title-chevron">
               ▾

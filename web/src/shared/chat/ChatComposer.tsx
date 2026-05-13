@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from "react";
 import type { ChatContextFile, ProjectFile, RebuildModel } from "../../contracts/api";
 import { fileBasename } from "../../domain/files";
-import { groupModelsByTier, modelTierLabels } from "../../domain/modelLabels";
+import { CompactModelPicker } from "../CompactModelPicker";
 
 const composerMaxRows = 8;
 
@@ -11,10 +11,6 @@ function contextLabel(file: ChatContextFile) {
 
 function fileLabel(file: ProjectFile) {
   return file.name || fileBasename(file.path);
-}
-
-function compactModelLabel(model: RebuildModel) {
-  return model.displayName || model.id;
 }
 
 function resizeComposer(textarea: HTMLTextAreaElement | null) {
@@ -84,13 +80,8 @@ export function ChatComposer({
   const [contextPickerOpen, setContextPickerOpen] = useState(false);
   const [contextQuery, setContextQuery] = useState("");
   const [activeContextIndex, setActiveContextIndex] = useState(0);
-  const [modelPickerOpen, setModelPickerOpen] = useState(false);
-  const [activeModelIndex, setActiveModelIndex] = useState(0);
   const contextInputRef = useRef<HTMLInputElement | null>(null);
-  const activeModelOptionRef = useRef<HTMLButtonElement | null>(null);
   const contextBlurTimeoutRef = useRef<number | null>(null);
-  const modelBlurTimeoutRef = useRef<number | null>(null);
-  const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
   const selectedContextPaths = useMemo(() => new Set(selectedContextFiles.map((file) => file.path)), [selectedContextFiles]);
   const filteredContextFiles = useMemo(() => {
     const query = contextQuery.trim().toLowerCase();
@@ -102,8 +93,6 @@ export function ChatComposer({
       })
       .slice(0, 12);
   }, [contextFiles, contextQuery, selectedContextPaths]);
-  const tieredModels = useMemo(() => groupModelsByTier(models), [models]);
-  const modelOptions = useMemo(() => tieredModels.flatMap((group) => group.models), [tieredModels]);
 
   useEffect(() => {
     resizeComposer(textareaRef.current);
@@ -119,22 +108,8 @@ export function ChatComposer({
   }, [contextQuery, contextPickerOpen]);
 
   useEffect(() => {
-    if (!modelPickerOpen) return;
-    const selectedIndex = modelOptions.findIndex((model) => model.id === selectedModelId);
-    setActiveModelIndex(selectedIndex >= 0 ? selectedIndex : 0);
-  }, [modelOptions, modelPickerOpen, selectedModelId]);
-
-  useEffect(() => {
-    if (!modelPickerOpen) return;
-    window.requestAnimationFrame(() => {
-      activeModelOptionRef.current?.scrollIntoView({ block: "nearest" });
-    });
-  }, [activeModelIndex, modelPickerOpen]);
-
-  useEffect(() => {
     return () => {
       if (contextBlurTimeoutRef.current) window.clearTimeout(contextBlurTimeoutRef.current);
-      if (modelBlurTimeoutRef.current) window.clearTimeout(modelBlurTimeoutRef.current);
     };
   }, []);
 
@@ -183,47 +158,6 @@ export function ChatComposer({
   const closeContextPickerSoon = () => {
     if (contextBlurTimeoutRef.current) window.clearTimeout(contextBlurTimeoutRef.current);
     contextBlurTimeoutRef.current = window.setTimeout(() => setContextPickerOpen(false), 120);
-  };
-
-  const closeModelPickerSoon = () => {
-    if (modelBlurTimeoutRef.current) window.clearTimeout(modelBlurTimeoutRef.current);
-    modelBlurTimeoutRef.current = window.setTimeout(() => setModelPickerOpen(false), 120);
-  };
-
-  const selectModel = (modelId: string) => {
-    onModelChange(modelId);
-    setModelPickerOpen(false);
-    textareaRef.current?.focus();
-  };
-
-  const handleModelPickerKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!modelOptions.length) return;
-
-    if (event.key === "Escape") {
-      event.preventDefault();
-      setModelPickerOpen(false);
-      textareaRef.current?.focus();
-      return;
-    }
-
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setModelPickerOpen(true);
-      setActiveModelIndex((current) => (current + 1) % modelOptions.length);
-      return;
-    }
-
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setModelPickerOpen(true);
-      setActiveModelIndex((current) => (current <= 0 ? modelOptions.length - 1 : current - 1));
-      return;
-    }
-
-    if (event.key === "Enter" && modelPickerOpen) {
-      event.preventDefault();
-      selectModel(modelOptions[activeModelIndex]?.id ?? selectedModelId);
-    }
   };
 
   return (
@@ -320,58 +254,7 @@ export function ChatComposer({
           </div>
         ) : null}
         <div className="chat-composer-actions">
-          <div className="chat-model-picker" onBlur={closeModelPickerSoon} onFocus={() => {
-            if (modelBlurTimeoutRef.current) window.clearTimeout(modelBlurTimeoutRef.current);
-          }} onKeyDown={handleModelPickerKeyDown}>
-            <button
-              aria-expanded={modelPickerOpen}
-              aria-haspopup="listbox"
-              className="chat-model-trigger"
-              disabled={disabled || !models.length}
-              onClick={() => setModelPickerOpen((open) => !open)}
-              type="button"
-            >
-              <span className="chat-model-trigger-label">{selectedModel ? compactModelLabel(selectedModel) : "Model"}</span>
-              <span aria-hidden="true" className="chat-model-trigger-chevron">
-                ▾
-              </span>
-            </button>
-            {modelPickerOpen ? (
-              <div className="chat-model-popover" role="listbox" aria-label="Select model">
-                {models.length ? (
-                  tieredModels.map(({ tier, models: tierModels }) => {
-                    return (
-                      <div className={`chat-model-group chat-model-group-${tier}`} key={tier}>
-                        <p>{modelTierLabels[tier]}</p>
-                        {tierModels.map((model) => {
-                          const optionIndex = modelOptions.findIndex((option) => option.id === model.id);
-                          const isActive = optionIndex === activeModelIndex;
-                          const isSelected = model.id === selectedModelId;
-                          return (
-                            <button
-                              aria-selected={isSelected}
-                              className={`chat-model-option${isActive ? " active" : ""}${isSelected ? " selected" : ""}`}
-                              key={model.id}
-                              onClick={() => selectModel(model.id)}
-                              onMouseDown={(event) => event.preventDefault()}
-                              onMouseEnter={() => setActiveModelIndex(optionIndex)}
-                              ref={isActive ? activeModelOptionRef : undefined}
-                              role="option"
-                              type="button"
-                            >
-                              <strong>{compactModelLabel(model)}</strong>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    );
-                  })
-                ) : (
-                  <p className="chat-context-state">No models loaded.</p>
-                )}
-              </div>
-            ) : null}
-          </div>
+          <CompactModelPicker disabled={disabled} models={models} onAfterModelChange={() => textareaRef.current?.focus()} onModelChange={onModelChange} selectedModelId={selectedModelId} />
           {modelAdjacentAction ? (
             <>
               <button

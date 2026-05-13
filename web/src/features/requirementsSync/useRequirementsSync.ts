@@ -15,7 +15,6 @@ export function useRequirementsSync({ projectSlug, selectedModelId, onApplied, o
   const [step, setStep] = useState<RequirementsSyncStep>("goal");
   const [proposals, setProposals] = useState<Partial<Record<RequirementsSyncStep, RequirementsSyncProposal>>>({});
   const [signals, setSignals] = useState<RequirementsSyncSignalsResponse | null>(null);
-  const [userInstruction, setUserInstruction] = useState("");
   const [loadingStep, setLoadingStep] = useState<RequirementsSyncStep | null>(null);
   const [applying, setApplying] = useState(false);
 
@@ -65,7 +64,6 @@ export function useRequirementsSync({ projectSlug, selectedModelId, onApplied, o
         const response = await api.proposeRequirementsSync(projectSlug, {
           modelId: selectedModelId,
           step: targetStep,
-          userInstruction: userInstruction.trim() || undefined,
         });
         setProposals((current) => ({ ...current, [targetStep]: response.proposal }));
         return true;
@@ -76,7 +74,7 @@ export function useRequirementsSync({ projectSlug, selectedModelId, onApplied, o
         setLoadingStep(null);
       }
     },
-    [busy, onNotice, projectSlug, selectedModelId, step, userInstruction],
+    [busy, onNotice, projectSlug, selectedModelId, step],
   );
 
   const updateDiffStatus = useCallback(
@@ -150,12 +148,10 @@ export function useRequirementsSync({ projectSlug, selectedModelId, onApplied, o
       refreshSignals,
       setAllDiffs,
       setStep,
-      setUserInstruction,
       showController,
       signals,
       step,
       updateDiffStatus,
-      userInstruction,
     }),
     [
       applyProposal,
@@ -172,7 +168,6 @@ export function useRequirementsSync({ projectSlug, selectedModelId, onApplied, o
       signals,
       step,
       updateDiffStatus,
-      userInstruction,
     ],
   );
 }

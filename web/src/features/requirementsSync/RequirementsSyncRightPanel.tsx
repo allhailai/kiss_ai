@@ -1,8 +1,7 @@
 import type { RebuildModel, RequirementsSyncProposal, RequirementsSyncStep } from "../../contracts/api";
-import { formatModelLabel } from "../../domain/modelLabels";
 import { requirementsSyncSteps, nextRequirementsSyncStep } from "../../domain/requirementsSync";
+import { CompactModelPicker } from "../../shared/CompactModelPicker";
 import { ConceptualDiffReviewItem } from "../../shared/conceptualDiff/ConceptualDiffReviewItem";
-import { ModelSelect } from "../../shared/ModelSelect";
 import type { useRequirementsSync } from "./useRequirementsSync";
 
 type RequirementsSyncController = ReturnType<typeof useRequirementsSync>;
@@ -52,7 +51,6 @@ export function RequirementsSyncRightPanel({
   onOpenAgent: () => void;
   selectedModelId: string;
 }) {
-  const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
   const currentStep = requirementsSyncSteps.find((candidate) => candidate.id === controller.step) ?? requirementsSyncSteps[0];
   const currentProposal = controller.currentProposal;
 
@@ -67,28 +65,22 @@ export function RequirementsSyncRightPanel({
             Requirements Sync
           </button>
         </div>
-        <span className="eyebrow">Requirements sync</span>
-        <h2>
-          {currentStep.label}: <code>{currentStep.filePath}</code>
-        </h2>
-        <p>{currentStep.description}</p>
+        <h2>AI update the requirements files.</h2>
+        <ul className="requirements-sync-panel-description">
+          <li>
+            <strong>Goal:</strong> ensure all important objectives are covered.
+          </li>
+          <li>
+            <strong>Inputs:</strong> add all relevant sources to support the goal.
+          </li>
+          <li>
+            <strong>Outputs:</strong> provide outputs in alignment to inputs and goal.
+          </li>
+        </ul>
+        <p>
+          Current: {currentStep.label} <code>{currentStep.filePath}</code>
+        </p>
       </header>
-
-      <section className="requirements-sync-panel-controls">
-        <ModelSelect
-          className="requirements-auto-update-model"
-          disabled={controller.busy}
-          label="AI Model"
-          models={models}
-          onModelChange={onModelChange}
-          selectedModelId={selectedModelId}
-          showTierNote={false}
-        />
-        <div className="requirements-auto-update-model-note">
-          {selectedModel ? <strong>{formatModelLabel(selectedModel)}</strong> : <strong>Select a model</strong>}
-          <span>Use a stronger model for requirements quality.</span>
-        </div>
-      </section>
 
       <section className="requirements-auto-update-stepper" aria-label="Requirements sync steps">
         {requirementsSyncSteps.map((candidate) => (
@@ -120,26 +112,23 @@ export function RequirementsSyncRightPanel({
         </section>
       ) : null}
 
-      <section className="requirements-sync-instruction">
-        <label htmlFor="requirements-sync-panel-user-instruction">Optional instruction</label>
-        <textarea
-          disabled={controller.busy}
-          id="requirements-sync-panel-user-instruction"
-          onChange={(event) => controller.setUserInstruction(event.target.value)}
-          placeholder="Add special guidance for this sync run."
-          value={controller.userInstruction}
-        />
-      </section>
-
       <section className="requirements-sync-panel-review">
         <div className="requirements-sync-panel-review-heading">
           <div>
             <strong>Conceptual diffs</strong>
             <p>Accept changes to apply, reject changes to remember as constraints, or continue when no apply is needed.</p>
           </div>
-          <button disabled={controller.busy || !selectedModelId} onClick={() => void controller.proposeStep()} type="button">
-            {controller.loadingStep === controller.step ? "Thinking..." : currentProposal ? "Regenerate" : "Generate"}
-          </button>
+          <div className="requirements-sync-generate-actions">
+            <CompactModelPicker disabled={controller.busy} models={models} onModelChange={onModelChange} selectedModelId={selectedModelId} />
+            <button
+              className="requirements-sync-generate-button"
+              disabled={controller.busy || !selectedModelId}
+              onClick={() => void controller.proposeStep()}
+              type="button"
+            >
+              {controller.loadingStep === controller.step ? "Thinking..." : currentProposal ? "Regenerate" : "Generate"}
+            </button>
+          </div>
         </div>
 
         {currentProposal ? (
