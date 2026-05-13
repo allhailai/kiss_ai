@@ -107,7 +107,7 @@ function normalizeConceptualDiffApplyNotes(value) {
   };
 }
 
-export function normalizeConceptualDiff(value, authorizedEditablePaths, { idPrefix = "diff" } = {}) {
+export function normalizeConceptualDiff(value, authorizedEditablePaths = null, { idPrefix = "diff" } = {}) {
   const source = value && typeof value === "object" ? value : {};
   const filePath = String(source.filePath ?? source.path ?? "").trim();
   const title = String(source.title ?? "").trim();
@@ -117,8 +117,9 @@ export function normalizeConceptualDiff(value, authorizedEditablePaths, { idPref
   const evidence = normalizeConceptualDiffEvidence(source.evidence);
   const applyNotes = normalizeConceptualDiffApplyNotes(source.applyNotes);
   const memory = normalizeConceptualDiffMemory(source.memory);
+  const pathIsAllowed = !authorizedEditablePaths || authorizedEditablePaths.has(filePath);
 
-  if (!filePath || !title || !summary || !authorizedEditablePaths.has(filePath)) return null;
+  if (!filePath || !title || !summary || !pathIsAllowed) return null;
 
   return {
     id: String(source.id ?? "").trim().slice(0, 80) || createConceptualDiffId(idPrefix),

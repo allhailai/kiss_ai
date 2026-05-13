@@ -5,8 +5,9 @@ import {
   linkResolutionClass,
   linkResolutionTitle,
   markdownLinkPattern,
-  resolveMarkdownLink,
-  resolveWikiLink,
+  createLinkResolutionIndex,
+  resolveMarkdownLinkWithIndex,
+  resolveWikiLinkWithIndex,
   wikiLinkLabel,
   wikiLinkPattern,
   type WikiLinkResolution,
@@ -66,6 +67,8 @@ export function buildWikiLinkExtension({
   selectedPath: string | null;
   onOpenFile: (path: string) => void;
 }): Extension {
+  const linkIndex = createLinkResolutionIndex(files, selectedPath);
+
   function buildDecorations(view: import("@codemirror/view").EditorView) {
     const builder = new RangeSetBuilder<Decoration>();
 
@@ -92,7 +95,7 @@ export function buildWikiLinkExtension({
             from: line.from + matchIndex,
             to: line.from + matchIndex + match[0].length,
             label: wikiLinkLabel(rawTarget),
-            resolution: resolveWikiLink(rawTarget, files, selectedPath),
+            resolution: resolveWikiLinkWithIndex(rawTarget, linkIndex),
           });
         }
 
@@ -109,7 +112,7 @@ export function buildWikiLinkExtension({
             from: linkFrom,
             to: linkTo,
             label,
-            resolution: resolveMarkdownLink(rawTarget, files, selectedPath),
+            resolution: resolveMarkdownLinkWithIndex(rawTarget, linkIndex),
           });
         }
 
@@ -142,7 +145,7 @@ export function buildWikiLinkExtension({
       }
 
       update(update: ViewUpdate) {
-        if (update.docChanged || update.selectionSet || update.viewportChanged) {
+        if (update.docChanged || update.viewportChanged) {
           this.decorations = buildDecorations(update.view);
         }
       }

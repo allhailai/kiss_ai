@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
 import type { ProjectSummary } from "../../contracts/api";
 import { errorMessage } from "../../domain/errors";
@@ -28,8 +28,7 @@ export function ProjectPicker({
 }) {
   const [projectName, setProjectName] = useState("");
   const [createError, setCreateError] = useState("");
-  const derivedSlug = useMemo(() => slugifyProjectName(projectName), [projectName]);
-  const selectedSlug = derivedSlug;
+  const selectedSlug = slugifyProjectName(projectName);
   const slugIsValid = !selectedSlug || /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(selectedSlug);
   const projectNameIsTaken = Boolean(selectedSlug && projects.some((project) => project.slug === selectedSlug));
   const liveCreateError = projectNameIsTaken ? "That project name is taken. Please use another one." : "";

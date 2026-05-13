@@ -9,9 +9,10 @@ import {
   normalizeConceptualDiffMemoryFile,
   updateConceptualDiffRejectionMemory,
 } from "./conceptualDiffMemory.js";
-import { extractApplyResultFromText, extractConceptualDiffsFromText } from "./conceptualDiffs.js";
+import { extractApplyResultFromText, extractConceptualDiffsFromText, firstTagContent } from "./conceptualDiffs.js";
 import { normalizeChatContext } from "./chatContext.js";
 import { prepareCursorAgentRun } from "./cursorAgentRun.js";
+import { buildGitDiffPromptEntries } from "./gitDiffPrompt.js";
 
 const maxPromptFileBytes = 24 * 1024;
 const maxPromptHistoryMessages = 40;
@@ -309,12 +310,6 @@ function summarizeAssistantText(text) {
   return compact.length > 240 ? `${compact.slice(0, 237)}...` : compact;
 }
 
-function firstTagContent(text, tagName, { trim = true } = {}) {
-  const pattern = new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, "i");
-  const value = String(text ?? "").match(pattern)?.[1] ?? "";
-  return trim ? value.trim() : value;
-}
-
 function allTagContent(text, tagName) {
   const pattern = new RegExp(`<${tagName}>\\s*([\\s\\S]*?)\\s*<\\/${tagName}>`, "gi");
   return [...String(text ?? "").matchAll(pattern)].map((match) => match[1]?.trim() ?? "");
@@ -337,18 +332,7 @@ function proposalNotice(conceptualDiffs) {
   return `Generated ${conceptualDiffs.length} proposed change${conceptualDiffs.length === 1 ? "" : "s"}.`;
 }
 
-function normalizeGitDiffTextResult(value) {
-  if (value && typeof value === "object") {
-    return {
-      diff: typeof value.diff === "string" ? value.diff : "",
-      ...(typeof value.diffError === "string" && value.diffError ? { diffError: value.diffError } : {}),
-    };
-  }
-
-  return { diff: typeof value === "string" ? value : "" };
-}
-
-async function readScopedFilePayload({ project, readTextFile, gitFileDiffText, conversation }) {
+async function readScopedFilePayload({ project, readTextFile, gitFileDiffText, gitFileDiffTexts, conversation }) {
   const aiEditableFiles = uniqueByPath(conversation.fileContext?.ai_editable_files ?? [], maxAiEditableFiles);
   const contextFiles = uniqueByPath(conversation.fileContext?.context_files ?? [], maxContextFiles);
   const [aiEditableFileResults, contextFileResults] = await Promise.all([
@@ -359,16 +343,7 @@ async function readScopedFilePayload({ project, readTextFile, gitFileDiffText, c
   const rejectedAiEditableFiles = aiEditableFileResults.filter((file) => file.error);
   const readableContextFiles = contextFileResults.filter((file) => !file.error);
   const diffPaths = uniqueByPath([...authorizedAiEditableFiles, ...readableContextFiles], maxAiEditableFiles + maxContextFiles);
-  const gitDiffs = await Promise.all(
-    diffPaths.map(async (file) => {
-      const result = normalizeGitDiffTextResult(await gitFileDiffText(project.path, file.path));
-      return {
-        path: file.path,
-        diff: trimForPrompt(result.diff),
-        ...(result.diffError ? { diffError: result.diffError } : {}),
-      };
-    }),
-  );
+  const gitDiffs = await buildGitDiffPromptEntries({ projectRoot: project.path, files: diffPaths, gitFileDiffText, gitFileDiffTexts, trimForPrompt });
 
   return {
     authorizedAiEditableFiles,
@@ -390,8 +365,8 @@ function editableContentHashByPath(conversation) {
   return new Map((conversation.fileContext?.ai_editable_files ?? []).filter((file) => file?.path && file.contentHash).map((file) => [file.path, file.contentHash]));
 }
 
-async function createEditProposalPrompt({ project, conversation, readProjectJson, readTextFile, gitFileDiffText }) {
-  const payload = await readScopedFilePayload({ project, readTextFile, gitFileDiffText, conversation });
+async function createEditProposalPrompt({ project, conversation, readProjectJson, readTextFile, gitFileDiffText, gitFileDiffTexts }) {
+  const payload = await readScopedFilePayload({ project, readTextFile, gitFileDiffText, gitFileDiffTexts, conversation });
   const authorizedEditablePaths = new Set(payload.authorizedAiEditableFiles.map((file) => file.path));
   const hasUserMessages = conversation.messages.some((message) => message.role === "user" && String(message.content ?? "").trim());
   const hasScopedDiffs = payload.gitDiffs.some((entry) => entry.diff.trim());
@@ -460,8 +435,8 @@ async function createEditProposalPrompt({ project, conversation, readProjectJson
   };
 }
 
-async function createApplyProposalPrompt({ project, conversation, proposal, readTextFile, gitFileDiffText }) {
-  const payload = await readScopedFilePayload({ project, readTextFile, gitFileDiffText, conversation });
+async function createApplyProposalPrompt({ project, conversation, proposal, readTextFile, gitFileDiffText, gitFileDiffTexts }) {
+  const payload = await readScopedFilePayload({ project, readTextFile, gitFileDiffText, gitFileDiffTexts, conversation });
   const allAcceptedConceptualDiffs = proposal.conceptualDiffs.filter((diff) => diff.status === "accepted");
   const rejectedConceptualDiffs = proposal.conceptualDiffs.filter((diff) => diff.status === "rejected");
   const acceptedPaths = new Set(allAcceptedConceptualDiffs.map((diff) => diff.filePath));
@@ -559,6 +534,7 @@ export function createChatAgentService({
   displayProjectName,
   editUserMessage,
   gitFileDiffText,
+  gitFileDiffTexts = null,
   httpError,
   listCursorModels,
   notifyConversation,
@@ -739,6 +715,7 @@ export function createChatAgentService({
         project,
         conversation: conversationWithContext,
         gitFileDiffText,
+        gitFileDiffTexts,
         readProjectJson,
         readTextFile,
       });
@@ -878,6 +855,7 @@ export function createChatAgentService({
         project,
         conversation: applyingConversation,
         gitFileDiffText,
+        gitFileDiffTexts,
         proposal: applyingProposal,
         readTextFile,
       });

@@ -1,8 +1,8 @@
 import type { RebuildModel, RequirementsSyncProposal, RequirementsSyncStep } from "../../contracts/api";
 import { formatModelLabel } from "../../domain/modelLabels";
+import { requirementsSyncSteps, nextRequirementsSyncStep } from "../../domain/requirementsSync";
 import { ConceptualDiffReviewItem } from "../../shared/conceptualDiff/ConceptualDiffReviewItem";
 import { ModelSelect } from "../../shared/ModelSelect";
-import { requirementsSyncSteps, nextRequirementsSyncStep } from "./requirementsSyncTypes";
 import type { useRequirementsSync } from "./useRequirementsSync";
 
 type RequirementsSyncController = ReturnType<typeof useRequirementsSync>;

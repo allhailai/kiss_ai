@@ -1,14 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from "react";
 import type { ChatContextFile, ProjectFile, RebuildModel } from "../../contracts/api";
 import { fileBasename } from "../../domain/files";
-import { modelTierOrder } from "../../domain/modelLabels";
+import { groupModelsByTier, modelTierLabels } from "../../domain/modelLabels";
 
 const composerMaxRows = 8;
-const modelPriceLabels: Record<RebuildModel["tier"], string> = {
-  high: "High $$$",
-  medium: "Medium $$",
-  small: "Low $",
-};
 
 function contextLabel(file: ChatContextFile) {
   return file.label || file.path;
@@ -107,20 +102,7 @@ export function ChatComposer({
       })
       .slice(0, 12);
   }, [contextFiles, contextQuery, selectedContextPaths]);
-  const tieredModels = useMemo(
-    () =>
-      modelTierOrder
-        .map((tier) => ({
-          tier,
-          models: models
-            .filter((model) => model.tier === tier)
-            .sort((left, right) =>
-              (left.displayName || left.id).localeCompare(right.displayName || right.id, undefined, { sensitivity: "base" }),
-            ),
-        }))
-        .filter((group) => group.models.length > 0),
-    [models],
-  );
+  const tieredModels = useMemo(() => groupModelsByTier(models), [models]);
   const modelOptions = useMemo(() => tieredModels.flatMap((group) => group.models), [tieredModels]);
 
   useEffect(() => {
@@ -360,7 +342,7 @@ export function ChatComposer({
                   tieredModels.map(({ tier, models: tierModels }) => {
                     return (
                       <div className={`chat-model-group chat-model-group-${tier}`} key={tier}>
-                        <p>{modelPriceLabels[tier]}</p>
+                        <p>{modelTierLabels[tier]}</p>
                         {tierModels.map((model) => {
                           const optionIndex = modelOptions.findIndex((option) => option.id === model.id);
                           const isActive = optionIndex === activeModelIndex;

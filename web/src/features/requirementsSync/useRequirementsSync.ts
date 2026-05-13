@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RequirementsSyncConceptualDiff, RequirementsSyncProposal, RequirementsSyncSignalsResponse, RequirementsSyncStep } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { errorMessage } from "../../domain/errors";
-import { nextRequirementsSyncStep } from "./requirementsSyncTypes";
 
 type RequirementsSyncControllerOptions = {
   projectSlug: string | null;
@@ -46,11 +45,6 @@ export function useRequirementsSync({ projectSlug, selectedModelId, onApplied, o
     setOpen(true);
     void refreshSignals();
   }, [refreshSignals]);
-
-  const hideController = useCallback(() => {
-    if (busy) return;
-    setOpen(false);
-  }, [busy]);
 
   const recordProposalReview = useCallback(
     (proposal: RequirementsSyncProposal) => {
@@ -143,67 +137,39 @@ export function useRequirementsSync({ projectSlug, selectedModelId, onApplied, o
     [applying, currentProposal, onApplied, onNotice, projectSlug, refreshSignals, selectedModelId],
   );
 
-  const applyAndNext = useCallback(async () => {
-    const applied = await applyProposal();
-    if (!applied) return;
-    const nextStep = nextRequirementsSyncStep(step);
-    if (nextStep) setStep(nextStep);
-  }, [applyProposal, step]);
-
-  const skipStep = useCallback(() => {
-    const nextStep = nextRequirementsSyncStep(step);
-    if (nextStep) setStep(nextStep);
-  }, [step]);
-
-  const reset = useCallback(() => {
-    if (busy) return;
-    setStep("goal");
-    setProposals({});
-    setUserInstruction("");
-    void refreshSignals();
-  }, [busy, refreshSignals]);
-
   return useMemo(
     () => ({
-      applyAndNext,
       applyProposal,
       applying,
       busy,
       currentProposal,
-      hideController,
       loadingStep,
       open,
       proposeStep,
       proposals,
       refreshSignals,
-      reset,
       setAllDiffs,
       setStep,
       setUserInstruction,
       showController,
       signals,
-      skipStep,
       step,
       updateDiffStatus,
       userInstruction,
     }),
     [
-      applyAndNext,
       applyProposal,
       applying,
       busy,
       currentProposal,
-      hideController,
       loadingStep,
       open,
       proposeStep,
       proposals,
       refreshSignals,
-      reset,
       setAllDiffs,
       showController,
       signals,
-      skipStep,
       step,
       updateDiffStatus,
       userInstruction,

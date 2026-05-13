@@ -140,6 +140,7 @@ const {
   fileExists,
   gitFileDiff,
   gitFileDiffText,
+  gitFileDiffTexts,
   gitStatus,
   isPathInsideRoot,
   listMarkdownFiles,
@@ -217,6 +218,7 @@ const { applyEditProposal, editChatMessage, generateEditProposal, sendChatMessag
   projectAgentLock,
   listCursorModels,
   gitFileDiffText,
+  gitFileDiffTexts,
   notifyConversation,
   pickRebuildModelId,
   readConversation,
@@ -250,6 +252,7 @@ const { startHumanAttentionResolution, startRebuild } = createAgentJobService({
 const { applyRequirementsSync, proposeRequirementsSync, recordRequirementsSyncReview, requirementsSyncSignals } = createRequirementsSyncService({
   FRAMEWORK_ROOT,
   gitFileDiffText,
+  gitFileDiffTexts,
   gitStatus,
   httpError,
   listCursorModels,

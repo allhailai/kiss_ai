@@ -12,6 +12,9 @@ export function createProjectFileService({
   humanizePathSegment,
   httpError,
 }) {
+  const searchCacheTtlMs = 5_000;
+  let searchAllowlistCache = null;
+  const searchCandidateCache = new Map();
   const previewableExtensions = new Set([
     ".css",
     ".csv",
@@ -259,6 +262,7 @@ export function createProjectFileService({
     }
 
     await fs.writeFile(absolute, content, "utf8");
+    invalidateSearchCache(projectRoot);
     return readTextFile(projectRoot, meta.path);
   }
 
@@ -385,6 +389,7 @@ export function createProjectFileService({
       uploaded.push(projectFileItem("inputs_human", relative, meta, stat));
     }
 
+    invalidateSearchCache(projectRoot);
     return { files: uploaded };
   }
 
@@ -419,23 +424,32 @@ export function createProjectFileService({
     await fs.unlink(absolute);
     const inputRoot = projectPath(projectRoot, "inputs_human");
     await pruneEmptyDirectories(inputRoot.absolute, path.dirname(absolute));
+    invalidateSearchCache(projectRoot);
 
     return { path: meta.path };
   }
 
   async function readSearchAllowedPaths() {
+    const allowlistPath = path.join(WEB_ROOT, "server/search-allowed-paths.json");
+    const stat = await fs.stat(allowlistPath).catch(() => null);
+    if (searchAllowlistCache && searchAllowlistCache.mtimeMs === stat?.mtimeMs) {
+      return searchAllowlistCache.value;
+    }
+
     let lookup = {};
 
     try {
-      lookup = JSON.parse(await fs.readFile(path.join(WEB_ROOT, "server/search-allowed-paths.json"), "utf8"));
+      lookup = JSON.parse(await fs.readFile(allowlistPath, "utf8"));
     } catch {
       lookup = {};
     }
 
-    return {
+    const value = {
       directories: Array.isArray(lookup.directories) ? lookup.directories.map(String) : [],
       files: Array.isArray(lookup.files) ? lookup.files.map(String) : [],
     };
+    searchAllowlistCache = { mtimeMs: stat?.mtimeMs, value };
+    return value;
   }
 
   function fileMatchesPattern(fileName, pattern) {
@@ -517,30 +531,50 @@ export function createProjectFileService({
     return files;
   }
 
-  async function searchFiles(projectRoot, query) {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return [];
+  function searchableText(file) {
+    return [
+      file.path,
+      file.name,
+      ...file.path.split("/").map(humanizePathSegment),
+      humanizePathSegment(file.name.split("/").at(-1) ?? file.name),
+    ]
+      .join(" ")
+      .toLowerCase();
+  }
+
+  function invalidateSearchCache(projectRoot = null) {
+    if (projectRoot) {
+      searchCandidateCache.delete(projectRoot);
+      return;
+    }
+    searchCandidateCache.clear();
+  }
+
+  async function searchCandidates(projectRoot) {
+    const cached = searchCandidateCache.get(projectRoot);
+    if (cached && Date.now() - cached.createdAt < searchCacheTtlMs) return cached.candidates;
 
     const allowlist = await readSearchAllowedPaths();
     const candidates = [
       ...(await Promise.all(allowlist.directories.map((directory) => listSearchDirectoryFiles(projectRoot, directory)))).flat(),
       ...(await Promise.all(allowlist.files.map((pattern) => listSearchPatternFiles(projectRoot, pattern)))).flat(),
     ];
-    const uniqueCandidates = [...new Map(candidates.map((file) => [file.path, file])).values()];
+    const uniqueCandidates = [...new Map(candidates.map((file) => [file.path, file])).values()].map((file) => ({
+      ...file,
+      searchableText: searchableText(file),
+    }));
 
-    return uniqueCandidates
-      .filter((file) => {
-        const searchableText = [
-          file.path,
-          file.name,
-          ...file.path.split("/").map(humanizePathSegment),
-          humanizePathSegment(file.name.split("/").at(-1) ?? file.name),
-        ]
-          .join(" ")
-          .toLowerCase();
+    searchCandidateCache.set(projectRoot, { createdAt: Date.now(), candidates: uniqueCandidates });
+    return uniqueCandidates;
+  }
 
-        return searchableText.includes(normalizedQuery);
-      })
+  async function searchFiles(projectRoot, query) {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return [];
+
+    return (await searchCandidates(projectRoot))
+      .filter((file) => file.searchableText.includes(normalizedQuery))
+      .map(({ searchableText: _searchableText, ...file }) => file)
       .sort((left, right) => left.path.localeCompare(right.path))
       .slice(0, MAX_SEARCH_RESULTS);
   }
@@ -618,6 +652,52 @@ export function createProjectFileService({
     });
   }
 
+  async function gitFileDiffTexts(projectRoot, relativePaths) {
+    const metas = [];
+    for (const relativePath of [...new Set(relativePaths)]) {
+      const meta = classifyPath(projectRoot, relativePath);
+      await resolveProjectFileTarget(projectRoot, meta.path);
+      metas.push(meta);
+    }
+
+    if (!metas.length) return [];
+
+    const diffText = await new Promise((resolve) => {
+      execFile("git", ["diff", "--", ...metas.map((meta) => meta.path)], { cwd: projectRoot }, (error, stdout) => {
+        if (error) {
+          resolve(null);
+          return;
+        }
+
+        resolve(String(stdout ?? ""));
+      });
+    });
+
+    if (diffText === null) {
+      return await Promise.all(metas.map((meta) => gitFileDiffText(projectRoot, meta.path).then((result) => ({ path: meta.path, ...result }))));
+    }
+
+    const starts = metas
+      .map((meta) => ({ path: meta.path, index: diffText.indexOf(`diff --git a/${meta.path} b/${meta.path}`) }))
+      .filter((entry) => entry.index >= 0)
+      .sort((left, right) => left.index - right.index);
+    const diffByPath = new Map(
+      starts.map((entry, index) => {
+        const next = starts[index + 1]?.index ?? diffText.length;
+        return [entry.path, diffText.slice(entry.index, next)];
+      }),
+    );
+
+    return await Promise.all(
+      metas.map(async (meta) => {
+        const diff = diffByPath.get(meta.path);
+        if (diff !== undefined) return { path: meta.path, diff, diffError: "" };
+        if (!diffText.includes(`/${meta.path}`)) return { path: meta.path, diff: "", diffError: "" };
+        return { path: meta.path, ...(await gitFileDiffText(projectRoot, meta.path)) };
+      }),
+    );
+  }
+
   async function restoreFileFromHead(projectRoot, relativePath) {
     const meta = classifyPath(projectRoot, relativePath);
 
@@ -642,6 +722,7 @@ export function createProjectFileService({
       });
     });
 
+    invalidateSearchCache(projectRoot);
     return readTextFile(projectRoot, meta.path);
   }
 
@@ -651,6 +732,7 @@ export function createProjectFileService({
     fileExists,
     gitFileDiff,
     gitFileDiffText,
+    gitFileDiffTexts,
     gitStatus,
     isPathInsideRoot,
     listMarkdownFiles,

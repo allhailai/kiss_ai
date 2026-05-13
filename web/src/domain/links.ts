@@ -11,6 +11,13 @@ export type WikiLinkResolution =
 export const wikiLinkPattern = /\[\[([^\]\n]+)\]\]/g;
 export const markdownLinkPattern = /\[([^\]\n]+)\]\(([^)\n]+)\)/g;
 
+export type LinkResolutionIndex = {
+  basename: Map<string, ProjectFile[]>;
+  basenameStem: Map<string, ProjectFile[]>;
+  exact: Map<string, ProjectFile[]>;
+  selectedDirectory: string;
+};
+
 function normalizeWikiTarget(rawTarget: string) {
   const withoutAlias = rawTarget.split("|")[0]?.trim() ?? "";
   const withoutHeading = withoutAlias.split("#")[0]?.trim() ?? "";
@@ -65,49 +72,88 @@ function normalizeRelativeProjectPath(target: string, selectedPath: string | nul
   return normalizedParts.join("/");
 }
 
-export function resolveWikiLink(rawTarget: string, files: ProjectFile[], selectedPath: string | null): WikiLinkResolution {
-  const normalizedTarget = normalizeWikiTarget(rawTarget);
-  if (!normalizedTarget) return { status: "missing" };
+function addMatch(map: Map<string, ProjectFile[]>, key: string, file: ProjectFile) {
+  if (!key) return;
+  map.set(key, [...(map.get(key) ?? []), file]);
+}
 
-  const selectedDirectory = selectedPath?.includes("/") ? selectedPath.split("/").slice(0, -1).join("/") : "";
-  const siblingTarget = selectedDirectory ? `${selectedDirectory}/${normalizedTarget}` : normalizedTarget;
-  const targetWithoutExtension = normalizedTarget.replace(/\.md$/i, "");
-  const exactMatches = files.filter((file) => file.path === normalizedTarget || file.path === siblingTarget || file.name === normalizedTarget);
+function selectedDirectoryFromPath(selectedPath: string | null) {
+  return selectedPath?.includes("/") ? selectedPath.split("/").slice(0, -1).join("/") : "";
+}
 
-  if (exactMatches.length === 1) return { status: "resolved", file: exactMatches[0] };
-  if (exactMatches.length > 1) return { status: "ambiguous", matches: exactMatches };
+function uniqueFiles(files: ProjectFile[]) {
+  return [...new Map(files.map((file) => [file.path, file])).values()];
+}
 
-  const basenameMatches = files.filter((file) => {
-    const basename = fileBasename(file.path);
-    return basename === normalizedTarget || basename.replace(/\.md$/i, "") === targetWithoutExtension;
-  });
-
-  if (basenameMatches.length === 1) return { status: "resolved", file: basenameMatches[0] };
-  if (basenameMatches.length > 1) return { status: "ambiguous", matches: basenameMatches };
-
+function resolutionFromMatches(matches: ProjectFile[]): WikiLinkResolution {
+  const uniqueMatches = uniqueFiles(matches);
+  if (uniqueMatches.length === 1) return { status: "resolved", file: uniqueMatches[0] };
+  if (uniqueMatches.length > 1) return { status: "ambiguous", matches: uniqueMatches };
   return { status: "missing" };
 }
 
-export function resolveMarkdownLink(rawTarget: string, files: ProjectFile[], selectedPath: string | null): WikiLinkResolution {
+function matchesForKeys(map: Map<string, ProjectFile[]>, keys: string[]) {
+  return keys.flatMap((key) => map.get(key) ?? []);
+}
+
+export function createLinkResolutionIndex(files: ProjectFile[], selectedPath: string | null): LinkResolutionIndex {
+  const index: LinkResolutionIndex = {
+    basename: new Map(),
+    basenameStem: new Map(),
+    exact: new Map(),
+    selectedDirectory: selectedDirectoryFromPath(selectedPath),
+  };
+
+  for (const file of files) {
+    const basename = fileBasename(file.path);
+    addMatch(index.exact, file.path, file);
+    addMatch(index.exact, file.name, file);
+    addMatch(index.basename, basename, file);
+    addMatch(index.basenameStem, basename.replace(/\.md$/i, ""), file);
+  }
+
+  return index;
+}
+
+export function resolveWikiLinkWithIndex(rawTarget: string, index: LinkResolutionIndex): WikiLinkResolution {
+  const normalizedTarget = normalizeWikiTarget(rawTarget);
+  if (!normalizedTarget) return { status: "missing" };
+
+  const siblingTarget = index.selectedDirectory ? `${index.selectedDirectory}/${normalizedTarget}` : normalizedTarget;
+  const targetWithoutExtension = normalizedTarget.replace(/\.md$/i, "");
+  const exactMatches = matchesForKeys(index.exact, [normalizedTarget, siblingTarget]);
+  const exactResolution = resolutionFromMatches(exactMatches);
+
+  if (exactResolution.status !== "missing") return exactResolution;
+
+  return resolutionFromMatches([
+    ...matchesForKeys(index.basename, [normalizedTarget]),
+    ...matchesForKeys(index.basenameStem, [targetWithoutExtension]),
+  ]);
+}
+
+export function resolveWikiLink(rawTarget: string, files: ProjectFile[], selectedPath: string | null): WikiLinkResolution {
+  return resolveWikiLinkWithIndex(rawTarget, createLinkResolutionIndex(files, selectedPath));
+}
+
+export function resolveMarkdownLinkWithIndex(rawTarget: string, index: LinkResolutionIndex): WikiLinkResolution {
   const cleanedTarget = cleanMarkdownTarget(rawTarget);
   if (!cleanedTarget) return { status: "missing" };
   if (isExternalTarget(cleanedTarget)) return { status: "external", href: cleanedTarget };
 
-  const normalizedTarget = normalizeRelativeProjectPath(cleanedTarget, selectedPath);
+  const normalizedTarget = normalizeRelativeProjectPath(cleanedTarget, index.selectedDirectory ? `${index.selectedDirectory}/current.md` : null);
   if (!normalizedTarget) return { status: "missing" };
 
   const candidates = normalizedTarget.endsWith(".md") ? [normalizedTarget] : [normalizedTarget, `${normalizedTarget}.md`];
-  const exactMatches = files.filter((file) => candidates.includes(file.path) || candidates.includes(file.name));
+  const exactResolution = resolutionFromMatches(matchesForKeys(index.exact, candidates));
 
-  if (exactMatches.length === 1) return { status: "resolved", file: exactMatches[0] };
-  if (exactMatches.length > 1) return { status: "ambiguous", matches: exactMatches };
+  if (exactResolution.status !== "missing") return exactResolution;
 
-  const basenameMatches = files.filter((file) => candidates.includes(fileBasename(file.path)));
+  return resolutionFromMatches(matchesForKeys(index.basename, candidates));
+}
 
-  if (basenameMatches.length === 1) return { status: "resolved", file: basenameMatches[0] };
-  if (basenameMatches.length > 1) return { status: "ambiguous", matches: basenameMatches };
-
-  return { status: "missing" };
+export function resolveMarkdownLink(rawTarget: string, files: ProjectFile[], selectedPath: string | null): WikiLinkResolution {
+  return resolveMarkdownLinkWithIndex(rawTarget, createLinkResolutionIndex(files, selectedPath));
 }
 
 export function linkResolutionClass(resolution: WikiLinkResolution) {

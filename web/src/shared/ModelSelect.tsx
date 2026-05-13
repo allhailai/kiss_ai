@@ -1,5 +1,5 @@
 import type { RebuildModel } from "../contracts/api";
-import { formatModelLabel, modelTierLabels, modelTierOrder } from "../domain/modelLabels";
+import { formatModelLabel, groupModelsByTier, modelTierLabels } from "../domain/modelLabels";
 
 export function ModelSelect({
   className,
@@ -21,30 +21,22 @@ export function ModelSelect({
   showTierNote?: boolean;
 }) {
   const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
+  const tieredModels = groupModelsByTier(models);
 
   return (
     <label className={className}>
       <span>{label}</span>
       <select disabled={disabled || !models.length} onChange={(event) => onModelChange(event.target.value)} value={selectedModelId}>
         {models.length ? (
-          modelTierOrder.map((tier) => {
-            const tierModels = models
-              .filter((model) => model.tier === tier)
-              .sort((left, right) =>
-                (left.displayName || left.id).localeCompare(right.displayName || right.id, undefined, { sensitivity: "base" }),
-              );
-            if (!tierModels.length) return null;
-
-            return (
-              <optgroup key={tier} label={modelTierLabels[tier]}>
-                {tierModels.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {formatModelLabel(model)}
-                  </option>
-                ))}
-              </optgroup>
-            );
-          })
+          tieredModels.map(({ tier, models: tierModels }) => (
+            <optgroup key={tier} label={modelTierLabels[tier]}>
+              {tierModels.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {formatModelLabel(model)}
+                </option>
+              ))}
+            </optgroup>
+          ))
         ) : (
           <option value="">No models loaded</option>
         )}

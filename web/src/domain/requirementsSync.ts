@@ -1,27 +1,29 @@
 import type { RequirementsSyncStep } from "../contracts/api";
+import type { RequirementAutoUpdatePath } from "./projectPaths";
+import { requirementAutoUpdatePaths } from "./projectPaths";
 
 export const requirementsSyncSteps: Array<{
   id: RequirementsSyncStep;
   label: string;
-  filePath: string;
+  filePath: RequirementAutoUpdatePath;
   description: string;
 }> = [
   {
     id: "goal",
     label: "Goal",
-    filePath: "human_goal_requirements.md",
+    filePath: requirementAutoUpdatePaths[0],
     description: "Consolidate the controlling project contract.",
   },
   {
     id: "inputs",
     label: "Inputs",
-    filePath: "human_input_requirements.md",
+    filePath: requirementAutoUpdatePaths[1],
     description: "Ensure source requirements support the goal.",
   },
   {
     id: "outputs",
     label: "Outputs",
-    filePath: "human_output_requirements.md",
+    filePath: requirementAutoUpdatePaths[2],
     description: "Ensure deliverables address the goal.",
   },
 ];

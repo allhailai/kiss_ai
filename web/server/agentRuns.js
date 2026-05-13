@@ -3,6 +3,7 @@ import path from "node:path";
 
 const maxEvents = 500;
 const maxLogEntries = 300;
+const streamingPersistDelayMs = 150;
 const rebuildStatuses = new Set(["idle", "running", "finished", "finished_with_attention", "error", "blocked", "interrupted"]);
 const runKinds = new Set(["rebuild", "human_attention_resolve"]);
 const eventTypes = new Set(["system", "assistant_message", "run_status", "tool_activity", "artifact_change", "error"]);
@@ -117,6 +118,7 @@ export function createRebuildStore({ stateDir, projectSlugPattern }) {
   const rebuildStates = new Map();
   const activeRebuilds = new Set();
   const subscribers = new Map();
+  const scheduledPersists = new Map();
 
   function rebuildStatePath(projectSlug) {
     if (!projectSlugPattern.test(projectSlug)) {
@@ -145,6 +147,34 @@ export function createRebuildStore({ stateDir, projectSlugPattern }) {
     const temporary = `${target}.${process.pid}.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`;
     await fs.writeFile(temporary, `${JSON.stringify(normalizeRebuildState(state), null, 2)}\n`, "utf8");
     await fs.rename(temporary, target);
+  }
+
+  function clearScheduledPersist(projectSlug) {
+    const timeout = scheduledPersists.get(projectSlug);
+    if (!timeout) return;
+    clearTimeout(timeout);
+    scheduledPersists.delete(projectSlug);
+  }
+
+  async function persistLatestRebuildState(projectSlug) {
+    clearScheduledPersist(projectSlug);
+    const state = rebuildStates.get(projectSlug);
+    if (state) await writePersistedRebuildState(projectSlug, state);
+  }
+
+  function schedulePersistLatestRebuildState(projectSlug) {
+    clearScheduledPersist(projectSlug);
+    scheduledPersists.set(
+      projectSlug,
+      setTimeout(() => {
+        scheduledPersists.delete(projectSlug);
+        const state = rebuildStates.get(projectSlug);
+        if (!state) return;
+        void writePersistedRebuildState(projectSlug, state).catch((error) => {
+          console.warn(`[kiss_ai UI warning] Could not persist streaming rebuild state for ${projectSlug}: ${error.message}`);
+        });
+      }, streamingPersistDelayMs),
+    );
   }
 
   function notify(projectSlug, state, event = null) {
@@ -196,10 +226,14 @@ export function createRebuildStore({ stateDir, projectSlugPattern }) {
     return next;
   }
 
-  async function setRebuildState(projectSlug, nextState, emittedEvent = null) {
+  async function setRebuildState(projectSlug, nextState, emittedEvent = null, { persist = "immediate" } = {}) {
     const normalized = normalizeRebuildState(nextState);
     rebuildStates.set(projectSlug, normalized);
-    await writePersistedRebuildState(projectSlug, normalized);
+    if (persist === "deferred") {
+      schedulePersistLatestRebuildState(projectSlug);
+    } else {
+      await persistLatestRebuildState(projectSlug);
+    }
     notify(projectSlug, normalized, emittedEvent);
     return normalized;
   }
@@ -216,6 +250,7 @@ export function createRebuildStore({ stateDir, projectSlugPattern }) {
         log: deriveLog(events, rebuildState.log),
       },
       event,
+      { persist: "deferred" },
     );
   }
 

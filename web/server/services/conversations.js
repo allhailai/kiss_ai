@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { MAX_STORED_MESSAGE_BYTES } from "../contracts/chatLimits.js";
 import { normalizeChatContext, normalizeConversationFileContext } from "./chatContext.js";
-import { normalizeConceptualDiffMemory } from "./conceptualDiffMemory.js";
+import { normalizeConceptualDiff } from "./conceptualDiffs.js";
 
 const conversationVersion = 1;
 const conversationIdPattern = /^[a-zA-Z0-9_-]+$/;
@@ -30,84 +30,6 @@ function datestamp(date = new Date()) {
 
 function trimText(value, maxLength) {
   return String(value ?? "").trim().slice(0, maxLength);
-}
-
-function optionalText(value, maxLength) {
-  const text = trimText(value, maxLength);
-  return text || "";
-}
-
-function normalizeStringList(value, maxItems = 8, maxLength = 240) {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => optionalText(item, maxLength)).filter(Boolean).slice(0, maxItems);
-}
-
-function normalizeConceptualDiffScope(value) {
-  return ["local", "section", "multi_section", "document"].includes(value) ? value : "";
-}
-
-function normalizeConceptualDiffTarget(value) {
-  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const sections = normalizeStringList(source.sections);
-  const anchors = normalizeStringList(source.anchors);
-  const explicitScope = normalizeConceptualDiffScope(source.scope);
-  const inferredScope = sections.length > 1 ? "multi_section" : sections.length ? "section" : anchors.length ? "local" : "";
-  const scope = explicitScope || inferredScope;
-
-  if (!scope) return null;
-
-  return {
-    scope,
-    ...(sections.length ? { sections } : {}),
-    ...(anchors.length ? { anchors } : {}),
-  };
-}
-
-function normalizeConceptualDiffIntent(value) {
-  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const objective = optionalText(source.objective, 800);
-  if (!objective) return null;
-
-  const rationale = optionalText(source.rationale, 800);
-  const mustPreserve = normalizeStringList(source.mustPreserve, 8, 260);
-  const avoid = normalizeStringList(source.avoid, 8, 260);
-
-  return {
-    objective,
-    ...(rationale ? { rationale } : {}),
-    ...(mustPreserve.length ? { mustPreserve } : {}),
-    ...(avoid.length ? { avoid } : {}),
-  };
-}
-
-function normalizeConceptualDiffEvidence(value) {
-  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const userGuidance = normalizeStringList(source.userGuidance, 6, 260);
-  const gitDiffSignals = normalizeStringList(source.gitDiffSignals, 6, 260);
-  const contextSignals = normalizeStringList(source.contextSignals, 6, 260);
-
-  if (!userGuidance.length && !gitDiffSignals.length && !contextSignals.length) return null;
-
-  return {
-    ...(userGuidance.length ? { userGuidance } : {}),
-    ...(gitDiffSignals.length ? { gitDiffSignals } : {}),
-    ...(contextSignals.length ? { contextSignals } : {}),
-  };
-}
-
-function normalizeConceptualDiffApplyNotes(value) {
-  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const expectedChangeShape = optionalText(source.expectedChangeShape, 600);
-  const nonGoals = normalizeStringList(source.nonGoals, 8, 260);
-  const riskLevel = ["low", "medium", "high"].includes(source.riskLevel) ? source.riskLevel : "";
-
-  if (!expectedChangeShape && !nonGoals.length && !riskLevel) return null;
-
-  return {
-    ...(expectedChangeShape ? { expectedChangeShape } : {}),
-    ...(nonGoals.length ? { nonGoals } : {}),
-    ...(riskLevel ? { riskLevel } : {}),
-  };
 }
 
 function titleFromContent(content) {
@@ -146,35 +68,6 @@ function normalizeMessage(value, fallback = {}) {
     status,
     context: normalizeChatContext(source.context, { maxDraftContentLength: MAX_STORED_MESSAGE_BYTES }),
     metadata,
-  };
-}
-
-function normalizeConceptualDiff(value) {
-  const source = value && typeof value === "object" ? value : {};
-  const id = typeof source.id === "string" && source.id.trim() ? source.id.trim().slice(0, 80) : createId("diff");
-  const filePath = trimText(source.filePath, 300);
-  const title = trimText(source.title, 160);
-  const summary = trimText(source.summary, 1200);
-  const status = source.status === "rejected" ? "rejected" : "accepted";
-  const target = normalizeConceptualDiffTarget(source.target);
-  const intent = normalizeConceptualDiffIntent(source.intent);
-  const evidence = normalizeConceptualDiffEvidence(source.evidence);
-  const applyNotes = normalizeConceptualDiffApplyNotes(source.applyNotes);
-  const memory = normalizeConceptualDiffMemory(source.memory);
-
-  if (!filePath || !title || !summary) return null;
-
-  return {
-    id,
-    filePath,
-    title,
-    summary,
-    status,
-    ...(target ? { target } : {}),
-    ...(intent ? { intent } : {}),
-    ...(evidence ? { evidence } : {}),
-    ...(applyNotes ? { applyNotes } : {}),
-    ...(memory ? { memory } : {}),
   };
 }
 

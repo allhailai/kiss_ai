@@ -11,12 +11,14 @@ import {
 } from "./conceptualDiffMemory.js";
 import { extractApplyResultFromText, extractConceptualDiffsFromText, parseJsonTaggedContent } from "./conceptualDiffs.js";
 import { prepareCursorAgentRun } from "./cursorAgentRun.js";
+import { buildGitDiffPromptEntries } from "./gitDiffPrompt.js";
 
 const requirementFilePaths = {
   goal: "human_goal_requirements.md",
   inputs: "human_input_requirements.md",
   outputs: "human_output_requirements.md",
 };
+const requirementFilePathSet = new Set(Object.values(requirementFilePaths));
 const requirementSteps = ["goal", "inputs", "outputs"];
 const maxPromptFileBytes = 24 * 1024;
 const maxSignalDiffs = 40;
@@ -77,9 +79,7 @@ function isRelevantSignalPath(statusLine) {
   const pathText = String(statusLine ?? "").slice(3).trim();
   return (
     /^human_[^/]+_requirements\.md$/i.test(pathText) ||
-    pathText === "human_goal_requirements.md" ||
-    pathText === "human_input_requirements.md" ||
-    pathText === "human_output_requirements.md" ||
+    requirementFilePathSet.has(pathText) ||
     pathText.startsWith("inputs_human/") ||
     pathText.startsWith("inputs_ai/") ||
     pathText.startsWith("outputs_ai/")
@@ -98,7 +98,7 @@ async function readProjectFilesForRoot(listProjectFiles, projectRoot, rootRelati
   }
 }
 
-async function collectSignalInventory({ project, gitFileDiffText, gitStatus, listProjectFiles }) {
+async function collectSignalInventory({ project, gitFileDiffText, gitFileDiffTexts, gitStatus, listProjectFiles }) {
   const [statusLines, humanInputs, aiInputs, outputs] = await Promise.all([
     gitStatus(project.path),
     readProjectFilesForRoot(listProjectFiles, project.path, "inputs_human"),
@@ -112,17 +112,7 @@ async function collectSignalInventory({ project, gitFileDiffText, gitStatus, lis
     ...aiInputs,
     ...outputs,
   ]).slice(0, maxSignalDiffs);
-  const diffs = await Promise.all(
-    diffCandidates.map(async (file) => {
-      const result = await gitFileDiffText(project.path, file.path);
-      return {
-        path: file.path,
-        kind: file.kind,
-        diff: trimForPrompt(result.diff ?? ""),
-        diffError: result.diffError || "",
-      };
-    }),
-  );
+  const diffs = await buildGitDiffPromptEntries({ projectRoot: project.path, files: diffCandidates, gitFileDiffText, gitFileDiffTexts, trimForPrompt });
 
   return {
     gitStatus: relevantStatus,
@@ -272,6 +262,7 @@ function proposalPromptPayload({ project, rejectionMemory = null, step, targetFi
 export function createRequirementsSyncService({
   FRAMEWORK_ROOT,
   gitFileDiffText,
+  gitFileDiffTexts = null,
   gitStatus,
   httpError,
   listCursorModels,
@@ -356,7 +347,7 @@ export function createRequirementsSyncService({
     try {
       const [requirementsContext, signalInventory, rejectionMemory] = await Promise.all([
         readRequirementsContext({ project, readTextFile }),
-        collectSignalInventory({ project, gitFileDiffText, gitStatus, listProjectFiles }),
+        collectSignalInventory({ project, gitFileDiffText, gitFileDiffTexts, gitStatus, listProjectFiles }),
         loadConceptualDiffMemory(project.path),
       ]);
       const targetFilePath = requirementFilePaths[step];
@@ -455,7 +446,7 @@ export function createRequirementsSyncService({
     try {
       const [requirementsContext, signalInventory] = await Promise.all([
         readRequirementsContext({ project, readTextFile }),
-        collectSignalInventory({ project, gitFileDiffText, gitStatus, listProjectFiles }),
+        collectSignalInventory({ project, gitFileDiffText, gitFileDiffTexts, gitStatus, listProjectFiles }),
       ]);
       const prompt = await createApplyPrompt({
         project,
@@ -507,7 +498,7 @@ export function createRequirementsSyncService({
   }
 
   async function requirementsSyncSignals(project) {
-    const signalInventory = await collectSignalInventory({ project, gitFileDiffText, gitStatus, listProjectFiles });
+    const signalInventory = await collectSignalInventory({ project, gitFileDiffText, gitFileDiffTexts, gitStatus, listProjectFiles });
     const openQuestions = await readOptionalTextFile(readTextFile, project.path, "human_open_questions.md");
     const openQuestionLines = openQuestions.content
       .split("\n")
