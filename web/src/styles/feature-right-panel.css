@@ -432,25 +432,6 @@
   white-space: nowrap;
 }
 
-.requirements-sync-step.status-generating small::before {
-  content: "";
-  display: inline-block;
-  width: 0.48rem;
-  height: 0.48rem;
-  margin-right: 5px;
-  border: 2px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
-  border-top-color: var(--color-warning);
-  border-radius: 999px;
-  vertical-align: -0.06em;
-  animation: requirements-sync-thinking 0.8s linear infinite;
-}
-
-@keyframes requirements-sync-thinking {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .requirements-sync-panel .requirements-sync-file-strip,
 .requirements-sync-panel .requirements-sync-signals {
   margin: 0 12px;
@@ -460,7 +441,7 @@
   min-height: 0;
   flex: 1 1 auto;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 8px;
   overflow: hidden;
   padding: 0 12px 4px;
@@ -471,6 +452,40 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+}
+
+.requirements-sync-agent-thinking {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px dashed color-mix(in srgb, var(--color-secondary) 44%, var(--color-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-secondary) 8%, var(--color-surface));
+}
+
+.requirements-sync-agent-thinking header {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--color-secondary);
+  font-size: 0.7rem;
+  line-height: 1.15;
+}
+
+.requirements-sync-agent-thinking header strong {
+  min-width: 0;
+  color: var(--color-primary);
+  font-size: 0.76rem;
+}
+
+.requirements-sync-agent-thinking header span {
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .requirements-sync-generate-actions {

@@ -68,6 +68,8 @@ export type ProjectStatus = {
   staleOutputs: unknown[];
   humanAttentionItems: HumanAttentionItem[];
   humanAttentionCount: number;
+  openQuestions: string[];
+  openQuestionsCount: number;
   cursorApiKeyAvailable: boolean;
   cursorApiKeySource: string | null;
   cursorApiKeyWarnings: string[];

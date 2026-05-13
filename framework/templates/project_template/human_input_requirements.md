@@ -12,6 +12,8 @@ State the source scope and organization the project should focus on.
 
 List any background notes, source lists, uploaded documents, or other context the project should use.
 
+Human-provided files under `inputs_human/**` are optional unless this file explicitly lists them as required. If no files are present, that means the human has no documents to share yet; it is not a gap by itself.
+
 Expected file types:
 
 - List expected extensions or document types here, for example Markdown, PDF, PowerPoint, Word, spreadsheets, images, or plain text.

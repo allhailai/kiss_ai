@@ -28,6 +28,7 @@ import { RightPanelModeSwitch } from "../shared/rightPanel/RightPanelModeSwitch"
 import { makeEditableTargetForFile, useAgentFileContext } from "./hooks/useAgentFileContext";
 import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
 import type { ChatMessageFileEdit } from "../contracts/api";
+import { openQuestionsFilePath } from "../domain/projectPaths";
 
 const aiFileAssistPrompt =
   "Review the saved annotations in this file. Interpret the Git diff as user guidance, then propose edits that integrate those annotations cleanly throughout the document while preserving the document's intent, structure, and voice.";
@@ -169,13 +170,6 @@ export function App() {
     toastWorkspace.setNotice(decision.message);
   };
   const startRebuildWithRequirementsCheck = () => {
-    if (requirementsSync.signals?.hasSignals) {
-      const shouldContinue = window.confirm(
-        `Requirements sync signals were detected: ${requirementsSync.signals.summary}\n\nContinue rebuild without synchronizing requirements?`,
-      );
-      if (!shouldContinue) return;
-    }
-
     void rebuildWorkspace.startRebuild();
   };
   const assistCurrentFile = async () => {
@@ -309,6 +303,7 @@ export function App() {
             status={rebuildWorkspace.status}
             rebuild={rebuildWorkspace.rebuild}
             onOpenBuildProject={openBuildProjectPanel}
+            onOpenQuestions={() => navigateTo("requirements", openQuestionsFilePath)}
             onOpenRequirementsSync={openRequirementsSyncPanel}
             requirementsSyncSignals={requirementsSync.signals}
           />

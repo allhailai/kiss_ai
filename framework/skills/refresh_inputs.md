@@ -11,6 +11,7 @@ Maintain AI-managed source files under `inputs_ai/` according to `human_input_re
 ## Safety Rules
 
 - Do not edit `inputs_human/**`.
+- Treat an empty or `.gitkeep`-only `inputs_human/` directory as neutral unless `human_input_requirements.md` explicitly requires human-provided files. Humans add files there when they have files to share.
 - Do not remove source files unless the requirements explicitly call for removal. If removal seems needed but is not authorized, preserve the file or mark it stale and record a human-attention item.
 - Flag material changes before downstream outputs are trusted.
 - Preserve source URLs, effective dates, and check dates whenever possible.
@@ -36,7 +37,7 @@ Maintain AI-managed source files under `inputs_ai/` according to `human_input_re
    - `last_updated` when content changes
    - source URLs
    - change notes
-8. Add unresolved questions to `human_open_questions.md`.
+8. Add unresolved questions to `human_open_questions.md` only for required or genuinely ambiguous source/evidence needs. Do not ask for `inputs_human/**` uploads solely because none exist.
 9. Update any source manifest, update runbook, or **category coverage ledger** required by the project.
 
 ## Material Change Criteria

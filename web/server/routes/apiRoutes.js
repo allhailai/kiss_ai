@@ -20,6 +20,7 @@ export function registerApiRoutes(app, deps) {
     listCursorModels: deps.listCursorModels,
     pickRebuildModelId: deps.pickRebuildModelId,
     readProjectJson: deps.readProjectJson,
+    readTextFile: deps.readTextFile,
     resolveCursorApiKey: deps.resolveCursorApiKey,
   });
 

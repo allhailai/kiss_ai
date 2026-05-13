@@ -50,9 +50,8 @@ function getEventText(event: AgentRunEvent) {
 function completionTone(status: RebuildState["status"] | undefined) {
   switch (status) {
     case "finished":
-      return "success";
     case "finished_with_attention":
-      return "attention";
+      return "success";
     case "error":
     case "blocked":
     case "interrupted":
@@ -65,9 +64,8 @@ function completionTone(status: RebuildState["status"] | undefined) {
 function completionLabel(status: RebuildState["status"] | undefined) {
   switch (status) {
     case "finished":
-      return "Build complete";
     case "finished_with_attention":
-      return "Build complete with attention needed";
+      return "Build complete";
     case "error":
       return "Build error";
     case "blocked":
@@ -132,6 +130,8 @@ export function BuildProjectRightPanel({
   const startDisabled = buildRunning || !status?.cursorApiKeyAvailable || !selectedModelId || !models.length;
   const tone = completionTone(rebuild?.status);
   const completion = completionLabel(rebuild?.status);
+  const completionMessage =
+    rebuild?.status === "finished_with_attention" ? "The latest project build completed." : rebuild?.message || "The latest project build has reached a terminal state.";
   const hasEvents = Boolean(rebuild?.events.length);
   const hasLog = Boolean(rebuild?.log.length);
 
@@ -145,8 +145,7 @@ export function BuildProjectRightPanel({
       <header className="build-project-panel-header">
         <RightPanelModeSwitch activeKind="build-project" onSelect={onSelectPanel} />
         <div>
-          <h2>Build Project</h2>
-          <p>This will build requirements -&gt; inputs -&gt; outputs.</p>
+          <h2>Build: requirements &gt; inputs &gt; outputs</h2>
         </div>
       </header>
 
@@ -154,7 +153,7 @@ export function BuildProjectRightPanel({
         {tone && completion ? (
           <div className={`build-project-completion build-project-completion-${tone}`} role="status">
             <strong>{completion}</strong>
-            <p>{rebuild?.message || "The latest project build has reached a terminal state."}</p>
+            <p>{completionMessage}</p>
           </div>
         ) : null}
 
@@ -184,7 +183,7 @@ export function BuildProjectRightPanel({
       </section>
 
       <section className="build-project-details" aria-label="Build details">
-        <details open={buildRunning}>
+        <details>
           <summary>Runner details</summary>
           <div className="build-project-runner-grid">
             <div>

@@ -142,6 +142,7 @@ describe("API routes", () => {
       listCursorModels: async () => [],
       pickRebuildModelId: () => null,
       readProjectJson: async () => ({}),
+      readTextFile: async () => ({ content: "" }),
       resolveCursorApiKey: async () => ({ available: false, source: null, warnings: [] }),
     });
     app.use(apiErrorHandler);

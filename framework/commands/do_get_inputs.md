@@ -15,6 +15,7 @@ Create or refresh AI-managed source inputs according to `human_input_requirement
 
 - **First substantive input acquisition:** treat as first build when `.harness-state.json` shows no prior successful input refresh, or when `human_input_requirements.md` adds required source categories or expected `inputs_ai/` paths not yet recorded as populated or explicitly gapped in the category coverage ledger. On first acquisition, **full coverage** is mandatory: every required category must be populated with source-backed files or documented with a qualifying gap file. Silent empty scaffold directories are not allowed.
 - **Subsequent refreshes:** incremental updates are allowed when the category coverage ledger shows no required category in `empty_without_gap` state and dependency maps indicate unchanged categories do not affect rebuilt outputs. When uncertain, refresh more sources rather than fewer—especially for high-impact decision outputs.
+- **Human uploads are optional unless required:** an empty or `.gitkeep`-only `inputs_human/` directory is expected and neutral when `human_input_requirements.md` does not explicitly require human-provided files. Do not create open questions, source gaps, or human-attention items solely because the human has not uploaded documents. If humans later add files, inventory and process them normally.
 
 ## Instructions
 
@@ -25,6 +26,7 @@ Create or refresh AI-managed source inputs according to `human_input_requirement
    - Include hidden files, binary documents, and filenames with spaces or parentheses. Treat `.pptx`, `.pdf`, `.docx`, images, spreadsheets, and other non-Markdown files as real source inputs unless the project explicitly excludes them.
    - For every discovered file, decide whether it is readable directly, needs extraction/conversion, is a placeholder such as `.gitkeep`, or is intentionally out of scope.
    - If any non-placeholder file cannot be read or converted, add an open question and treat it as a fatal input blocker unless the project requirements explicitly allow excluding or deferring that file.
+   - If no non-placeholder files are present and the requirements do not require human uploads, record the inventory as empty/optional and continue without asking the human to add files.
 3. Determine the expected source inventory using `human_input_requirements.md`, `.harness-state.json`, and the verified `inputs_human/` inventory.
 4. Ensure the required `inputs_ai/` folders exist. Use only the folders explicitly defined by the project requirements.
 5. Read any source manifest or update runbook required by the project.
@@ -59,7 +61,7 @@ Create or refresh AI-managed source inputs according to `human_input_requirement
    - target scope
    - downstream output conclusions
 12. Identify likely downstream impact where possible: affected source categories, affected wiki pages, affected intermediate ledgers, affected final outputs, and outputs that may now be stale.
-13. Add or update open questions in `human_open_questions.md` when the source material is incomplete or unresolved.
+13. Add or update open questions in `human_open_questions.md` only when required source material is incomplete, unreadable, contradictory, or genuinely ambiguous. Do not ask whether the owner should populate `inputs_human/` merely because it is empty; humans will add files there when they have files to share.
 14. Prepend requirement or source-process changes to `change_logs/change_logs.md`.
 15. Update `.harness-state.json` with input refresh status, including the verified `inputs_human/` inventory, unreadable or excluded files, source inventory status, **category coverage ledger path and summary**, source-side scaling signals, stale sources, material changes, and likely downstream impact.
 

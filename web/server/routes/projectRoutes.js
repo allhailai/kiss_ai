@@ -1,5 +1,34 @@
 import { buildLogQuerySchema, createProjectBodySchema, parseRequestBody, parseRequestQuery } from "./requestSchemas.js";
 
+function extractOpenQuestions(content) {
+  const lines = content.split("\n");
+  const openSection = [];
+  let inOpenQuestions = false;
+
+  for (const line of lines) {
+    if (/^##\s+Open Questions\s*$/i.test(line.trim())) {
+      inOpenQuestions = true;
+      continue;
+    }
+    if (inOpenQuestions && /^##\s+/.test(line.trim())) break;
+    if (inOpenQuestions) openSection.push(line.trim());
+  }
+
+  return openSection
+    .filter((line) => /^[-*]\s+\S/.test(line) || /^\d+\.\s+\S/.test(line) || /\?$/.test(line))
+    .filter((line) => !/^no open questions/i.test(line.replace(/^[-*]\s+|^\d+\.\s+/, "")))
+    .slice(0, 20);
+}
+
+async function readOpenQuestions(readTextFile, projectRoot) {
+  try {
+    const file = await readTextFile(projectRoot, "human_open_questions.md");
+    return extractOpenQuestions(file.content);
+  } catch {
+    return [];
+  }
+}
+
 export function registerProjectRoutes(app, {
   PROJECTS_ROOT,
   buildLogTabState,
@@ -11,6 +40,7 @@ export function registerProjectRoutes(app, {
   listCursorModels,
   pickRebuildModelId,
   readProjectJson,
+  readTextFile,
   resolveCursorApiKey,
   httpError,
 }) {
@@ -65,6 +95,7 @@ export function registerProjectRoutes(app, {
       const harness = await readProjectJson(project.path, ".harness-state.json", {});
       const cursorApiKey = await resolveCursorApiKey();
       const humanAttentionItems = getHumanAttentionItems(harness);
+      const openQuestions = await readOpenQuestions(readTextFile, project.path);
 
       response.json({
         projectSlug: harness.project_slug ?? project.slug,
@@ -81,6 +112,8 @@ export function registerProjectRoutes(app, {
         staleOutputs: harness.rebuild_scope?.outputs_marked_stale ?? [],
         humanAttentionItems,
         humanAttentionCount: humanAttentionItems.length,
+        openQuestions,
+        openQuestionsCount: openQuestions.length,
         cursorApiKeyAvailable: cursorApiKey.available,
         cursorApiKeySource: cursorApiKey.source,
         cursorApiKeyWarnings: cursorApiKey.warnings,

@@ -6,6 +6,7 @@ export function RebuildWorkspace({
   status,
   rebuild,
   onOpenBuildProject,
+  onOpenQuestions,
   onOpenRequirementsSync,
   requirementsSyncSignals,
 }: {
@@ -13,11 +14,28 @@ export function RebuildWorkspace({
   status: ProjectStatus | null;
   rebuild: RebuildState | null;
   onOpenBuildProject: () => void;
+  onOpenQuestions: () => void;
   onOpenRequirementsSync: () => void;
   requirementsSyncSignals: RequirementsSyncSignalsResponse | null;
 }) {
+  const openQuestionsCount = status?.openQuestionsCount ?? 0;
+
   return (
     <div className="panel-stack rebuild-launcher-workspace">
+      {openQuestionsCount ? (
+        <section className="rebuild-open-questions-callout" aria-label="Unanswered human questions">
+          <div>
+            <strong>You have unanswered questions for the next build.</strong>
+            <p>
+              Answer {openQuestionsCount} question{openQuestionsCount === 1 ? "" : "s"} in human_open_questions.md when you are ready to refine the project.
+            </p>
+          </div>
+          <button onClick={onOpenQuestions} type="button">
+            Answer Questions
+          </button>
+        </section>
+      ) : null}
+
       <section className="content-card rebuild-launcher-card" aria-label="Build actions">
         <div className="rebuild-launcher-actions">
           <button className="rebuild-launcher-action rebuild-launcher-sync" onClick={onOpenRequirementsSync} type="button">

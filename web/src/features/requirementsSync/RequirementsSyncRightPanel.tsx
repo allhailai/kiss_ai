@@ -97,6 +97,11 @@ export function RequirementsSyncRightPanel({
   const controlsDisabled = controller.busy || appliedState.applied;
   const primaryActionLabel = controller.loadingStep ? `Syncing ${loadingStep?.label ?? "requirements"}...` : controller.allProposalsReady ? "Regenerate All" : "Sync Requirements";
   const canApplyBatch = controller.allProposalsReady && controller.acceptedDiffCount > 0 && !appliedState.applied;
+  const agentWorkingLabel = controller.applying
+    ? "Agent is applying accepted conceptual diffs..."
+    : controller.loadingStep
+      ? `Agent is proposing ${loadingStep?.label ?? requirementsSyncStepLabel(controller.loadingStep)} conceptual diffs...`
+      : null;
 
   return (
     <div className="requirements-sync-panel">
@@ -136,6 +141,7 @@ export function RequirementsSyncRightPanel({
             <p>You can accept or reject proposed changes and apply them.</p>
           </div>
         )}
+        {agentWorkingLabel ? <RequirementsSyncAgentThinking label={agentWorkingLabel} /> : null}
       </section>
 
       <section className="requirements-sync-file-strip" aria-label="Requirements sync files">
@@ -170,6 +176,22 @@ export function RequirementsSyncRightPanel({
         </div>
       </section>
     </div>
+  );
+}
+
+function RequirementsSyncAgentThinking({ label }: { label: string }) {
+  return (
+    <article className="requirements-sync-agent-thinking" aria-label={label} role="status" aria-live="polite">
+      <header>
+        <strong>Agent</strong>
+        <span>{label}</span>
+      </header>
+      <div className="chat-thinking-indicator" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+    </article>
   );
 }
 

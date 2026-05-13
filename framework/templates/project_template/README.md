@@ -56,7 +56,7 @@ Do not commit `web/.env`. Prefer Keychain for longer-lived storage and use `.env
 - `human_output_requirements.md`
 - `human_open_questions.md`
 - `human_design_identity.md`
-- `inputs_human/` — notes, source lists, uploads, and durable context
+- `inputs_human/` — optional notes, source lists, uploads, and durable context humans choose to provide
 
 ### AI-managed (generated or processed by the agent)
 
