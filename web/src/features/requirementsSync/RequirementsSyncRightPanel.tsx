@@ -77,12 +77,27 @@ export function RequirementsSyncRightPanel({
             <strong>Outputs:</strong> provide outputs in alignment to inputs and goal.
           </li>
         </ul>
-        <p>
-          Current: {currentStep.label} <code>{currentStep.filePath}</code>
-        </p>
       </header>
 
-      <section className="requirements-auto-update-stepper" aria-label="Requirements sync steps">
+      <section className="requirements-sync-panel-review">
+        <div className="requirements-sync-panel-review-heading">
+          <div>
+            <strong>Conceptual diffs</strong>
+            <p>Accept changes to apply, reject changes to remember as constraints, or continue when no apply is needed.</p>
+          </div>
+        </div>
+
+        {currentProposal ? (
+          <ProposalReview controller={controller} onFinish={onFinish} proposal={currentProposal} />
+        ) : (
+          <div className="requirements-sync-empty">
+            <strong>No proposal yet.</strong>
+            <p>Generate this step to let the AI propose conceptual diffs for this requirement file.</p>
+          </div>
+        )}
+      </section>
+
+      <section className="requirements-sync-file-strip" aria-label="Requirements sync files">
         {requirementsSyncSteps.map((candidate) => (
           <button
             className={candidate.id === controller.step ? "requirements-sync-step active" : "requirements-sync-step"}
@@ -98,47 +113,22 @@ export function RequirementsSyncRightPanel({
         ))}
       </section>
 
-      {controller.signals ? (
-        <section className={controller.signals.hasSignals ? "requirements-sync-signals active" : "requirements-sync-signals"}>
-          <strong>Sync signals</strong>
-          <p>{controller.signals.summary}</p>
-          {controller.signals.gitStatus.length ? (
-            <ul>
-              {controller.signals.gitStatus.slice(0, 4).map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
-      ) : null}
-
-      <section className="requirements-sync-panel-review">
-        <div className="requirements-sync-panel-review-heading">
-          <div>
-            <strong>Conceptual diffs</strong>
-            <p>Accept changes to apply, reject changes to remember as constraints, or continue when no apply is needed.</p>
-          </div>
-          <div className="requirements-sync-generate-actions">
-            <CompactModelPicker disabled={controller.busy} models={models} onModelChange={onModelChange} selectedModelId={selectedModelId} />
-            <button
-              className="requirements-sync-generate-button"
-              disabled={controller.busy || !selectedModelId}
-              onClick={() => void controller.proposeStep()}
-              type="button"
-            >
-              {controller.loadingStep === controller.step ? "Thinking..." : currentProposal ? "Regenerate" : "Generate"}
-            </button>
-          </div>
+      <section className="requirements-sync-run-controls" aria-label="Generate requirements sync proposal">
+        <div>
+          <span className="agent-context-label">Selected file</span>
+          <code title={currentStep.filePath}>{currentStep.label}</code>
         </div>
-
-        {currentProposal ? (
-          <ProposalReview controller={controller} onFinish={onFinish} proposal={currentProposal} />
-        ) : (
-          <div className="requirements-sync-empty">
-            <strong>No proposal yet.</strong>
-            <p>Generate this step to let the AI propose conceptual diffs for this requirement file.</p>
-          </div>
-        )}
+        <div className="requirements-sync-generate-actions">
+          <CompactModelPicker disabled={controller.busy} models={models} onModelChange={onModelChange} selectedModelId={selectedModelId} />
+          <button
+            className="requirements-sync-generate-button"
+            disabled={controller.busy || !selectedModelId}
+            onClick={() => void controller.proposeStep()}
+            type="button"
+          >
+            {controller.loadingStep === controller.step ? "Thinking..." : currentProposal ? "Regenerate" : "Generate"}
+          </button>
+        </div>
       </section>
     </div>
   );
