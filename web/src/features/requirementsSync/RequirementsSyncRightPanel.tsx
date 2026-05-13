@@ -94,7 +94,7 @@ export function RequirementsSyncRightPanel({
   const loadingStep = requirementsSyncSteps.find((candidate) => candidate.id === controller.loadingStep);
   const appliedState = requirementsSyncAppliedState(controller);
   const controlsDisabled = controller.busy || appliedState.applied;
-  const primaryActionLabel = controller.loadingStep ? `Syncing ${loadingStep?.label ?? "requirements"}...` : controller.allProposalsReady ? "Regenerate All" : "Sync All Requirements";
+  const primaryActionLabel = controller.loadingStep ? `Syncing ${loadingStep?.label ?? "requirements"}...` : controller.allProposalsReady ? "Regenerate All" : "Sync Requirements";
   const canApplyBatch = controller.allProposalsReady && controller.acceptedDiffCount > 0 && !appliedState.applied;
 
   return (
@@ -131,7 +131,7 @@ export function RequirementsSyncRightPanel({
         ) : (
           <div className="requirements-sync-empty">
             <button className="requirements-sync-empty-action" disabled={controller.busy || !selectedModelId} onClick={() => void controller.syncAll()} type="button">
-              Sync All Requirements
+              Sync Requirements
             </button>
             <p>AI Synchronize Requirements to ensure that all files are complete and aligned.</p>
             <div className="requirements-sync-empty-files" aria-label="Requirement files">
