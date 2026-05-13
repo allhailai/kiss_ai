@@ -171,7 +171,7 @@ export function RequirementsSyncRightPanel({
             {primaryActionLabel}
           </button>
           <button className="agent-edit-proposal-apply" disabled={controlsDisabled || !canApplyBatch} onClick={() => void controller.applyAll()} type="button">
-            {controller.applying ? "Applying..." : "Apply Accepted Changes"}
+            {controller.applying ? "Applying..." : "Apply Changes"}
           </button>
         </div>
       </section>

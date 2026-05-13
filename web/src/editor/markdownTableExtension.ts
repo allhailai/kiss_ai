@@ -1,5 +1,5 @@
-import { RangeSetBuilder, type Extension, type Text } from "@codemirror/state";
-import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import { RangeSetBuilder, StateField, type Extension, type Text } from "@codemirror/state";
+import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view";
 import { wikiLinkLabel } from "../domain/links";
 
 export type MarkdownTableBlock = {
@@ -812,70 +812,65 @@ export function buildMarkdownTableExtension(options: MarkdownTableExtensionOptio
     onNotice: options.onNotice ?? (() => undefined),
   };
 
-  function buildDecorations(view: EditorView) {
+  function buildDecorations(doc: Text) {
     const builder = new RangeSetBuilder<Decoration>();
+    let position = 0;
 
-    for (const { from, to } of view.visibleRanges) {
-      let position = from;
+    while (position <= doc.length) {
+      const line = doc.lineAt(position);
+      const table = parseMarkdownTableBlock(doc, line.number);
 
-      while (position <= to) {
-        const line = view.state.doc.lineAt(position);
-        const table = parseMarkdownTableBlock(view.state.doc, line.number);
+      if (table) {
+        builder.add(
+          table.from,
+          table.from,
+          Decoration.widget({
+            block: true,
+            side: -1,
+            widget: new MarkdownTableWidget(table, extensionOptions),
+          }),
+        );
 
-        if (table) {
-          for (let tableLineNumber = table.startLineNumber; tableLineNumber <= table.endLineNumber; tableLineNumber += 1) {
-            const tableLine = view.state.doc.line(tableLineNumber);
+        for (let tableLineNumber = table.startLineNumber; tableLineNumber <= table.endLineNumber; tableLineNumber += 1) {
+          const tableLine = doc.line(tableLineNumber);
 
-            if (tableLineNumber > table.startLineNumber) {
-              builder.add(
-                tableLine.from,
-                tableLine.from,
-                Decoration.line({
-                  class: "cm-markdown-table-hidden-line",
-                }),
-              );
-            }
+          builder.add(
+            tableLine.from,
+            tableLine.from,
+            Decoration.line({
+              class: "cm-markdown-table-hidden-line",
+            }),
+          );
 
-            builder.add(
-              tableLine.from,
-              tableLine.to,
-              Decoration.replace({
-                widget:
-                  tableLineNumber === table.startLineNumber
-                    ? new MarkdownTableWidget(table, extensionOptions)
-                    : new EmptyMarkdownWidget(),
-              }),
-            );
-          }
-
-          position = table.to + 1;
-          continue;
+          builder.add(
+            tableLine.from,
+            tableLine.to,
+            Decoration.replace({
+              widget: new EmptyMarkdownWidget(),
+            }),
+          );
         }
 
-        if (line.to >= to) break;
-        position = line.to + 1;
+        position = table.to + 1;
+        continue;
       }
+
+      if (line.to >= doc.length) break;
+      position = line.to + 1;
     }
 
     return builder.finish();
   }
 
-  return ViewPlugin.fromClass(
-    class {
-      decorations: DecorationSet;
-
-      constructor(view: EditorView) {
-        this.decorations = buildDecorations(view);
-      }
-
-      update(update: ViewUpdate) {
-        if (update.docChanged || update.selectionSet || update.viewportChanged) {
-          this.decorations = buildDecorations(update.view);
-        }
-      }
+  const tableDecorations = StateField.define<DecorationSet>({
+    create(state) {
+      return buildDecorations(state.doc);
     },
-    {
-      decorations: (plugin) => plugin.decorations,
+    update(decorations, transaction) {
+      return transaction.docChanged ? buildDecorations(transaction.state.doc) : decorations.map(transaction.changes);
     },
-  );
+    provide: (field) => EditorView.decorations.from(field),
+  });
+
+  return tableDecorations;
 }
