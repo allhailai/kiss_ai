@@ -3,6 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { MAX_STORED_MESSAGE_BYTES } from "../contracts/chatLimits.js";
 import { normalizeChatContext, normalizeConversationFileContext } from "./chatContext.js";
+import { normalizeConceptualDiffMemory } from "./conceptualDiffMemory.js";
 
 const conversationVersion = 1;
 const conversationIdPattern = /^[a-zA-Z0-9_-]+$/;
@@ -159,6 +160,7 @@ function normalizeConceptualDiff(value) {
   const intent = normalizeConceptualDiffIntent(source.intent);
   const evidence = normalizeConceptualDiffEvidence(source.evidence);
   const applyNotes = normalizeConceptualDiffApplyNotes(source.applyNotes);
+  const memory = normalizeConceptualDiffMemory(source.memory);
 
   if (!filePath || !title || !summary) return null;
 
@@ -172,6 +174,7 @@ function normalizeConceptualDiff(value) {
     ...(intent ? { intent } : {}),
     ...(evidence ? { evidence } : {}),
     ...(applyNotes ? { applyNotes } : {}),
+    ...(memory ? { memory } : {}),
   };
 }
 

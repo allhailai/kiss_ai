@@ -10,6 +10,7 @@ import {
   updateConceptualDiffRejectionMemory,
 } from "./conceptualDiffMemory.js";
 import { extractApplyResultFromText, extractConceptualDiffsFromText, parseJsonTaggedContent } from "./conceptualDiffs.js";
+import { prepareCursorAgentRun } from "./cursorAgentRun.js";
 
 const requirementFilePaths = {
   goal: "human_goal_requirements.md",
@@ -282,24 +283,18 @@ export function createRequirementsSyncService({
   runCursorAgent,
 }) {
   async function prepareAgentRun(project, requestedModelId) {
-    const releaseProjectAgent = projectAgentLock.acquire(project, "requirements_sync");
-    try {
-      const cursorApiKey = await resolveCursorApiKey();
-      if (!cursorApiKey.available) {
-        throw httpError("No Cursor API key found. Requirements sync is unavailable from the UI.", 503, "cursor_api_key_unavailable");
-      }
-
-      const models = await listCursorModels(cursorApiKey.apiKey);
-      if (!models.length) {
-        throw httpError("No Cursor models are available for requirements sync.", 503, "cursor_models_unavailable");
-      }
-
-      const modelId = pickRebuildModelId(models, requestedModelId);
-      return { cursorApiKey, modelId, releaseProjectAgent };
-    } catch (error) {
-      releaseProjectAgent();
-      throw error;
-    }
+    return prepareCursorAgentRun({
+      httpError,
+      label: "requirements_sync",
+      listCursorModels,
+      noApiKeyMessage: "No Cursor API key found. Requirements sync is unavailable from the UI.",
+      noModelsMessage: "No Cursor models are available for requirements sync.",
+      pickRebuildModelId,
+      project,
+      projectAgentLock,
+      requestedModelId,
+      resolveCursorApiKey,
+    });
   }
 
   async function createPrompt({ project, rejectionMemory, step, requirementsContext, signalInventory, userInstruction }) {
@@ -453,7 +448,7 @@ export function createRequirementsSyncService({
       throw httpError("Accept at least one conceptual diff before applying Requirements Sync.", 400, "requirements_sync_no_accepted_diffs");
     }
 
-    const requestedModelId = String(body.modelId ?? proposal.modelId ?? "").trim();
+    const requestedModelId = String(body.modelId ?? "").trim();
     if (!requestedModelId) throw httpError("Requirements sync apply requires a model.", 400, "requirements_sync_model_required");
 
     const { cursorApiKey, modelId, releaseProjectAgent } = await prepareAgentRun(project, requestedModelId);

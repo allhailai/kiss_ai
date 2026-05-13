@@ -14,14 +14,9 @@ import { formatLocalDateTime } from "../../domain/formatters";
 import { humanAttentionItemText } from "../../domain/humanAttention";
 import { formatModelLabel, modelTierLabels } from "../../domain/modelLabels";
 import { humanAttentionQueuePath } from "../../domain/projectPaths";
+import { requirementsSyncSteps } from "../../domain/requirementsSync";
 import { AgentTranscript } from "../../shared/agents/AgentTranscript";
 import { ModelSelect } from "../../shared/ModelSelect";
-
-const requirementsSyncSteps: Array<{ id: RequirementsSyncStep; label: string; filePath: string }> = [
-  { id: "goal", label: "Goal", filePath: "human_goal_requirements.md" },
-  { id: "inputs", label: "Inputs", filePath: "human_input_requirements.md" },
-  { id: "outputs", label: "Outputs", filePath: "human_output_requirements.md" },
-];
 
 function formatRunDuration(rebuild: RebuildState | null) {
   if (!rebuild?.startedAt) return "Not started";

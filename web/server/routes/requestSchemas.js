@@ -117,20 +117,20 @@ export const resolveHumanAttentionBodySchema = z
   });
 
 const requirementsSyncStepSchema = z.enum(["goal", "inputs", "outputs"]);
-const conceptualDiffStringArraySchema = z.array(z.string().trim().min(1).max(300)).max(12).optional();
+const conceptualDiffStringArraySchema = z.array(z.string().trim().min(1).max(260)).max(8).optional();
 const conceptualDiffMemorySchema = z
   .object({
-    fingerprint: optionalTrimmedString(120),
-    reconsidersRejectedId: optionalTrimmedString(160),
-    reconsiderReason: optionalTrimmedString(1000),
+    fingerprint: optionalTrimmedString(80),
+    reconsidersRejectedId: optionalTrimmedString(120),
+    reconsiderReason: optionalTrimmedString(600),
     suppressionState: z.enum(["new", "reconsidered", "near_rejected"]).optional(),
   })
   .optional();
 const conceptualDiffSchema = z.object({
-  id: z.string().trim().min(1).max(120),
+  id: z.string().trim().min(1).max(80),
   filePath: z.string().trim().min(1).max(300),
-  title: z.string().trim().min(1).max(200),
-  summary: z.string().trim().min(1).max(1600),
+  title: z.string().trim().min(1).max(160),
+  summary: z.string().trim().min(1).max(1200),
   status: z.enum(["accepted", "rejected"]),
   target: z
     .object({
@@ -141,8 +141,8 @@ const conceptualDiffSchema = z.object({
     .optional(),
   intent: z
     .object({
-      objective: z.string().trim().min(1).max(1000),
-      rationale: optionalTrimmedString(1000),
+      objective: z.string().trim().min(1).max(800),
+      rationale: optionalTrimmedString(800),
       mustPreserve: conceptualDiffStringArraySchema,
       avoid: conceptualDiffStringArraySchema,
     })
@@ -156,7 +156,7 @@ const conceptualDiffSchema = z.object({
     .optional(),
   applyNotes: z
     .object({
-      expectedChangeShape: optionalTrimmedString(800),
+      expectedChangeShape: optionalTrimmedString(600),
       nonGoals: conceptualDiffStringArraySchema,
       riskLevel: z.enum(["low", "medium", "high"]).optional(),
     })

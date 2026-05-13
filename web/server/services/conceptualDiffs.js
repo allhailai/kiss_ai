@@ -121,7 +121,7 @@ export function normalizeConceptualDiff(value, authorizedEditablePaths, { idPref
   if (!filePath || !title || !summary || !authorizedEditablePaths.has(filePath)) return null;
 
   return {
-    id: String(source.id ?? "").trim().slice(0, 120) || createConceptualDiffId(idPrefix),
+    id: String(source.id ?? "").trim().slice(0, 80) || createConceptualDiffId(idPrefix),
     filePath,
     title: title.slice(0, 160),
     summary: summary.slice(0, 1200),

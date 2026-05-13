@@ -9,8 +9,9 @@ import {
   normalizeConceptualDiffMemoryFile,
   updateConceptualDiffRejectionMemory,
 } from "./conceptualDiffMemory.js";
-import { extractApplyResultFromText, extractConceptualDiffsFromText, parseJsonTaggedContent } from "./conceptualDiffs.js";
+import { extractApplyResultFromText, extractConceptualDiffsFromText } from "./conceptualDiffs.js";
 import { normalizeChatContext } from "./chatContext.js";
+import { prepareCursorAgentRun } from "./cursorAgentRun.js";
 
 const maxPromptFileBytes = 24 * 1024;
 const maxPromptHistoryMessages = 40;
@@ -334,16 +335,6 @@ export function extractApplyResult(rawText, allowedFailedIds = null) {
 function proposalNotice(conceptualDiffs) {
   if (!conceptualDiffs.length) return "No proposed changes were generated.";
   return `Generated ${conceptualDiffs.length} proposed change${conceptualDiffs.length === 1 ? "" : "s"}.`;
-}
-
-function groupDiffsByFile(conceptualDiffs) {
-  const groups = new Map();
-  conceptualDiffs.forEach((diff) => {
-    const list = groups.get(diff.filePath) ?? [];
-    list.push(diff);
-    groups.set(diff.filePath, list);
-  });
-  return [...groups.entries()].map(([filePath, diffs]) => ({ filePath, diffs }));
 }
 
 function normalizeGitDiffTextResult(value) {
@@ -672,24 +663,18 @@ export function createChatAgentService({
   }
 
   async function prepareAgentRun(project, requestedModelId, label) {
-    const releaseProjectAgent = projectAgentLock.acquire(project, label);
-    try {
-      const cursorApiKey = await resolveCursorApiKey();
-      if (!cursorApiKey.available) {
-        throw httpError("No Cursor API key found. Chat is unavailable from the UI.", 503, "cursor_api_key_unavailable");
-      }
-
-      const models = await listCursorModels(cursorApiKey.apiKey);
-      if (!models.length) {
-        throw httpError("No Cursor models are available for chat.", 503, "cursor_models_unavailable");
-      }
-
-      const modelId = pickRebuildModelId(models, requestedModelId);
-      return { cursorApiKey, modelId, releaseProjectAgent };
-    } catch (error) {
-      releaseProjectAgent();
-      throw error;
-    }
+    return prepareCursorAgentRun({
+      httpError,
+      label,
+      listCursorModels,
+      noApiKeyMessage: "No Cursor API key found. Chat is unavailable from the UI.",
+      noModelsMessage: "No Cursor models are available for chat.",
+      pickRebuildModelId,
+      project,
+      projectAgentLock,
+      requestedModelId,
+      resolveCursorApiKey,
+    });
   }
 
   async function sendChatMessage(project, conversationId, body) {

@@ -13,7 +13,6 @@ type RequirementsSyncControllerOptions = {
 
 export function useRequirementsSync({ projectSlug, selectedModelId, onApplied, onNotice }: RequirementsSyncControllerOptions) {
   const [open, setOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   const [step, setStep] = useState<RequirementsSyncStep>("goal");
   const [proposals, setProposals] = useState<Partial<Record<RequirementsSyncStep, RequirementsSyncProposal>>>({});
   const [signals, setSignals] = useState<RequirementsSyncSignalsResponse | null>(null);
@@ -43,20 +42,15 @@ export function useRequirementsSync({ projectSlug, selectedModelId, onApplied, o
     if (projectSlug) void refreshSignals();
   }, [projectSlug, refreshSignals]);
 
-  const openModal = useCallback(() => {
+  const showController = useCallback(() => {
     setOpen(true);
-    setCollapsed(false);
     void refreshSignals();
   }, [refreshSignals]);
 
-  const showController = openModal;
-
-  const closeModal = useCallback(() => {
+  const hideController = useCallback(() => {
     if (busy) return;
     setOpen(false);
   }, [busy]);
-
-  const hideController = closeModal;
 
   const recordProposalReview = useCallback(
     (proposal: RequirementsSyncProposal) => {
@@ -175,19 +169,15 @@ export function useRequirementsSync({ projectSlug, selectedModelId, onApplied, o
       applyProposal,
       applying,
       busy,
-      closeModal,
-      collapsed,
       currentProposal,
       hideController,
       loadingStep,
       open,
-      openModal,
       proposeStep,
       proposals,
       refreshSignals,
       reset,
       setAllDiffs,
-      setCollapsed,
       setStep,
       setUserInstruction,
       showController,
@@ -202,13 +192,10 @@ export function useRequirementsSync({ projectSlug, selectedModelId, onApplied, o
       applyProposal,
       applying,
       busy,
-      closeModal,
-      collapsed,
       currentProposal,
       hideController,
       loadingStep,
       open,
-      openModal,
       proposeStep,
       proposals,
       refreshSignals,

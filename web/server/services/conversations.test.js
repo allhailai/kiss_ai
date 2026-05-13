@@ -118,6 +118,12 @@ describe("conversation service", () => {
                 nonGoals: ["Do not rewrite the full report."],
                 riskLevel: "medium",
               },
+              memory: {
+                fingerprint: "fingerprint_1",
+                reconsidersRejectedId: "rej_1",
+                reconsiderReason: "New source evidence supports reconsidering this change.",
+                suppressionState: "reconsidered",
+              },
             },
           ],
         },
@@ -150,12 +156,25 @@ describe("conversation service", () => {
               nonGoals: ["Do not rewrite the full report."],
               riskLevel: "medium",
             },
+            memory: {
+              fingerprint: "fingerprint_1",
+              reconsidersRejectedId: "rej_1",
+              reconsiderReason: "New source evidence supports reconsidering this change.",
+              suppressionState: "reconsidered",
+            },
           },
         ],
       },
     ]);
     await expect(service.readConversation(project, conversation.id)).resolves.toMatchObject({
-      editProposals: [{ id: "proposal_1", sourceMessageId: "msg_1", appliedAt: "2026-05-11T00:01:00.000Z" }],
+      editProposals: [
+        {
+          id: "proposal_1",
+          sourceMessageId: "msg_1",
+          appliedAt: "2026-05-11T00:01:00.000Z",
+          conceptualDiffs: [{ id: "diff_1", memory: { reconsidersRejectedId: "rej_1", suppressionState: "reconsidered" } }],
+        },
+      ],
     });
   });
 

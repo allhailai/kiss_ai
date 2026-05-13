@@ -26,7 +26,7 @@ src/
 
 App-owned orchestration belongs in `app/`. If state drives more than one workflow surface, keep the controller in `app/` or a focused `app/hooks/` module and pass behavior into features as props.
 
-Right-panel behavior is app shell state. Panel persistence, panel width, selected agent conversation mirroring, and file context selection belong in `app/`; the panel UI belongs in `features/agents/`.
+Right-panel behavior is app shell state. Panel persistence, panel width, panel kind, selected agent conversation mirroring, mode switching, and file context selection belong in `app/`. `features/agents/` owns the AI File Assist / agent chat panel body, and `features/requirementsSync/` owns the Requirements Sync panel body.
 
 `app/useProjectWorkspace.ts` owns the shared `projectFiles` index used by navigation, editor link resolution, and agent file context selection. View-specific file content stays in the selected file state; features should not maintain a parallel project tree unless the data is truly local to that workflow.
 
@@ -74,6 +74,7 @@ Current features:
 - `navigation/`
 - `projectPicker/`
 - `rebuild/`
+- `requirementsSync/`
 - `search/`
 - `toast/`
 
@@ -97,9 +98,9 @@ The right-panel chat, AI File Assist, and Requirements Sync are implementations 
 
 Start here, then follow the durable protocol contract in [`/opt/all_hail_ai/kiss_ai/docs/development/concepts/agent-protocol-edit-proposals.md`](/opt/all_hail_ai/kiss_ai/docs/development/concepts/agent-protocol-edit-proposals.md). That page explains intent, scope semantics, review UI expectations, and apply-agent rules.
 
-The frontend keeps shared conversation state and API orchestration in `app/hooks/useProjectChat.ts`; `features/agents/RightPanelAgentChat.tsx` owns the AI File Assist review UI for accepting, rejecting, and expanding conceptual diffs. Requirements Sync orchestration lives in `features/requirementsSync/useRequirementsSync.ts`, and `features/requirementsSync/RequirementsSyncModal.tsx` owns the `Goal > Inputs > Outputs` conceptual diff wizard.
+The frontend keeps shared conversation state and API orchestration in `app/hooks/useProjectChat.ts`; `features/agents/RightPanelAgentChat.tsx` owns the AI File Assist conversation composition. Requirements Sync orchestration lives in `features/requirementsSync/useRequirementsSync.ts`, and `features/requirementsSync/RequirementsSyncRightPanel.tsx` owns the `Goal > Inputs > Outputs` conceptual diff wizard. Shared conceptual diff review primitives live under `shared/conceptualDiff/` so AI File Assist and Requirements Sync render the same target, risk, evidence, and rejection-memory details.
 
-Proposal requests use route-specific stacks. `contracts/api.ts` defines shared request/response shapes. AI File Assist uses `data/chatApi.ts`, `server/routes/chatRoutes.js`, and `server/services/chatAgent.js`. Requirements Sync uses `data/requirementsSyncApi.ts`, `server/routes/requirementsSyncRoutes.js`, `server/services/requirementsSync.js`, and sync-specific prompts under `framework/prompts/requirements_sync/**`. Shared conceptual diff parsing lives in `server/services/conceptualDiffs.js`; shared rejection memory lives in `server/services/conceptualDiffMemory.js`.
+Proposal requests use route-specific stacks. `contracts/api.ts` defines shared request/response shapes. AI File Assist uses `data/chatApi.ts`, `server/routes/chatRoutes.js`, and `server/services/chatAgent.js`. Requirements Sync uses `data/requirementsSyncApi.ts`, `server/routes/requirementsSyncRoutes.js`, `server/services/requirementsSync.js`, and sync-specific prompts under `FRAMEWORK_ROOT/prompts/requirements_sync/**` (defaulting to `_kiss_ai/framework/prompts/requirements_sync/**` in this workspace layout). Shared conceptual diff parsing lives in `server/services/conceptualDiffs.js`; shared rejection memory lives in `server/services/conceptualDiffMemory.js`.
 
 The lifecycle is:
 
@@ -124,6 +125,8 @@ Only one Cursor agent task may run per project at a time. Chat, proposal, apply,
 Run `npm run check` from `web/` before handing off substantive changes. It runs app TypeScript, server TypeScript, boundary checks, and Vitest.
 
 `scripts/check-boundaries.js` is the import boundary gate. Keep it aligned with this document when adding layers, moving workflow ownership, or allowing a deliberate exception.
+
+The boundary gate intentionally checks static imports only and skips `*.test.*` / `*.spec.*` files. It enforces feature isolation, pure-ish domain/editor/navigation/shared layers, a thin `main.tsx`, and server filesystem/process/Cursor SDK ownership. It does not currently forbid every possible layer edge, such as `app/` importing `data/`, `data/` importing `navigation/`, or `domain/` importing `navigation/`; document or tighten those edges only when the architecture needs that stronger guarantee.
 
 ## Adding A New Workflow
 
