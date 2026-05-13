@@ -3,6 +3,7 @@ import { MAX_USER_MESSAGE_BYTES } from "../contracts/chatLimits.js";
 import { httpError } from "../services/httpErrors.js";
 import {
   applyEditProposalBodySchema,
+  applyRequirementsSyncBatchBodySchema,
   applyRequirementsSyncBodySchema,
   buildLogQuerySchema,
   conversationParamsSchema,
@@ -183,6 +184,10 @@ describe("request schemas", () => {
     expect(parseRequestBody(applyRequirementsSyncBodySchema, { modelId: "gpt-test", proposal }, httpError)).toMatchObject({
       modelId: "gpt-test",
       proposal,
+    });
+    expect(parseRequestBody(applyRequirementsSyncBatchBodySchema, { modelId: "gpt-test", proposals: [proposal] }, httpError)).toMatchObject({
+      modelId: "gpt-test",
+      proposals: [proposal],
     });
     expect(parseRequestBody(reviewRequirementsSyncBodySchema, { proposal }, httpError)).toMatchObject({ proposal });
     expect(() => parseRequestBody(proposeRequirementsSyncBodySchema, { step: "bad", modelId: "gpt-test" }, httpError)).toThrow(

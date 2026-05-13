@@ -67,6 +67,7 @@ export function registerApiRoutes(app, deps) {
   });
 
   registerRequirementsSyncRoutes(app, {
+    applyRequirementsSyncBatch: deps.applyRequirementsSyncBatch,
     applyRequirementsSync: deps.applyRequirementsSync,
     httpError: deps.httpError,
     proposeRequirementsSync: deps.proposeRequirementsSync,

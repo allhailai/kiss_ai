@@ -285,31 +285,50 @@
 
 .requirements-sync-file-strip {
   display: grid;
-  gap: 5px;
+  gap: 4px;
 }
 
 .requirements-sync-step {
   display: grid;
-  gap: 1px;
-  padding: 5px 7px;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
   border: 1px solid color-mix(in srgb, var(--color-secondary) 28%, var(--color-border));
-  border-radius: 10px;
+  border-radius: 9px;
   background: color-mix(in srgb, var(--color-secondary) 6%, var(--color-surface));
   color: var(--color-primary);
   text-align: left;
 }
 
 .requirements-sync-step strong {
-  overflow: hidden;
-  font-size: 0.72rem;
+  min-width: 0;
+  font-size: 0.78rem;
   line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .requirements-sync-step.active {
   border-color: color-mix(in srgb, var(--color-secondary) 70%, var(--color-border));
   background: color-mix(in srgb, var(--color-secondary) 14%, var(--color-surface));
+}
+
+.requirements-sync-step.status-generating,
+.requirements-sync-step.status-applying {
+  border-color: color-mix(in srgb, var(--color-warning) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface));
+}
+
+.requirements-sync-step.status-ready,
+.requirements-sync-step.status-applied {
+  border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface));
+}
+
+.requirements-sync-step.status-error,
+.requirements-sync-step.status-failed {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
 }
 
 .requirements-sync-step small,
@@ -330,6 +349,63 @@
   background: color-mix(in srgb, var(--color-secondary) 6%, var(--color-surface));
 }
 
+.requirements-sync-empty {
+  align-content: center;
+  justify-items: start;
+  gap: 14px;
+  min-height: 100%;
+  padding: 22px;
+  border-color: color-mix(in srgb, var(--color-secondary) 40%, var(--color-border));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-secondary) 12%, transparent), transparent 56%),
+    color-mix(in srgb, var(--color-secondary) 8%, var(--color-surface));
+}
+
+.requirements-sync-empty p {
+  color: color-mix(in srgb, var(--color-primary) 78%, var(--color-secondary));
+  font-weight: 700;
+}
+
+.requirements-sync-empty-action {
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 65%, var(--color-border));
+  border-radius: 999px;
+  background: var(--color-secondary);
+  color: white;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-secondary) 18%, transparent);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.requirements-sync-empty-action:hover,
+.requirements-sync-empty-action:focus-visible {
+  background: color-mix(in srgb, var(--color-secondary) 88%, black);
+  outline: 2px solid color-mix(in srgb, var(--color-secondary) 24%, transparent);
+  outline-offset: 2px;
+}
+
+.requirements-sync-empty-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+.requirements-sync-empty-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.requirements-sync-empty-files span {
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 35%, var(--color-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-secondary) 10%, var(--color-surface));
+  color: var(--color-primary);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
 .requirements-sync-signals.active {
   border-color: color-mix(in srgb, var(--color-secondary) 70%, var(--color-border));
   background: color-mix(in srgb, var(--color-secondary) 14%, var(--color-surface));
@@ -343,11 +419,33 @@
 }
 
 .requirements-sync-step small {
+  justify-self: end;
   overflow: hidden;
-  font-size: 0.66rem;
+  max-width: 170px;
+  font-size: 0.68rem;
+  font-weight: 800;
   line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.requirements-sync-step.status-generating small::before {
+  content: "";
+  display: inline-block;
+  width: 0.48rem;
+  height: 0.48rem;
+  margin-right: 5px;
+  border: 2px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
+  border-top-color: var(--color-warning);
+  border-radius: 999px;
+  vertical-align: -0.06em;
+  animation: requirements-sync-thinking 0.8s linear infinite;
+}
+
+@keyframes requirements-sync-thinking {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .requirements-sync-panel .requirements-sync-file-strip,
@@ -375,6 +473,7 @@
 .requirements-sync-generate-actions {
   flex: 0 0 auto;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
@@ -393,20 +492,9 @@
   background: color-mix(in srgb, var(--color-surface) 88%, var(--color-background));
 }
 
-.requirements-sync-run-controls > div:first-child {
+.requirements-sync-run-controls > .chat-model-picker {
+  flex: 0 1 auto;
   min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.requirements-sync-run-controls code {
-  overflow: hidden;
-  color: var(--color-primary);
-  font-size: 0.76rem;
-  font-weight: 800;
-  line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .requirements-sync-run-controls .chat-model-trigger {
@@ -446,6 +534,28 @@
   box-shadow: none;
 }
 
+.requirements-sync-run-controls .agent-edit-proposal-apply {
+  min-height: 32px;
+  padding: 6px 13px;
+  border-color: color-mix(in srgb, var(--color-secondary) 58%, var(--color-border));
+  background: var(--color-secondary);
+  color: white;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-secondary) 18%, transparent);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.requirements-sync-run-controls .agent-edit-proposal-apply:hover,
+.requirements-sync-run-controls .agent-edit-proposal-apply:focus-visible {
+  background: color-mix(in srgb, var(--color-secondary) 88%, black);
+  outline: 2px solid color-mix(in srgb, var(--color-secondary) 24%, transparent);
+  outline-offset: 2px;
+}
+
+.requirements-sync-run-controls .agent-edit-proposal-apply:disabled {
+  box-shadow: none;
+}
+
 .requirements-sync-panel-review-heading p {
   margin: 2px 0 0;
   color: color-mix(in srgb, var(--color-secondary) 62%, var(--color-primary));
@@ -457,30 +567,236 @@
   max-height: none;
   min-height: 0;
   height: 100%;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   overflow: hidden;
   margin: 0;
+  border-color: color-mix(in srgb, var(--color-secondary) 42%, var(--color-border));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-secondary) 10%, transparent), transparent 48%),
+    color-mix(in srgb, var(--color-secondary) 7%, var(--color-surface));
+}
+
+.requirements-sync-edit-proposal .agent-edit-proposal-header {
+  padding-bottom: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-secondary) 28%, var(--color-border));
+}
+
+.requirements-sync-edit-proposal .agent-context-label,
+.requirements-sync-edit-proposal .agent-edit-proposal-header > strong {
+  color: var(--color-secondary);
+}
+
+.requirements-sync-edit-proposal .agent-edit-proposal-header p {
+  color: color-mix(in srgb, var(--color-secondary) 72%, var(--color-primary));
+}
+
+.requirements-sync-edit-proposal .agent-edit-proposal-actions button {
+  border-color: color-mix(in srgb, var(--color-secondary) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 8%, white);
+  color: var(--color-secondary);
+}
+
+.requirements-sync-edit-proposal .agent-edit-proposal-actions button:hover,
+.requirements-sync-edit-proposal .agent-edit-proposal-actions button:focus-visible {
+  border-color: color-mix(in srgb, var(--color-secondary) 60%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 14%, white);
+  outline-color: color-mix(in srgb, var(--color-secondary) 22%, transparent);
 }
 
 .agent-edit-proposal.requirements-sync-edit-proposal .agent-edit-proposal-files {
   min-height: 0;
+  align-content: start;
+  grid-auto-rows: max-content;
   overflow: auto;
 }
 
 .agent-edit-proposal.requirements-sync-edit-proposal .agent-edit-proposal-file {
-  min-height: 100%;
-  align-content: start;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-content: normal;
+  overflow: visible;
+}
+
+.agent-edit-proposal.requirements-sync-edit-proposal .agent-edit-proposal-file.requirements-sync-review-file {
+  gap: 0;
+  padding: 0;
+  border-color: color-mix(in srgb, var(--color-secondary) 34%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 9%, var(--color-surface));
+  overflow: hidden;
+}
+
+.requirements-sync-review-file-heading {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-secondary) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 24%, var(--color-surface));
+}
+
+.requirements-sync-review-file-title-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.requirements-sync-review-summary p,
+.requirements-sync-apply-result {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.requirements-sync-review-summary strong {
+  color: color-mix(in srgb, var(--color-secondary) 72%, var(--color-primary));
+  font-weight: 900;
+}
+
+.requirements-sync-review-summary button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+}
+
+.requirements-sync-review-summary button:hover,
+.requirements-sync-review-summary button:focus-visible {
+  color: color-mix(in srgb, var(--color-secondary) 82%, var(--color-primary));
+  text-decoration: underline;
+  outline: none;
+}
+
+.requirements-sync-review-summary-collapse {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.requirements-sync-review-file-heading strong {
+  flex: 0 0 auto;
+  color: var(--color-secondary);
+  font-size: 0.9rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.requirements-sync-review-file-title-row span {
+  flex: 0 0 auto;
+  color: var(--color-primary);
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.requirements-sync-file-actions {
+  justify-content: flex-start;
+  padding: 8px 12px 0;
+}
+
+.requirements-sync-review-file .agent-edit-proposal-diff {
+  flex: 0 0 auto;
+  margin: 8px 12px 0;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 32%, var(--color-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-secondary) 10%, var(--color-surface));
+}
+
+.requirements-sync-review-file .agent-edit-proposal-diff:last-child,
+.requirements-sync-review-file .requirements-sync-no-diffs:last-child {
+  margin-bottom: 12px;
+}
+
+.requirements-sync-edit-proposal .agent-edit-proposal-diff input {
+  accent-color: var(--color-secondary);
+}
+
+.requirements-sync-edit-proposal .agent-edit-proposal-diff strong {
+  color: color-mix(in srgb, var(--color-primary) 86%, var(--color-secondary));
+}
+
+.requirements-sync-edit-proposal .agent-edit-proposal-diff small {
+  color: color-mix(in srgb, var(--color-secondary) 72%, var(--color-primary));
+}
+
+.requirements-sync-edit-proposal .agent-edit-proposal-badge {
+  border-color: color-mix(in srgb, var(--color-secondary) 26%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 8%, var(--color-surface));
+  color: color-mix(in srgb, var(--color-secondary) 82%, var(--color-primary));
+}
+
+.requirements-sync-edit-proposal .agent-edit-proposal-badge.elevated {
+  border-color: color-mix(in srgb, var(--color-secondary) 46%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 14%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+.requirements-sync-edit-proposal .agent-edit-proposal-badge.memory {
+  border-color: color-mix(in srgb, var(--color-secondary) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 12%, var(--color-surface));
+  color: var(--color-secondary);
+}
+
+.requirements-sync-edit-proposal .agent-edit-proposal-details summary,
+.requirements-sync-source-signals summary {
+  color: var(--color-secondary);
+}
+
+.requirements-sync-edit-proposal .agent-edit-proposal-detail-grid {
+  border-color: color-mix(in srgb, var(--color-secondary) 24%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 6%, var(--color-surface));
+}
+
+.requirements-sync-apply-result {
+  margin: 8px 12px 0;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-background) 55%, var(--color-surface));
+}
+
+.requirements-sync-apply-result.status-applied {
+  border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-border));
+  background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface));
+}
+
+.requirements-sync-apply-result.status-skipped {
+  border-color: color-mix(in srgb, var(--color-secondary) 25%, var(--color-border));
+}
+
+.requirements-sync-apply-result.status-failed {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
 }
 
 .requirements-sync-source-signals {
   min-width: 0;
+  padding: 8px 12px 0;
 }
 
 .requirements-sync-source-signals summary {
   cursor: pointer;
-  color: var(--color-accent);
+  color: var(--color-secondary);
   font-size: 0.7rem;
   font-weight: 900;
+}
+
+.requirements-sync-source-signals summary:hover,
+.requirements-sync-source-signals summary:focus-visible {
+  color: color-mix(in srgb, var(--color-secondary) 82%, var(--color-primary));
+  outline: 2px solid color-mix(in srgb, var(--color-secondary) 18%, transparent);
+  outline-offset: 2px;
 }
 
 .requirements-sync-source-signals ul {
@@ -492,10 +808,18 @@
 }
 
 .requirements-sync-no-diffs {
-  margin: 0;
-  color: var(--color-secondary);
-  font-size: 0.78rem;
-  line-height: 1.4;
+  margin: 8px 12px 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-success) 42%, var(--color-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-success) 9%, var(--color-surface));
+  color: color-mix(in srgb, var(--color-primary) 82%, var(--color-success));
+  font-size: 0.84rem;
+  line-height: 1.3;
+}
+
+.requirements-sync-no-diffs strong {
+  font-weight: 900;
 }
 
 .requirements-sync-panel-actions {

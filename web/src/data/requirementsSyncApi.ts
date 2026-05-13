@@ -1,4 +1,6 @@
 import type {
+  ApplyRequirementsSyncBatchRequest,
+  ApplyRequirementsSyncBatchResponse,
   ApplyRequirementsSyncRequest,
   ApplyRequirementsSyncResponse,
   ProposeRequirementsSyncRequest,
@@ -19,6 +21,11 @@ export const requirementsSyncApi = {
     }),
   applyRequirementsSync: (projectSlug: string, body: ApplyRequirementsSyncRequest) =>
     request<ApplyRequirementsSyncResponse>(`${projectBase(projectSlug)}/requirements-sync/apply`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  applyRequirementsSyncBatch: (projectSlug: string, body: ApplyRequirementsSyncBatchRequest) =>
+    request<ApplyRequirementsSyncBatchResponse>(`${projectBase(projectSlug)}/requirements-sync/apply-batch`, {
       method: "POST",
       body: JSON.stringify(body),
     }),

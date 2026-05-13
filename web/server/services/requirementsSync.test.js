@@ -87,6 +87,14 @@ function createHarness(options = { frameworkRoot: "", runCursorAgent: null }) {
   return { files, project, service };
 }
 
+async function proposeAllRequirementsSync(service, project) {
+  const proposals = [];
+  for (const step of ["goal", "inputs", "outputs"]) {
+    proposals.push((await service.proposeRequirementsSync(project, { step, modelId: "model-a" })).proposal);
+  }
+  return proposals;
+}
+
 describe("requirements sync service", () => {
   it("extracts structured proposals", () => {
     const proposal = extractRequirementsSyncProposal(
@@ -145,6 +153,84 @@ describe("requirements sync service", () => {
       summary: "Applied goal.",
     });
     expect(files.get("human_goal_requirements.md")).toBe("Applied goal\n");
+  });
+
+  it("applies all accepted requirements sync proposals in a batch", async () => {
+    const frameworkRoot = await createFrameworkRoot();
+    const { files, project, service } = createHarness({ frameworkRoot, runCursorAgent: null });
+    const proposals = await proposeAllRequirementsSync(service, project);
+
+    const response = await service.applyRequirementsSyncBatch(project, { modelId: "model-a", proposals });
+
+    expect(response.results).toEqual([
+      expect.objectContaining({ step: "goal", status: "applied", appliedFile: { path: "human_goal_requirements.md", contentHash: "hash:13" } }),
+      expect.objectContaining({ step: "inputs", status: "applied", appliedFile: { path: "human_input_requirements.md", contentHash: "hash:15" } }),
+      expect.objectContaining({ step: "outputs", status: "applied", appliedFile: { path: "human_output_requirements.md", contentHash: "hash:16" } }),
+    ]);
+    expect(files.get("human_goal_requirements.md")).toBe("Applied goal\n");
+    expect(files.get("human_input_requirements.md")).toBe("Applied inputs\n");
+    expect(files.get("human_output_requirements.md")).toBe("Applied outputs\n");
+  });
+
+  it("records rejected batch proposals and skips files with no accepted diffs", async () => {
+    const frameworkRoot = await createFrameworkRoot();
+    const projectPath = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-rs-batch-memory-"));
+    const { project, service } = createHarness({ frameworkRoot, projectPath, runCursorAgent: null });
+    const proposals = await proposeAllRequirementsSync(service, project);
+    const reviewed = proposals.map((proposal) =>
+      proposal.step === "goal"
+        ? { ...proposal, conceptualDiffs: proposal.conceptualDiffs.map((diff) => ({ ...diff, status: "rejected" })) }
+        : proposal.step === "inputs"
+          ? { ...proposal, conceptualDiffs: [] }
+          : proposal,
+    );
+
+    const response = await service.applyRequirementsSyncBatch(project, { modelId: "model-a", proposals: reviewed });
+    const memory = normalizeConceptualDiffMemoryFile(JSON.parse(await fs.readFile(path.join(projectPath, ".conceptual-diff-memory.json"), "utf8")));
+
+    expect(response.results).toEqual([
+      expect.objectContaining({ step: "goal", status: "skipped" }),
+      expect.objectContaining({ step: "inputs", status: "skipped" }),
+      expect.objectContaining({ step: "outputs", status: "applied" }),
+    ]);
+    expect(memory.records).toEqual([expect.objectContaining({ flow: "requirements_sync", step: "goal", filePath: "human_goal_requirements.md" })]);
+  });
+
+  it("returns per-file failures when one batch apply fails", async () => {
+    const frameworkRoot = await createFrameworkRoot();
+    const { project, service } = createHarness({
+      frameworkRoot,
+      runCursorAgent: async ({ onEvent, prompt }) => {
+        const step = prompt.includes('"step": "inputs"') ? "inputs" : prompt.includes('"step": "outputs"') ? "outputs" : "goal";
+        if (prompt.includes("approved_conceptual_diffs") && step === "inputs") throw new Error("Inputs apply failed.");
+        const targetFilePath =
+          step === "inputs" ? "human_input_requirements.md" : step === "outputs" ? "human_output_requirements.md" : "human_goal_requirements.md";
+        if (prompt.includes("approved_conceptual_diffs")) {
+          await onEvent({
+            type: "assistant_delta",
+            text: `<requirements_sync_apply_json>${JSON.stringify({ failedConceptualDiffIds: [], notice: `Applied ${step}.` })}</requirements_sync_apply_json>`,
+          });
+          return;
+        }
+        await onEvent({
+          type: "assistant_delta",
+          text: `<requirements_sync_proposal_json>${JSON.stringify({
+            summary: `Updated ${step}.`,
+            conceptualDiffs: [{ id: `${step}_diff`, filePath: targetFilePath, title: "Clarify", summary: "Clarify requirements.", status: "accepted" }],
+            sourceSignalsUsed: [],
+          })}</requirements_sync_proposal_json>`,
+        });
+      },
+    });
+    const proposals = await proposeAllRequirementsSync(service, project);
+
+    const response = await service.applyRequirementsSyncBatch(project, { modelId: "model-a", proposals });
+
+    expect(response.results).toEqual([
+      expect.objectContaining({ step: "goal", status: "applied" }),
+      expect.objectContaining({ step: "inputs", status: "failed", summary: "Inputs apply failed." }),
+      expect.objectContaining({ step: "outputs", status: "applied" }),
+    ]);
   });
 
   it("includes relevant rejection memory in requirements sync proposal prompts", async () => {

@@ -249,7 +249,7 @@ const { startHumanAttentionResolution, startRebuild } = createAgentJobService({
   setRebuildState,
 });
 
-const { applyRequirementsSync, proposeRequirementsSync, recordRequirementsSyncReview, requirementsSyncSignals } = createRequirementsSyncService({
+const { applyRequirementsSyncBatch, applyRequirementsSync, proposeRequirementsSync, recordRequirementsSyncReview, requirementsSyncSignals } = createRequirementsSyncService({
   FRAMEWORK_ROOT,
   gitFileDiffText,
   gitFileDiffTexts,
@@ -306,6 +306,7 @@ registerApiRoutes(app, {
   restoreFileFromHead,
   searchFiles,
   applyEditProposal,
+  applyRequirementsSyncBatch,
   applyRequirementsSync,
   editChatMessage,
   generateEditProposal,

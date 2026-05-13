@@ -166,6 +166,7 @@ describe("API routes", () => {
       next();
     });
     registerRequirementsSyncRoutes(app, {
+      applyRequirementsSyncBatch: async () => ({}),
       applyRequirementsSync: async () => ({}),
       httpError,
       proposeRequirementsSync: async () => ({}),

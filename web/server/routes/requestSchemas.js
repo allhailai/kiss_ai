@@ -189,6 +189,11 @@ export const applyRequirementsSyncBodySchema = z.object({
   proposal: requirementsSyncProposalSchema,
 });
 
+export const applyRequirementsSyncBatchBodySchema = z.object({
+  modelId: z.string().trim().min(1).max(160),
+  proposals: z.array(requirementsSyncProposalSchema).min(1).max(3),
+});
+
 export const reviewRequirementsSyncBodySchema = z.object({
   proposal: requirementsSyncProposalSchema,
 });

@@ -18,6 +18,8 @@ import { requirementsSyncSteps } from "../../domain/requirementsSync";
 import { AgentTranscript } from "../../shared/agents/AgentTranscript";
 import { ModelSelect } from "../../shared/ModelSelect";
 
+type RequirementsSyncStepStatus = "idle" | "generating" | "ready" | "error" | "applying" | "applied" | "skipped" | "failed";
+
 function formatRunDuration(rebuild: RebuildState | null) {
   if (!rebuild?.startedAt) return "Not started";
 
@@ -55,9 +57,26 @@ function optionLabel(option: ResolutionOption) {
   return `${option.recommended ? "Recommended: " : ""}${option.label || option.id}`;
 }
 
-function requirementsSyncStepStatus(step: RequirementsSyncStep, proposal: RequirementsSyncProposal | undefined, activeStep: RequirementsSyncStep) {
-  if (proposal) return step === activeStep ? "Ready to review" : "Proposal ready";
-  return step === activeStep ? "Current file" : "Not started";
+function requirementsSyncStepStatus(status: RequirementsSyncStepStatus, proposal: RequirementsSyncProposal | undefined, active: boolean) {
+  switch (status) {
+    case "generating":
+      return "Generating proposal";
+    case "ready":
+      return active ? "Ready to review" : "Proposal ready";
+    case "error":
+      return "Needs regeneration";
+    case "applying":
+      return "Submitting review";
+    case "applied":
+      return "Applied";
+    case "skipped":
+      return "Skipped";
+    case "failed":
+      return "Apply failed";
+    default:
+      if (proposal) return active ? "Ready to review" : "Proposal ready";
+      return active ? "Focused file" : "Not started";
+  }
 }
 
 function CopyableValue({ value }: { value: string }) {
@@ -88,6 +107,7 @@ export function RebuildWorkspace({
   requirementsSyncBusy,
   requirementsSyncProposals,
   requirementsSyncStep,
+  requirementsSyncStepStatuses,
   onRequirementsSyncStepChange,
   onResolve,
 }: {
@@ -105,6 +125,7 @@ export function RebuildWorkspace({
   requirementsSyncBusy: boolean;
   requirementsSyncProposals: Partial<Record<RequirementsSyncStep, RequirementsSyncProposal>>;
   requirementsSyncStep: RequirementsSyncStep;
+  requirementsSyncStepStatuses: Record<RequirementsSyncStep, RequirementsSyncStepStatus>;
   onRequirementsSyncStepChange: (step: RequirementsSyncStep) => void;
   onResolve: (request: { itemId: string; resolutionOptionId?: string; manualPrompt?: string }) => void;
 }) {
@@ -152,17 +173,17 @@ export function RebuildWorkspace({
               <div className="requirements-sync-rebuild-controller-heading">
                 <div>
                   <span className="eyebrow">Requirements sync</span>
-                  <strong>Goal &gt; Inputs &gt; Outputs</strong>
+                  <strong>Goal, Inputs, and Outputs</strong>
                   <p>{requirementsSyncSignals?.summary ?? "No requirements sync signals loaded yet."}</p>
                 </div>
                 <button disabled={Boolean(rebuild?.running) || requirementsSyncBusy} onClick={onStartRequirementsSync} type="button">
-                  Start Sync
+                  {requirementsSyncBusy ? "Sync Running" : "Start Sync"}
                 </button>
               </div>
               <div className="requirements-sync-rebuild-steps" aria-label="Requirements sync file status">
                 {requirementsSyncSteps.map((step) => (
                   <button
-                    className={step.id === requirementsSyncStep ? "requirements-sync-rebuild-step active" : "requirements-sync-rebuild-step"}
+                    className={`requirements-sync-rebuild-step status-${requirementsSyncStepStatuses[step.id]}${step.id === requirementsSyncStep ? " active" : ""}`}
                     disabled={requirementsSyncBusy}
                     key={step.id}
                     onClick={() => onRequirementsSyncStepChange(step.id)}
@@ -170,7 +191,7 @@ export function RebuildWorkspace({
                   >
                     <span>{step.label}</span>
                     <strong>{step.filePath}</strong>
-                    <small>{requirementsSyncStepStatus(step.id, requirementsSyncProposals[step.id], requirementsSyncStep)}</small>
+                    <small>{requirementsSyncStepStatus(requirementsSyncStepStatuses[step.id], requirementsSyncProposals[step.id], step.id === requirementsSyncStep)}</small>
                   </button>
                 ))}
               </div>

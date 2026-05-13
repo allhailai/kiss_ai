@@ -115,6 +115,10 @@ export function App() {
     requirementsSync.showController();
     rightPanelSurface.openPanel(panelForKind("requirements-sync"));
   };
+  const startRequirementsSync = () => {
+    openRequirementsSyncPanel();
+    void requirementsSync.syncAll();
+  };
   const closeRightPanel = () => {
     if (rightPanelSurface.rightPanel?.kind === "agent-chat") {
       closeAgentPanel();
@@ -291,12 +295,13 @@ export function App() {
             onOpenRequirementsSync={openRequirementsSyncPanel}
             onShowRequirementsSyncController={requirementsSync.showController}
             onStart={startRebuildWithRequirementsCheck}
-            onStartRequirementsSync={openRequirementsSyncPanel}
+            onStartRequirementsSync={startRequirementsSync}
             requirementsSyncSignals={requirementsSync.signals}
             requirementsSyncControllerOpen={requirementsSync.open}
             requirementsSyncBusy={requirementsSync.busy}
             requirementsSyncProposals={requirementsSync.proposals}
             requirementsSyncStep={requirementsSync.step}
+            requirementsSyncStepStatuses={requirementsSync.stepStatuses}
             onRequirementsSyncStepChange={requirementsSync.setStep}
             onResolve={(request) => void rebuildWorkspace.resolveHumanAttention(request)}
           />

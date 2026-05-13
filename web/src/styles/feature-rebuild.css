@@ -72,6 +72,24 @@
   background: color-mix(in srgb, var(--color-accent) 9%, var(--color-surface));
 }
 
+.requirements-sync-rebuild-step.status-generating,
+.requirements-sync-rebuild-step.status-applying {
+  border-color: color-mix(in srgb, var(--color-warning) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface));
+}
+
+.requirements-sync-rebuild-step.status-ready,
+.requirements-sync-rebuild-step.status-applied {
+  border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface));
+}
+
+.requirements-sync-rebuild-step.status-error,
+.requirements-sync-rebuild-step.status-failed {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
+}
+
 .requirements-sync-rebuild-step span,
 .requirements-sync-rebuild-step small {
   color: var(--color-secondary);

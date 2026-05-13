@@ -427,12 +427,17 @@ export function createRequirementsSyncService({
     };
   }
 
-  async function applyRequirementsSync(project, body) {
-    const proposal = body.proposal;
+  function validateApplyProposal(proposal, errorPrefix = "Cannot apply requirements sync") {
     if (!proposal) throw httpError("Apply requires a requirements sync proposal.", 400, "requirements_sync_empty_apply");
     const step = normalizeStep(proposal.step);
     const targetPath = String(proposal.targetFilePath ?? "").trim();
-    if (targetPath !== requirementFilePaths[step]) throw httpError(`Cannot apply requirements sync to ${targetPath}.`, 403, "requirements_sync_path_not_allowed");
+    if (targetPath !== requirementFilePaths[step]) throw httpError(`${errorPrefix} to ${targetPath}.`, 403, "requirements_sync_path_not_allowed");
+    return { step, targetPath };
+  }
+
+  async function applyRequirementsSync(project, body) {
+    const proposal = body.proposal;
+    const { targetPath } = validateApplyProposal(proposal);
     const acceptedConceptualDiffs = proposal.conceptualDiffs.filter((diff) => diff.status === "accepted" && diff.filePath === targetPath);
     await recordRequirementsSyncReview(project, { proposal });
     if (proposal.conceptualDiffs.length && !acceptedConceptualDiffs.length) {
@@ -497,6 +502,74 @@ export function createRequirementsSyncService({
     }
   }
 
+  async function applyRequirementsSyncBatch(project, body) {
+    const requestedModelId = String(body.modelId ?? "").trim();
+    if (!requestedModelId) throw httpError("Requirements sync batch apply requires a model.", 400, "requirements_sync_model_required");
+
+    const proposalByStep = new Map();
+    for (const proposal of body.proposals ?? []) {
+      const { step } = validateApplyProposal(proposal, "Cannot batch apply requirements sync");
+      if (proposalByStep.has(step)) throw httpError(`Duplicate Requirements Sync proposal for ${step}.`, 400, "requirements_sync_duplicate_step");
+      proposalByStep.set(step, proposal);
+    }
+
+    const missingSteps = requirementSteps.filter((step) => !proposalByStep.has(step));
+    if (missingSteps.length) {
+      throw httpError(`Requirements Sync batch apply is missing proposal(s): ${missingSteps.join(", ")}.`, 400, "requirements_sync_missing_steps");
+    }
+
+    const results = [];
+    for (const step of requirementSteps) {
+      const proposal = proposalByStep.get(step);
+      const targetPath = requirementFilePaths[step];
+      const acceptedConceptualDiffs = proposal.conceptualDiffs.filter((diff) => diff.status === "accepted" && diff.filePath === targetPath);
+
+      if (!acceptedConceptualDiffs.length) {
+        await recordRequirementsSyncReview(project, { proposal });
+        results.push({
+          step,
+          targetFilePath: targetPath,
+          status: "skipped",
+          appliedFile: null,
+          failedConceptualDiffIds: [],
+          summary: proposal.conceptualDiffs.length
+            ? `Skipped ${targetPath}; no conceptual diffs were accepted.`
+            : `Skipped ${targetPath}; no conceptual diffs were proposed.`,
+        });
+        continue;
+      }
+
+      try {
+        const response = await applyRequirementsSync(project, { modelId: requestedModelId, proposal });
+        results.push({
+          step,
+          targetFilePath: targetPath,
+          status: response.failedConceptualDiffIds.length ? "failed" : "applied",
+          appliedFile: response.appliedFile,
+          failedConceptualDiffIds: response.failedConceptualDiffIds,
+          summary: response.summary,
+        });
+      } catch (error) {
+        results.push({
+          step,
+          targetFilePath: targetPath,
+          status: "failed",
+          appliedFile: null,
+          failedConceptualDiffIds: acceptedConceptualDiffs.map((diff) => diff.id),
+          summary: error instanceof Error ? error.message : `Could not apply Requirements Sync to ${targetPath}.`,
+        });
+      }
+    }
+
+    const appliedCount = results.filter((result) => result.status === "applied").length;
+    const failedCount = results.filter((result) => result.status === "failed").length;
+    const skippedCount = results.filter((result) => result.status === "skipped").length;
+    return {
+      results,
+      summary: `Requirements Sync complete: ${appliedCount} applied, ${skippedCount} skipped, ${failedCount} failed.`,
+    };
+  }
+
   async function requirementsSyncSignals(project) {
     const signalInventory = await collectSignalInventory({ project, gitFileDiffText, gitFileDiffTexts, gitStatus, listProjectFiles });
     const openQuestions = await readOptionalTextFile(readTextFile, project.path, "human_open_questions.md");
@@ -521,6 +594,7 @@ export function createRequirementsSyncService({
   }
 
   return {
+    applyRequirementsSyncBatch,
     applyRequirementsSync,
     proposeRequirementsSync,
     recordRequirementsSyncReview,

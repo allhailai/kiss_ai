@@ -1,4 +1,5 @@
 import {
+  applyRequirementsSyncBatchBodySchema,
   applyRequirementsSyncBodySchema,
   parseRequestBody,
   proposeRequirementsSyncBodySchema,
@@ -6,6 +7,7 @@ import {
 } from "./requestSchemas.js";
 
 export function registerRequirementsSyncRoutes(app, {
+  applyRequirementsSyncBatch,
   applyRequirementsSync,
   httpError,
   proposeRequirementsSync,
@@ -31,6 +33,14 @@ export function registerRequirementsSyncRoutes(app, {
   app.post("/api/projects/:projectSlug/requirements-sync/apply", async (request, response, next) => {
     try {
       response.json(await applyRequirementsSync(request.project, parseRequestBody(applyRequirementsSyncBodySchema, request.body, httpError)));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/requirements-sync/apply-batch", async (request, response, next) => {
+    try {
+      response.json(await applyRequirementsSyncBatch(request.project, parseRequestBody(applyRequirementsSyncBatchBodySchema, request.body, httpError)));
     } catch (error) {
       next(error);
     }

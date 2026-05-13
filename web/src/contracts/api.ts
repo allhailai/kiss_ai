@@ -424,6 +424,28 @@ export type ApplyRequirementsSyncResponse = {
   summary: string;
 };
 
+export type ApplyRequirementsSyncBatchRequest = {
+  modelId: string;
+  proposals: RequirementsSyncProposal[];
+};
+
+export type RequirementsSyncBatchApplyResult = {
+  step: RequirementsSyncStep;
+  targetFilePath: RequirementsSyncProposal["targetFilePath"];
+  status: "applied" | "skipped" | "failed";
+  appliedFile: {
+    path: string;
+    contentHash: string;
+  } | null;
+  failedConceptualDiffIds: string[];
+  summary: string;
+};
+
+export type ApplyRequirementsSyncBatchResponse = {
+  results: RequirementsSyncBatchApplyResult[];
+  summary: string;
+};
+
 export type ReviewRequirementsSyncRequest = {
   proposal: RequirementsSyncProposal;
 };
