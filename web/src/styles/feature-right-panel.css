@@ -24,7 +24,8 @@
   background: var(--color-surface);
 }
 
-.right-panel-requirements-sync .right-panel-surface {
+.right-panel-requirements-sync .right-panel-surface,
+.right-panel-build-project .right-panel-surface {
   background: color-mix(in srgb, var(--color-secondary) 30%, transparent);
 }
 
@@ -221,7 +222,9 @@
 }
 
 .requirements-sync-panel .right-panel-mode-switch button.active,
-.requirements-sync-panel .right-panel-mode-switch button[aria-pressed="true"] {
+.requirements-sync-panel .right-panel-mode-switch button[aria-pressed="true"],
+.build-project-panel .right-panel-mode-switch button.active,
+.build-project-panel .right-panel-mode-switch button[aria-pressed="true"] {
   background: var(--color-secondary);
   color: white;
 }
@@ -553,6 +556,374 @@
 }
 
 .requirements-sync-run-controls .agent-edit-proposal-apply:disabled {
+  box-shadow: none;
+}
+
+.build-project-panel {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.build-project-panel-header {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.build-project-panel-header h2,
+.build-project-panel-header p {
+  margin: 0;
+}
+
+.build-project-panel-header h2 {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.build-project-panel-header p {
+  color: var(--color-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.build-project-stream-shell {
+  min-height: 0;
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  overflow: hidden;
+  padding: 0 12px;
+}
+
+.build-project-stream {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 32%, var(--color-border));
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-secondary) 8%, transparent), transparent 52%),
+    color-mix(in srgb, var(--color-surface) 90%, var(--color-background));
+  overscroll-behavior: contain;
+}
+
+.build-project-empty {
+  min-height: 220px;
+  display: grid;
+  align-content: center;
+  gap: 12px;
+}
+
+.build-project-empty p {
+  margin: 0;
+  color: var(--color-secondary);
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.build-project-empty-action {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 65%, var(--color-border));
+  border-radius: 999px;
+  background: var(--color-secondary);
+  color: white;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-secondary) 18%, transparent);
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
+.build-project-empty-action:hover,
+.build-project-empty-action:focus-visible {
+  background: color-mix(in srgb, var(--color-secondary) 88%, black);
+  outline: 2px solid color-mix(in srgb, var(--color-secondary) 24%, transparent);
+  outline-offset: 2px;
+}
+
+.build-project-empty-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+.build-project-event,
+.build-project-agent-thinking {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 28%, var(--color-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, white 70%, var(--color-surface));
+}
+
+.build-project-event-assistant_message,
+.build-project-agent-thinking {
+  border-color: color-mix(in srgb, var(--color-secondary) 48%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 10%, var(--color-surface));
+}
+
+.build-project-event-error {
+  border-color: color-mix(in srgb, var(--color-danger) 48%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
+}
+
+.build-project-event header,
+.build-project-agent-thinking header {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--color-secondary);
+  font-size: 0.7rem;
+  line-height: 1.15;
+}
+
+.build-project-event header strong,
+.build-project-agent-thinking header strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-primary);
+  font-size: 0.76rem;
+}
+
+.build-project-event header span,
+.build-project-event-status {
+  color: var(--color-secondary);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.build-project-event-body {
+  color: var(--color-primary);
+  font-size: 0.84rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.build-project-event-body p {
+  margin: 0 0 8px;
+}
+
+.build-project-event-body p:last-child {
+  margin-bottom: 0;
+}
+
+.build-project-completion {
+  display: grid;
+  gap: 3px;
+  padding: 9px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 13px;
+  background: var(--color-surface);
+}
+
+.build-project-completion strong {
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
+.build-project-completion p {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.build-project-completion-success {
+  border-color: color-mix(in srgb, var(--color-success) 54%, var(--color-border));
+  background: color-mix(in srgb, var(--color-success) 10%, var(--color-surface));
+}
+
+.build-project-completion-attention {
+  border-color: color-mix(in srgb, var(--color-warning) 58%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface));
+}
+
+.build-project-completion-danger {
+  border-color: color-mix(in srgb, var(--color-danger) 54%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
+}
+
+.build-project-details {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: min(42%, 360px);
+  display: grid;
+  align-content: start;
+  gap: 0;
+  margin: 0 12px;
+  overflow: auto;
+}
+
+.build-project-details details {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 24%, var(--color-border));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--color-secondary) 6%, var(--color-surface));
+}
+
+.build-project-details summary {
+  color: var(--color-secondary);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.build-project-runner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.build-project-runner-grid div,
+.build-project-latest-log {
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 22%, var(--color-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, white 70%, var(--color-surface));
+}
+
+.build-project-runner-grid span,
+.build-project-latest-log span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--color-secondary);
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.build-project-runner-grid strong,
+.build-project-latest-log p {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: 0.76rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.build-project-technical-details,
+.build-project-key-source,
+.build-project-attention > p {
+  margin: 8px 0 0;
+  color: var(--color-secondary);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.build-project-technical-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.build-project-latest-log {
+  margin-top: 8px;
+}
+
+.build-project-key-warning {
+  margin: 0;
+}
+
+.build-project-details .agent-debug-log {
+  margin-top: 0;
+}
+
+.build-project-run-controls {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 12px;
+  padding: 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface) 88%, var(--color-background));
+}
+
+.build-project-run-controls > .chat-model-picker {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.build-project-run-controls .chat-model-trigger {
+  border-color: color-mix(in srgb, var(--color-secondary) 48%, var(--color-border));
+}
+
+.build-project-run-controls .chat-model-trigger:hover,
+.build-project-run-controls .chat-model-trigger:focus-visible {
+  border-color: color-mix(in srgb, var(--color-secondary) 58%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 10%, white);
+  outline-color: color-mix(in srgb, var(--color-secondary) 22%, transparent);
+}
+
+.build-project-run-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.build-project-run-actions p {
+  min-width: 0;
+  max-width: 180px;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.build-project-build-button {
+  min-height: 32px;
+  padding: 6px 13px;
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 58%, var(--color-border));
+  border-radius: 999px;
+  background: var(--color-secondary);
+  color: white;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-secondary) 22%, transparent);
+  font-size: 0.82rem;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.build-project-build-button:hover,
+.build-project-build-button:focus-visible {
+  background: color-mix(in srgb, var(--color-secondary) 88%, black);
+  outline: 2px solid color-mix(in srgb, var(--color-secondary) 24%, transparent);
+  outline-offset: 2px;
+}
+
+.build-project-build-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
   box-shadow: none;
 }
 

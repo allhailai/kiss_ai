@@ -1,3 +1,57 @@
+.rebuild-launcher-workspace {
+  max-width: 980px;
+}
+
+.rebuild-launcher-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.rebuild-launcher-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.rebuild-launcher-action {
+  min-height: 116px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 30%, var(--color-border));
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-secondary) 10%, transparent), transparent 58%),
+    var(--color-surface);
+  color: var(--color-primary);
+  text-align: left;
+}
+
+.rebuild-launcher-action:hover,
+.rebuild-launcher-action:focus-visible {
+  border-color: color-mix(in srgb, var(--color-secondary) 64%, var(--color-border));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-secondary) 16%, transparent), transparent 58%),
+    var(--color-surface);
+  outline: 2px solid color-mix(in srgb, var(--color-secondary) 22%, transparent);
+  outline-offset: 2px;
+}
+
+.rebuild-launcher-action span {
+  font-size: 1.05rem;
+  font-weight: 950;
+}
+
+.rebuild-launcher-action small {
+  color: var(--color-secondary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .rebuild-status-card {
   display: grid;
   gap: 10px;

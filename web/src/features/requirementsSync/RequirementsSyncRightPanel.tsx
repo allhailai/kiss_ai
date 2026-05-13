@@ -3,6 +3,7 @@ import type { RebuildModel, RequirementsSyncBatchApplyResult, RequirementsSyncPr
 import { requirementsSyncStepLabel, requirementsSyncSteps } from "../../domain/requirementsSync";
 import { CompactModelPicker } from "../../shared/CompactModelPicker";
 import { ConceptualDiffReviewItem } from "../../shared/conceptualDiff/ConceptualDiffReviewItem";
+import { RightPanelModeSwitch, type RightPanelModeKind } from "../../shared/rightPanel/RightPanelModeSwitch";
 import type { useRequirementsSync } from "./useRequirementsSync";
 
 type RequirementsSyncController = ReturnType<typeof useRequirementsSync>;
@@ -82,13 +83,13 @@ export function RequirementsSyncRightPanel({
   controller,
   models,
   onModelChange,
-  onOpenAgent,
+  onSelectPanel,
   selectedModelId,
 }: {
   controller: RequirementsSyncController;
   models: RebuildModel[];
   onModelChange: (modelId: string) => void;
-  onOpenAgent: () => void;
+  onSelectPanel: (kind: RightPanelModeKind) => void;
   selectedModelId: string;
 }) {
   const loadingStep = requirementsSyncSteps.find((candidate) => candidate.id === controller.loadingStep);
@@ -100,14 +101,7 @@ export function RequirementsSyncRightPanel({
   return (
     <div className="requirements-sync-panel">
       <header className="requirements-sync-panel-header">
-        <div className="right-panel-mode-switch" role="group" aria-label="Right panel mode">
-          <button type="button" onClick={onOpenAgent}>
-            Agent
-          </button>
-          <button aria-pressed="true" className="active" type="button">
-            Requirements Sync
-          </button>
-        </div>
+        <RightPanelModeSwitch activeKind="requirements-sync" onSelect={onSelectPanel} />
         <h2>AI update the requirements files.</h2>
       </header>
 

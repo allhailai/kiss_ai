@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { readRightPanelKind, writeRightPanelKind } from "../rightPanelSurfaceStorage";
 
-export type RightPanelKind = "agent-chat" | "requirements-sync";
+export type RightPanelKind = "agent-chat" | "requirements-sync" | "build-project";
 
 export type RightPanelState = {
   kind: RightPanelKind;
@@ -11,6 +11,7 @@ export type RightPanelState = {
 const rightPanelByKind: Record<RightPanelKind, NonNullable<RightPanelState>> = {
   "agent-chat": { kind: "agent-chat", title: "Agent Chat" },
   "requirements-sync": { kind: "requirements-sync", title: "Requirements Sync" },
+  "build-project": { kind: "build-project", title: "Build Project" },
 };
 
 export function panelForKind(kind: RightPanelKind) {

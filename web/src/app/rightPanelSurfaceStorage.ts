@@ -4,7 +4,7 @@ const rightPanelKindStorageKey = "kiss_ai.rightPanelKind";
 const agentChatConversationStorageKeyPrefix = "kiss_ai.agentChatConversationId:";
 
 function isRightPanelKind(value: string | null): value is RightPanelKind {
-  return value === "agent-chat" || value === "requirements-sync";
+  return value === "agent-chat" || value === "requirements-sync" || value === "build-project";
 }
 
 function agentChatConversationStorageKey(projectSlug: string) {
