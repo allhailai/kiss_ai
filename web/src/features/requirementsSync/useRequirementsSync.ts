@@ -8,7 +8,7 @@ import type {
 } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { errorMessage } from "../../domain/errors";
-import { requirementsSyncSteps } from "../../domain/requirementsSync";
+import { requirementsSyncSteps, type RequirementsSyncStepStatus } from "../../domain/requirementsSync";
 
 type RequirementsSyncControllerOptions = {
   projectSlug: string | null;
@@ -16,8 +16,6 @@ type RequirementsSyncControllerOptions = {
   onApplied: () => Promise<void> | void;
   onNotice: (message: string) => void;
 };
-
-export type RequirementsSyncStepStatus = "idle" | "generating" | "ready" | "error" | "applying" | "applied" | "skipped" | "failed";
 
 function initialStepStatuses(): Record<RequirementsSyncStep, RequirementsSyncStepStatus> {
   return {

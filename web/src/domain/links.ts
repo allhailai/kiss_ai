@@ -132,10 +132,6 @@ export function resolveWikiLinkWithIndex(rawTarget: string, index: LinkResolutio
   ]);
 }
 
-export function resolveWikiLink(rawTarget: string, files: ProjectFile[], selectedPath: string | null): WikiLinkResolution {
-  return resolveWikiLinkWithIndex(rawTarget, createLinkResolutionIndex(files, selectedPath));
-}
-
 export function resolveMarkdownLinkWithIndex(rawTarget: string, index: LinkResolutionIndex): WikiLinkResolution {
   const cleanedTarget = cleanMarkdownTarget(rawTarget);
   if (!cleanedTarget) return { status: "missing" };
@@ -150,10 +146,6 @@ export function resolveMarkdownLinkWithIndex(rawTarget: string, index: LinkResol
   if (exactResolution.status !== "missing") return exactResolution;
 
   return resolutionFromMatches(matchesForKeys(index.basename, candidates));
-}
-
-export function resolveMarkdownLink(rawTarget: string, files: ProjectFile[], selectedPath: string | null): WikiLinkResolution {
-  return resolveMarkdownLinkWithIndex(rawTarget, createLinkResolutionIndex(files, selectedPath));
 }
 
 export function linkResolutionClass(resolution: WikiLinkResolution) {

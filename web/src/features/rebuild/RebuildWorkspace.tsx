@@ -14,11 +14,9 @@ import { formatLocalDateTime } from "../../domain/formatters";
 import { humanAttentionItemText } from "../../domain/humanAttention";
 import { formatModelLabel, modelTierLabels } from "../../domain/modelLabels";
 import { humanAttentionQueuePath } from "../../domain/projectPaths";
-import { requirementsSyncSteps } from "../../domain/requirementsSync";
+import { requirementsSyncSteps, type RequirementsSyncStepStatus } from "../../domain/requirementsSync";
 import { AgentTranscript } from "../../shared/agents/AgentTranscript";
 import { ModelSelect } from "../../shared/ModelSelect";
-
-type RequirementsSyncStepStatus = "idle" | "generating" | "ready" | "error" | "applying" | "applied" | "skipped" | "failed";
 
 function formatRunDuration(rebuild: RebuildState | null) {
   if (!rebuild?.startedAt) return "Not started";

@@ -2,6 +2,8 @@ import type { RequirementsSyncStep } from "../contracts/api";
 import type { RequirementAutoUpdatePath } from "./projectPaths";
 import { requirementAutoUpdatePaths } from "./projectPaths";
 
+export type RequirementsSyncStepStatus = "idle" | "generating" | "ready" | "error" | "applying" | "applied" | "skipped" | "failed";
+
 export const requirementsSyncSteps: Array<{
   id: RequirementsSyncStep;
   label: string;
@@ -27,8 +29,3 @@ export const requirementsSyncSteps: Array<{
     description: "Ensure deliverables address the goal.",
   },
 ];
-
-export function nextRequirementsSyncStep(step: RequirementsSyncStep): RequirementsSyncStep | null {
-  const index = requirementsSyncSteps.findIndex((candidate) => candidate.id === step);
-  return requirementsSyncSteps[index + 1]?.id ?? null;
-}
