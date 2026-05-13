@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  buildLogNavLeaf,
   chatNavLeaf,
   openQuestionsNavLeaf,
   requirementNavLeaves,
@@ -69,17 +68,14 @@ export function SimplifiedNavigator({
         const isActiveSection = activeSection === section.id;
         const isBuildSection = section.id === "build";
         const isChatSection = section.id === "chat";
-        const isBuildLogSection = section.id === "build-log";
-        const isDirectViewSection = isBuildLogSection || isChatSection || isBuildSection;
+        const isDirectViewSection = isChatSection || isBuildSection;
 
         return (
           <section className={isActiveSection ? "nav-section active" : "nav-section"} key={section.id}>
             <button
               className="nav-section-trigger"
               onClick={() =>
-                isBuildLogSection
-                  ? onOpenView(buildLogNavLeaf.view)
-                  : isChatSection
+                isChatSection
                     ? onOpenView(chatNavLeaf.view)
                     : isBuildSection
                       ? onOpenView("rebuild")

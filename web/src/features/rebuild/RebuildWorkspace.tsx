@@ -1,12 +1,15 @@
+import type { ReactNode } from "react";
 import type { ProjectStatus, RebuildState, RequirementsSyncSignalsResponse } from "../../contracts/api";
 
 export function RebuildWorkspace({
+  buildLog,
   status,
   rebuild,
   onOpenBuildProject,
   onOpenRequirementsSync,
   requirementsSyncSignals,
 }: {
+  buildLog: ReactNode;
   status: ProjectStatus | null;
   rebuild: RebuildState | null;
   onOpenBuildProject: () => void;
@@ -15,12 +18,6 @@ export function RebuildWorkspace({
 }) {
   return (
     <div className="panel-stack rebuild-launcher-workspace">
-      <header className="page-header">
-        <span className="eyebrow">Project rebuild</span>
-        <h2>Build Project</h2>
-        <p>Use the right panel to synchronize requirements or stream the project build.</p>
-      </header>
-
       <section className="content-card rebuild-launcher-card" aria-label="Build actions">
         <div className="rebuild-launcher-actions">
           <button className="rebuild-launcher-action rebuild-launcher-sync" onClick={onOpenRequirementsSync} type="button">
@@ -38,6 +35,10 @@ export function RebuildWorkspace({
           </p>
         ) : null}
       </section>
+
+      <div className="rebuild-build-log-divider" role="separator" aria-hidden="true" />
+
+      {buildLog}
     </div>
   );
 }

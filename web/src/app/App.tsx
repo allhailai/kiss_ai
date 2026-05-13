@@ -251,14 +251,6 @@ export function App() {
       </aside>
 
       <section className="workspace">
-        {route.view === "build-log" ? (
-          <BuildLogWorkspace
-            buildLog={rebuildWorkspace.buildLog}
-            status={rebuildWorkspace.status}
-            rebuild={rebuildWorkspace.rebuild}
-            onSelectLog={(tabId, path, sectionId) => void rebuildWorkspace.refreshBuildLog(tabId, path, sectionId)}
-          />
-        ) : null}
         {route.view === "dashboard" ? (
           <Dashboard
             status={rebuildWorkspace.status}
@@ -306,6 +298,14 @@ export function App() {
         ) : null}
         {route.view === "rebuild" ? (
           <RebuildWorkspace
+            buildLog={
+              <BuildLogWorkspace
+                buildLog={rebuildWorkspace.buildLog}
+                status={rebuildWorkspace.status}
+                rebuild={rebuildWorkspace.rebuild}
+                onSelectLog={(tabId, path, sectionId) => void rebuildWorkspace.refreshBuildLog(tabId, path, sectionId)}
+              />
+            }
             status={rebuildWorkspace.status}
             rebuild={rebuildWorkspace.rebuild}
             onOpenBuildProject={openBuildProjectPanel}

@@ -7,6 +7,7 @@ type UseSelectedProjectLifecycleOptions = {
   clearSelectedFile: () => void;
   clearRebuildModels: () => void;
   projects: ProjectSummary[];
+  refreshBuildLog: () => Promise<void>;
   refreshProjectFiles: () => Promise<void>;
   refreshRebuildModels: () => Promise<void>;
   refreshStatus: () => Promise<void>;
@@ -24,6 +25,7 @@ export function useSelectedProjectLifecycle({
   clearSelectedFile,
   clearRebuildModels,
   projects,
+  refreshBuildLog,
   refreshProjectFiles,
   refreshRebuildModels,
   refreshStatus,
@@ -54,7 +56,7 @@ export function useSelectedProjectLifecycle({
     window.localStorage.setItem(selectedProjectStorageKey, selectedProjectSlug);
     void (async () => {
       try {
-        await Promise.all([refreshStatus(), refreshRebuildModels(), refreshProjectFiles()]);
+        await Promise.all([refreshStatus(), refreshBuildLog(), refreshRebuildModels(), refreshProjectFiles()]);
       } catch (error) {
         if (!cancelled) {
           setNotice(errorMessage(error, "Could not load the selected project."));
@@ -68,6 +70,7 @@ export function useSelectedProjectLifecycle({
   }, [
     clearSelectedFile,
     clearRebuildModels,
+    refreshBuildLog,
     refreshProjectFiles,
     refreshRebuildModels,
     refreshStatus,

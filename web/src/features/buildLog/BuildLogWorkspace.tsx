@@ -88,10 +88,7 @@ export function BuildLogWorkspace({
   return (
     <div className="panel-stack build-log-workspace">
       <header className="page-header build-log-header">
-        <div>
-          <span className="eyebrow">Build Log</span>
-          <h2>Latest build summary and project history</h2>
-        </div>
+        <h2>Build Log</h2>
         <div className="build-log-metrics" aria-label="Build log status summary">
           <BuildLogMetric label="Status" value={rebuild?.status ?? status?.rebuildStatus ?? "Unknown"} />
           <BuildLogMetric label="Last success" value={formatLocalDateTime(status?.lastSuccessfulRunAt)} />

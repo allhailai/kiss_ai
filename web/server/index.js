@@ -48,7 +48,7 @@ const buildLogDefinitions = [
   },
   {
     id: "annotation-change-log",
-    label: "Annotation Change Log",
+    label: "Annotation Log",
     path: "change_logs/annotation_change_logs.md",
     emptyMessage: "No annotation change log found yet.",
   },

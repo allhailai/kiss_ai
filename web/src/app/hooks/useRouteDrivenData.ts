@@ -63,10 +63,7 @@ export function useRouteDrivenData({
 
         if (nextView === "rebuild") {
           await refreshRebuild();
-        }
-        if (!isCurrentRouteRequest()) return;
-
-        if (nextView === "build-log") {
+          if (!isCurrentRouteRequest()) return;
           await refreshBuildLog();
         }
         if (!isCurrentRouteRequest()) return;
