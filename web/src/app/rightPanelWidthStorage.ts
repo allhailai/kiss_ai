@@ -16,6 +16,6 @@ export function writeRightPanelWidth(width: string) {
   try {
     window.sessionStorage.setItem(rightPanelWidthStorageKey, width);
   } catch {
-    // Keep the in-memory width even if browser storage is unavailable.
+    // Ignore storage failures; the caller-owned width state is already updated.
   }
 }

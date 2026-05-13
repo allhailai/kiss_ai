@@ -1,17 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from "react";
 import type { ChatContextFile, ProjectFile, RebuildModel } from "../../contracts/api";
-import { fileBasename } from "../../domain/files";
+import { labeledFileDisplayName, projectFileDisplayName } from "../../domain/files";
 import { CompactModelPicker } from "../CompactModelPicker";
 
 const composerMaxRows = 8;
-
-function contextLabel(file: ChatContextFile) {
-  return file.label || file.path;
-}
-
-function fileLabel(file: ProjectFile) {
-  return file.name || fileBasename(file.path);
-}
 
 function resizeComposer(textarea: HTMLTextAreaElement | null) {
   if (!textarea) return;
@@ -31,7 +23,7 @@ function resizeComposer(textarea: HTMLTextAreaElement | null) {
 
 export function ChatComposer({
   contextFiles,
-  selectedContextFiles,
+  attachedContextFiles,
   disabled,
   draft,
   models,
@@ -49,7 +41,7 @@ export function ChatComposer({
   textareaRef,
 }: {
   contextFiles: ProjectFile[];
-  selectedContextFiles: ChatContextFile[];
+  attachedContextFiles: ChatContextFile[];
   disabled: boolean;
   draft: string;
   models: RebuildModel[];
@@ -82,17 +74,17 @@ export function ChatComposer({
   const [activeContextIndex, setActiveContextIndex] = useState(0);
   const contextInputRef = useRef<HTMLInputElement | null>(null);
   const contextBlurTimeoutRef = useRef<number | null>(null);
-  const selectedContextPaths = useMemo(() => new Set(selectedContextFiles.map((file) => file.path)), [selectedContextFiles]);
+  const attachedContextPaths = useMemo(() => new Set(attachedContextFiles.map((file) => file.path)), [attachedContextFiles]);
   const filteredContextFiles = useMemo(() => {
     const query = contextQuery.trim().toLowerCase();
     return contextFiles
-      .filter((file) => !selectedContextPaths.has(file.path))
+      .filter((file) => !attachedContextPaths.has(file.path))
       .filter((file) => {
         if (!query) return true;
         return `${file.path} ${file.name} ${file.kind}`.toLowerCase().includes(query);
       })
       .slice(0, 12);
-  }, [contextFiles, contextQuery, selectedContextPaths]);
+  }, [attachedContextPaths, contextFiles, contextQuery]);
 
   useEffect(() => {
     resizeComposer(textareaRef.current);
@@ -222,7 +214,7 @@ export function ChatComposer({
                           title={file.path}
                           type="button"
                         >
-                          <strong>{fileLabel(file)}</strong>
+                          <strong>{projectFileDisplayName(file)}</strong>
                           <span>{file.path}</span>
                         </button>
                       ))
@@ -233,9 +225,9 @@ export function ChatComposer({
                 </div>
               ) : null}
             </div>
-            {selectedContextFiles.length ? (
+            {attachedContextFiles.length ? (
               <div className="chat-context-chips" aria-label="Selected file context">
-                {selectedContextFiles.map((file) => (
+                {attachedContextFiles.map((file) => (
                   <button
                     className="chat-context-chip"
                     key={file.path}
@@ -243,7 +235,7 @@ export function ChatComposer({
                     title={`Remove ${file.path}`}
                     type="button"
                   >
-                    <span className="chat-context-chip-label">{contextLabel(file)}</span>
+                    <span className="chat-context-chip-label">{labeledFileDisplayName(file)}</span>
                     <span className="chat-context-chip-remove" aria-hidden="true">
                       x
                     </span>

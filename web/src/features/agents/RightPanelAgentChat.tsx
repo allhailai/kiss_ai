@@ -9,7 +9,7 @@ import type {
   ProjectFile,
   RebuildModel,
 } from "../../contracts/api";
-import { fileBasename, uniqueByPathPreserveFirst } from "../../domain/files";
+import { labeledFileDisplayName, projectFileDisplayName, uniqueByPathPreserveFirst } from "../../domain/files";
 import { ChatComposer } from "../../shared/chat/ChatComposer";
 import { ChatThread } from "../../shared/chat/ChatThread";
 import { formatChatDateTime } from "../../shared/chat/chatRendering";
@@ -43,14 +43,6 @@ type VisibleEditableTarget = {
   file: AgentContextFile;
   isCurrent: boolean;
 };
-
-function contextFileLabel(file: AgentContextFile | ChatContextFile) {
-  return file.label || file.path;
-}
-
-function projectFileLabel(file: ProjectFile) {
-  return file.name || fileBasename(file.path);
-}
 
 function latestAttentionEditProposal(conversation: Conversation | null): EditProposal | null {
   return [...(conversation?.editProposals ?? [])].reverse().find((proposal) => proposal.status !== "applied") ?? null;
@@ -367,7 +359,7 @@ export function RightPanelAgentChat({
         {currentFile ? (
           <div className="agent-current-file-main">
             <code title={currentFile.path}>
-              {contextFileLabel(currentFile)}
+              {labeledFileDisplayName(currentFile)}
               {currentFile.draftState === "unsaved" ? " (unsaved)" : ""}
             </code>
             {!currentFileInContext || (currentFile.editable && !currentFileInAiEditable) ? (
@@ -474,7 +466,7 @@ export function RightPanelAgentChat({
                 }
                 key={file.path}
               >
-                <code title={file.path}>{contextFileLabel(file)}</code>
+                <code title={file.path}>{labeledFileDisplayName(file)}</code>
                 <button aria-label={`Remove ${file.path} from context`} disabled={controlsDisabled} onClick={() => removeContextFile(file.path)} type="button">
                   x
                 </button>
@@ -503,7 +495,7 @@ export function RightPanelAgentChat({
             {filePickerOptions.length ? (
               filePickerOptions.map((file) => (
                 <button key={file.path} onClick={() => addPickerFile(file.path)} title={file.path} type="button">
-                  <strong>{projectFileLabel(file)}</strong>
+                  <strong>{projectFileDisplayName(file)}</strong>
                   <span>{file.path}</span>
                 </button>
               ))
@@ -514,8 +506,8 @@ export function RightPanelAgentChat({
         </section>
       ) : null}
       <ChatComposer
+        attachedContextFiles={contextFiles}
         contextFiles={projectFiles}
-        selectedContextFiles={contextFiles}
         disabled={controlsDisabled}
         draft={draft}
         models={models}
@@ -559,7 +551,7 @@ export function RightPanelAgentChat({
                 key={file.path}
               >
                 <code title={file.path}>
-                  {contextFileLabel(file)}
+                  {labeledFileDisplayName(file)}
                   {file.draftState === "unsaved" ? " (unsaved)" : ""}
                 </code>
                 {isCurrent ? <small>Current</small> : null}

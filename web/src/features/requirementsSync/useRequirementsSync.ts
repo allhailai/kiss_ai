@@ -203,12 +203,11 @@ export function useRequirementsSync({ projectSlug, selectedModelId, onApplied, o
   const applyAll = useCallback(
     async () => {
       if (!projectSlug || applying) return false;
-      const proposalsToApply = requirementsSyncSteps.map((candidate) => proposals[candidate.id]);
-      if (proposalsToApply.some((proposal) => !proposal)) {
+      const completeProposals = orderedProposals(proposals);
+      if (completeProposals.length !== requirementsSyncSteps.length) {
         onNotice("Generate all Requirements Sync proposals before applying.");
         return false;
       }
-      const completeProposals = proposalsToApply.filter((proposal): proposal is RequirementsSyncProposal => Boolean(proposal));
       const acceptedDiffs = completeProposals.flatMap((proposal) => proposal.conceptualDiffs.filter((diff) => diff.status === "accepted"));
       if (!acceptedDiffs.length) {
         onNotice("Accept at least one conceptual change before applying Requirements Sync.");

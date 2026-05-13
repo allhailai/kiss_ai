@@ -29,3 +29,7 @@ export const requirementsSyncSteps: Array<{
     description: "Ensure deliverables address the goal.",
   },
 ];
+
+export function requirementsSyncStepLabel(step: RequirementsSyncStep) {
+  return requirementsSyncSteps.find((candidate) => candidate.id === step)?.label ?? step;
+}

@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { RebuildModel } from "../contracts/api";
-import { groupModelsByTier, modelTierLabels } from "../domain/modelLabels";
-
-function compactModelLabel(model: RebuildModel) {
-  return model.displayName || model.id;
-}
+import { groupModelsByTier, modelDisplayName, modelTierLabels } from "../domain/modelLabels";
 
 export function CompactModelPicker({
   disabled,
@@ -26,12 +22,16 @@ export function CompactModelPicker({
   const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
   const tieredModels = useMemo(() => groupModelsByTier(models), [models]);
   const modelOptions = useMemo(() => tieredModels.flatMap((group) => group.models), [tieredModels]);
+  const modelOptionIndexes = useMemo(
+    () => new Map(modelOptions.map((model, index) => [model.id, index])),
+    [modelOptions],
+  );
 
   useEffect(() => {
     if (!modelPickerOpen) return;
-    const selectedIndex = modelOptions.findIndex((model) => model.id === selectedModelId);
+    const selectedIndex = modelOptionIndexes.get(selectedModelId) ?? -1;
     setActiveModelIndex(selectedIndex >= 0 ? selectedIndex : 0);
-  }, [modelOptions, modelPickerOpen, selectedModelId]);
+  }, [modelOptionIndexes, modelPickerOpen, selectedModelId]);
 
   useEffect(() => {
     if (!modelPickerOpen) return;
@@ -104,7 +104,7 @@ export function CompactModelPicker({
         onClick={() => setModelPickerOpen((open) => !open)}
         type="button"
       >
-        <span className="chat-model-trigger-label">{selectedModel ? compactModelLabel(selectedModel) : "Model"}</span>
+        <span className="chat-model-trigger-label">{selectedModel ? modelDisplayName(selectedModel) : "Model"}</span>
         <span aria-hidden="true" className="chat-model-trigger-chevron">
           ▾
         </span>
@@ -117,7 +117,7 @@ export function CompactModelPicker({
                 <div className={`chat-model-group chat-model-group-${tier}`} key={tier}>
                   <p>{modelTierLabels[tier]}</p>
                   {tierModels.map((model) => {
-                    const optionIndex = modelOptions.findIndex((option) => option.id === model.id);
+                    const optionIndex = modelOptionIndexes.get(model.id) ?? 0;
                     const isActive = optionIndex === activeModelIndex;
                     const isSelected = model.id === selectedModelId;
                     return (
@@ -132,7 +132,7 @@ export function CompactModelPicker({
                         role="option"
                         type="button"
                       >
-                        <strong>{compactModelLabel(model)}</strong>
+                        <strong>{modelDisplayName(model)}</strong>
                       </button>
                     );
                   })}

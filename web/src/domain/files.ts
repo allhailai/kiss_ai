@@ -99,6 +99,14 @@ export function fileBasename(path: string) {
   return path.split("/").at(-1) ?? path;
 }
 
+export function projectFileDisplayName(file: Pick<ProjectFile, "name" | "path">) {
+  return file.name || fileBasename(file.path);
+}
+
+export function labeledFileDisplayName(file: { label?: string | null; path: string }) {
+  return file.label || file.path;
+}
+
 export function humanizePathSegment(pathSegment: string) {
   const withoutExtension = pathSegment.replace(/\.[^.]+$/i, "");
   const spaced = withoutExtension

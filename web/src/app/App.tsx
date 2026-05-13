@@ -328,7 +328,6 @@ export function App() {
             <RequirementsSyncRightPanel
               controller={requirementsSync}
               models={rebuildWorkspace.models}
-              onFinish={() => rightPanelSurface.closePanel()}
               onModelChange={rebuildWorkspace.setSelectedModelId}
               onOpenAgent={openAgentChatPanel}
               selectedModelId={rebuildWorkspace.selectedModelId}

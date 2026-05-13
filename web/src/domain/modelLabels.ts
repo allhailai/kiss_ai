@@ -8,12 +8,12 @@ export const modelTierLabels: Record<RebuildModel["tier"], string> = {
 
 export const modelTierOrder: RebuildModel["tier"][] = ["high", "medium", "small"];
 
-function modelSortLabel(model: RebuildModel) {
+export function modelDisplayName(model: RebuildModel) {
   return model.displayName || model.id;
 }
 
 export function formatModelLabel(model: RebuildModel) {
-  const modelName = modelSortLabel(model);
+  const modelName = modelDisplayName(model);
   return model.provider ? `${modelName} - ${model.provider}` : modelName;
 }
 
@@ -23,7 +23,7 @@ export function groupModelsByTier(models: RebuildModel[]) {
       tier,
       models: models
         .filter((model) => model.tier === tier)
-        .sort((left, right) => modelSortLabel(left).localeCompare(modelSortLabel(right), undefined, { sensitivity: "base" })),
+        .sort((left, right) => modelDisplayName(left).localeCompare(modelDisplayName(right), undefined, { sensitivity: "base" })),
     }))
     .filter((group) => group.models.length > 0);
 }

@@ -3,6 +3,8 @@ import type { FormEvent } from "react";
 import type { ProjectSummary } from "../../contracts/api";
 import { errorMessage } from "../../domain/errors";
 
+const projectNameTakenMessage = "That project name is taken. Please use another one.";
+
 function slugifyProjectName(name: string) {
   return name
     .trim()
@@ -31,7 +33,7 @@ export function ProjectPicker({
   const selectedSlug = slugifyProjectName(projectName);
   const slugIsValid = !selectedSlug || /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(selectedSlug);
   const projectNameIsTaken = Boolean(selectedSlug && projects.some((project) => project.slug === selectedSlug));
-  const liveCreateError = projectNameIsTaken ? "That project name is taken. Please use another one." : "";
+  const liveCreateError = projectNameIsTaken ? projectNameTakenMessage : "";
   const visibleCreateError = liveCreateError || createError;
   const canCreate = Boolean(projectName.trim() && selectedSlug && slugIsValid && !projectNameIsTaken && !creatingProject);
 
@@ -50,7 +52,7 @@ export function ProjectPicker({
     }
 
     if (projectNameIsTaken) {
-      setCreateError("That project name is taken. Please use another one.");
+      setCreateError(projectNameTakenMessage);
       return;
     }
 

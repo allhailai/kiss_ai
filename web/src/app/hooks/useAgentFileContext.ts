@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { AgentContextFile, ChatContextFile, FileContent, ProjectFile } from "../../contracts/api";
-import { fileBasename } from "../../domain/files";
+import { fileBasename, projectFileDisplayName } from "../../domain/files";
 
 function contextFileFromProjectFile(file: ProjectFile): ChatContextFile {
   return {
     path: file.path,
-    label: file.name || fileBasename(file.path),
+    label: projectFileDisplayName(file),
     kind: file.kind,
   };
 }
@@ -15,7 +15,7 @@ function editableTargetFromProjectFile(file: ProjectFile, selected: FileContent 
   const draftState = selectedFile ? (draft !== selectedFile.content ? "unsaved" : "saved") : "unknown";
   return {
     path: file.path,
-    label: file.name || fileBasename(file.path),
+    label: projectFileDisplayName(file),
     kind: file.kind,
     editable: file.editable,
     annotation: file.annotation,
@@ -29,7 +29,7 @@ function editableTargetFromProjectFile(file: ProjectFile, selected: FileContent 
 function editableSelectionFromProjectFile(file: ProjectFile): AgentContextFile {
   return {
     path: file.path,
-    label: file.name || fileBasename(file.path),
+    label: projectFileDisplayName(file),
     kind: file.kind,
     editable: file.editable,
     annotation: file.annotation,
@@ -43,7 +43,7 @@ function enrichEditableTarget(file: AgentContextFile, projectFiles: ProjectFile[
     return editableTargetFromProjectFile(
       {
         path: selected.path,
-        name: projectFile?.name ?? file.label ?? fileBasename(selected.path),
+        name: projectFile ? projectFileDisplayName(projectFile) : file.label ?? fileBasename(selected.path),
         kind: selected.kind,
         editable: selected.editable,
         annotation: selected.annotation,
@@ -55,7 +55,7 @@ function enrichEditableTarget(file: AgentContextFile, projectFiles: ProjectFile[
 
   return {
     ...file,
-    label: file.label ?? projectFile?.name ?? fileBasename(file.path),
+    label: file.label ?? (projectFile ? projectFileDisplayName(projectFile) : fileBasename(file.path)),
     kind: file.kind ?? projectFile?.kind,
     editable: file.editable ?? projectFile?.editable,
     annotation: file.annotation ?? projectFile?.annotation,

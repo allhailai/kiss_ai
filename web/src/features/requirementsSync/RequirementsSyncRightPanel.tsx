@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { RebuildModel, RequirementsSyncBatchApplyResult, RequirementsSyncProposal, RequirementsSyncStep } from "../../contracts/api";
-import { requirementsSyncSteps } from "../../domain/requirementsSync";
+import { requirementsSyncStepLabel, requirementsSyncSteps } from "../../domain/requirementsSync";
 import { CompactModelPicker } from "../../shared/CompactModelPicker";
 import { ConceptualDiffReviewItem } from "../../shared/conceptualDiff/ConceptualDiffReviewItem";
 import type { useRequirementsSync } from "./useRequirementsSync";
@@ -44,19 +44,8 @@ function totalDiffCount(proposals: RequirementsSyncProposal[]) {
   return proposals.reduce((count, proposal) => count + proposal.conceptualDiffs.length, 0);
 }
 
-function stepDisplayLabel(step: RequirementsSyncStep) {
-  switch (step) {
-    case "goal":
-      return "Goal";
-    case "inputs":
-      return "Inputs";
-    case "outputs":
-      return "Outputs";
-  }
-}
-
 function stepStatusLabel(step: RequirementsSyncStep) {
-  return `${stepDisplayLabel(step)} Requirements`;
+  return `${requirementsSyncStepLabel(step)} Requirements`;
 }
 
 function summaryPreview(summary: string) {
@@ -98,7 +87,6 @@ export function RequirementsSyncRightPanel({
 }: {
   controller: RequirementsSyncController;
   models: RebuildModel[];
-  onFinish: () => void;
   onModelChange: (modelId: string) => void;
   onOpenAgent: () => void;
   selectedModelId: string;
@@ -210,7 +198,7 @@ function BatchProposalReview({
             <div className="requirements-sync-applied-feedback">
               {appliedState.feedback.map((feedback) => (
                 <p key={feedback.step}>
-                  <span>{stepDisplayLabel(feedback.step)} summary:</span> {feedback.summary}
+                  <span>{requirementsSyncStepLabel(feedback.step)} summary:</span> {feedback.summary}
                 </p>
               ))}
             </div>
@@ -251,7 +239,7 @@ function BatchProposalReview({
               <div className="agent-edit-proposal-file requirements-sync-review-file" key={candidate.id}>
                 <div className="requirements-sync-review-file-heading">
                   <div>
-                    <strong title={candidate.filePath}>{stepDisplayLabel(candidate.id)}</strong>
+                    <strong title={candidate.filePath}>{requirementsSyncStepLabel(candidate.id)}</strong>
                   </div>
                 </div>
                 <p className="requirements-sync-no-diffs">{stepStatus(controller, candidate.id)}</p>
@@ -278,7 +266,7 @@ function ProposalReviewFile({ controller, proposal }: { controller: Requirements
     <div className="agent-edit-proposal-file requirements-sync-review-file">
       <div className="requirements-sync-review-file-heading">
         <div className="requirements-sync-review-file-title-row">
-          <strong title={proposal.targetFilePath}>{stepDisplayLabel(proposal.step)}</strong>
+          <strong title={proposal.targetFilePath}>{requirementsSyncStepLabel(proposal.step)}</strong>
           <span>
             {acceptedDiffCount(proposal)} accepted / {proposal.conceptualDiffs.length} total
           </span>

@@ -32,7 +32,7 @@ export function writeRightPanelKind(kind: RightPanelKind | null) {
       window.sessionStorage.removeItem(rightPanelKindStorageKey);
     }
   } catch {
-    // Keep the in-memory panel state even if browser storage is unavailable.
+    // Ignore storage failures; the caller-owned panel state is already updated.
   }
 }
 
@@ -56,6 +56,6 @@ export function writeAgentChatConversationId(projectSlug: string | null, convers
       window.sessionStorage.removeItem(agentChatConversationStorageKey(projectSlug));
     }
   } catch {
-    // Keep the in-memory conversation state even if browser storage is unavailable.
+    // Ignore storage failures; the caller-owned conversation state is already updated.
   }
 }
