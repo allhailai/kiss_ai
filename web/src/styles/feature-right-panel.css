@@ -719,6 +719,12 @@
   white-space: pre-wrap;
 }
 
+.build-project-event-body .chat-markdown {
+  font-size: inherit;
+  line-height: inherit;
+  white-space: normal;
+}
+
 .build-project-event-body p {
   margin: 0 0 8px;
 }

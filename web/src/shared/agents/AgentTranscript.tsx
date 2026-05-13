@@ -1,5 +1,6 @@
 import type { AgentRunEvent } from "../../contracts/api";
 import { formatLocalTime } from "../../domain/formatters";
+import { renderMarkdownMessageContent } from "../chat/chatRendering";
 
 function getEventLabel(event: AgentRunEvent) {
   if (event.type === "assistant_message") return "Agent";
@@ -12,17 +13,6 @@ function getEventLabel(event: AgentRunEvent) {
 
 function getEventText(event: AgentRunEvent) {
   return event.text || event.title || event.status || "No details recorded.";
-}
-
-function renderParagraphs(text: string) {
-  const paragraphs = text
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
-
-  if (!paragraphs.length) return <p>No details recorded.</p>;
-
-  return paragraphs.map((paragraph, index) => <p key={`${index}-${paragraph.slice(0, 24)}`}>{paragraph}</p>);
 }
 
 export function AgentTranscript({ events, log }: { events: AgentRunEvent[]; log: string[] }) {
@@ -45,7 +35,7 @@ export function AgentTranscript({ events, log }: { events: AgentRunEvent[]; log:
                 <strong>{getEventLabel(event)}</strong>
                 <span>{formatLocalTime(event.updatedAt)}</span>
               </header>
-              <div className="agent-event-body">{renderParagraphs(getEventText(event))}</div>
+              <div className="agent-event-body">{renderMarkdownMessageContent(getEventText(event))}</div>
               {event.status === "streaming" ? <span className="agent-event-status">Streaming</span> : null}
             </article>
           ))

@@ -48,6 +48,12 @@
   white-space: pre-wrap;
 }
 
+.agent-event-body .chat-markdown {
+  font-size: inherit;
+  line-height: inherit;
+  white-space: normal;
+}
+
 .agent-event-body p {
   margin: 0 0 10px;
 }

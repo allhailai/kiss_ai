@@ -3,6 +3,7 @@ import type { AgentRunEvent, ProjectStatus, RebuildModel, RebuildState } from ".
 import { formatLocalDateTime, formatLocalTime } from "../../domain/formatters";
 import { formatModelLabel, modelTierLabels } from "../../domain/modelLabels";
 import { CompactModelPicker } from "../../shared/CompactModelPicker";
+import { renderMarkdownMessageContent } from "../../shared/chat/chatRendering";
 import { RightPanelModeSwitch, type RightPanelModeKind } from "../../shared/rightPanel/RightPanelModeSwitch";
 
 function formatRunDuration(rebuild: RebuildState | null) {
@@ -44,17 +45,6 @@ function getEventLabel(event: AgentRunEvent) {
 
 function getEventText(event: AgentRunEvent) {
   return event.text || event.title || event.status || "No details recorded.";
-}
-
-function renderParagraphs(text: string) {
-  const paragraphs = text
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
-
-  if (!paragraphs.length) return <p>No details recorded.</p>;
-
-  return paragraphs.map((paragraph, index) => <p key={`${index}-${paragraph.slice(0, 24)}`}>{paragraph}</p>);
 }
 
 function completionTone(status: RebuildState["status"] | undefined) {
@@ -184,7 +174,7 @@ export function BuildProjectRightPanel({
                 <strong>{getEventLabel(event)}</strong>
                 <span>{formatLocalTime(event.updatedAt)}</span>
               </header>
-              <div className="build-project-event-body">{renderParagraphs(getEventText(event))}</div>
+              <div className="build-project-event-body">{renderMarkdownMessageContent(getEventText(event))}</div>
               {event.status === "streaming" ? <span className="build-project-event-status">Streaming</span> : null}
             </article>
           ))}

@@ -16,7 +16,7 @@ const chatMarkdownComponents: Components = {
   },
 };
 
-export function renderMessageContent(content: string) {
+export function renderMarkdownMessageContent(content: string) {
   if (!content.trim()) return <p>No content recorded.</p>;
   return (
     <div className="chat-markdown">
@@ -26,3 +26,5 @@ export function renderMessageContent(content: string) {
     </div>
   );
 }
+
+export const renderMessageContent = renderMarkdownMessageContent;
