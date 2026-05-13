@@ -53,7 +53,7 @@ export function createAgentJobService({
     const resolutionOptionId = String(body?.resolutionOptionId ?? "").trim();
     const manualPrompt = String(body?.manualPrompt ?? "").trim();
 
-    if (!itemId) throw httpError("A human-attention item id is required.");
+    if (!itemId) throw httpError("A review note id is required.");
     if (resolutionOptionId && manualPrompt) throw httpError("Choose either a suggested option or a manual prompt, not both.");
     if (!resolutionOptionId && !manualPrompt) throw httpError("Choose a suggested option or provide a manual prompt.");
 
@@ -71,7 +71,7 @@ export function createAgentJobService({
 
     const selectedOption = resolutionOptionId ? getResolutionOption(item, resolutionOptionId) : null;
     if (resolutionOptionId && !selectedOption) {
-      throw httpError("Selected resolution option was not found on this human-attention item.", 404, "resolution_option_not_found");
+      throw httpError("Selected resolution option was not found on this review note.", 404, "resolution_option_not_found");
     }
 
     const selectedResolution = selectedOption
@@ -125,12 +125,13 @@ export function createAgentJobService({
       const attentionCount = getHumanAttentionItems(harness).length;
       const finishedWithAttention = result.status === "finished" && attentionCount > 0;
       const status = result.status === "finished" ? (finishedWithAttention ? "finished_with_attention" : "finished") : "error";
+      const resultDetail = typeof result.result === "string" ? result.result.trim() : "";
       const message =
         result.status === "finished"
           ? finishedWithAttention
-            ? `${jobName} finished with ${attentionCount} human-attention item${attentionCount === 1 ? "" : "s"} still open.`
+            ? `${jobName} finished. Review notes are available if you want to improve source confidence or project settings.`
             : `${jobName} finished.`
-          : `${jobName} ended with status: ${result.status}`;
+          : resultDetail || `${jobName} stopped before finishing.`;
 
       return { attentionCount, finishedWithAttention, message, status };
     };
@@ -304,7 +305,7 @@ export function createAgentJobService({
       requestedModelId: requestBody?.modelId,
       runKind: "human_attention_resolve",
       attentionContext: context,
-      startMessage: "Starting local Cursor agent human-attention resolution.",
+      startMessage: "Starting review-note resolution.",
       noApiKeyMessage:
         "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Human-attention resolution is unavailable from the UI.",
       noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
@@ -340,6 +341,7 @@ export function createAgentJobService({
 
       await finishAssistantMessage(project.slug);
       const completedState = await getRebuildState(project.slug);
+      const resultDetail = typeof result.result === "string" ? result.result.trim() : "";
       const { attentionCount, finishedWithAttention, message, status } = await createAgentJobCompletionMessage(jobName)({ project, result });
       await setRebuildState(project.slug, {
         ...completedState,
@@ -350,12 +352,11 @@ export function createAgentJobService({
       });
       await appendRunEvent(project.slug, {
         type: result.status === "finished" ? "run_status" : "error",
-        title:
-          finishedWithAttention ? `${jobName} finished with attention needed` : result.status === "finished" ? `${jobName} finished` : `${jobName} ended with an error`,
+        title: finishedWithAttention ? `${jobName} complete` : result.status === "finished" ? `${jobName} finished` : `${jobName} stopped before finishing`,
         text: message,
         status,
         runtime: "cursor",
-        metadata: { resultStatus: result.status, attentionCount },
+        metadata: { resultStatus: result.status, attentionCount, resultDetail },
       });
     } catch (error) {
       await finishAssistantMessage(project.slug);

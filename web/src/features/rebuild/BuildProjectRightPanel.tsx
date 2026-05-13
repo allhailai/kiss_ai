@@ -35,7 +35,8 @@ function getLatestLogText(entry: string | null) {
 }
 
 function getEventLabel(event: AgentRunEvent) {
-  if (event.type === "assistant_message") return "Agent";
+  if (event.type === "run_status" && event.status === "finished_with_attention") return "Build complete";
+  if (event.type === "assistant_message") return "Build details";
   if (event.type === "error") return "Error";
   if (event.type === "run_status") return event.title || "Run status";
   if (event.type === "tool_activity") return event.title || "Tool activity";
@@ -44,6 +45,12 @@ function getEventLabel(event: AgentRunEvent) {
 }
 
 function getEventText(event: AgentRunEvent) {
+  if (event.type === "run_status" && event.status === "finished_with_attention") {
+    return "The build finished. Review notes are available if you want to improve source confidence or project settings.";
+  }
+  if (event.type === "error") {
+    return "The build stopped before finishing. You can try again, or open the technical details below.";
+  }
   return event.text || event.title || event.status || "No details recorded.";
 }
 
@@ -105,6 +112,31 @@ function AgentThinkingCard() {
   );
 }
 
+function BuildProjectEventBody({ event }: { event: AgentRunEvent }) {
+  const content = getEventText(event);
+
+  if (event.type === "assistant_message" || event.type === "error") {
+    const technicalText = event.text || event.title || event.status || "";
+    return (
+      <div className="build-project-event-body">
+        <p>
+          {event.type === "error"
+            ? "The build stopped before finishing. You can try again, or expand this section if you need the technical runner message."
+            : "The agent recorded build details. Expand this section if you need the technical log."}
+        </p>
+        {technicalText ? (
+          <details className="build-project-technical-event">
+            <summary>Technical details</summary>
+            <div>{renderMarkdownMessageContent(technicalText)}</div>
+          </details>
+        ) : null}
+      </div>
+    );
+  }
+
+  return <div className="build-project-event-body">{renderMarkdownMessageContent(content)}</div>;
+}
+
 export function BuildProjectRightPanel({
   models,
   onModelChange,
@@ -131,7 +163,9 @@ export function BuildProjectRightPanel({
   const tone = completionTone(rebuild?.status);
   const completion = completionLabel(rebuild?.status);
   const completionMessage =
-    rebuild?.status === "finished_with_attention" ? "The latest project build completed." : rebuild?.message || "The latest project build has reached a terminal state.";
+    rebuild?.status === "finished_with_attention"
+      ? "The build finished. Review notes are available if you want to improve source confidence or project settings."
+      : rebuild?.message || "The latest project build has reached a terminal state.";
   const hasEvents = Boolean(rebuild?.events.length);
   const hasLog = Boolean(rebuild?.log.length);
 
@@ -173,7 +207,7 @@ export function BuildProjectRightPanel({
                 <strong>{getEventLabel(event)}</strong>
                 <span>{formatLocalTime(event.updatedAt)}</span>
               </header>
-              <div className="build-project-event-body">{renderMarkdownMessageContent(getEventText(event))}</div>
+              <BuildProjectEventBody event={event} />
               {event.status === "streaming" ? <span className="build-project-event-status">Streaming</span> : null}
             </article>
           ))}

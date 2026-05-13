@@ -60,9 +60,9 @@ const buildLogDefinitions = [
   },
   {
     id: "human-attention-queue",
-    label: "Human Attention Queue",
+    label: "Review Notes",
     path: "change_logs/human_attention_queue.md",
-    emptyMessage: "No human attention queue found yet.",
+    emptyMessage: "No review notes found yet.",
   },
 ];
 const buildLogDefinitionById = new Map(buildLogDefinitions.map((definition) => [definition.id, definition]));

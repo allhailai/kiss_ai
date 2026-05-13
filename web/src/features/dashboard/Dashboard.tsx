@@ -1,5 +1,23 @@
 import type { DesignState, ProjectStatus } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
+import { rebuildStatusLabel } from "../../domain/rebuild";
+
+function lintStatusLabel(status: string | null | undefined) {
+  switch (status) {
+    case "completed_with_warnings":
+      return "Completed with review notes";
+    case "passed":
+    case "clean":
+      return "Passed";
+    case "failed":
+      return "Needs fixes";
+    case null:
+    case undefined:
+      return "Unknown";
+    default:
+      return status.replace(/_/g, " ");
+  }
+}
 
 export function Dashboard({
   status,
@@ -21,9 +39,9 @@ export function Dashboard({
       <div className="card-grid">
         <StatusCard label="Last successful run" value={formatLocalDateTime(status?.lastSuccessfulRunAt)} />
         <StatusCard label="Scaling mode" value={status?.scalingMode ?? "Unknown"} />
-        <StatusCard label="Rebuild scope" value={status?.rebuildStatus ?? "Unknown"} />
-        <StatusCard label="Lint" value={status?.lintStatus ?? "Unknown"} />
-        <StatusCard label="Needs attention" value={String(status?.humanAttentionCount ?? 0)} />
+        <StatusCard label="Latest build" value={rebuildStatusLabel(status?.rebuildStatus)} />
+        <StatusCard label="Checks" value={lintStatusLabel(status?.lintStatus)} />
+        <StatusCard label="Review notes" value={String(status?.humanAttentionCount ?? 0)} />
       </div>
 
       <div className="card-grid dashboard-action-grid">

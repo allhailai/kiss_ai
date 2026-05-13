@@ -116,8 +116,14 @@ export function buildWikiLinkExtension({
           });
         }
 
+        let lastLinkEnd = -1;
         linkDecorations
-          .sort((left, right) => left.from - right.from)
+          .sort((left, right) => left.from - right.from || left.to - right.to)
+          .filter((link) => {
+            if (link.from < lastLinkEnd) return false;
+            lastLinkEnd = link.to;
+            return true;
+          })
           .forEach((link) => {
             builder.add(
               link.from,

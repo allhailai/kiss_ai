@@ -1,11 +1,29 @@
 import type { BuildLogState, BuildLogTab, ProjectStatus, RebuildState } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
-import { humanAttentionItemText } from "../../domain/humanAttention";
-import { humanAttentionQueuePath } from "../../domain/projectPaths";
+import { friendlyHumanAttentionItems } from "../../domain/humanAttention";
+import { rebuildStatusLabel } from "../../domain/rebuild";
 
-function MarkdownBlock({ content, emptyMessage = "No build log content found yet." }: { content: string; emptyMessage?: string }) {
+function MarkdownBlock({
+  content,
+  emptyMessage = "No build log content found yet.",
+  technicalSummary,
+}: {
+  content: string;
+  emptyMessage?: string;
+  technicalSummary?: string | null;
+}) {
   if (!content.trim()) {
     return <p className="build-log-empty">{emptyMessage}</p>;
+  }
+
+  if (technicalSummary) {
+    return (
+      <details className="build-log-technical-markdown">
+        <summary>{technicalSummary}</summary>
+        <p>These details are mostly for troubleshooting and audits.</p>
+        <pre className="build-log-markdown">{content}</pre>
+      </details>
+    );
   }
 
   return <pre className="build-log-markdown">{content}</pre>;
@@ -38,6 +56,12 @@ function BuildLogTabPanel({
   const selectedFile = activeTab.selectedFile;
   const selectedPath = selectedFile?.path ?? "";
   const showFilePicker = activeTab.id === "build-summary";
+  const technicalSummary =
+    activeTab.id === "build-summary"
+      ? "Technical build summary"
+      : activeTab.id === "human-attention-queue"
+        ? "Technical review-note log"
+        : null;
 
   return (
     <section className="content-card build-log-tab-panel">
@@ -64,7 +88,7 @@ function BuildLogTabPanel({
         ) : null}
       </div>
 
-      <MarkdownBlock content={selectedFile?.content ?? ""} emptyMessage={activeTab.emptyMessage} />
+      <MarkdownBlock content={selectedFile?.content ?? ""} emptyMessage={activeTab.emptyMessage} technicalSummary={technicalSummary} />
     </section>
   );
 }
@@ -84,31 +108,44 @@ export function BuildLogWorkspace({
   const activeTab = buildLog?.tabs.find((tab) => tab.id === activeTabId) ?? buildLog?.tabs[0] ?? null;
   const latestSummary = buildLog?.tabs.find((tab) => tab.id === "build-summary")?.files[0] ?? null;
   const attentionCount = status?.humanAttentionCount ?? 0;
+  const reviewNotes = friendlyHumanAttentionItems(status?.humanAttentionItems ?? []);
 
   return (
     <div className="panel-stack build-log-workspace">
       <header className="page-header build-log-header">
         <h2>Build Log</h2>
         <div className="build-log-metrics" aria-label="Build log status summary">
-          <BuildLogMetric label="Status" value={rebuild?.status ?? status?.rebuildStatus ?? "Unknown"} />
+          <BuildLogMetric label="Status" value={rebuildStatusLabel(rebuild?.status ?? status?.rebuildStatus)} />
           <BuildLogMetric label="Last success" value={formatLocalDateTime(status?.lastSuccessfulRunAt)} />
-          <BuildLogMetric label="Attention" value={String(attentionCount)} />
+          <BuildLogMetric label="Review notes" value={String(attentionCount)} />
           <BuildLogMetric label="Latest summary" value={latestSummary ? formatLocalDateTime(latestSummary.modifiedAt) : "None"} />
         </div>
       </header>
 
       {attentionCount ? (
-        <section className="warning-callout">
-          <strong>Attention Needed</strong>
-          <p>
-            Review {attentionCount} item{attentionCount === 1 ? "" : "s"} in `{humanAttentionQueuePath}`.
-          </p>
-          {status?.humanAttentionItems?.length ? (
-            <ul>
-              {status.humanAttentionItems.slice(0, 5).map((item, index) => (
-                <li key={index}>{humanAttentionItemText(item)}</li>
+        <section className="build-log-review-notes">
+          <strong>Review Notes</strong>
+          <p>The build finished. These optional notes can help improve source confidence or project settings.</p>
+          {reviewNotes.length ? (
+            <div className="build-log-review-note-list">
+              {reviewNotes.slice(0, 5).map((item, index) => (
+                <article className="build-log-review-note" key={`${item.title}-${index}`}>
+                  <h3>{item.title}</h3>
+                  <p>{item.summary}</p>
+                  {item.action ? <strong>{item.action}</strong> : null}
+                  {item.technicalDetails.length ? (
+                    <details>
+                      <summary>Technical details</summary>
+                      <ul>
+                        {item.technicalDetails.map((detail) => (
+                          <li key={detail}>{detail}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  ) : null}
+                </article>
               ))}
-            </ul>
+            </div>
           ) : null}
         </section>
       ) : null}

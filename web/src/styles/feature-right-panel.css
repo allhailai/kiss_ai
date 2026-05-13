@@ -748,6 +748,21 @@
   margin-bottom: 0;
 }
 
+.build-project-technical-event {
+  margin-top: 8px;
+}
+
+.build-project-technical-event summary {
+  color: var(--color-secondary);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.build-project-technical-event .chat-markdown {
+  margin-top: 8px;
+}
+
 .build-project-completion {
   display: grid;
   gap: 3px;

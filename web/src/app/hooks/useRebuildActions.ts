@@ -45,7 +45,7 @@ export function useRebuildActions({
           setNotice(next.message);
         }
       } catch (error) {
-        setNotice(errorMessage(error, "Could not start human-attention resolution."));
+        setNotice(errorMessage(error, "Could not start review-note resolution."));
       }
     },
     [rebuildModels, requireSelectedProjectSlug, selectedRebuildModelId, setNotice, setRebuild],
