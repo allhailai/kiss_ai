@@ -1,11 +1,15 @@
 import { useState } from "react";
-import type { RebuildModel, RequirementsSyncProposal, RequirementsSyncStep } from "../../contracts/api";
+import type { RebuildModel, RequirementsSyncBatchApplyResult, RequirementsSyncProposal, RequirementsSyncStep } from "../../contracts/api";
 import { requirementsSyncSteps } from "../../domain/requirementsSync";
 import { CompactModelPicker } from "../../shared/CompactModelPicker";
 import { ConceptualDiffReviewItem } from "../../shared/conceptualDiff/ConceptualDiffReviewItem";
 import type { useRequirementsSync } from "./useRequirementsSync";
 
 type RequirementsSyncController = ReturnType<typeof useRequirementsSync>;
+type RequirementsSyncAppliedState = {
+  applied: boolean;
+  feedback: Array<{ step: RequirementsSyncStep; summary: string }>;
+};
 const summaryPreviewCharacterLimit = 260;
 
 function stepStatus(controller: RequirementsSyncController, step: RequirementsSyncStep) {
@@ -61,6 +65,30 @@ function summaryPreview(summary: string) {
   return preview || summary.slice(0, summaryPreviewCharacterLimit).trimEnd();
 }
 
+function isAgentApplyFeedback(result: RequirementsSyncBatchApplyResult) {
+  const summary = result.summary.trim();
+  if (!summary) return false;
+  return summary !== `Applied Requirements Sync to ${result.targetFilePath}.`;
+}
+
+function requirementsSyncAppliedState(controller: RequirementsSyncController): RequirementsSyncAppliedState {
+  const proposals = controller.allProposals;
+  const results = proposals.map((proposal) => controller.applyResults[proposal.step]);
+  const complete = proposals.length > 0 && results.every((result): result is RequirementsSyncBatchApplyResult => Boolean(result));
+  const successful = complete && results.every((result) => result.status === "applied" || result.status === "skipped");
+  const applied = successful && controller.acceptedDiffCount > 0 && results.some((result) => result.status === "applied");
+  const feedback = applied
+    ? results
+        .filter((result) => result.status === "applied" && isAgentApplyFeedback(result))
+        .map((result) => ({ step: result.step, summary: result.summary.trim() }))
+    : [];
+
+  return {
+    applied,
+    feedback,
+  };
+}
+
 export function RequirementsSyncRightPanel({
   controller,
   models,
@@ -76,8 +104,10 @@ export function RequirementsSyncRightPanel({
   selectedModelId: string;
 }) {
   const loadingStep = requirementsSyncSteps.find((candidate) => candidate.id === controller.loadingStep);
+  const appliedState = requirementsSyncAppliedState(controller);
+  const controlsDisabled = controller.busy || appliedState.applied;
   const primaryActionLabel = controller.loadingStep ? `Syncing ${loadingStep?.label ?? "requirements"}...` : controller.allProposalsReady ? "Regenerate All" : "Sync All Requirements";
-  const canApplyBatch = controller.allProposalsReady && controller.acceptedDiffCount > 0;
+  const canApplyBatch = controller.allProposalsReady && controller.acceptedDiffCount > 0 && !appliedState.applied;
 
   return (
     <div className="requirements-sync-panel">
@@ -99,7 +129,9 @@ export function RequirementsSyncRightPanel({
             <strong>Conceptual diffs</strong>
             <p>Sync all requirement files, review every conceptual diff, then apply the accepted changes in one submit.</p>
           </div>
-          {controller.allProposals.length ? (
+          {appliedState.applied ? (
+            <strong>Applied</strong>
+          ) : controller.allProposals.length ? (
             <strong>
               {controller.acceptedDiffCount} accepted / {controller.totalDiffCount} total
             </strong>
@@ -107,7 +139,7 @@ export function RequirementsSyncRightPanel({
         </div>
 
         {controller.allProposals.length ? (
-          <BatchProposalReview controller={controller} />
+          <BatchProposalReview appliedState={appliedState} controller={controller} />
         ) : (
           <div className="requirements-sync-empty">
             <button className="requirements-sync-empty-action" disabled={controller.busy || !selectedModelId} onClick={() => void controller.syncAll()} type="button">
@@ -128,7 +160,7 @@ export function RequirementsSyncRightPanel({
         {requirementsSyncSteps.map((candidate) => (
           <button
             className={`requirements-sync-step status-${controller.stepStatuses[candidate.id]}${candidate.id === controller.step ? " active" : ""}`}
-            disabled={controller.applying}
+            disabled={controller.applying || appliedState.applied}
             key={candidate.id}
             onClick={() => controller.setStep(candidate.id)}
             type="button"
@@ -140,17 +172,17 @@ export function RequirementsSyncRightPanel({
       </section>
 
       <section className="requirements-sync-run-controls" aria-label="Run requirements sync">
-        <CompactModelPicker disabled={controller.busy} models={models} onModelChange={onModelChange} selectedModelId={selectedModelId} />
+        <CompactModelPicker disabled={controlsDisabled} models={models} onModelChange={onModelChange} selectedModelId={selectedModelId} />
         <div className="requirements-sync-generate-actions">
           <button
             className="requirements-sync-generate-button"
-            disabled={controller.busy || !selectedModelId}
+            disabled={controlsDisabled || !selectedModelId}
             onClick={() => void controller.syncAll()}
             type="button"
           >
             {primaryActionLabel}
           </button>
-          <button className="agent-edit-proposal-apply" disabled={controller.busy || !canApplyBatch} onClick={() => void controller.applyAll()} type="button">
+          <button className="agent-edit-proposal-apply" disabled={controlsDisabled || !canApplyBatch} onClick={() => void controller.applyAll()} type="button">
             {controller.applying ? "Applying..." : "Apply Accepted Changes"}
           </button>
         </div>
@@ -160,12 +192,33 @@ export function RequirementsSyncRightPanel({
 }
 
 function BatchProposalReview({
+  appliedState,
   controller,
 }: {
+  appliedState: RequirementsSyncAppliedState;
   controller: RequirementsSyncController;
 }) {
   const proposals = requirementsSyncSteps.map((candidate) => controller.proposals[candidate.id]).filter((proposal): proposal is RequirementsSyncProposal => Boolean(proposal));
   const hasDiffs = totalDiffCount(proposals) > 0;
+
+  if (appliedState.applied) {
+    return (
+      <section className="agent-edit-proposal requirements-sync-edit-proposal" aria-label="Requirements Sync Applied Changes">
+        <div className="requirements-sync-applied-state" role="status">
+          <strong>Edits have been applied</strong>
+          {appliedState.feedback.length ? (
+            <div className="requirements-sync-applied-feedback">
+              {appliedState.feedback.map((feedback) => (
+                <p key={feedback.step}>
+                  <span>{stepDisplayLabel(feedback.step)} summary:</span> {feedback.summary}
+                </p>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="agent-edit-proposal requirements-sync-edit-proposal" aria-label="Requirements Sync Proposed Changes">

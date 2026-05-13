@@ -603,6 +603,44 @@
   outline-color: color-mix(in srgb, var(--color-secondary) 22%, transparent);
 }
 
+.requirements-sync-applied-state {
+  display: grid;
+  gap: 12px;
+  align-content: center;
+  min-height: 220px;
+  padding: 28px 20px;
+}
+
+.requirements-sync-applied-state > strong {
+  color: var(--color-secondary);
+  font-size: clamp(1.24rem, 3.4vw, 1.7rem);
+  font-weight: 950;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.requirements-sync-applied-feedback {
+  display: grid;
+  width: 100%;
+  max-width: 52rem;
+  justify-self: center;
+}
+
+.requirements-sync-applied-feedback p {
+  margin: 0;
+  padding: 12px 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-secondary) 26%, var(--color-border));
+  color: var(--color-primary);
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.requirements-sync-applied-feedback span {
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
 .agent-edit-proposal.requirements-sync-edit-proposal .agent-edit-proposal-files {
   min-height: 0;
   align-content: start;
