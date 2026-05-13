@@ -1,5 +1,9 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createChatAgentService, extractApplyResult, extractConceptualDiffs, extractFileEditProposals } from "./chatAgent.js";
+import { emptyConceptualDiffMemory, normalizeConceptualDiffMemoryFile, updateConceptualDiffRejectionMemory } from "./conceptualDiffMemory.js";
 import { httpError } from "./httpErrors.js";
 import { createProjectAgentLock } from "./projectAgentLock.js";
 
@@ -83,6 +87,7 @@ function createConversationFixture(overrides = {}) {
 function createChatAgentHarness({
   conversation = createConversationFixture(),
   gitFileDiffText = async () => ({ diff: "", diffError: "" }),
+  projectPath = "/tmp/demo",
   readTextFile = async (_projectRoot, relativePath) => ({
     path: relativePath,
     kind: relativePath.startsWith("change_logs/") ? "log" : "human",
@@ -107,7 +112,7 @@ function createChatAgentHarness({
   },
 } = {}) {
   let currentConversation = structuredClone(conversation);
-  const project = { slug: "demo", name: "Demo", path: "/tmp/demo" };
+  const project = { slug: "demo", name: "Demo", path: projectPath };
   const projectAgentLock = createProjectAgentLock({ httpError });
   const service = createChatAgentService({
     appendMessage: async (_project, _conversationId, message) => {
@@ -127,6 +132,14 @@ function createChatAgentHarness({
     pickRebuildModelId: () => "model-a",
     projectAgentLock,
     readConversation: async () => currentConversation,
+    readProjectJson: async (_projectRoot, relativePath, fallback) => {
+      try {
+        return JSON.parse(await fs.readFile(path.join(projectPath, relativePath), "utf8"));
+      } catch (error) {
+        if (error?.code === "ENOENT") return fallback;
+        throw error;
+      }
+    },
     readProjectHarness: async () => ({ project_name: "Demo", project_slug: "demo", setup: { status: "ready" } }),
     readTextFile,
     resolveCursorApiKey: async () => ({ available: true, apiKey: "cursor-key", source: "test" }),
@@ -134,6 +147,10 @@ function createChatAgentHarness({
     writeConversation: async (_project, nextConversation) => {
       currentConversation = structuredClone(nextConversation);
       return currentConversation;
+    },
+    writeProjectJson: async (_projectRoot, relativePath, value) => {
+      await fs.writeFile(path.join(projectPath, relativePath), `${JSON.stringify(value, null, 2)}\n`, "utf8");
+      return value;
     },
   });
 
@@ -271,6 +288,70 @@ describe("extractConceptualDiffs", () => {
       }),
     ]);
   });
+
+  it("extracts and sanitizes rich conceptual diff details", () => {
+    const text = [
+      "<edit_proposal_json>",
+      JSON.stringify({
+        conceptualDiffs: [
+          {
+            filePath: "human_goal_requirements.md",
+            title: "Align document",
+            summary: "Make a document-wide pass to align annotations.",
+            target: {
+              scope: "document",
+              sections: ["Goal", "Scope", "Non-goals", "Extra 1", "Extra 2", "Extra 3", "Extra 4", "Extra 5", "Extra 6"],
+              anchors: ["Current objective"],
+            },
+            intent: {
+              objective: "Reflect annotation guidance across the document.",
+              rationale: "The saved annotation applies globally.",
+              mustPreserve: ["Existing voice"],
+              avoid: ["Adding unrelated requirements"],
+            },
+            evidence: {
+              userGuidance: ["Interpret Git diff as user guidance."],
+              gitDiffSignals: ["Annotation asks for global alignment."],
+              contextSignals: ["Context reinforces current scope."],
+            },
+            applyNotes: {
+              expectedChangeShape: "Broad editorial pass without inventing scope.",
+              nonGoals: ["Do not add implementation details."],
+              riskLevel: "high",
+            },
+          },
+        ],
+      }),
+      "</edit_proposal_json>",
+    ].join("\n");
+
+    expect(extractConceptualDiffs(text, new Set(["human_goal_requirements.md"]))).toEqual([
+      expect.objectContaining({
+        filePath: "human_goal_requirements.md",
+        target: {
+          scope: "document",
+          sections: ["Goal", "Scope", "Non-goals", "Extra 1", "Extra 2", "Extra 3", "Extra 4", "Extra 5"],
+          anchors: ["Current objective"],
+        },
+        intent: {
+          objective: "Reflect annotation guidance across the document.",
+          rationale: "The saved annotation applies globally.",
+          mustPreserve: ["Existing voice"],
+          avoid: ["Adding unrelated requirements"],
+        },
+        evidence: {
+          userGuidance: ["Interpret Git diff as user guidance."],
+          gitDiffSignals: ["Annotation asks for global alignment."],
+          contextSignals: ["Context reinforces current scope."],
+        },
+        applyNotes: {
+          expectedChangeShape: "Broad editorial pass without inventing scope.",
+          nonGoals: ["Do not add implementation details."],
+          riskLevel: "high",
+        },
+      }),
+    ]);
+  });
 });
 
 describe("extractApplyResult", () => {
@@ -384,6 +465,89 @@ describe("edit proposal lifecycle", () => {
     });
   });
 
+  it("includes relevant rejection memory in edit proposal prompts", async () => {
+    const projectPath = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-chat-memory-"));
+    await fs.writeFile(path.join(projectPath, ".conceptual-diff-memory.json"), `${JSON.stringify(updateConceptualDiffRejectionMemory(emptyConceptualDiffMemory(), {
+      conceptualDiffs: [
+        {
+          id: "diff_rejected",
+          filePath: "human_goal_requirements.md",
+          title: "Rejected audience",
+          summary: "Do not expand the audience.",
+          status: "rejected",
+          intent: { objective: "Expand the audience." },
+        },
+      ],
+      flow: "ai_file_assist",
+    }), null, 2)}\n`, "utf8");
+    let capturedPrompt = "";
+    const { project, service } = createChatAgentHarness({
+      projectPath,
+      runCursorAgent: async ({ onEvent, prompt }) => {
+        capturedPrompt = prompt;
+        await onEvent({
+          type: "assistant_delta",
+          text: `<edit_proposal_json>${JSON.stringify({ conceptualDiffs: [{ filePath: "human_goal_requirements.md", title: "Clarify goal", summary: "Clarify the goal." }] })}</edit_proposal_json>`,
+        });
+        return { status: "finished" };
+      },
+    });
+
+    await service.generateEditProposal(project, "conv_1", {
+      modelId: "model-a",
+      content: "Make the goal more specific.",
+      fileContext: {
+        ai_editable_files: [{ path: "human_goal_requirements.md" }],
+        context_files: [],
+      },
+    });
+
+    expect(capturedPrompt).toContain("conceptual_diff_rejection_memory");
+    expect(capturedPrompt).toContain("Rejected audience");
+    expect(capturedPrompt).toContain("soft suppression");
+  });
+
+  it("persists rejected AI File Assist conceptual diffs to shared memory", async () => {
+    const projectPath = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-chat-memory-"));
+    const { project, service } = createChatAgentHarness({
+      projectPath,
+      conversation: createConversationFixture({
+        editProposals: [
+          {
+            id: "proposal_1",
+            status: "proposed",
+            createdAt: "2026-05-11T00:00:00.000Z",
+            updatedAt: "2026-05-11T00:00:00.000Z",
+            conceptualDiffs: [
+              {
+                id: "diff_rejected",
+                filePath: "human_goal_requirements.md",
+                title: "Rejected",
+                summary: "Rejected summary.",
+                status: "accepted",
+                intent: { objective: "Rejected objective." },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    await service.updateEditProposal(project, "conv_1", "proposal_1", {
+      conceptualDiffs: [{ id: "diff_rejected", status: "rejected" }],
+    });
+
+    const memory = normalizeConceptualDiffMemoryFile(JSON.parse(await fs.readFile(path.join(projectPath, ".conceptual-diff-memory.json"), "utf8")));
+    expect(memory.records).toEqual([
+      expect.objectContaining({
+        flow: "ai_file_assist",
+        filePath: "human_goal_requirements.md",
+        title: "Rejected",
+        status: "active",
+      }),
+    ]);
+  });
+
   it("applies only allowed accepted diffs and keeps rejected diffs as constraints", async () => {
     let capturedPrompt = "";
     const { project, service } = createChatAgentHarness({
@@ -396,9 +560,29 @@ describe("edit proposal lifecycle", () => {
             createdAt: "2026-05-11T00:00:00.000Z",
             updatedAt: "2026-05-11T00:00:00.000Z",
             conceptualDiffs: [
-              { id: "diff_allowed", filePath: "human_goal_requirements.md", title: "Allowed", summary: "Allowed summary.", status: "accepted" },
+              {
+                id: "diff_allowed",
+                filePath: "human_goal_requirements.md",
+                title: "Allowed",
+                summary: "Allowed summary.",
+                status: "accepted",
+                target: { scope: "document", sections: ["Goal"] },
+                intent: {
+                  objective: "Align the whole file with accepted guidance.",
+                  mustPreserve: ["Existing voice"],
+                  avoid: ["Unrelated scope expansion"],
+                },
+                applyNotes: { expectedChangeShape: "Broad editorial pass.", nonGoals: ["Do not add implementation details."], riskLevel: "high" },
+              },
               { id: "diff_blocked", filePath: "change_logs/change_logs.md", title: "Blocked", summary: "Blocked summary.", status: "accepted" },
-              { id: "diff_rejected", filePath: "human_goal_requirements.md", title: "Rejected", summary: "Rejected summary.", status: "rejected" },
+              {
+                id: "diff_rejected",
+                filePath: "human_goal_requirements.md",
+                title: "Rejected",
+                summary: "Rejected summary.",
+                status: "rejected",
+                intent: { objective: "Do not make this rejected change.", avoid: ["Rejected direction"] },
+              },
             ],
           },
         ],
@@ -419,6 +603,10 @@ describe("edit proposal lifecycle", () => {
     expect(capturedPrompt).not.toContain('"id": "diff_blocked"');
     expect(capturedPrompt).toContain('"rejected_conceptual_diffs"');
     expect(capturedPrompt).toContain('"id": "diff_rejected"');
+    expect(capturedPrompt).toContain('"scope": "document"');
+    expect(capturedPrompt).toContain('"mustPreserve"');
+    expect(capturedPrompt).toContain('"nonGoals"');
+    expect(capturedPrompt).toContain("positive apply contract");
     expect(next.editProposals[0]).toMatchObject({
       status: "partial",
       notice: "Applied partially.",

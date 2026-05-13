@@ -101,6 +101,23 @@ describe("conversation service", () => {
               title: "Clarify caveat",
               summary: "Add a short source-confidence caveat.",
               status: "accepted",
+              target: { scope: "section", sections: ["Evidence"], anchors: ["source confidence"] },
+              intent: {
+                objective: "Make source confidence explicit.",
+                rationale: "The existing caveat is too implicit.",
+                mustPreserve: ["Concise report style"],
+                avoid: ["Overstating uncertainty"],
+              },
+              evidence: {
+                userGuidance: ["Clarify the caveat."],
+                gitDiffSignals: ["Annotation mentions source confidence."],
+                contextSignals: ["Report uses cautious language."],
+              },
+              applyNotes: {
+                expectedChangeShape: "Update one nearby sentence.",
+                nonGoals: ["Do not rewrite the full report."],
+                riskLevel: "medium",
+              },
             },
           ],
         },
@@ -112,7 +129,29 @@ describe("conversation service", () => {
         id: "proposal_1",
         sourceMessageId: "msg_1",
         appliedAt: "2026-05-11T00:01:00.000Z",
-        conceptualDiffs: [{ id: "diff_1", status: "accepted" }],
+        conceptualDiffs: [
+          {
+            id: "diff_1",
+            status: "accepted",
+            target: { scope: "section", sections: ["Evidence"], anchors: ["source confidence"] },
+            intent: {
+              objective: "Make source confidence explicit.",
+              rationale: "The existing caveat is too implicit.",
+              mustPreserve: ["Concise report style"],
+              avoid: ["Overstating uncertainty"],
+            },
+            evidence: {
+              userGuidance: ["Clarify the caveat."],
+              gitDiffSignals: ["Annotation mentions source confidence."],
+              contextSignals: ["Report uses cautious language."],
+            },
+            applyNotes: {
+              expectedChangeShape: "Update one nearby sentence.",
+              nonGoals: ["Do not rewrite the full report."],
+              riskLevel: "medium",
+            },
+          },
+        ],
       },
     ]);
     await expect(service.readConversation(project, conversation.id)).resolves.toMatchObject({

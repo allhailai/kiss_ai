@@ -18,6 +18,7 @@ import { apiErrorHandler, httpError } from "./services/httpErrors.js";
 import { createProjectAgentLock } from "./services/projectAgentLock.js";
 import { createProjectFileService } from "./services/projectFiles.js";
 import { createProjectService } from "./services/projects.js";
+import { createRequirementsSyncService } from "./services/requirementsSync.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(__dirname, "..");
@@ -50,6 +51,12 @@ const buildLogDefinitions = [
     label: "Annotation Change Log",
     path: "change_logs/annotation_change_logs.md",
     emptyMessage: "No annotation change log found yet.",
+  },
+  {
+    id: "requirements-sync-log",
+    label: "Requirements Sync Log",
+    path: "change_logs/requirements_sync_log.md",
+    emptyMessage: "No requirements sync log found yet.",
   },
   {
     id: "human-attention-queue",
@@ -143,6 +150,7 @@ const {
   restoreFileFromHead,
   searchFiles,
   uploadHumanInputFiles,
+  writeProjectJson,
   writeTextFile,
 } = createProjectFileService({
   WEB_ROOT,
@@ -212,11 +220,13 @@ const { applyEditProposal, editChatMessage, generateEditProposal, sendChatMessag
   notifyConversation,
   pickRebuildModelId,
   readConversation,
+  readProjectJson,
   readProjectHarness,
   readTextFile,
   resolveCursorApiKey,
   runCursorAgent,
   writeConversation,
+  writeProjectJson,
 });
 
 const { startHumanAttentionResolution, startRebuild } = createAgentJobService({
@@ -235,6 +245,20 @@ const { startHumanAttentionResolution, startRebuild } = createAgentJobService({
   resolveCursorApiKey,
   runCursorAgent,
   setRebuildState,
+});
+
+const { applyRequirementsSync, proposeRequirementsSync, recordRequirementsSyncReview, requirementsSyncSignals } = createRequirementsSyncService({
+  FRAMEWORK_ROOT,
+  gitFileDiffText,
+  gitStatus,
+  httpError,
+  listCursorModels,
+  listProjectFiles,
+  pickRebuildModelId,
+  projectAgentLock,
+  readTextFile,
+  resolveCursorApiKey,
+  runCursorAgent,
 });
 
 function execFileText(command, args, options = {}) {
@@ -279,9 +303,13 @@ registerApiRoutes(app, {
   restoreFileFromHead,
   searchFiles,
   applyEditProposal,
+  applyRequirementsSync,
   editChatMessage,
   generateEditProposal,
   sendChatMessage,
+  proposeRequirementsSync,
+  recordRequirementsSyncReview,
+  requirementsSyncSignals,
   startHumanAttentionResolution,
   startRebuild,
   subscribeToConversation,

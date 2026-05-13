@@ -29,6 +29,7 @@ export type FileWorkspaceController = {
   inputMutationLoading: boolean;
   loading: boolean;
   projectFiles: ProjectFile[];
+  refreshProjectFiles: () => Promise<void>;
   refreshSelectedFile: () => Promise<void>;
   revertSelected: () => Promise<void>;
   reverting: boolean;

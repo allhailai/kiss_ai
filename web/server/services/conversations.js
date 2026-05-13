@@ -31,6 +31,84 @@ function trimText(value, maxLength) {
   return String(value ?? "").trim().slice(0, maxLength);
 }
 
+function optionalText(value, maxLength) {
+  const text = trimText(value, maxLength);
+  return text || "";
+}
+
+function normalizeStringList(value, maxItems = 8, maxLength = 240) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => optionalText(item, maxLength)).filter(Boolean).slice(0, maxItems);
+}
+
+function normalizeConceptualDiffScope(value) {
+  return ["local", "section", "multi_section", "document"].includes(value) ? value : "";
+}
+
+function normalizeConceptualDiffTarget(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const sections = normalizeStringList(source.sections);
+  const anchors = normalizeStringList(source.anchors);
+  const explicitScope = normalizeConceptualDiffScope(source.scope);
+  const inferredScope = sections.length > 1 ? "multi_section" : sections.length ? "section" : anchors.length ? "local" : "";
+  const scope = explicitScope || inferredScope;
+
+  if (!scope) return null;
+
+  return {
+    scope,
+    ...(sections.length ? { sections } : {}),
+    ...(anchors.length ? { anchors } : {}),
+  };
+}
+
+function normalizeConceptualDiffIntent(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const objective = optionalText(source.objective, 800);
+  if (!objective) return null;
+
+  const rationale = optionalText(source.rationale, 800);
+  const mustPreserve = normalizeStringList(source.mustPreserve, 8, 260);
+  const avoid = normalizeStringList(source.avoid, 8, 260);
+
+  return {
+    objective,
+    ...(rationale ? { rationale } : {}),
+    ...(mustPreserve.length ? { mustPreserve } : {}),
+    ...(avoid.length ? { avoid } : {}),
+  };
+}
+
+function normalizeConceptualDiffEvidence(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const userGuidance = normalizeStringList(source.userGuidance, 6, 260);
+  const gitDiffSignals = normalizeStringList(source.gitDiffSignals, 6, 260);
+  const contextSignals = normalizeStringList(source.contextSignals, 6, 260);
+
+  if (!userGuidance.length && !gitDiffSignals.length && !contextSignals.length) return null;
+
+  return {
+    ...(userGuidance.length ? { userGuidance } : {}),
+    ...(gitDiffSignals.length ? { gitDiffSignals } : {}),
+    ...(contextSignals.length ? { contextSignals } : {}),
+  };
+}
+
+function normalizeConceptualDiffApplyNotes(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const expectedChangeShape = optionalText(source.expectedChangeShape, 600);
+  const nonGoals = normalizeStringList(source.nonGoals, 8, 260);
+  const riskLevel = ["low", "medium", "high"].includes(source.riskLevel) ? source.riskLevel : "";
+
+  if (!expectedChangeShape && !nonGoals.length && !riskLevel) return null;
+
+  return {
+    ...(expectedChangeShape ? { expectedChangeShape } : {}),
+    ...(nonGoals.length ? { nonGoals } : {}),
+    ...(riskLevel ? { riskLevel } : {}),
+  };
+}
+
 function titleFromContent(content) {
   const firstLine = String(content ?? "")
     .split("\n")
@@ -77,6 +155,10 @@ function normalizeConceptualDiff(value) {
   const title = trimText(source.title, 160);
   const summary = trimText(source.summary, 1200);
   const status = source.status === "rejected" ? "rejected" : "accepted";
+  const target = normalizeConceptualDiffTarget(source.target);
+  const intent = normalizeConceptualDiffIntent(source.intent);
+  const evidence = normalizeConceptualDiffEvidence(source.evidence);
+  const applyNotes = normalizeConceptualDiffApplyNotes(source.applyNotes);
 
   if (!filePath || !title || !summary) return null;
 
@@ -86,6 +168,10 @@ function normalizeConceptualDiff(value) {
     title,
     summary,
     status,
+    ...(target ? { target } : {}),
+    ...(intent ? { intent } : {}),
+    ...(evidence ? { evidence } : {}),
+    ...(applyNotes ? { applyNotes } : {}),
   };
 }
 

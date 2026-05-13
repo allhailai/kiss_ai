@@ -199,6 +199,12 @@ export function createProjectFileService({
     }
   }
 
+  async function writeProjectJson(projectRoot, relativePath, value) {
+    const { absolute } = await resolveProjectFileTarget(projectRoot, relativePath, { allowMissing: true });
+    await fs.writeFile(absolute, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+    return value;
+  }
+
   async function readTextFile(projectRoot, relativePath) {
     const meta = classifyPath(projectRoot, relativePath);
     const { absolute } = await resolveProjectFileTarget(projectRoot, meta.path);
@@ -655,6 +661,7 @@ export function createProjectFileService({
     restoreFileFromHead,
     searchFiles,
     uploadHumanInputFiles,
+    writeProjectJson,
     writeTextFile,
   };
 }

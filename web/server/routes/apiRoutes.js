@@ -3,6 +3,7 @@ import { registerChatRoutes } from "./chatRoutes.js";
 import { registerFileRoutes } from "./fileRoutes.js";
 import { registerProjectRoutes } from "./projectRoutes.js";
 import { registerRebuildRoutes } from "./rebuildRoutes.js";
+import { registerRequirementsSyncRoutes } from "./requirementsSyncRoutes.js";
 
 export function registerApiRoutes(app, deps) {
   app.use("/api/projects/:projectSlug", deps.attachProject);
@@ -63,5 +64,13 @@ export function registerApiRoutes(app, deps) {
     startHumanAttentionResolution: deps.startHumanAttentionResolution,
     startRebuild: deps.startRebuild,
     subscribeToRebuild: deps.subscribeToRebuild,
+  });
+
+  registerRequirementsSyncRoutes(app, {
+    applyRequirementsSync: deps.applyRequirementsSync,
+    httpError: deps.httpError,
+    proposeRequirementsSync: deps.proposeRequirementsSync,
+    recordRequirementsSyncReview: deps.recordRequirementsSyncReview,
+    requirementsSyncSignals: deps.requirementsSyncSignals,
   });
 }

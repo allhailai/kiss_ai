@@ -289,6 +289,7 @@ export function useProjectWorkspace() {
     inputMutationLoading,
     loading: treeLoading || fileLoading || saving || reverting || inputMutationLoading,
     projectFiles,
+    refreshProjectFiles,
     refreshSelectedFile,
     revertSelected,
     reverting,

@@ -18,6 +18,77 @@
   color: var(--color-primary);
 }
 
+.requirements-sync-rebuild-controller {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, var(--color-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
+}
+
+.requirements-sync-rebuild-controller > div:first-child,
+.requirements-sync-rebuild-controller-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.requirements-sync-rebuild-controller p {
+  margin: 2px 0 0;
+  color: var(--color-secondary);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.requirements-sync-rebuild-controller strong {
+  color: var(--color-primary);
+}
+
+.requirements-sync-rebuild-controller button {
+  white-space: nowrap;
+}
+
+.requirements-sync-rebuild-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.requirements-sync-rebuild-step {
+  display: grid;
+  gap: 2px;
+  padding: 8px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  text-align: left;
+}
+
+.requirements-sync-rebuild-step.active {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 9%, var(--color-surface));
+}
+
+.requirements-sync-rebuild-step span,
+.requirements-sync-rebuild-step small {
+  color: var(--color-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.requirements-sync-rebuild-step strong {
+  overflow: hidden;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .rebuild-status-controls {
   display: grid;
   grid-template-columns: minmax(280px, 1fr) auto;

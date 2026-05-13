@@ -1,11 +1,22 @@
 import { createHash, randomUUID } from "node:crypto";
 import { MAX_USER_MESSAGE_BYTES } from "../contracts/chatLimits.js";
+import {
+  activeRejectionRecords,
+  annotateConceptualDiffsWithMemory,
+  buildRejectionMemoryPromptContext,
+  emptyConceptualDiffMemory,
+  filterSuppressedConceptualDiffs,
+  normalizeConceptualDiffMemoryFile,
+  updateConceptualDiffRejectionMemory,
+} from "./conceptualDiffMemory.js";
+import { extractApplyResultFromText, extractConceptualDiffsFromText, parseJsonTaggedContent } from "./conceptualDiffs.js";
 import { normalizeChatContext } from "./chatContext.js";
 
 const maxPromptFileBytes = 24 * 1024;
 const maxPromptHistoryMessages = 40;
 const maxContextFiles = 20;
 const maxAiEditableFiles = 10;
+const conceptualDiffMemoryPath = ".conceptual-diff-memory.json";
 const noProposalGuidanceMessage = [
   "What changes do you want to make to the editable files?",
   "I need guidance.",
@@ -308,66 +319,16 @@ function allTagContent(text, tagName) {
   return [...String(text ?? "").matchAll(pattern)].map((match) => match[1]?.trim() ?? "");
 }
 
-function parseJsonTaggedContent(text, tagName) {
-  const tagged = firstTagContent(text, tagName);
-  const candidate = tagged || String(text ?? "").trim();
-  if (!candidate) return null;
-
-  try {
-    return JSON.parse(candidate);
-  } catch {
-    const jsonMatch = candidate.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    try {
-      return JSON.parse(jsonMatch[0]);
-    } catch {
-      return null;
-    }
-  }
-}
-
 function createProposalId() {
   return `proposal_${randomUUID().replaceAll("-", "").slice(0, 18)}`;
 }
 
-function createConceptualDiffId() {
-  return `diff_${randomUUID().replaceAll("-", "").slice(0, 18)}`;
-}
-
-function normalizeConceptualDiffResult(value, authorizedEditablePaths) {
-  const source = value && typeof value === "object" ? value : {};
-  const filePath = String(source.filePath ?? source.path ?? "").trim();
-  const title = String(source.title ?? "").trim();
-  const summary = String(source.summary ?? source.description ?? "").trim();
-
-  if (!filePath || !title || !summary || !authorizedEditablePaths.has(filePath)) return null;
-
-  return {
-    id: createConceptualDiffId(),
-    filePath,
-    title: title.slice(0, 160),
-    summary: summary.slice(0, 1200),
-    status: "accepted",
-  };
-}
-
 export function extractConceptualDiffs(rawText, authorizedEditablePaths) {
-  const parsed = parseJsonTaggedContent(rawText, "edit_proposal_json");
-  const candidates = Array.isArray(parsed?.conceptualDiffs) ? parsed.conceptualDiffs : Array.isArray(parsed) ? parsed : [];
-  return candidates.map((candidate) => normalizeConceptualDiffResult(candidate, authorizedEditablePaths)).filter(Boolean);
+  return extractConceptualDiffsFromText(rawText, "edit_proposal_json", authorizedEditablePaths);
 }
 
 export function extractApplyResult(rawText, allowedFailedIds = null) {
-  const parsed = parseJsonTaggedContent(rawText, "apply_result_json");
-  const allowedIds = allowedFailedIds ? new Set(allowedFailedIds) : null;
-  const failedConceptualDiffIds = Array.isArray(parsed?.failedConceptualDiffIds)
-    ? parsed.failedConceptualDiffIds.filter((id) => typeof id === "string" && (!allowedIds || allowedIds.has(id)))
-    : [];
-  return {
-    failedConceptualDiffIds,
-    notice: typeof parsed?.notice === "string" && parsed.notice.trim() ? parsed.notice.trim().slice(0, 1200) : "",
-    valid: Boolean(parsed && typeof parsed === "object" && !Array.isArray(parsed)),
-  };
+  return extractApplyResultFromText(rawText, "apply_result_json", allowedFailedIds);
 }
 
 function proposalNotice(conceptualDiffs) {
@@ -430,7 +391,15 @@ function currentConversationMessages(conversation) {
   return conversation.messages.map(formatHistoryMessage);
 }
 
-async function createEditProposalPrompt({ project, conversation, readTextFile, gitFileDiffText }) {
+function latestUserInstruction(conversation) {
+  return [...(conversation.messages ?? [])].reverse().find((message) => message.role === "user" && String(message.content ?? "").trim())?.content ?? "";
+}
+
+function editableContentHashByPath(conversation) {
+  return new Map((conversation.fileContext?.ai_editable_files ?? []).filter((file) => file?.path && file.contentHash).map((file) => [file.path, file.contentHash]));
+}
+
+async function createEditProposalPrompt({ project, conversation, readProjectJson, readTextFile, gitFileDiffText }) {
   const payload = await readScopedFilePayload({ project, readTextFile, gitFileDiffText, conversation });
   const authorizedEditablePaths = new Set(payload.authorizedAiEditableFiles.map((file) => file.path));
   const hasUserMessages = conversation.messages.some((message) => message.role === "user" && String(message.content ?? "").trim());
@@ -450,6 +419,8 @@ async function createEditProposalPrompt({ project, conversation, readTextFile, g
     };
   }
 
+  const rejectionMemory = normalizeConceptualDiffMemoryFile(await readProjectJson(project.path, conceptualDiffMemoryPath, emptyConceptualDiffMemory()));
+  const userInstruction = latestUserInstruction(conversation);
   const promptPayload = {
     project: {
       slug: project.slug,
@@ -463,6 +434,11 @@ async function createEditProposalPrompt({ project, conversation, readTextFile, g
     rejected_ai_editable_files: payload.rejectedAiEditableFiles,
     context_files: payload.contextFileResults,
     git_diffs: payload.gitDiffs,
+    conceptual_diff_rejection_memory: buildRejectionMemoryPromptContext(rejectionMemory, {
+      filePaths: authorizedEditablePaths,
+      flow: "ai_file_assist",
+      userInstruction,
+    }),
   };
 
   return {
@@ -474,10 +450,18 @@ async function createEditProposalPrompt({ project, conversation, readTextFile, g
       "- Read only. Do not edit files, write logs, run modifying commands, or create artifacts.",
       "- Use only the current conversation messages, selected context files, selected AI Editable files, and scoped git diffs in the payload.",
       "- Propose changes only for paths listed in ai_editable_files.",
-      "- Each proposed change must be conceptual and terse, not a low-level patch.",
+      "- Each proposed change must be conceptual, concise, and high-level; do not provide patches or replacement content.",
+      "- Include enough structured intent for a later apply agent to preserve the user's meaning.",
+      "- Choose the narrowest target.scope that satisfies the user's intent: local, section, multi_section, or document.",
+      "- Use document scope only when guidance, annotations, or Git diffs imply a broad file-wide pass.",
+      "- Use target anchors or section names when they are supported by the file content.",
+      "- Do not invent evidence. Leave evidence arrays empty or omit them when unsupported by the payload.",
+      "- Treat conceptual_diff_rejection_memory as soft suppression guidance for prior rejected conceptual diffs.",
+      "- Do not re-propose exact rejected concepts unless fresh evidence or explicit user guidance justifies reconsideration.",
+      "- If reconsidering a rejected concept, include memory.reconsidersRejectedId and memory.reconsiderReason on that conceptual diff.",
       "- Group proposals per file using filePath.",
       "- Return only JSON wrapped in <edit_proposal_json> tags.",
-      "- JSON shape: {\"conceptualDiffs\":[{\"filePath\":\"relative/path.md\",\"title\":\"short title\",\"summary\":\"terse conceptual change\"}]}",
+      "- JSON shape: {\"conceptualDiffs\":[{\"filePath\":\"relative/path.md\",\"title\":\"short title\",\"summary\":\"terse conceptual change\",\"target\":{\"scope\":\"local|section|multi_section|document\",\"sections\":[\"section name\"],\"anchors\":[\"nearby phrase\"]},\"intent\":{\"objective\":\"what should be true after applying\",\"rationale\":\"why this change is needed\",\"mustPreserve\":[\"constraint\"],\"avoid\":[\"negative constraint\"]},\"evidence\":{\"userGuidance\":[\"user signal\"],\"gitDiffSignals\":[\"diff signal\"],\"contextSignals\":[\"context signal\"]},\"applyNotes\":{\"expectedChangeShape\":\"how broad the edit should be\",\"nonGoals\":[\"do not do this\"],\"riskLevel\":\"low|medium|high\"},\"memory\":{\"reconsidersRejectedId\":\"rejection id when reconsidering\",\"reconsiderReason\":\"fresh evidence or user override reason\"}}]}",
       "",
       "Payload:",
       JSON.stringify(promptPayload, null, 2),
@@ -529,7 +513,12 @@ async function createApplyProposalPrompt({ project, conversation, proposal, read
       "- Do not edit files that have no accepted conceptual diff.",
       "- Do not edit context files unless they are also listed in allowed_edit_paths.",
       "- Treat rejected_conceptual_diffs as explicit negative constraints.",
-      "- Preserve the user's intent and keep edits scoped to the approved conceptual diffs.",
+      "- Treat approved_conceptual_diffs as the positive apply contract.",
+      "- Use target.scope to control edit breadth: local means nearby phrase/paragraph edits, section means one named section, multi_section means coordinated edits across listed sections, and document means a broad file-wide pass.",
+      "- For document scope, broad edits are allowed only when needed to satisfy the accepted objective.",
+      "- Treat intent.mustPreserve, intent.avoid, applyNotes.nonGoals, and applyNotes.expectedChangeShape as binding guidance.",
+      "- Preserve the user's intent and keep edits scoped to the approved conceptual diff details.",
+      "- If current file context conflicts with an approved conceptual diff's intent, skip that diff and report it.",
       "- Partial apply is allowed. If any approved conceptual diff cannot be applied, skip it and report it.",
       "- Stay inside the current project.",
       "- After editing, return JSON wrapped in <apply_result_json> tags.",
@@ -585,11 +574,13 @@ export function createChatAgentService({
   pickRebuildModelId,
   projectAgentLock,
   readConversation,
+  readProjectJson,
   readProjectHarness,
   readTextFile,
   resolveCursorApiKey,
   runCursorAgent,
   writeConversation,
+  writeProjectJson,
 }) {
   function startAssistantGeneration({ project, conversationId, releaseProjectAgent, conversationWithUser, assistantMessageId, cursorApiKey, modelId }) {
     void (async () => {
@@ -763,6 +754,7 @@ export function createChatAgentService({
         project,
         conversation: conversationWithContext,
         gitFileDiffText,
+        readProjectJson,
         readTextFile,
       });
 
@@ -790,7 +782,13 @@ export function createChatAgentService({
         },
       });
 
-      const conceptualDiffs = extractConceptualDiffs(assistantText, authorizedEditablePaths);
+      const rejectionMemory = normalizeConceptualDiffMemoryFile(await readProjectJson(project.path, conceptualDiffMemoryPath, emptyConceptualDiffMemory()));
+      const activeRecords = activeRejectionRecords(rejectionMemory, { filePaths: authorizedEditablePaths, flow: "ai_file_assist" });
+      const conceptualDiffs = filterSuppressedConceptualDiffs(
+        annotateConceptualDiffsWithMemory(extractConceptualDiffs(assistantText, authorizedEditablePaths), activeRecords),
+        activeRecords,
+        { userInstruction: body.content ?? latestUserInstruction(conversationWithContext) },
+      );
       const timestamp = nowIso();
       const proposal = {
         id: createProposalId(),
@@ -818,20 +816,38 @@ export function createChatAgentService({
     const updates = new Map((body?.conceptualDiffs ?? []).map((diff) => [diff.id, diff.status]));
     const timestamp = nowIso();
     let foundProposal = false;
+    const memoryDiffs = [];
     const editProposals = (conversation.editProposals ?? []).map((proposal) => {
       if (proposal.id !== proposalId) return proposal;
       foundProposal = true;
+      const conceptualDiffs = proposal.conceptualDiffs.map((diff) => {
+        const nextStatus = updates.get(diff.id) === "rejected" ? "rejected" : updates.get(diff.id) === "accepted" ? "accepted" : diff.status;
+        if ((nextStatus === "rejected" && diff.status !== "rejected") || (nextStatus === "accepted" && diff.memory?.reconsidersRejectedId)) {
+          memoryDiffs.push({ ...diff, status: nextStatus });
+        }
+        return {
+          ...diff,
+          status: nextStatus,
+        };
+      });
       return {
         ...proposal,
         updatedAt: timestamp,
-        conceptualDiffs: proposal.conceptualDiffs.map((diff) => ({
-          ...diff,
-          status: updates.get(diff.id) === "rejected" ? "rejected" : updates.get(diff.id) === "accepted" ? "accepted" : diff.status,
-        })),
+        conceptualDiffs,
       };
     });
 
     if (!foundProposal) throw httpError("Edit proposal not found.", 404, "edit_proposal_not_found");
+
+    if (memoryDiffs.length) {
+      const memory = normalizeConceptualDiffMemoryFile(await readProjectJson(project.path, conceptualDiffMemoryPath, emptyConceptualDiffMemory()));
+      await writeProjectJson(project.path, conceptualDiffMemoryPath, updateConceptualDiffRejectionMemory(memory, {
+        conceptualDiffs: memoryDiffs,
+        flow: "ai_file_assist",
+        now: timestamp,
+        sourceContentHashByPath: editableContentHashByPath(conversation),
+      }));
+    }
 
     const nextConversation = await writeConversation(project, {
       ...conversation,
@@ -863,6 +879,16 @@ export function createChatAgentService({
       notifyConversation(project.slug, conversationId, { type: "snapshot", conversation: applyingConversation });
 
       const applyingProposal = applyingConversation.editProposals.find((candidate) => candidate.id === proposalId);
+      const reconsideredAcceptedDiffs = (applyingProposal?.conceptualDiffs ?? []).filter((diff) => diff.status === "accepted" && diff.memory?.reconsidersRejectedId);
+      if (reconsideredAcceptedDiffs.length) {
+        const memory = normalizeConceptualDiffMemoryFile(await readProjectJson(project.path, conceptualDiffMemoryPath, emptyConceptualDiffMemory()));
+        await writeProjectJson(project.path, conceptualDiffMemoryPath, updateConceptualDiffRejectionMemory(memory, {
+          conceptualDiffs: reconsideredAcceptedDiffs,
+          flow: "ai_file_assist",
+          now: applyingAt,
+          sourceContentHashByPath: editableContentHashByPath(applyingConversation),
+        }));
+      }
       const { approvedConceptualDiffIds = [], prompt, notice } = await createApplyProposalPrompt({
         project,
         conversation: applyingConversation,

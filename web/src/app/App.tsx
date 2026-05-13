@@ -1,11 +1,11 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { projectPathPrefixes } from "../domain/projectPaths";
 import { resolveChatFileEditApplication } from "./chatFileEdits";
 import { buildThemeStyle } from "./theme";
 import { useProjectWorkspace } from "./useProjectWorkspace";
 import { RightPanelSurface } from "./RightPanelSurface";
 import { RightPanelToggle } from "./RightPanelToggle";
-import { useRightPanelSurface } from "./hooks/useRightPanelSurface";
+import { panelForKind, useRightPanelSurface } from "./hooks/useRightPanelSurface";
 import { useRightPanelWidth } from "./hooks/useRightPanelWidth";
 import { useAgentChatPanel } from "./hooks/useAgentChatPanel";
 import { useProjectChat } from "./hooks/useProjectChat";
@@ -18,6 +18,8 @@ import { FileWorkspace } from "../features/files/FileWorkspace";
 import { SimplifiedNavigator } from "../features/navigation/WorkflowMenus";
 import { ProjectPicker } from "../features/projectPicker/ProjectPicker";
 import { RebuildWorkspace } from "../features/rebuild/RebuildWorkspace";
+import { RequirementsSyncRightPanel } from "../features/requirementsSync/RequirementsSyncRightPanel";
+import { useRequirementsSync } from "../features/requirementsSync/useRequirementsSync";
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
 import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
@@ -65,13 +67,28 @@ export function App() {
     () => readAgentChatConversationId(project.selectedProjectSlug),
     [project.selectedProjectSlug],
   );
+  const refreshAfterAiFileAssistApply = async () => {
+    await fileWorkspace.refreshProjectFiles();
+    await fileWorkspace.refreshSelectedFile();
+    await rebuildWorkspace.refreshStatus();
+  };
   const projectChat = useProjectChat({
     preferredConversationId: preferredAgentChatConversationId,
     projectSlug: project.selectedProjectSlug,
     selectedModelId: rebuildWorkspace.selectedModelId,
     projectFiles: fileWorkspace.projectFiles,
     onNotice: toastWorkspace.setNotice,
-    onProposalApplied: fileWorkspace.refreshSelectedFile,
+    onProposalApplied: refreshAfterAiFileAssistApply,
+  });
+  const requirementsSync = useRequirementsSync({
+    projectSlug: project.selectedProjectSlug,
+    selectedModelId: rebuildWorkspace.selectedModelId,
+    onNotice: toastWorkspace.setNotice,
+    onApplied: async () => {
+      await fileWorkspace.refreshProjectFiles();
+      await fileWorkspace.refreshSelectedFile();
+      await rebuildWorkspace.refreshStatus();
+    },
   });
   const navigateTo = (view: View, filePath?: string | null, context?: Record<string, string>) => route.navigateTo(view, filePath, context);
   const { closeAgentPanel, isAgentPanelOpen, openAgentChatPanel, selectProjectChatConversation, toggleAgentPanel } = useAgentChatPanel({
@@ -94,6 +111,23 @@ export function App() {
   const openProjectFileWithAgentContext = (path: string) => {
     agentFileContext.openProjectFileWithAgentContext(path, isAgentPanelOpen);
   };
+  const openRequirementsSyncPanel = () => {
+    requirementsSync.showController();
+    rightPanelSurface.openPanel(panelForKind("requirements-sync"));
+  };
+  const closeRightPanel = () => {
+    if (rightPanelSurface.rightPanel?.kind === "agent-chat") {
+      closeAgentPanel();
+      return;
+    }
+
+    rightPanelSurface.closePanel();
+  };
+  useEffect(() => {
+    if (rightPanelSurface.rightPanel?.kind === "requirements-sync" && !requirementsSync.open) {
+      requirementsSync.showController();
+    }
+  }, [requirementsSync.open, requirementsSync.showController, rightPanelSurface.rightPanel?.kind]);
   const applyChatFileEdit = async (edit: ChatMessageFileEdit) => {
     const decision = await resolveChatFileEditApplication({ draft: fileWorkspace.draft, edit, selected: fileWorkspace.selected });
 
@@ -110,6 +144,16 @@ export function App() {
 
     fileWorkspace.setDraft(decision.content);
     toastWorkspace.setNotice(decision.message);
+  };
+  const startRebuildWithRequirementsCheck = () => {
+    if (requirementsSync.signals?.hasSignals) {
+      const shouldContinue = window.confirm(
+        `Requirements sync signals were detected: ${requirementsSync.signals.summary}\n\nContinue rebuild without synchronizing requirements?`,
+      );
+      if (!shouldContinue) return;
+    }
+
+    void rebuildWorkspace.startRebuild();
   };
   const assistCurrentFile = async () => {
     const selected = fileWorkspace.selected;
@@ -217,6 +261,7 @@ export function App() {
             onDraft={fileWorkspace.setDraft}
             onAiFileAssist={() => void assistCurrentFile()}
             onNotice={toastWorkspace.setNotice}
+            onOpenRequirementsSync={route.view === "requirements" ? openRequirementsSyncPanel : undefined}
             onOpenFile={openProjectFileWithAgentContext}
             onUploadFiles={route.view === "inputs" ? fileWorkspace.uploadHumanInputFiles : undefined}
             onRevert={() => void fileWorkspace.revertSelected()}
@@ -243,14 +288,23 @@ export function App() {
             models={rebuildWorkspace.models}
             selectedModelId={rebuildWorkspace.selectedModelId}
             onModelChange={rebuildWorkspace.setSelectedModelId}
-            onStart={() => void rebuildWorkspace.startRebuild()}
+            onOpenRequirementsSync={openRequirementsSyncPanel}
+            onShowRequirementsSyncController={requirementsSync.showController}
+            onStart={startRebuildWithRequirementsCheck}
+            onStartRequirementsSync={openRequirementsSyncPanel}
+            requirementsSyncSignals={requirementsSync.signals}
+            requirementsSyncControllerOpen={requirementsSync.open}
+            requirementsSyncBusy={requirementsSync.busy}
+            requirementsSyncProposals={requirementsSync.proposals}
+            requirementsSyncStep={requirementsSync.step}
+            onRequirementsSyncStepChange={requirementsSync.setStep}
             onResolve={(request) => void rebuildWorkspace.resolveHumanAttention(request)}
           />
         ) : null}
       </section>
       {rightPanelSurface.rightPanel ? (
         <RightPanelSurface
-          onClose={closeAgentPanel}
+          onClose={closeRightPanel}
           panel={rightPanelSurface.rightPanel}
           resize={
             rightPanelWidth.isResizable
@@ -265,23 +319,44 @@ export function App() {
               : undefined
           }
         >
-          <RightPanelAgentChat
-            aiEditableFiles={agentFileContext.aiEditableFiles}
-            chat={projectChat}
-            contextFiles={agentFileContext.contextFiles}
-            currentFile={agentFileContext.currentFile}
-            draftSeed={agentDraftSeed}
-            highlightedContext={agentFileContext.highlightedContext}
-            models={rebuildWorkspace.models}
-            onAddContextFile={agentFileContext.addContextFile}
-            onApplyFileEdit={applyChatFileEdit}
-            onContextFilesChange={projectChat.setContextFiles}
-            onModelChange={rebuildWorkspace.setSelectedModelId}
-            onModifyCurrentFile={() => agentFileContext.currentFile && agentFileContext.addEditableFile(agentFileContext.currentFile.path)}
-            onRemoveAiEditableFile={agentFileContext.removeAiEditableFile}
-            projectFiles={fileWorkspace.projectFiles}
-            selectedModelId={rebuildWorkspace.selectedModelId}
-          />
+          {rightPanelSurface.rightPanel.kind === "requirements-sync" ? (
+            <RequirementsSyncRightPanel
+              controller={requirementsSync}
+              models={rebuildWorkspace.models}
+              onFinish={() => rightPanelSurface.closePanel()}
+              onModelChange={rebuildWorkspace.setSelectedModelId}
+              onOpenAgent={openAgentChatPanel}
+              selectedModelId={rebuildWorkspace.selectedModelId}
+            />
+          ) : (
+            <div className="right-panel-mode-layout">
+              <div className="right-panel-mode-switch" role="group" aria-label="Right panel mode">
+                <button aria-pressed="true" className="active" type="button">
+                  Agent
+                </button>
+                <button type="button" onClick={openRequirementsSyncPanel}>
+                  Requirements Sync
+                </button>
+              </div>
+              <RightPanelAgentChat
+                aiEditableFiles={agentFileContext.aiEditableFiles}
+                chat={projectChat}
+                contextFiles={agentFileContext.contextFiles}
+                currentFile={agentFileContext.currentFile}
+                draftSeed={agentDraftSeed}
+                highlightedContext={agentFileContext.highlightedContext}
+                models={rebuildWorkspace.models}
+                onAddContextFile={agentFileContext.addContextFile}
+                onApplyFileEdit={applyChatFileEdit}
+                onContextFilesChange={projectChat.setContextFiles}
+                onModelChange={rebuildWorkspace.setSelectedModelId}
+                onModifyCurrentFile={() => agentFileContext.currentFile && agentFileContext.addEditableFile(agentFileContext.currentFile.path)}
+                onRemoveAiEditableFile={agentFileContext.removeAiEditableFile}
+                projectFiles={fileWorkspace.projectFiles}
+                selectedModelId={rebuildWorkspace.selectedModelId}
+              />
+            </div>
+          )}
         </RightPanelSurface>
       ) : null}
     </main>

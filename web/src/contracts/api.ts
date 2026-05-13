@@ -236,12 +236,53 @@ export type ChatMessageMetadata = Record<string, unknown> & {
 
 export type ConceptualDiffStatus = "accepted" | "rejected";
 
+export type ConceptualDiffScope = "local" | "section" | "multi_section" | "document";
+
+export type ConceptualDiffRiskLevel = "low" | "medium" | "high";
+
+export type ConceptualDiffTarget = {
+  scope: ConceptualDiffScope;
+  sections?: string[];
+  anchors?: string[];
+};
+
+export type ConceptualDiffIntent = {
+  objective: string;
+  rationale?: string;
+  mustPreserve?: string[];
+  avoid?: string[];
+};
+
+export type ConceptualDiffEvidence = {
+  userGuidance?: string[];
+  gitDiffSignals?: string[];
+  contextSignals?: string[];
+};
+
+export type ConceptualDiffApplyNotes = {
+  expectedChangeShape?: string;
+  nonGoals?: string[];
+  riskLevel?: ConceptualDiffRiskLevel;
+};
+
+export type ConceptualDiffMemory = {
+  fingerprint?: string;
+  reconsidersRejectedId?: string;
+  reconsiderReason?: string;
+  suppressionState?: "new" | "reconsidered" | "near_rejected";
+};
+
 export type ConceptualDiff = {
   id: string;
   filePath: string;
   title: string;
   summary: string;
   status: ConceptualDiffStatus;
+  target?: ConceptualDiffTarget;
+  intent?: ConceptualDiffIntent;
+  evidence?: ConceptualDiffEvidence;
+  applyNotes?: ConceptualDiffApplyNotes;
+  memory?: ConceptualDiffMemory;
 };
 
 export type EditProposalStatus = "proposed" | "applying" | "applied" | "partial" | "failed";
@@ -334,6 +375,61 @@ export type UpdateEditProposalRequest = {
 
 export type ApplyEditProposalRequest = {
   modelId: string;
+};
+
+export type RequirementsSyncStep = "goal" | "inputs" | "outputs";
+
+export type RequirementsSyncConceptualDiff = ConceptualDiff;
+
+export type RequirementsSyncProposal = {
+  step: RequirementsSyncStep;
+  targetFilePath: "human_goal_requirements.md" | "human_input_requirements.md" | "human_output_requirements.md";
+  originalContentHash: string;
+  summary: string;
+  conceptualDiffs: RequirementsSyncConceptualDiff[];
+  sourceSignalsUsed: string[];
+  generatedAt: string;
+  modelId?: string;
+  notice?: string;
+};
+
+export type RequirementsSyncSignalsResponse = {
+  hasSignals: boolean;
+  gitStatus: string[];
+  openQuestions: string[];
+  summary: string;
+};
+
+export type ProposeRequirementsSyncRequest = {
+  step: RequirementsSyncStep;
+  modelId: string;
+  userInstruction?: string;
+};
+
+export type ProposeRequirementsSyncResponse = {
+  proposal: RequirementsSyncProposal;
+};
+
+export type ApplyRequirementsSyncRequest = {
+  modelId: string;
+  proposal: RequirementsSyncProposal;
+};
+
+export type ApplyRequirementsSyncResponse = {
+  appliedFile: {
+    path: string;
+    contentHash: string;
+  } | null;
+  failedConceptualDiffIds: string[];
+  summary: string;
+};
+
+export type ReviewRequirementsSyncRequest = {
+  proposal: RequirementsSyncProposal;
+};
+
+export type ReviewRequirementsSyncResponse = {
+  recordedRejectedConceptualDiffIds: string[];
 };
 
 export type ChatConversationEvent =

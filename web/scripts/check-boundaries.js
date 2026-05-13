@@ -124,6 +124,7 @@ const serverRules = [
         "harnessState.js",
         "projectFiles.js",
         "projects.js",
+        "requirementsSync.js",
       ]).has(path.basename(filePath)),
     message: "server services must keep filesystem access in approved service modules",
   },

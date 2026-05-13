@@ -89,13 +89,17 @@ Chat and rebuild workflows use a dual transport:
 
 Long-running server work should have an explicit lifecycle state. Rebuilds persist state under `.runtime/`; chat conversations persist messages under the project and should normalize stale streaming messages when recovered.
 
-## AI Edit Proposal Flow
+## Conceptual Diff File Edit Protocol
 
-The right-panel chat can turn a user guidance message plus selected AI Editable files into per-file Proposed Changes. The frontend keeps shared conversation state and API orchestration in `app/hooks/useProjectChat.ts`; `features/agents/RightPanelAgentChat.tsx` owns the review UI for accepting or rejecting conceptual diffs.
+Conceptual diffs are the first-class review contract for AI file edits in the local web UI. A proposal agent describes intended file changes as conceptual diffs; the human accepts or rejects those diffs; an apply agent may then edit only the approved targets while treating rejected diffs as negative constraints.
 
-This section is the source map for the web implementation. The durable protocol contract lives in [`/opt/all_hail_ai/kiss_ai/docs/development/concepts/agent-protocol-edit-proposals.md`](/opt/all_hail_ai/kiss_ai/docs/development/concepts/agent-protocol-edit-proposals.md).
+The right-panel chat, AI File Assist, and Requirements Sync are implementations of this protocol. Requirements Sync uses the same conceptual diff contract with its own goal/input/output authority prompts. Both flows also share rejection memory so previously rejected conceptual intent is treated consistently across proposal runs.
 
-Proposal requests use the chat route stack: `contracts/api.ts` defines request/response shapes, `data/chatApi.ts` transports them, `server/routes/chatRoutes.js` validates them, and `server/services/chatAgent.js` builds the agent prompts and persists proposal metadata on the conversation.
+Start here, then follow the durable protocol contract in [`/opt/all_hail_ai/kiss_ai/docs/development/concepts/agent-protocol-edit-proposals.md`](/opt/all_hail_ai/kiss_ai/docs/development/concepts/agent-protocol-edit-proposals.md). That page explains intent, scope semantics, review UI expectations, and apply-agent rules.
+
+The frontend keeps shared conversation state and API orchestration in `app/hooks/useProjectChat.ts`; `features/agents/RightPanelAgentChat.tsx` owns the AI File Assist review UI for accepting, rejecting, and expanding conceptual diffs. Requirements Sync orchestration lives in `features/requirementsSync/useRequirementsSync.ts`, and `features/requirementsSync/RequirementsSyncModal.tsx` owns the `Goal > Inputs > Outputs` conceptual diff wizard.
+
+Proposal requests use route-specific stacks. `contracts/api.ts` defines shared request/response shapes. AI File Assist uses `data/chatApi.ts`, `server/routes/chatRoutes.js`, and `server/services/chatAgent.js`. Requirements Sync uses `data/requirementsSyncApi.ts`, `server/routes/requirementsSyncRoutes.js`, `server/services/requirementsSync.js`, and sync-specific prompts under `framework/prompts/requirements_sync/**`. Shared conceptual diff parsing lives in `server/services/conceptualDiffs.js`; shared rejection memory lives in `server/services/conceptualDiffMemory.js`.
 
 The lifecycle is:
 
@@ -107,7 +111,9 @@ flowchart LR
   apply --> applied["Applied, partial, or failed"]
 ```
 
-Conceptual diffs are read-only in v1: users accept or reject them, then the server runs a constrained local Cursor agent to edit approved files directly on disk. Context files remain read-only unless the same path is also selected as AI Editable and has an accepted conceptual diff. Rejected conceptual diffs are sent to apply runs as explicit negative constraints.
+Conceptual diffs are read-only review artifacts: users accept or reject them, then the server runs a constrained local Cursor agent to edit approved files directly on disk. The compact review surface is title and summary, with expandable details for scope, intent, evidence, preservation constraints, non-goals, risk, and reconsideration memory. Context files remain read-only unless the same path is also selected as AI Editable and has an accepted conceptual diff. Rejected conceptual diffs are sent to apply runs as explicit negative constraints.
+
+Rejected conceptual diffs are also persisted as soft project memory. Future proposal prompts receive relevant active memory for the selected editable files or Requirements Sync step, suppressing exact repeats unless changed evidence or explicit user guidance justifies reconsideration. Reconsidered diffs show a small “Previously rejected” badge and explanation when available.
 
 Applied proposal state remains in conversation-level `editProposals` and links back to the originating user message with `sourceMessageId`. The chat thread renders compact applied-proposal chips on those messages, while the large proposal review card hides fully applied proposals unless a chip reopens the read-only details.
 

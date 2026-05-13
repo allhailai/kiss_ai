@@ -4,18 +4,18 @@
   z-index: 40;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 16px;
   background: rgba(16, 24, 32, 0.48);
 }
 
 .requirements-auto-update-modal {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  width: min(1060px, calc(100vw - 48px));
-  max-height: min(860px, calc(100vh - 48px));
+  width: min(1180px, calc(100vw - 32px));
+  max-height: min(820px, calc(100vh - 32px));
   overflow: hidden;
   border: 1px solid var(--color-border);
-  border-radius: 20px;
+  border-radius: 18px;
   background: var(--color-surface);
   box-shadow: 0 24px 70px rgba(16, 24, 32, 0.28);
 }
@@ -24,26 +24,273 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 18px;
-  padding: 18px 20px;
+  gap: 14px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--color-border);
+}
+
+.requirements-auto-update-header-actions,
+.requirements-sync-actions,
+.requirements-sync-diff-actions,
+.requirements-sync-diff-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .requirements-auto-update-header h2,
 .requirements-auto-update-header p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
 }
 
 .requirements-auto-update-header p {
   color: var(--color-secondary);
-  line-height: 1.5;
+  font-size: 0.9rem;
+  line-height: 1.35;
 }
 
 .requirements-auto-update-body {
   display: grid;
-  gap: 14px;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 12px 16px 14px;
+}
+
+.requirements-sync-setup-panel {
+  min-height: 0;
   overflow: auto;
-  padding: 18px 20px 20px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.requirements-auto-update-controls {
+  display: grid;
+  gap: 8px;
+  align-items: start;
+}
+
+.requirements-auto-update-model-note {
+  display: grid;
+  gap: 2px;
+  color: var(--color-secondary);
+  font-size: 0.78rem;
+}
+
+.requirements-auto-update-stepper {
+  display: grid;
+  gap: 7px;
+}
+
+.requirements-sync-step {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  text-align: left;
+}
+
+.requirements-sync-step strong {
+  overflow: hidden;
+  font-size: 0.82rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requirements-sync-step.active {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+}
+
+.requirements-sync-step small,
+.requirements-sync-signals p,
+.requirements-sync-empty p,
+.requirements-sync-proposal-summary p,
+.requirements-sync-diff p {
+  margin: 0;
+  color: var(--color-secondary);
+  line-height: 1.45;
+}
+
+.requirements-sync-signals,
+.requirements-sync-empty,
+.requirements-sync-proposal-summary,
+.requirements-sync-instruction {
+  display: grid;
+  gap: 6px;
+  padding: 9px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.requirements-sync-signals.active {
+  border-color: color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface));
+}
+
+.requirements-sync-signals ul,
+.requirements-sync-proposal-summary ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.requirements-sync-instruction textarea {
+  min-height: 58px;
+  resize: vertical;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: var(--color-primary);
+}
+
+.requirements-sync-diffs {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding-right: 3px;
+}
+
+.requirements-sync-diff-actions {
+  justify-content: space-between;
+}
+
+.requirements-sync-diff {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    opacity 120ms ease;
+}
+
+.requirements-sync-diff.accepted {
+  border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-success) 7%, var(--color-surface));
+}
+
+.requirements-sync-diff.rejected {
+  border-color: color-mix(in srgb, var(--color-warning) 38%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface));
+  opacity: 0.78;
+}
+
+.requirements-sync-diff small {
+  color: var(--color-secondary);
+}
+
+.requirements-sync-diff-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.requirements-sync-diff-status {
+  padding: 2px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.requirements-sync-diff-badge {
+  padding: 2px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.requirements-sync-diff-badge.elevated {
+  border-color: color-mix(in srgb, var(--color-warning) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+.requirements-sync-diff-badge.memory {
+  border-color: color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+  color: var(--color-accent);
+}
+
+.requirements-sync-diff-details {
+  margin-top: 6px;
+}
+
+.requirements-sync-diff-details summary {
+  cursor: pointer;
+  color: var(--color-accent);
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.requirements-sync-detail-grid {
+  display: grid;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-surface) 84%, var(--color-background));
+}
+
+.requirements-sync-detail-row {
+  display: grid;
+  gap: 3px;
+}
+
+.requirements-sync-detail-row strong {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.requirements-sync-detail-row p,
+.requirements-sync-detail-row ul {
+  margin: 0;
+  color: var(--color-secondary);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.requirements-sync-detail-row ul {
+  padding-left: 18px;
+}
+
+.requirements-sync-diff.accepted .requirements-sync-diff-status {
+  border-color: color-mix(in srgb, var(--color-success) 55%, var(--color-border));
+  color: var(--color-success);
+}
+
+.requirements-sync-diff.rejected .requirements-sync-diff-status {
+  border-color: color-mix(in srgb, var(--color-warning) 55%, var(--color-border));
+  color: var(--color-warning);
+}
+
+.requirements-sync-diff-buttons button.active {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: white;
 }
 
 .requirements-auto-update-files {
@@ -78,17 +325,23 @@
 }
 
 .requirements-auto-update-review {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
   display: grid;
-  gap: 14px;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  align-content: start;
+  gap: 10px;
+  overflow: hidden;
 }
 
 .requirements-auto-update-footer {
   position: sticky;
-  bottom: -20px;
+  bottom: 0;
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  padding: 14px 0 0;
+  gap: 8px;
+  padding: 10px 0 0;
   background: linear-gradient(180deg, transparent, var(--color-surface) 28%);
 }
 
@@ -101,13 +354,18 @@
 }
 
 .warning-callout {
-  margin: 14px 0 18px;
-  padding: 14px 16px;
-  border-left: 5px solid var(--color-warning);
-  border-radius: 12px;
+  margin: 0;
+  padding: 9px 10px;
+  border-left: 4px solid var(--color-warning);
+  border-radius: 10px;
   background: color-mix(in srgb, var(--color-warning) 10%, white);
   color: var(--color-primary);
-  line-height: 1.5;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.warning-callout p {
+  margin: 4px 0 0;
 }
 
 .warning-callout ul {
@@ -206,4 +464,19 @@
   background: var(--color-console-background);
   color: var(--color-console-text);
   white-space: pre-wrap;
+}
+
+@media (max-width: 860px) {
+  .requirements-auto-update-body {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: auto;
+  }
+
+  .requirements-sync-setup-panel {
+    overflow: visible;
+  }
+
+  .requirements-sync-diffs {
+    max-height: 45vh;
+  }
 }

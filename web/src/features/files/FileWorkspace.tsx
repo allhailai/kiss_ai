@@ -17,6 +17,7 @@ export function FileWorkspace({
   onDraft,
   onAiFileAssist,
   onNotice,
+  onOpenRequirementsSync,
   onOpenFile,
   onUploadFiles,
   onRevert,
@@ -33,6 +34,7 @@ export function FileWorkspace({
   onDraft: (value: string) => void;
   onAiFileAssist?: () => void;
   onNotice: (message: string) => void;
+  onOpenRequirementsSync?: () => void;
   onOpenFile: (path: string) => void;
   onUploadFiles?: (files: File[]) => Promise<void>;
   onRevert: () => void;
@@ -41,8 +43,15 @@ export function FileWorkspace({
   return (
     <div className={onUploadFiles ? "document-workspace has-upload-dropzone" : "document-workspace"}>
       <header className="document-header">
-        <span className="eyebrow">{title}</span>
-        {explainer ? <p>{explainer}</p> : null}
+        <div>
+          <span className="eyebrow">{title}</span>
+          {explainer ? <p>{explainer}</p> : null}
+        </div>
+        {onOpenRequirementsSync ? (
+          <button className="editor-secondary-button" onClick={onOpenRequirementsSync} type="button">
+            Sync Requirements
+          </button>
+        ) : null}
       </header>
       {onUploadFiles ? <HumanInputDropzone onUploadFiles={onUploadFiles} onNotice={onNotice} /> : null}
       <EditorPane

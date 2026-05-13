@@ -1,11 +1,27 @@
 import { useState } from "react";
-import type { HumanAttentionItem, ProjectStatus, RebuildModel, RebuildState, ResolutionAttempt, ResolutionOption } from "../../contracts/api";
+import type {
+  HumanAttentionItem,
+  ProjectStatus,
+  RebuildModel,
+  RebuildState,
+  RequirementsSyncProposal,
+  RequirementsSyncSignalsResponse,
+  RequirementsSyncStep,
+  ResolutionAttempt,
+  ResolutionOption,
+} from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
 import { humanAttentionItemText } from "../../domain/humanAttention";
 import { formatModelLabel, modelTierLabels } from "../../domain/modelLabels";
 import { humanAttentionQueuePath } from "../../domain/projectPaths";
 import { AgentTranscript } from "../../shared/agents/AgentTranscript";
 import { ModelSelect } from "../../shared/ModelSelect";
+
+const requirementsSyncSteps: Array<{ id: RequirementsSyncStep; label: string; filePath: string }> = [
+  { id: "goal", label: "Goal", filePath: "human_goal_requirements.md" },
+  { id: "inputs", label: "Inputs", filePath: "human_input_requirements.md" },
+  { id: "outputs", label: "Outputs", filePath: "human_output_requirements.md" },
+];
 
 function formatRunDuration(rebuild: RebuildState | null) {
   if (!rebuild?.startedAt) return "Not started";
@@ -44,6 +60,11 @@ function optionLabel(option: ResolutionOption) {
   return `${option.recommended ? "Recommended: " : ""}${option.label || option.id}`;
 }
 
+function requirementsSyncStepStatus(step: RequirementsSyncStep, proposal: RequirementsSyncProposal | undefined, activeStep: RequirementsSyncStep) {
+  if (proposal) return step === activeStep ? "Ready to review" : "Proposal ready";
+  return step === activeStep ? "Current file" : "Not started";
+}
+
 function CopyableValue({ value }: { value: string }) {
   const copyValue = () => {
     void navigator.clipboard?.writeText(value);
@@ -63,7 +84,16 @@ export function RebuildWorkspace({
   models,
   selectedModelId,
   onModelChange,
+  onOpenRequirementsSync,
+  onShowRequirementsSyncController,
   onStart,
+  onStartRequirementsSync,
+  requirementsSyncSignals,
+  requirementsSyncControllerOpen,
+  requirementsSyncBusy,
+  requirementsSyncProposals,
+  requirementsSyncStep,
+  onRequirementsSyncStepChange,
   onResolve,
 }: {
   status: ProjectStatus | null;
@@ -71,7 +101,16 @@ export function RebuildWorkspace({
   models: RebuildModel[];
   selectedModelId: string;
   onModelChange: (modelId: string) => void;
+  onOpenRequirementsSync: () => void;
+  onShowRequirementsSyncController: () => void;
   onStart: () => void;
+  onStartRequirementsSync: () => void;
+  requirementsSyncSignals: RequirementsSyncSignalsResponse | null;
+  requirementsSyncControllerOpen: boolean;
+  requirementsSyncBusy: boolean;
+  requirementsSyncProposals: Partial<Record<RequirementsSyncStep, RequirementsSyncProposal>>;
+  requirementsSyncStep: RequirementsSyncStep;
+  onRequirementsSyncStepChange: (step: RequirementsSyncStep) => void;
   onResolve: (request: { itemId: string; resolutionOptionId?: string; manualPrompt?: string }) => void;
 }) {
   const [manualItemId, setManualItemId] = useState<string | null>(null);
@@ -101,6 +140,49 @@ export function RebuildWorkspace({
       </header>
 
       <section className="content-card rebuild-status-card">
+        <div className="requirements-sync-rebuild-controller">
+          {!requirementsSyncControllerOpen ? (
+            <>
+              <div>
+                <span className="eyebrow">Requirements sync</span>
+                <strong>Review requirement diffs before rebuilding.</strong>
+                <p>{requirementsSyncSignals?.summary ?? "Check Goal, Inputs, and Outputs for sync opportunities."}</p>
+              </div>
+              <button disabled={Boolean(rebuild?.running)} onClick={onShowRequirementsSyncController} type="button">
+                Sync Requirements
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="requirements-sync-rebuild-controller-heading">
+                <div>
+                  <span className="eyebrow">Requirements sync</span>
+                  <strong>Goal &gt; Inputs &gt; Outputs</strong>
+                  <p>{requirementsSyncSignals?.summary ?? "No requirements sync signals loaded yet."}</p>
+                </div>
+                <button disabled={Boolean(rebuild?.running) || requirementsSyncBusy} onClick={onStartRequirementsSync} type="button">
+                  Start Sync
+                </button>
+              </div>
+              <div className="requirements-sync-rebuild-steps" aria-label="Requirements sync file status">
+                {requirementsSyncSteps.map((step) => (
+                  <button
+                    className={step.id === requirementsSyncStep ? "requirements-sync-rebuild-step active" : "requirements-sync-rebuild-step"}
+                    disabled={requirementsSyncBusy}
+                    key={step.id}
+                    onClick={() => onRequirementsSyncStepChange(step.id)}
+                    type="button"
+                  >
+                    <span>{step.label}</span>
+                    <strong>{step.filePath}</strong>
+                    <small>{requirementsSyncStepStatus(step.id, requirementsSyncProposals[step.id], requirementsSyncStep)}</small>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
         <div className="section-heading rebuild-status-heading">
           <h3>Runner status</h3>
           <p>
@@ -133,6 +215,16 @@ export function RebuildWorkspace({
           ) : null}
           <p>{rebuild?.message ?? "No rebuild state loaded."}</p>
         </div>
+
+        {requirementsSyncSignals?.hasSignals ? (
+          <div className="warning-callout">
+            <strong>Requirements sync signals detected</strong>
+            <p>{requirementsSyncSignals.summary}. Review requirements before rebuilding, or continue if these changes are intentional.</p>
+            <button className="editor-secondary-button" disabled={Boolean(rebuild?.running)} onClick={onOpenRequirementsSync} type="button">
+              Open Requirements Sync
+            </button>
+          </div>
+        ) : null}
 
         {rebuild?.status === "finished_with_attention" || status?.humanAttentionCount ? (
           <div className="warning-callout">
