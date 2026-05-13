@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { ProjectChatController } from "./useProjectChat";
 import type { View } from "../../navigation/views";
 import { readAgentChatConversationId, writeAgentChatConversationId } from "../rightPanelSurfaceStorage";
-import type { RightPanelState } from "./useRightPanelSurface";
+import { panelForKind, type RightPanelState } from "./useRightPanelSurface";
 
-export const agentChatPanel = { kind: "agent-chat", title: "Agent Chat" } as const;
+const agentChatPanel = panelForKind("agent-chat");
 
 type RightPanelSurfaceController = {
   closePanel: () => void;

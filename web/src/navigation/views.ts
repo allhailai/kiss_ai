@@ -10,18 +10,9 @@ export type RouteState = {
   context: Record<string, string>;
 };
 
-const views: Array<{ id: View; label: string; description: string }> = [
-  { id: "build-log", label: "Build Log", description: "Latest rebuild summary and history" },
-  { id: "chat", label: "Chat", description: "Project-local agent conversations" },
-  { id: "requirements", label: "Requirements", description: "Human-owned source of truth" },
-  { id: "inputs", label: "Source Data", description: "Human and AI-acquired source material" },
-  { id: "outputs", label: "Outputs", description: "Generated research and reports" },
-  { id: "design", label: "Design", description: "Project visual identity" },
-  { id: "rebuild", label: "Rebuild", description: "Run the project loop" },
-  { id: "dashboard", label: "Tech Dashboard", description: "Project state and readiness" },
-];
+const views: View[] = ["build-log", "chat", "requirements", "inputs", "outputs", "design", "rebuild", "dashboard"];
 
-export const viewIds = new Set<View>(views.map((item) => item.id));
+export const viewIds = new Set<View>(views);
 export const fileBackedViews = new Set<View>(["requirements", "inputs", "outputs", "design"]);
 export const defaultRoute: RouteState = { projectSlug: null, view: "rebuild", filePath: null, context: {} };
 export const selectedProjectStorageKey = "kiss_ai.selectedProject";

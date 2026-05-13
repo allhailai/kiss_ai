@@ -8,7 +8,6 @@ export type {
   AgentContextFile,
   AgentContextFileKind,
   AgentContextFileRole,
-  AgentMessageContext,
 } from "./agents";
 
 export type ResolutionOption = {
