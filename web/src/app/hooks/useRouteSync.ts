@@ -7,28 +7,49 @@ type UseRouteSyncOptions = {
   applyRoute: (route: RouteState) => Promise<void>;
   canLeaveCurrentRoute?: (nextRoute: RouteState) => boolean;
   currentRoute: RouteState;
+  onRouteApplied?: (route: RouteState) => void;
   onRouteError?: (message: string) => void;
   selectedProjectSlug: string | null;
   setSelectedProjectSlug: (projectSlug: string | null) => void;
 };
 
-function applyRouteSafely(applyRoute: (route: RouteState) => Promise<void>, route: RouteState, onRouteError?: (message: string) => void) {
-  applyRoute(route).catch((error: unknown) => {
-    console.error("[kiss_ai UI warning] Route sync failed.", error);
-    onRouteError?.(errorMessage(error, "Could not load this route."));
-  });
+function applyRouteSafely(
+  applyRoute: (route: RouteState) => Promise<void>,
+  route: RouteState,
+  onRouteError?: (message: string) => void,
+  onRouteApplied?: (route: RouteState) => void,
+) {
+  applyRoute(route)
+    .then(() => {
+      const appliedHash = buildRouteHash(route.projectSlug, route.view, route.filePath, route.context);
+      if (window.location.hash === appliedHash) onRouteApplied?.(route);
+    })
+    .catch((error: unknown) => {
+      console.error("[kiss_ai UI warning] Route sync failed.", error);
+      onRouteError?.(errorMessage(error, "Could not load this route."));
+    });
 }
 
-export function useRouteSync({ applyRoute, canLeaveCurrentRoute, currentRoute, onRouteError, selectedProjectSlug, setSelectedProjectSlug }: UseRouteSyncOptions) {
+export function useRouteSync({
+  applyRoute,
+  canLeaveCurrentRoute,
+  currentRoute,
+  onRouteApplied,
+  onRouteError,
+  selectedProjectSlug,
+  setSelectedProjectSlug,
+}: UseRouteSyncOptions) {
   const applyRouteRef = useRef(applyRoute);
   const canLeaveCurrentRouteRef = useRef(canLeaveCurrentRoute);
   const currentRouteRef = useRef(currentRoute);
+  const onRouteAppliedRef = useRef(onRouteApplied);
   const onRouteErrorRef = useRef(onRouteError);
   const selectedProjectSlugRef = useRef(selectedProjectSlug);
 
   applyRouteRef.current = applyRoute;
   canLeaveCurrentRouteRef.current = canLeaveCurrentRoute;
   currentRouteRef.current = currentRoute;
+  onRouteAppliedRef.current = onRouteApplied;
   onRouteErrorRef.current = onRouteError;
   selectedProjectSlugRef.current = selectedProjectSlug;
 
@@ -47,7 +68,7 @@ export function useRouteSync({ applyRoute, canLeaveCurrentRoute, currentRoute, o
 
       if (window.location.hash === nextHash) {
         if (currentHash !== nextHash) {
-          applyRouteSafely(applyRouteRef.current, nextRoute, onRouteErrorRef.current);
+          applyRouteSafely(applyRouteRef.current, nextRoute, onRouteErrorRef.current, onRouteAppliedRef.current);
         }
         return;
       }
@@ -99,7 +120,7 @@ export function useRouteSync({ applyRoute, canLeaveCurrentRoute, currentRoute, o
         return;
       }
 
-      applyRouteSafely(applyRouteRef.current, nextRoute, onRouteErrorRef.current);
+      applyRouteSafely(applyRouteRef.current, nextRoute, onRouteErrorRef.current, onRouteAppliedRef.current);
     };
 
     syncRoute();

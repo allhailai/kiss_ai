@@ -39,11 +39,11 @@ const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: str
   },
   inputs: {
     title: "Source Data",
-    explainer: `Human source material belongs under ${projectPathPrefixes.humanInput}. AI-acquired source material is listed under ${projectPathPrefixes.aiInput}.`,
+    explainer: "AI Inputs are AI-managed. Edits are treated as annotations for requirements sync / build.",
   },
   outputs: {
     title: "Outputs",
-    explainer: `Generated outputs are AI-managed. Saved edits under ${projectPathPrefixes.output} are treated as annotations for requirements and the next rebuild.`,
+    explainer: "Outputs are AI-managed. Edits are treated as annotations for requirements sync / build.",
   },
 };
 
@@ -225,10 +225,15 @@ export function App() {
           type="button"
           aria-expanded={!sidebarCollapsed}
           aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
-          title={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
+          aria-describedby="sidebar-toggle-tooltip"
           onClick={() => setSidebarCollapsed((current) => !current)}
         >
-          <span aria-hidden="true">{sidebarCollapsed ? ">" : "<"}</span>
+          <span aria-hidden="true" className="sidebar-toggle-icon">
+            {sidebarCollapsed ? ">" : "<"}
+          </span>
+          <span className="sidebar-toggle-tooltip" id="sidebar-toggle-tooltip" role="tooltip">
+            {sidebarCollapsed ? "Expand navigation" : "Minimize left navigation"}
+          </span>
           <span className="sidebar-toggle-label">{sidebarCollapsed ? "Expand" : "Collapse"}</span>
         </button>
         {!sidebarCollapsed ? (

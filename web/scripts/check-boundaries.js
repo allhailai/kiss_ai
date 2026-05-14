@@ -123,6 +123,7 @@ const serverRules = [
         "cursorModels.js",
         "harnessState.js",
         "projectFiles.js",
+        "projectUiState.js",
         "projects.js",
         "requirementsSync.js",
       ]).has(path.basename(filePath)),

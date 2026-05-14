@@ -1,4 +1,4 @@
-import { buildLogQuerySchema, createProjectBodySchema, parseRequestBody, parseRequestQuery } from "./requestSchemas.js";
+import { buildLogQuerySchema, createProjectBodySchema, parseRequestBody, parseRequestQuery, updateProjectUiStateBodySchema } from "./requestSchemas.js";
 
 function extractOpenQuestions(content) {
   const lines = content.split("\n");
@@ -40,9 +40,11 @@ export function registerProjectRoutes(app, {
   listCursorModels,
   pickRebuildModelId,
   readProjectJson,
+  readProjectUiState,
   readTextFile,
   resolveCursorApiKey,
   httpError,
+  writeProjectUiState,
 }) {
   app.get("/api/projects", async (_request, response, next) => {
     try {
@@ -84,6 +86,27 @@ export function registerProjectRoutes(app, {
         models,
         source: cursorApiKey.source,
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/projects/:projectSlug/ui-state", async (request, response, next) => {
+    try {
+      response.json(await readProjectUiState(request.project.path));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/projects/:projectSlug/ui-state", async (request, response, next) => {
+    try {
+      const body = parseRequestBody(updateProjectUiStateBodySchema, request.body, httpError);
+      if (body.lastRoute && !body.lastRoute.hash.startsWith(`#/p/${encodeURIComponent(request.project.slug)}/`)) {
+        throw httpError("Last route must belong to the selected project.", 400, "invalid_project_route");
+      }
+
+      response.json(await writeProjectUiState(request.project.path, body));
     } catch (error) {
       next(error);
     }

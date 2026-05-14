@@ -18,6 +18,7 @@ import { apiErrorHandler, httpError } from "./services/httpErrors.js";
 import { createProjectAgentLock } from "./services/projectAgentLock.js";
 import { createProjectFileService } from "./services/projectFiles.js";
 import { createProjectService } from "./services/projects.js";
+import { createProjectUiStateService } from "./services/projectUiState.js";
 import { createRequirementsSyncService } from "./services/requirementsSync.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -174,6 +175,11 @@ const { buildLogTabState } = createBuildLogService({
 
 const { getHumanAttentionItems, readProjectHarness } = createHarnessStateService({ httpError });
 
+const { readProjectUiState, writeProjectUiState } = createProjectUiStateService({
+  httpError,
+  isPathInsideRoot,
+});
+
 const { attachProject, createProjectFromTemplate, discoverProjects } = createProjectService({
   PROJECTS_ROOT,
   FRAMEWORK_ROOT,
@@ -301,6 +307,7 @@ registerApiRoutes(app, {
   pickRebuildModelId,
   readConversation,
   readProjectJson,
+  readProjectUiState,
   readTextFile,
   resolveCursorApiKey,
   restoreFileFromHead,
@@ -323,6 +330,7 @@ registerApiRoutes(app, {
   updateEditProposal,
   uploadHumanInputFiles,
   writeTextFile,
+  writeProjectUiState,
 });
 
 app.use(apiErrorHandler);

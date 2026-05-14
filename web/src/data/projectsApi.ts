@@ -1,4 +1,14 @@
-import type { BuildLogState, CreateProjectRequest, DesignState, ProjectListResponse, ProjectStatus, ProjectSummary, RebuildModelsResponse } from "../contracts/api";
+import type {
+  BuildLogState,
+  CreateProjectRequest,
+  DesignState,
+  ProjectListResponse,
+  ProjectStatus,
+  ProjectSummary,
+  ProjectUiState,
+  RebuildModelsResponse,
+  UpdateProjectUiStateRequest,
+} from "../contracts/api";
 import { projectBase, request } from "./request";
 
 export const projectsApi = {
@@ -9,6 +19,12 @@ export const projectsApi = {
       body: JSON.stringify(body),
     }),
   rebuildModels: () => request<RebuildModelsResponse>("/api/cursor/models"),
+  projectUiState: (projectSlug: string) => request<ProjectUiState>(`${projectBase(projectSlug)}/ui-state`),
+  updateProjectUiState: (projectSlug: string, body: UpdateProjectUiStateRequest) =>
+    request<ProjectUiState>(`${projectBase(projectSlug)}/ui-state`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
   status: (projectSlug: string) => request<ProjectStatus>(`${projectBase(projectSlug)}/status`),
   design: (projectSlug: string) => request<DesignState>(`${projectBase(projectSlug)}/design`),
   buildLog: (projectSlug: string, tabId?: string | null, path?: string | null, sectionId?: string | null) => {

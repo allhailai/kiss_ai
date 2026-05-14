@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../data/apiClient";
 import {
   type BuildLogState,
@@ -9,8 +9,9 @@ import {
   type RebuildState,
 } from "../contracts/api";
 import { buildRouteHash, parseRouteHash } from "../navigation/routes";
-import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type View } from "../navigation/views";
+import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type RouteState, type View } from "../navigation/views";
 import { errorMessage } from "../domain/errors";
+import { requirementAutoUpdatePaths } from "../domain/projectPaths";
 import { useProjectDataLoaders } from "./hooks/useProjectDataLoaders";
 import { useHumanInputs } from "./hooks/useHumanInputs";
 import { useRebuildSync } from "./hooks/useRebuildSync";
@@ -31,6 +32,7 @@ import type {
 } from "./workspaceControllers";
 
 export function useProjectWorkspace() {
+  const selectProjectRequestRef = useRef(0);
   const [view, setView] = useState<View>(() => parseRouteHash(window.location.hash).view);
   const [routeContext, setRouteContext] = useState<Record<string, string>>({});
   const [projectsRoot, setProjectsRoot] = useState("");
@@ -57,7 +59,7 @@ export function useProjectWorkspace() {
     refreshRebuildModels,
     selectedRebuildModelId,
     setSelectedRebuildModelId,
-  } = useModelSelection();
+  } = useModelSelection(selectedProjectSlug);
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.slug === selectedProjectSlug) ?? null,
@@ -126,7 +128,7 @@ export function useProjectWorkspace() {
     [routeContext, selected?.path, selectedProjectSlug, view],
   );
   const canLeaveCurrentRoute = useCallback(
-    (nextRoute: { projectSlug: string | null; view: View; filePath: string | null; context: Record<string, string> }) => {
+    (nextRoute: RouteState) => {
       const sameRoute =
         currentRoute.projectSlug === nextRoute.projectSlug &&
         currentRoute.view === nextRoute.view &&
@@ -152,7 +154,24 @@ export function useProjectWorkspace() {
     setView,
   });
 
-  const { navigateTo } = useRouteSync({ applyRoute, canLeaveCurrentRoute, currentRoute, onRouteError: setNotice, selectedProjectSlug, setSelectedProjectSlug });
+  const persistProjectRoute = useCallback((route: RouteState) => {
+    if (!route.projectSlug) return;
+
+    const hash = buildRouteHash(route.projectSlug, route.view, route.filePath, route.context);
+    void api.updateProjectUiState(route.projectSlug, { lastRoute: { hash } }).catch((error: unknown) => {
+      console.warn("[kiss_ai UI warning] Could not persist project route.", error);
+    });
+  }, []);
+
+  const { navigateTo } = useRouteSync({
+    applyRoute,
+    canLeaveCurrentRoute,
+    currentRoute,
+    onRouteApplied: persistProjectRoute,
+    onRouteError: setNotice,
+    selectedProjectSlug,
+    setSelectedProjectSlug,
+  });
 
   const openProjectFile = useCallback(
     (path: string) => {
@@ -188,18 +207,39 @@ export function useProjectWorkspace() {
 
   const selectProject = useCallback(
     (projectSlug: string) => {
-      if (!canLeaveCurrentRoute({ projectSlug, view: "rebuild", filePath: null, context: {} })) return;
+      const goalPath = requirementAutoUpdatePaths[0];
+      if (!canLeaveCurrentRoute({ projectSlug, view: "requirements", filePath: goalPath, context: {} })) return;
+      const requestId = selectProjectRequestRef.current + 1;
+      selectProjectRequestRef.current = requestId;
 
-      setSelectedProjectSlug(projectSlug);
-      window.localStorage.setItem(selectedProjectStorageKey, projectSlug);
-      window.location.hash = buildRouteHash(projectSlug, "rebuild");
+      void (async () => {
+        const firstProjectHash = buildRouteHash(projectSlug, "requirements", goalPath);
+        let nextHash = firstProjectHash;
+
+        try {
+          const projectUiState = await api.projectUiState(projectSlug);
+          const savedHash = projectUiState.lastRoute?.hash;
+          if (savedHash && parseRouteHash(savedHash).projectSlug === projectSlug) {
+            nextHash = savedHash;
+          }
+        } catch (error) {
+          if (selectProjectRequestRef.current !== requestId) return;
+          setNotice(errorMessage(error, "Could not load the saved project location."));
+        }
+
+        if (selectProjectRequestRef.current !== requestId) return;
+        setSelectedProjectSlug(projectSlug);
+        window.localStorage.setItem(selectedProjectStorageKey, projectSlug);
+        window.location.hash = nextHash;
+      })();
     },
-    [canLeaveCurrentRoute],
+    [canLeaveCurrentRoute, setNotice],
   );
 
   const clearSelectedProject = useCallback(() => {
     if (!canLeaveCurrentRoute({ projectSlug: null, view: "rebuild", filePath: null, context: {} })) return;
 
+    selectProjectRequestRef.current += 1;
     setSelectedProjectSlug(null);
     window.localStorage.removeItem(selectedProjectStorageKey);
     window.location.hash = "#/projects";

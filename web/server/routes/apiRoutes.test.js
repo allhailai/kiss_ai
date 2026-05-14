@@ -10,6 +10,7 @@ import { registerRequirementsSyncRoutes } from "./requirementsSyncRoutes.js";
 import { apiErrorHandler, httpError } from "../services/httpErrors.js";
 import { createProjectFileService } from "../services/projectFiles.js";
 import { createProjectService } from "../services/projects.js";
+import { createProjectUiStateService } from "../services/projectUiState.js";
 
 async function withServer(app, test) {
   const server = await new Promise((resolve) => {
@@ -49,6 +50,37 @@ function createFileService(webRoot) {
     humanizePathSegment: (value) => value,
     httpError,
   });
+}
+
+function createUiStateProjectApp(projectRoot) {
+  const service = createProjectUiStateService({ httpError, isPathInsideRoot });
+  const app = express();
+
+  app.use(express.json());
+  app.use("/api/projects/:projectSlug", (request, _response, next) => {
+    request.project = { slug: request.params.projectSlug, path: projectRoot };
+    next();
+  });
+  registerProjectRoutes(app, {
+    PROJECTS_ROOT: "/tmp/projects",
+    buildLogTabState: async () => ({}),
+    createProjectFromTemplate: async () => ({}),
+    discoverProjects: async () => [],
+    displayProjectName: (projectName, projectSlug) => projectName || projectSlug,
+    getHumanAttentionItems: () => [],
+    gitStatus: async () => [],
+    httpError,
+    listCursorModels: async () => [],
+    pickRebuildModelId: () => null,
+    readProjectJson: async () => ({}),
+    readProjectUiState: service.readProjectUiState,
+    readTextFile: async () => ({ content: "" }),
+    resolveCursorApiKey: async () => ({ available: false, source: null, warnings: [] }),
+    writeProjectUiState: service.writeProjectUiState,
+  });
+  app.use(apiErrorHandler);
+
+  return app;
 }
 
 describe("API routes", () => {
@@ -142,8 +174,10 @@ describe("API routes", () => {
       listCursorModels: async () => [],
       pickRebuildModelId: () => null,
       readProjectJson: async () => ({}),
+      readProjectUiState: async () => ({ version: 1 }),
       readTextFile: async () => ({ content: "" }),
       resolveCursorApiKey: async () => ({ available: false, source: null, warnings: [] }),
+      writeProjectUiState: async (_projectRoot, state) => ({ version: 1, ...state }),
     });
     app.use(apiErrorHandler);
 
@@ -156,6 +190,67 @@ describe("API routes", () => {
 
       await expect(response.json()).resolves.toMatchObject({ code: "invalid_request" });
       expect(response.status).toBe(400);
+    });
+  });
+
+  it("reads and writes project-local UI state", async () => {
+    const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-ui-state-project-"));
+    const app = createUiStateProjectApp(projectRoot);
+
+    await withServer(app, async (baseUrl) => {
+      const missing = await fetch(`${baseUrl}/api/projects/demo/ui-state`);
+      await expect(missing.json()).resolves.toEqual({ version: 1 });
+      expect(missing.status).toBe(200);
+
+      const updated = await fetch(`${baseUrl}/api/projects/demo/ui-state`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lastRoute: { hash: "#/p/demo/requirements/human_goal_requirements.md" },
+          preferredModelId: "model-a",
+        }),
+      });
+      await expect(updated.json()).resolves.toMatchObject({
+        version: 1,
+        lastRoute: { hash: "#/p/demo/requirements/human_goal_requirements.md" },
+        preferredModelId: "model-a",
+      });
+      expect(updated.status).toBe(200);
+
+      const stateFile = JSON.parse(await fs.readFile(path.join(projectRoot, ".kiss_ai", "ui_state.json"), "utf8"));
+      expect(stateFile).toMatchObject({
+        lastRoute: { hash: "#/p/demo/requirements/human_goal_requirements.md" },
+        preferredModelId: "model-a",
+      });
+    });
+  });
+
+  it("rejects invalid and corrupt project UI state", async () => {
+    const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-ui-state-project-"));
+    const app = createUiStateProjectApp(projectRoot);
+
+    await withServer(app, async (baseUrl) => {
+      const wrongProject = await fetch(`${baseUrl}/api/projects/demo/ui-state`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lastRoute: { hash: "#/p/other/requirements/human_goal_requirements.md" } }),
+      });
+      await expect(wrongProject.json()).resolves.toMatchObject({ code: "invalid_project_route" });
+      expect(wrongProject.status).toBe(400);
+
+      const escapedRoute = await fetch(`${baseUrl}/api/projects/demo/ui-state`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lastRoute: { hash: "../human_goal_requirements.md" } }),
+      });
+      await expect(escapedRoute.json()).resolves.toMatchObject({ code: "invalid_request" });
+      expect(escapedRoute.status).toBe(400);
+
+      await fs.mkdir(path.join(projectRoot, ".kiss_ai"), { recursive: true });
+      await fs.writeFile(path.join(projectRoot, ".kiss_ai", "ui_state.json"), "{not-json", "utf8");
+      const corrupt = await fetch(`${baseUrl}/api/projects/demo/ui-state`);
+      await expect(corrupt.json()).resolves.toMatchObject({ code: "corrupt_project_ui_state" });
+      expect(corrupt.status).toBe(500);
     });
   });
 

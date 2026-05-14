@@ -20,8 +20,10 @@ export function registerApiRoutes(app, deps) {
     listCursorModels: deps.listCursorModels,
     pickRebuildModelId: deps.pickRebuildModelId,
     readProjectJson: deps.readProjectJson,
+    readProjectUiState: deps.readProjectUiState,
     readTextFile: deps.readTextFile,
     resolveCursorApiKey: deps.resolveCursorApiKey,
+    writeProjectUiState: deps.writeProjectUiState,
   });
 
   registerChatRoutes(app, {

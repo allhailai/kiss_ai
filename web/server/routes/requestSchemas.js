@@ -61,6 +61,26 @@ export const createProjectBodySchema = z.object({
   slug: optionalTrimmedString(160),
 });
 
+const projectRouteHashSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(2_000)
+  .regex(/^#\/p\/[a-zA-Z0-9][a-zA-Z0-9_-]*\/[a-z]+(?:\/[^#?]*)?(?:\?[^#]*)?$/, "Last route must be a project hash route.");
+
+export const updateProjectUiStateBodySchema = z
+  .object({
+    lastRoute: z
+      .object({
+        hash: projectRouteHashSchema,
+      })
+      .optional(),
+    preferredModelId: optionalTrimmedString(160),
+  })
+  .refine((body) => body.lastRoute !== undefined || body.preferredModelId !== undefined, {
+    message: "At least one UI state field is required.",
+  });
+
 export const updateConversationBodySchema = z.object({
   title: optionalTrimmedString(120),
   summary: optionalTrimmedString(500),

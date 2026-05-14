@@ -94,6 +94,22 @@ export type CreateProjectRequest = {
   slug?: string;
 };
 
+export type ProjectUiState = {
+  version: 1;
+  updatedAt?: string | null;
+  lastRoute?: {
+    hash: string;
+  };
+  preferredModelId?: string;
+};
+
+export type UpdateProjectUiStateRequest = {
+  lastRoute?: {
+    hash: string;
+  };
+  preferredModelId?: string;
+};
+
 export type ProjectFile = {
   path: string;
   name: string;

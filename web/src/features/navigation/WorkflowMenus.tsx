@@ -12,6 +12,10 @@ import { type View } from "../../navigation/views";
 import type { ProjectFile } from "../../contracts/api";
 import { FileTreeNav } from "./FileTreeNav";
 
+const defaultExpandedSections = new Set<SimplifiedNavSectionId>(
+  simplifiedNavSections.filter((section) => section.id !== "source-data").map((section) => section.id),
+);
+
 export function SimplifiedNavigator({
   currentView,
   projectFiles,
@@ -31,7 +35,7 @@ export function SimplifiedNavigator({
 }) {
   const activeSection = sectionForView(currentView);
   const [expandedSections, setExpandedSections] = useState<Set<SimplifiedNavSectionId>>(
-    () => new Set(simplifiedNavSections.map((section) => section.id)),
+    () => new Set(defaultExpandedSections),
   );
   const humanInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.humanInput)), [projectFiles]);
   const aiInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.aiInput)), [projectFiles]);
