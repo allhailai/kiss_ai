@@ -10,6 +10,7 @@ export function registerApiRoutes(app, deps) {
   app.use("/api/projects/:projectSlug", deps.attachProject);
 
   registerSystemRoutes(app, {
+    checkKissAiUpdate: deps.checkKissAiUpdate,
     updateKissAi: deps.updateKissAi,
   });
 

@@ -13,6 +13,58 @@ function createExecFileText(outputs, calls = []) {
 }
 
 describe("kissAiUpdate service", () => {
+  it("reports when a remote update is available", async () => {
+    const calls = [];
+    const updateService = createKissAiUpdateService({
+      HUB_ROOT: "/repo/_kiss_ai",
+      WEB_ROOT: "/repo/_kiss_ai/web",
+      execFileText: createExecFileText(
+        {
+          "git rev-parse --is-inside-work-tree": "true",
+          "git status --porcelain": "",
+          "git rev-parse --abbrev-ref --symbolic-full-name @{u}": "target/master",
+          "git fetch --prune target": "",
+          "git rev-parse --short HEAD": "aaa111",
+          "git rev-parse --short target/master": "bbb222",
+        },
+        calls,
+      ),
+      httpError,
+    });
+
+    await expect(updateService.checkKissAiUpdate()).resolves.toEqual({
+      status: "update_available",
+      updateAvailable: true,
+      localRevision: "aaa111",
+      remoteRevision: "bbb222",
+      upstream: "target/master",
+    });
+    expect(calls).toContainEqual({ command: "git", args: ["fetch", "--prune", "target"], options: { cwd: "/repo/_kiss_ai" } });
+  });
+
+  it("reports when KISS AI is already up to date", async () => {
+    const updateService = createKissAiUpdateService({
+      HUB_ROOT: "/repo/_kiss_ai",
+      WEB_ROOT: "/repo/_kiss_ai/web",
+      execFileText: createExecFileText({
+        "git rev-parse --is-inside-work-tree": "true",
+        "git status --porcelain": "",
+        "git rev-parse --abbrev-ref --symbolic-full-name @{u}": "target/master",
+        "git fetch --prune target": "",
+        "git rev-parse --short HEAD": "aaa111",
+        "git rev-parse --short target/master": "aaa111",
+      }),
+      httpError,
+    });
+
+    await expect(updateService.checkKissAiUpdate()).resolves.toMatchObject({
+      status: "up_to_date",
+      updateAvailable: false,
+      localRevision: "aaa111",
+      remoteRevision: "aaa111",
+    });
+  });
+
   it("pulls latest files and installs dependencies when package files changed", async () => {
     const calls = [];
     const updateService = createKissAiUpdateService({
@@ -55,6 +107,23 @@ describe("kissAiUpdate service", () => {
     });
 
     await expect(updateService.updateKissAi()).rejects.toMatchObject({
+      code: "kiss_ai_working_tree_dirty",
+      statusCode: 409,
+    });
+  });
+
+  it("blocks update checks when _kiss_ai has local changes", async () => {
+    const updateService = createKissAiUpdateService({
+      HUB_ROOT: "/repo/_kiss_ai",
+      WEB_ROOT: "/repo/_kiss_ai/web",
+      execFileText: createExecFileText({
+        "git rev-parse --is-inside-work-tree": "true",
+        "git status --porcelain": " M README.md",
+      }),
+      httpError,
+    });
+
+    await expect(updateService.checkKissAiUpdate()).rejects.toMatchObject({
       code: "kiss_ai_working_tree_dirty",
       statusCode: 409,
     });

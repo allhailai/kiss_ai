@@ -89,6 +89,13 @@ describe("API routes", () => {
     const app = express();
     app.use(express.json());
     registerSystemRoutes(app, {
+      checkKissAiUpdate: async () => ({
+        status: "update_available",
+        updateAvailable: true,
+        localRevision: "aaa111",
+        remoteRevision: "bbb222",
+        upstream: "target/master",
+      }),
       updateKissAi: async () => ({
         status: "updated",
         beforeRevision: "aaa111",
@@ -105,6 +112,34 @@ describe("API routes", () => {
       await expect(response.json()).resolves.toMatchObject({
         status: "updated",
         afterRevision: "bbb222",
+      });
+      expect(response.status).toBe(200);
+    });
+  });
+
+  it("runs the kiss_ai update check route", async () => {
+    const app = express();
+    app.use(express.json());
+    registerSystemRoutes(app, {
+      checkKissAiUpdate: async () => ({
+        status: "up_to_date",
+        updateAvailable: false,
+        localRevision: "aaa111",
+        remoteRevision: "aaa111",
+        upstream: "target/master",
+      }),
+      updateKissAi: async () => ({}),
+    });
+    app.use(apiErrorHandler);
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/system/update/check`, { method: "POST" });
+
+      await expect(response.json()).resolves.toMatchObject({
+        status: "up_to_date",
+        updateAvailable: false,
+        localRevision: "aaa111",
+        remoteRevision: "aaa111",
       });
       expect(response.status).toBe(200);
     });

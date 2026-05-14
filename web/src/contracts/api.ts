@@ -89,6 +89,14 @@ export type ProjectListResponse = {
   projects: ProjectSummary[];
 };
 
+export type KissAiUpdateCheckResponse = {
+  status: "update_available" | "up_to_date";
+  updateAvailable: boolean;
+  localRevision: string;
+  remoteRevision: string;
+  upstream: string;
+};
+
 export type KissAiUpdateResponse = {
   status: "updated" | "up_to_date";
   beforeRevision: string;

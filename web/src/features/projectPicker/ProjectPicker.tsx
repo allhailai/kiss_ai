@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { KissAiUpdateResponse, ProjectSummary } from "../../contracts/api";
+import type { KissAiUpdateCheckResponse, ProjectSummary } from "../../contracts/api";
 import { errorMessage } from "../../domain/errors";
 
 const projectNameTakenMessage = "That project name is taken. Please use another one.";
@@ -18,21 +18,31 @@ export function ProjectPicker({
   error,
   projects,
   projectsRoot,
-  latestUpdate,
-  latestUpdateLoading,
   onCreateProject,
-  onGetLatest,
+  onCheckLatest,
+  onCloseUpdateModal,
+  onDownloadLatest,
   onSelect,
+  updateCheck,
+  updateCheckLoading,
+  updateDownloadLoading,
+  updateError,
+  updateModalOpen,
 }: {
   creatingProject: boolean;
   error: string;
   projects: ProjectSummary[];
   projectsRoot: string;
-  latestUpdate: KissAiUpdateResponse | null;
-  latestUpdateLoading: boolean;
   onCreateProject: (name: string, slug?: string) => Promise<void>;
-  onGetLatest: () => void;
+  onCheckLatest: () => void;
+  onCloseUpdateModal: () => void;
+  onDownloadLatest: () => void;
   onSelect: (projectSlug: string) => void;
+  updateCheck: KissAiUpdateCheckResponse | null;
+  updateCheckLoading: boolean;
+  updateDownloadLoading: boolean;
+  updateError: string;
+  updateModalOpen: boolean;
 }) {
   const [projectName, setProjectName] = useState("");
   const [createError, setCreateError] = useState("");
@@ -79,16 +89,50 @@ export function ProjectPicker({
           {projectsRoot ? <code>{projectsRoot}</code> : null}
         </div>
         <div className="project-picker-update">
-          {latestUpdate ? (
-            <span>
-              {latestUpdate.status === "updated" ? "Updated" : "Up to date"} <code>{latestUpdate.afterRevision}</code>
-            </span>
-          ) : null}
-          <button disabled={latestUpdateLoading} onClick={onGetLatest} type="button">
-            {latestUpdateLoading ? "Getting latest..." : "Get latest"}
+          <button disabled={updateCheckLoading || updateDownloadLoading} onClick={onCheckLatest} type="button">
+            {updateCheckLoading ? "Checking..." : "Get Latest KISS AI Version"}
           </button>
         </div>
       </div>
+
+      {updateModalOpen ? (
+        <div className="kiss-ai-update-modal-backdrop" role="presentation">
+          <section className="kiss-ai-update-modal" role="dialog" aria-modal="true" aria-labelledby="kiss-ai-update-title">
+            <div className="kiss-ai-update-modal-header">
+              <div>
+                <span className="eyebrow">KISS AI version</span>
+                <h2 id="kiss-ai-update-title">Get Latest KISS AI Version</h2>
+              </div>
+              <button className="kiss-ai-update-close" onClick={onCloseUpdateModal} type="button" aria-label="Close KISS AI update dialog">
+                x
+              </button>
+            </div>
+
+            {updateCheckLoading ? <p>Checking the latest KISS AI version...</p> : null}
+
+            {updateError ? (
+              <div className="warning-callout" role="alert">
+                <strong>Could not check for updates</strong>
+                <p>{updateError}</p>
+              </div>
+            ) : null}
+
+            {!updateCheckLoading && updateCheck?.status === "up_to_date" ? <p>KISS AI is up to date. No new version.</p> : null}
+
+            {!updateCheckLoading && updateCheck?.updateAvailable ? (
+              <div className="kiss-ai-update-available">
+                <p>
+                  A new KISS AI version is available for download. Current version: <code>{updateCheck.localRevision}</code>. Latest version:{" "}
+                  <code>{updateCheck.remoteRevision}</code>.
+                </p>
+                <button disabled={updateDownloadLoading} onClick={onDownloadLatest} type="button">
+                  {updateDownloadLoading ? "Downloading..." : "Download Latest Version"}
+                </button>
+              </div>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
 
       <form className="project-create-panel" onSubmit={submitProject}>
         <div>

@@ -12,6 +12,10 @@ export function createKissAiUpdateService({ HUB_ROOT, WEB_ROOT, execFileText, ht
     return execFileText("git", args, { cwd: HUB_ROOT });
   }
 
+  async function currentShortRevision(ref) {
+    return normalizeCommandOutput(await git(["rev-parse", "--short", ref]));
+  }
+
   async function ensureGitCheckout() {
     try {
       const insideWorkTree = normalizeCommandOutput(await git(["rev-parse", "--is-inside-work-tree"]));
@@ -35,6 +39,49 @@ export function createKissAiUpdateService({ HUB_ROOT, WEB_ROOT, execFileText, ht
     );
   }
 
+  async function upstreamBranch() {
+    try {
+      const upstream = normalizeCommandOutput(await git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]));
+      if (upstream) return upstream;
+    } catch {
+      // Handled below with a user-facing error.
+    }
+
+    throw httpError("_kiss_ai is not connected to a GitHub branch for updates. Ask a maintainer to set the Git upstream.", 409, "kiss_ai_upstream_missing");
+  }
+
+  async function fetchUpstream(upstream) {
+    const [remoteName] = upstream.split("/");
+    if (!remoteName) {
+      throw httpError("_kiss_ai is not connected to a GitHub branch for updates. Ask a maintainer to set the Git upstream.", 409, "kiss_ai_upstream_missing");
+    }
+
+    try {
+      await git(["fetch", "--prune", remoteName]);
+    } catch {
+      throw httpError("Could not check for the latest KISS AI version. Ask a maintainer to check the Git repository connection.", 500, "kiss_ai_update_check_failed");
+    }
+  }
+
+  async function checkKissAiUpdate() {
+    await ensureGitCheckout();
+    await ensureCleanWorkingTree();
+
+    const upstream = await upstreamBranch();
+    await fetchUpstream(upstream);
+
+    const localRevision = await currentShortRevision("HEAD");
+    const remoteRevision = await currentShortRevision(upstream);
+
+    return {
+      status: localRevision === remoteRevision ? "up_to_date" : "update_available",
+      updateAvailable: localRevision !== remoteRevision,
+      localRevision,
+      remoteRevision,
+      upstream,
+    };
+  }
+
   async function changedDependencyFiles(beforeRevision, afterRevision) {
     if (!beforeRevision || !afterRevision || beforeRevision === afterRevision) return [];
 
@@ -48,7 +95,7 @@ export function createKissAiUpdateService({ HUB_ROOT, WEB_ROOT, execFileText, ht
     await ensureGitCheckout();
     await ensureCleanWorkingTree();
 
-    const beforeRevision = normalizeCommandOutput(await git(["rev-parse", "--short", "HEAD"]));
+    const beforeRevision = await currentShortRevision("HEAD");
     let pullOutput = "";
 
     try {
@@ -57,7 +104,7 @@ export function createKissAiUpdateService({ HUB_ROOT, WEB_ROOT, execFileText, ht
       throw httpError("Could not get the latest kiss_ai files. Ask a maintainer to check the Git repository connection.", 500, "kiss_ai_update_failed");
     }
 
-    const afterRevision = normalizeCommandOutput(await git(["rev-parse", "--short", "HEAD"]));
+    const afterRevision = await currentShortRevision("HEAD");
     const dependencyFiles = await changedDependencyFiles(beforeRevision, afterRevision);
     let dependencyInstall = null;
 
@@ -85,6 +132,7 @@ export function createKissAiUpdateService({ HUB_ROOT, WEB_ROOT, execFileText, ht
   }
 
   return {
+    checkKissAiUpdate,
     updateKissAi,
   };
 }

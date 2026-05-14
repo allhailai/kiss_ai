@@ -178,7 +178,7 @@ const { buildLogTabState } = createBuildLogService({
 
 const { getHumanAttentionItems, readProjectHarness } = createHarnessStateService({ httpError });
 
-const { updateKissAi } = createKissAiUpdateService({
+const { checkKissAiUpdate, updateKissAi } = createKissAiUpdateService({
   HUB_ROOT,
   WEB_ROOT,
   execFileText,
@@ -297,6 +297,7 @@ registerApiRoutes(app, {
   PROJECTS_ROOT,
   attachProject,
   buildLogTabState,
+  checkKissAiUpdate,
   createProjectFromTemplate,
   createConversation,
   deleteHumanInputFile,

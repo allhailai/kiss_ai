@@ -29,7 +29,7 @@ import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
 import { RightPanelModeSwitch } from "../shared/rightPanel/RightPanelModeSwitch";
 import { makeEditableTargetForFile, useAgentFileContext } from "./hooks/useAgentFileContext";
 import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
-import type { ChatMessageFileEdit, KissAiUpdateResponse } from "../contracts/api";
+import type { ChatMessageFileEdit, KissAiUpdateCheckResponse } from "../contracts/api";
 import { openQuestionsFilePath } from "../domain/projectPaths";
 
 const aiFileAssistPrompt =
@@ -55,8 +55,11 @@ export function App() {
   const rightPanelSurface = useRightPanelSurface();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [agentDraftSeed, setAgentDraftSeed] = useState<{ id: string; draft: string } | null>(null);
-  const [latestUpdate, setLatestUpdate] = useState<KissAiUpdateResponse | null>(null);
-  const [latestUpdateLoading, setLatestUpdateLoading] = useState(false);
+  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const [updateCheck, setUpdateCheck] = useState<KissAiUpdateCheckResponse | null>(null);
+  const [updateCheckLoading, setUpdateCheckLoading] = useState(false);
+  const [updateDownloadLoading, setUpdateDownloadLoading] = useState(false);
+  const [updateError, setUpdateError] = useState("");
   const themeStyle = useMemo(() => buildThemeStyle(designWorkspace.design), [designWorkspace.design]);
   const rightPanelWidth = useRightPanelWidth({
     panelKind: rightPanelSurface.rightPanel?.kind ?? null,
@@ -146,20 +149,32 @@ export function App() {
 
     rightPanelSurface.closePanel();
   };
-  const getLatestKissAi = async () => {
-    if (latestUpdateLoading) return;
+  const checkLatestKissAi = async () => {
+    if (updateCheckLoading || updateDownloadLoading) return;
 
-    setLatestUpdateLoading(true);
+    setUpdateModalOpen(true);
+    setUpdateCheck(null);
+    setUpdateError("");
+    setUpdateCheckLoading(true);
     try {
-      const result = await api.updateKissAi();
-      setLatestUpdate(result);
-      toastWorkspace.setNotice(result.status === "updated" ? "kiss_ai updated. Refresh the browser if the app looks unchanged." : "kiss_ai is already up to date.");
-      await project.refreshProjects();
-      if (project.selectedProjectSlug) await rebuildWorkspace.refreshStatus();
+      setUpdateCheck(await api.checkKissAiUpdate());
     } catch (error) {
-      toastWorkspace.setNotice(errorMessage(error, "Could not get the latest kiss_ai update."));
+      setUpdateError(errorMessage(error, "Could not check for the latest KISS AI version."));
     } finally {
-      setLatestUpdateLoading(false);
+      setUpdateCheckLoading(false);
+    }
+  };
+  const downloadLatestKissAi = async () => {
+    if (updateDownloadLoading) return;
+
+    setUpdateError("");
+    setUpdateDownloadLoading(true);
+    try {
+      await api.updateKissAi();
+      window.location.reload();
+    } catch (error) {
+      setUpdateError(errorMessage(error, "Could not download the latest KISS AI version."));
+      setUpdateDownloadLoading(false);
     }
   };
   useEffect(() => {
@@ -213,13 +228,18 @@ export function App() {
         <ProjectPicker
           creatingProject={project.creatingProject}
           error={project.projectsError}
-          latestUpdate={latestUpdate}
-          latestUpdateLoading={latestUpdateLoading}
           onCreateProject={project.createProject}
-          onGetLatest={() => void getLatestKissAi()}
+          onCheckLatest={() => void checkLatestKissAi()}
+          onCloseUpdateModal={() => setUpdateModalOpen(false)}
+          onDownloadLatest={() => void downloadLatestKissAi()}
           onSelect={project.selectProject}
           projects={project.projects}
           projectsRoot={project.projectsRoot}
+          updateCheck={updateCheck}
+          updateCheckLoading={updateCheckLoading}
+          updateDownloadLoading={updateDownloadLoading}
+          updateError={updateError}
+          updateModalOpen={updateModalOpen}
         />
       </main>
     );
