@@ -5,7 +5,7 @@
 Just run this:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/all-hail-ai/kiss_ai/main/scripts/install-mac.sh | bash
+curl -fsSL https://raw.githubusercontent.com/allhailai/kiss_ai/master/scripts/install-mac.sh | bash
 ```
 
 `kiss_ai` is a local web application for creating, managing, and evolving AI-assisted research projects.

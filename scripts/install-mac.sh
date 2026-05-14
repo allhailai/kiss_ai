@@ -2,8 +2,8 @@
 set -euo pipefail
 
 KISS_AI_PROJECTS_ROOT="${KISS_AI_PROJECTS_ROOT:-$HOME/Documents/kiss_ai_projects}"
-KISS_AI_REPO_URL="${KISS_AI_REPO_URL:-https://github.com/all-hail-ai/kiss_ai.git}"
-KISS_AI_BRANCH="${KISS_AI_BRANCH:-main}"
+KISS_AI_REPO_URL="${KISS_AI_REPO_URL:-https://github.com/allhailai/kiss_ai.git}"
+KISS_AI_BRANCH="${KISS_AI_BRANCH:-master}"
 KISS_AI_APP_DIR="$KISS_AI_PROJECTS_ROOT/_kiss_ai"
 
 print_step() {
