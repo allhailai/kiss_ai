@@ -1,5 +1,7 @@
 # kiss_ai Framework
 
+This is maintainer documentation for the reusable framework. Non-technical users should start with [`../README.md`](../README.md) and only open command files when an agent asks them to paste a specific command path.
+
 This folder contains the reusable `kiss_ai` framework. Commands are the user-facing workflows; skills are lower-level procedures that commands invoke; templates are used to initialize new research projects.
 
 ## Runtime Contract
@@ -33,6 +35,22 @@ The framework assumes an LLM agent is executing the command files. Commands shou
 After lint, `do_all_rebuild.md` writes a per-rebuild summary under `change_logs/summaries/` and links it from the aggregate `change_logs/change_logs.md` run entry.
 
 Finalization uses one shared rebuild timestamp for the summary section, harness state, and aggregate change-log entry. Lint checks existing project health before the current summary is written; summary generation itself is a finalization gate, and a failed current-run summary blocks the framework guard and Git snapshot.
+
+## Command Map
+
+- [`commands/do_init_project.md`](commands/do_init_project.md) — create a new research project from the template.
+- [`commands/do_all_rebuild.md`](commands/do_all_rebuild.md) — run the normal end-to-end rebuild after setup.
+- [`commands/do_process_annotations.md`](commands/do_process_annotations.md) — detect human edits in AI-managed folders and log them as annotations.
+- [`commands/do_get_inputs.md`](commands/do_get_inputs.md) — create or refresh AI-managed source notes.
+- [`commands/do_organize_data.md`](commands/do_organize_data.md) — compile source notes into the project wiki.
+- [`commands/do_build_outputs.md`](commands/do_build_outputs.md) — build final deliverables from requirements, sources, and wiki pages.
+- [`commands/do_lint.md`](commands/do_lint.md) — run project, wiki, and output health checks.
+- [`commands/do_write_rebuild_summary.md`](commands/do_write_rebuild_summary.md) — write the user-facing rebuild summary.
+- [`commands/do_ai_assist.md`](commands/do_ai_assist.md) — support constrained file-assist workflows from the local hub.
+- [`commands/do_requirements_auto_update.md`](commands/do_requirements_auto_update.md) — support requirements-sync proposal workflows.
+- [`commands/do_resolve_human_attention_item.md`](commands/do_resolve_human_attention_item.md) — resolve a recorded human-attention item.
+
+When a command mentions `framework/...`, it means this centralized framework root. From a normal project folder, the explicit path is usually `../_kiss_ai/framework/...`, unless `KISS_AI_FRAMEWORK_ROOT` points somewhere else.
 
 ## Testing The Framework
 

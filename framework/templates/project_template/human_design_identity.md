@@ -85,6 +85,6 @@ Primary buttons should be warm and restrained. Annotation callouts must be visua
 ## Do's and Don'ts
 
 - Do make source freshness, blocked states, and annotation mode visible.
-- Do keep financial-research outputs sober and advisor-discussion oriented.
+- Do keep research outputs calm, readable, and easy to review.
 - Do not make the interface feel like a trading terminal or urgent alerting system.
 - Do not use the annotation color for ordinary navigation or decoration.

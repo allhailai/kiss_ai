@@ -1,78 +1,60 @@
 # New kiss_ai Research Project
 
-This research project was created from the `kiss_ai` project template.
+This project was created from the `kiss_ai` template.
 
 ## First Steps
-- You can use AI to help create, edit, and revise the `human_*.md` requirement files.
 
-1. Fill in `human_goal_requirements.md` in plain language.
-2. Fill in `human_input_requirements.md` in plain language.
-3. Fill in `human_output_requirements.md` in plain language.
-4. Optionally adjust `human_design_identity.md` to customize this project's UI identity.
-5. Use `human_open_questions.md` to answer questions that need human review.
-6. Put human-owned context, notes, files, and source lists in `inputs_human/`.
-7. From this project root, ask the agent to run `../_kiss_ai/framework/commands/do_all_rebuild.md`.
+Continue in the `kiss_ai` web app. The browser interface is the normal way to define, build, review, and evolve this project.
 
-## Cursor API Key For UI Rebuilds
+1. Open this project in the web app.
+2. Use **Define the requirements** to describe the goal, sources, outputs, and open questions.
+3. Use **Build the project** to launch the AI build.
+4. Use **Source data view** to review source material and AI-prepared source notes.
+5. Use **Outputs Built** to review generated reports, wiki pages, and other deliverables.
 
-If this project uses the optional local web UI rebuild runner, it needs a Cursor API key in the backend process environment. Support both modes:
+## Behind-The-Scenes Files
 
-### Safer persistent mode: macOS Keychain
+The web app stores project state in local files. You normally do not need to edit them directly.
 
-Store the key once:
-
-```bash
-security add-generic-password -a "$USER" -s cursor_api_key -w "cursor_..."
-```
-
-Load it when starting the UI:
-
-```bash
-export CURSOR_API_KEY="$(security find-generic-password -a "$USER" -s cursor_api_key -w)"
-npm run dev
-```
-
-### Convenient local mode: environment file
-
-For the shared local UI, you may put the key in `_kiss_ai/web/.env` as:
-
-```bash
-CURSOR_API_KEY="cursor_..."
-```
-
-Do not commit `web/.env`. Prefer Keychain for longer-lived storage and use `.env` only for local convenience.
-
-## Log Files
-
-- `change_logs/change_logs.md` records requirement, source-process, wiki, and output changes.
-- `change_logs/annotation_change_logs.md` records annotations extracted from AI-managed paths.
-
-## Folder Ownership
-
-### Human-owned (edit these for your research)
+Human-controlled project definition is stored in:
 
 - `human_goal_requirements.md`
 - `human_input_requirements.md`
 - `human_output_requirements.md`
 - `human_open_questions.md`
 - `human_design_identity.md`
-- `inputs_human/` — optional notes, source lists, uploads, and durable context humans choose to provide
+- `inputs_human/`
 
-### AI-managed (generated or processed by the agent)
+The agent creates or refreshes:
 
-- `inputs_ai/` — working sources the agent creates or refreshes
-- `outputs_ai/` — wiki and directed outputs
-- `change_logs/` — run and annotation logs (prepend-only convention)
-- `.harness-state.json` — harness and run status (updated by the agent during rebuilds)
+- `inputs_ai/`
+- `outputs_ai/`
+- `change_logs/`
+- `.harness-state.json`
 
-### Shared framework
+Human edits in AI-managed folders are treated as annotations during the next rebuild.
 
-- The shared framework lives outside this project at `../_kiss_ai/framework/`.
-- Do not create a project-local `framework/` folder. Framework changes belong in the `_kiss_ai` repo and should be committed there separately from project rebuild snapshots.
-- If you intentionally change the shared framework, say so when you ask for a rebuild so the agent can run the central framework guard.
+## Logs And Review
 
-### Agent hints
+- `change_logs/change_logs.md` records project changes.
+- `change_logs/annotation_change_logs.md` records annotations found in AI-managed paths.
+- `change_logs/human_attention_queue.md` records decisions the agent could not safely make alone.
+- `change_logs/summaries/` contains per-rebuild summaries.
 
-- `.cursor/rules/` — optional Cursor rules copied from the template; you can ignore or adjust them.
+## Shared Framework And Runtime
 
-Human edits in AI-managed folders are treated as annotations and processed during rebuild. A successful rebuild should also create a Git snapshot unless you explicitly ask the agent to defer it.
+The shared framework lives outside this project at `../_kiss_ai/framework/`. The web app calls local API routes that run Cursor CLI agent work behind the scenes.
+
+Do not create a project-local `framework/` folder.
+
+## Advanced Direct Access
+
+Direct Cursor or filesystem access is for maintainers, debugging, or recovery. To start the web app from this project folder:
+
+```sh
+cd ../_kiss_ai/web
+npm install
+npm run dev
+```
+
+AI builds launched from the web app need `CURSOR_API_KEY` in the web app environment or `_kiss_ai/web/.env`. Do not commit `.env` files or share API keys.

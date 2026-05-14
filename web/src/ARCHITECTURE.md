@@ -1,5 +1,7 @@
 # kiss_ai Web Source Architecture
 
+This is maintainer documentation for people changing the primary local web application. External users should start with [`../../README.md`](../../README.md).
+
 This directory is organized so AI agents can add features without growing a single app file.
 
 This is an AI-coded, AI-managed, and AI-developed web app. Architecture, code,
@@ -46,6 +48,8 @@ src/
 `main.tsx` imports the app shell from `app/App.tsx`.
 
 `app/App.tsx` composes the shell, sidebar, and active workflow. It should read like the map of the UI. Keep data loading, route application, saving, reverting, rebuild polling, and project selection in `app/useProjectWorkspace.ts`.
+
+Global hub actions that are not scoped to a research project should use `/api/system/*` routes. The current example is the dashboard **Get latest** action, which calls `data/systemApi.ts`, runs guarded server-side Git update logic in `server/services/kissAiUpdate.js`, and leaves project-local Git histories untouched.
 
 `navigation/views.ts` owns view ids, file-backed view policy, local storage keys, and file-path-to-view policy. Route hash behavior belongs in `navigation/routes.ts`; user-facing navigation labels belong in `navigation/navigationModel.ts` or the composing feature.
 
@@ -131,7 +135,7 @@ Conceptual diffs are the first-class review contract for AI file edits in the lo
 
 The right-panel chat, AI File Assist, and Requirements Sync are implementations of this protocol. Requirements Sync uses the same conceptual diff contract with its own goal/input/output authority prompts. Both flows also share rejection memory so previously rejected conceptual intent is treated consistently across proposal runs.
 
-Start here, then follow the durable protocol contract in the sibling framework checkout at `kiss_ai/docs/development/concepts/agent-protocol-edit-proposals.md`. That page explains intent, scope semantics, review UI expectations, and apply-agent rules.
+Start here for the current protocol contract. Keep this section aligned with the implementation whenever proposal, review, or apply behavior changes.
 
 The frontend keeps shared conversation state and API orchestration in `app/hooks/useProjectChat.ts`; `features/agents/RightPanelAgentChat.tsx` owns the AI File Assist conversation composition. Requirements Sync orchestration lives in `features/requirementsSync/useRequirementsSync.ts`, and `features/requirementsSync/RequirementsSyncRightPanel.tsx` owns the `Goal > Inputs > Outputs` conceptual diff wizard. Shared conceptual diff review primitives live under `shared/conceptualDiff/` so AI File Assist and Requirements Sync render the same target, risk, evidence, and rejection-memory details.
 

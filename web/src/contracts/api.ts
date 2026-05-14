@@ -89,6 +89,17 @@ export type ProjectListResponse = {
   projects: ProjectSummary[];
 };
 
+export type KissAiUpdateResponse = {
+  status: "updated" | "up_to_date";
+  beforeRevision: string;
+  afterRevision: string;
+  pullOutput: string;
+  dependencyInstall: {
+    ran: boolean;
+    output: string;
+  };
+};
+
 export type CreateProjectRequest = {
   name: string;
   slug?: string;

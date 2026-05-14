@@ -26,5 +26,3 @@ export function renderMarkdownMessageContent(content: string) {
     </div>
   );
 }
-
-export const renderMessageContent = renderMarkdownMessageContent;

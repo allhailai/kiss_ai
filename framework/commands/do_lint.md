@@ -47,18 +47,22 @@ Run health checks on the project, wiki, and directed outputs.
 28. **`REQUIRED_SOURCE_GAP_INCOMPLETE` (warning or critical):** Every gap/status file for a required category must state **attempted sources** (URLs, titles, or search paths), **what is missing**, **downstream impact**, and explicit **blocker status** (e.g. `blocks_outputs: true|false`). Missing any of these → emit at least **warning**; if conclusions could be materially misleading, use **critical**.
 29. **First substantive input acquisition:** If the run is a first acquisition per the centralized `do_get_inputs.md` command (no prior successful input refresh or newly required categories not yet covered), lint **must not pass** with critical count zero while required categories are silently empty or gaps are incomplete—treat as blocking until populated or properly gapped.
 30. **Subsequent builds:** If dependency maps, coverage ledgers, or `source_category_coverage.md` show a required category is **missing**, **stale**, or **not refreshed** while dependent wiki sections or directed outputs are marked current or were rebuilt without refreshing that category, emit **`STALE_OR_MISSING_SOURCE_FOR_OUTPUT`** as **warning** or **critical** (critical when high-impact outputs are affected).
-31. **`TOP_OF_FILE_INTERNAL_METADATA` (warning):** Directed Markdown outputs should not start with YAML/frontmatter-style internal build metadata unless `human_output_requirements.md` explicitly requires top-of-file frontmatter for a downstream tool. If a generated report begins with metadata keys such as `document_type`, `project`, `issued_for_cycle`, `generation_timestamp`, `primary_inputs`, `evidence_grade`, or path/routing notes, warn that agent-only metadata should be omitted or moved to a bottom `Technical build notes` section.
+31. **`TOP_OF_FILE_INTERNAL_METADATA` (warning):** Generated Markdown under `inputs_ai/**` or `outputs_ai/**` should not start with YAML/frontmatter-style internal build metadata unless the relevant human requirements explicitly require top-of-file frontmatter for a downstream tool. If a generated Markdown file begins with metadata keys such as `document_type`, `project`, `issued_for_cycle`, `generation_timestamp`, `primary_inputs`, `evidence_grade`, `source_record_id`, `publisher`, `public_url`, `source_access_provenance`, `normalized_timing_hint`, or path/routing notes, warn that useful technical metadata should be omitted or moved to a bottom section such as `Technical build notes`, `Source metadata`, or `Technical source notes`.
 
 ## Instructions
 
 1. Read the configured paths from `.harness-state.json` and requirements.
-2. Run each check above, including required-source category walks under `inputs_ai/` aligned with `human_input_requirements.md`. For the top-of-file metadata check, inspect required directed Markdown outputs under `outputs_ai/**`; skip the warning only when the human output requirements explicitly call for frontmatter at the top.
+2. Run each check above, including required-source category walks under `inputs_ai/` aligned with `human_input_requirements.md`. For the top-of-file metadata check, inspect generated Markdown under both `inputs_ai/**` and `outputs_ai/**`; skip the warning only when the relevant human requirements explicitly call for frontmatter at the top.
 3. Group findings by severity:
    - `critical` blocks rebuild or use
    - `warning` should be reviewed
    - `info` is useful context
 4. Update `.harness-state.json` with lint status. Each finding should include `severity`, `code`, `message`, `path`, `artifact`, and `blocking`.
 5. Append or prepend a lint entry to `change_logs/change_logs.md` based on the project's log convention. Default to prepend.
+6. Recommend the next command:
+   - If critical findings are fixable by the current rebuild flow, recommend rerunning `../_kiss_ai/framework/commands/do_all_rebuild.md` after fixing the cited files.
+   - If findings require a human decision, recommend reviewing `human_open_questions.md` or `change_logs/human_attention_queue.md` before rebuilding.
+   - If only warnings or info findings remain, recommend reviewing the cited files and continuing with the normal rebuild workflow when ready.
 
 ## Output
 

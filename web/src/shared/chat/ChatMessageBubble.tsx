@@ -1,6 +1,6 @@
 import { memo, useState } from "react";
 import type { ChatMessage, ChatMessageFileEdit, EditProposal } from "../../contracts/api";
-import { formatChatDateTime, renderMessageContent } from "./chatRendering";
+import { formatChatDateTime, renderMarkdownMessageContent } from "./chatRendering";
 
 function linkedProposalLabel(proposal: EditProposal) {
   const count = proposal.conceptualDiffs.length;
@@ -107,7 +107,7 @@ function ChatMessageBubbleComponent({
           </div>
         </form>
       ) : (
-        <div className="chat-message-content">{renderMessageContent(message.content)}</div>
+        <div className="chat-message-content">{renderMarkdownMessageContent(message.content)}</div>
       )}
       {contextEntries.length ? (
         <div className="chat-message-context">

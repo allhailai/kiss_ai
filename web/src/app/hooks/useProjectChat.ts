@@ -78,6 +78,8 @@ export function useProjectChat({
   const shouldStickToLatestRef = useRef(true);
   const forceScrollToLatestRef = useRef(false);
   const fileContextRef = useRef<ConversationFileContextState>(emptyConversationFileContext());
+  const contextPersistTimeoutRef = useRef<number | null>(null);
+  const pendingContextPersistRef = useRef<{ conversationId: string; fileContext: ConversationFileContextState } | null>(null);
   const availableContextFiles = useMemo(() => projectFiles.filter(isChatContextFile), [projectFiles]);
   const filteredConversations = useMemo(() => {
     const query = conversationFilter.trim().toLowerCase();
@@ -125,12 +127,31 @@ export function useProjectChat({
     [projectSlug, refreshConversations],
   );
 
+  const clearPendingConversationFileContext = () => {
+    if (contextPersistTimeoutRef.current !== null) {
+      window.clearTimeout(contextPersistTimeoutRef.current);
+      contextPersistTimeoutRef.current = null;
+    }
+    pendingContextPersistRef.current = null;
+  };
+
+  useEffect(() => clearPendingConversationFileContext, []);
+
   const updateConversationFileContext = (updater: SetStateAction<ConversationFileContextState>) => {
     const next = applyConversationFileContext(typeof updater === "function" ? updater(fileContextRef.current) : updater);
     if (!projectSlug || !activeConversation) return;
-    void persistConversationFileContext(activeConversation.id, next).catch((error) => {
-      onNotice(errorMessage(error, "Could not save the conversation file context."));
-    });
+    pendingContextPersistRef.current = { conversationId: activeConversation.id, fileContext: next };
+    if (contextPersistTimeoutRef.current !== null) window.clearTimeout(contextPersistTimeoutRef.current);
+    contextPersistTimeoutRef.current = window.setTimeout(() => {
+      const pending = pendingContextPersistRef.current;
+      pendingContextPersistRef.current = null;
+      contextPersistTimeoutRef.current = null;
+      if (!pending) return;
+
+      void persistConversationFileContext(pending.conversationId, pending.fileContext).catch((error) => {
+        onNotice(errorMessage(error, "Could not save the conversation file context."));
+      });
+    }, 400);
   };
 
   const setAiEditableFiles = (updater: SetStateAction<AgentContextFile[]>) => {
@@ -157,6 +178,7 @@ export function useProjectChat({
     setLoading(true);
     onNotice("");
     try {
+      clearPendingConversationFileContext();
       const conversation = await api.conversation(projectSlug, conversationId);
       setActiveConversation(conversation);
       applyConversationFileContext(conversationFileContextFromConversation(conversation));
@@ -174,6 +196,7 @@ export function useProjectChat({
     setLoading(true);
     onNotice("");
     try {
+      clearPendingConversationFileContext();
       const conversation = await api.createConversation(projectSlug, { modelId: selectedModelId });
       setActiveConversation(conversation);
       applyConversationFileContext(conversationFileContextFromConversation(conversation));
@@ -196,6 +219,7 @@ export function useProjectChat({
 
   const startDraftConversation = (initialFileContext: ConversationFileContextState = emptyConversationFileContext()) => {
     if (loading || sending || proposalUpdating) return;
+    clearPendingConversationFileContext();
     setActiveConversation(null);
     setMessageDraft("");
     applyConversationFileContext(initialFileContext);
@@ -219,6 +243,7 @@ export function useProjectChat({
     try {
       let conversation = await ensureConversation();
       if (hasSelectedFileContext(currentFileContext)) {
+        clearPendingConversationFileContext();
         conversation = await persistConversationFileContext(conversation.id, currentFileContext);
       }
       if (options.content === undefined) setMessageDraft("");
@@ -245,6 +270,7 @@ export function useProjectChat({
     try {
       let conversation = await ensureConversation();
       const nextContext = applyConversationFileContext(fileContext);
+      clearPendingConversationFileContext();
       conversation = await persistConversationFileContext(conversation.id, nextContext);
       const next = await api.generateEditProposal(projectSlug, conversation.id, {
         modelId: selectedModelId,

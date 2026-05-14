@@ -20,6 +20,7 @@ import {
   treeSectionParamsSchema,
   updateConversationBodySchema,
   updateEditProposalBodySchema,
+  updateProjectUiStateBodySchema,
   writeFileBodySchema,
 } from "./requestSchemas.js";
 
@@ -224,5 +225,17 @@ describe("request schemas", () => {
     expect(() => parseRequestParams(treeSectionParamsSchema, { section: "unknown" }, httpError)).toThrow("Invalid request params.");
     expect(() => parseRequestParams(conversationParamsSchema, { conversationId: "bad/id" }, httpError)).toThrow("Invalid conversation id.");
     expect(() => parseRequestQuery(filePathQuerySchema, {}, httpError)).toThrow("Invalid request query.");
+  });
+
+  it("accepts route hashes produced by the client route builder", () => {
+    const hashes = [
+      "#/p/demo_project/dashboard",
+      "#/p/demo-project/outputs/outputs_ai%2Fwiki%2FMarket%20notes.md",
+      "#/p/demo_project/requirements/human_goal_requirements.md?panel=requirements-sync",
+    ];
+
+    for (const hash of hashes) {
+      expect(parseRequestBody(updateProjectUiStateBodySchema, { lastRoute: { hash } }, httpError)).toEqual({ lastRoute: { hash } });
+    }
   });
 });

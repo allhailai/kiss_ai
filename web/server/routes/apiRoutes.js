@@ -4,9 +4,14 @@ import { registerFileRoutes } from "./fileRoutes.js";
 import { registerProjectRoutes } from "./projectRoutes.js";
 import { registerRebuildRoutes } from "./rebuildRoutes.js";
 import { registerRequirementsSyncRoutes } from "./requirementsSyncRoutes.js";
+import { registerSystemRoutes } from "./systemRoutes.js";
 
 export function registerApiRoutes(app, deps) {
   app.use("/api/projects/:projectSlug", deps.attachProject);
+
+  registerSystemRoutes(app, {
+    updateKissAi: deps.updateKissAi,
+  });
 
   registerProjectRoutes(app, {
     PROJECTS_ROOT: deps.PROJECTS_ROOT,

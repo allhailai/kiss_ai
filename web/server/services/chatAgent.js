@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { MAX_USER_MESSAGE_BYTES } from "../contracts/chatLimits.js";
+import { MAX_STORED_MESSAGE_BYTES, MAX_USER_MESSAGE_BYTES } from "../contracts/chatLimits.js";
 import {
   activeRejectionRecords,
   annotateConceptualDiffsWithMemory,
@@ -552,6 +552,7 @@ export function createChatAgentService({
   function startAssistantGeneration({ project, conversationId, releaseProjectAgent, conversationWithUser, assistantMessageId, cursorApiKey, modelId }) {
     void (async () => {
       const assistantTextChunks = [];
+      let assistantTextBytes = 0;
       try {
         const { authorizedEditablePaths, prompt } = await createChatPrompt({
           project,
@@ -568,6 +569,10 @@ export function createChatAgentService({
           prompt,
           onEvent: async (event) => {
             if (event.type !== "assistant_delta" || !event.text) return;
+            assistantTextBytes += Buffer.byteLength(event.text, "utf8");
+            if (assistantTextBytes > MAX_STORED_MESSAGE_BYTES) {
+              throw httpError("Assistant response is too large.", 413, "chat_message_too_large");
+            }
             assistantTextChunks.push(event.text);
             notifyConversation(project.slug, conversationId, {
               type: "message_delta",

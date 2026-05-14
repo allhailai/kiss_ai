@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { ProjectSummary } from "../../contracts/api";
+import type { KissAiUpdateResponse, ProjectSummary } from "../../contracts/api";
 import { errorMessage } from "../../domain/errors";
 
 const projectNameTakenMessage = "That project name is taken. Please use another one.";
@@ -18,14 +18,20 @@ export function ProjectPicker({
   error,
   projects,
   projectsRoot,
+  latestUpdate,
+  latestUpdateLoading,
   onCreateProject,
+  onGetLatest,
   onSelect,
 }: {
   creatingProject: boolean;
   error: string;
   projects: ProjectSummary[];
   projectsRoot: string;
+  latestUpdate: KissAiUpdateResponse | null;
+  latestUpdateLoading: boolean;
   onCreateProject: (name: string, slug?: string) => Promise<void>;
+  onGetLatest: () => void;
   onSelect: (projectSlug: string) => void;
 }) {
   const [projectName, setProjectName] = useState("");
@@ -68,8 +74,20 @@ export function ProjectPicker({
   return (
     <section className="project-picker">
       <div className="project-picker-header">
-        <h1>Projects</h1>
-        {projectsRoot ? <code>{projectsRoot}</code> : null}
+        <div className="project-picker-title">
+          <h1>Projects</h1>
+          {projectsRoot ? <code>{projectsRoot}</code> : null}
+        </div>
+        <div className="project-picker-update">
+          {latestUpdate ? (
+            <span>
+              {latestUpdate.status === "updated" ? "Updated" : "Up to date"} <code>{latestUpdate.afterRevision}</code>
+            </span>
+          ) : null}
+          <button disabled={latestUpdateLoading} onClick={onGetLatest} type="button">
+            {latestUpdateLoading ? "Getting latest..." : "Get latest"}
+          </button>
+        </div>
       </div>
 
       <form className="project-create-panel" onSubmit={submitProject}>

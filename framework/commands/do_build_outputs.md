@@ -61,12 +61,12 @@ Every directed output should include:
 - low-confidence areas
 - any compliance, safety, or review caveats required by the project
 
-Final Markdown reports should start with the human-facing report content, such as the title, executive summary, or first required section. Do not put YAML/frontmatter blocks or internal build metadata at the top of generated reports unless `human_output_requirements.md` explicitly requires that format for a downstream tool.
+Generated Markdown intended for non-technical review should start with human-facing content, such as the title, executive summary, source summary, or first required section. Do not put YAML/frontmatter blocks or internal build metadata at the top of generated reports or generated source notes unless the relevant human requirements explicitly require that format for a downstream tool.
 
 Handle technical-looking metadata this way:
 
 - Omit metadata that is useful only to the generating agent and already exists in `.harness-state.json`, dependency maps, ledgers, citations, or change logs.
-- Put reusable technical metadata at the bottom in a section such as `## Technical build notes` when it materially helps future rebuilds, review, or traceability.
+- Put reusable technical metadata at the bottom in a section such as `## Technical build notes`, `## Source metadata`, or `## Technical source notes` when it materially helps future rebuilds, review, or traceability.
 - Keep reader-relevant evidence limits, confidence issues, path caveats, source gaps, and disclaimers in normal report sections where a non-technical reader will see them.
 
 ## Output

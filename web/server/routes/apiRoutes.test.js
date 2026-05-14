@@ -7,6 +7,7 @@ import { registerChatRoutes } from "./chatRoutes.js";
 import { registerFileRoutes } from "./fileRoutes.js";
 import { registerProjectRoutes } from "./projectRoutes.js";
 import { registerRequirementsSyncRoutes } from "./requirementsSyncRoutes.js";
+import { registerSystemRoutes } from "./systemRoutes.js";
 import { apiErrorHandler, httpError } from "../services/httpErrors.js";
 import { createProjectFileService } from "../services/projectFiles.js";
 import { createProjectService } from "../services/projects.js";
@@ -84,6 +85,31 @@ function createUiStateProjectApp(projectRoot) {
 }
 
 describe("API routes", () => {
+  it("runs the kiss_ai update route", async () => {
+    const app = express();
+    app.use(express.json());
+    registerSystemRoutes(app, {
+      updateKissAi: async () => ({
+        status: "updated",
+        beforeRevision: "aaa111",
+        afterRevision: "bbb222",
+        pullOutput: "Updated",
+        dependencyInstall: { ran: false, output: "" },
+      }),
+    });
+    app.use(apiErrorHandler);
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/system/update`, { method: "POST" });
+
+      await expect(response.json()).resolves.toMatchObject({
+        status: "updated",
+        afterRevision: "bbb222",
+      });
+      expect(response.status).toBe(200);
+    });
+  });
+
   it("returns the structured API error shape for route-level path escapes", async () => {
     const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-route-project-"));
     const service = createFileService(projectRoot);

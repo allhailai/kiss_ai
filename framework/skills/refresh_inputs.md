@@ -31,12 +31,15 @@ Maintain AI-managed source files under `inputs_ai/` according to `human_input_re
 5. For each **missing required source** or **missing required source category**:
    - **fetch or synthesize** real content when possible (official data, primary docs, project-approved URLs), following the project schema.
    - **A placeholder alone is not sufficient** for required coverage: if you cannot fetch or synthesize, create an explicit **gap/status file** (e.g. `source_gap.md` in the category directory) that states: attempted sources (URLs/titles), why it is missing, downstream impact, and **`blocks_outputs: true|false`**.
+   - Start generated Markdown source records with reader-facing content such as a source title, summary, extraction note, or gap status. Do **not** put YAML/frontmatter-style technical metadata at the top unless `human_input_requirements.md` explicitly requires top-of-file frontmatter for a downstream tool.
+   - Preserve useful source metadata, provenance, confidence, timing, and traceability details when they help review or future rebuilds, but place them at the bottom under a section such as `## Source metadata` or `## Technical source notes`. Omit agent-only metadata that is already captured in ledgers, manifests, state, citations, or change logs.
 6. For each existing source, decide whether it is due for review.
 7. When reviewing a source, update:
    - `last_checked`
    - `last_updated` when content changes
    - source URLs
    - change notes
+   - metadata placement, if needed, so useful technical details remain at the bottom of Markdown source files
 8. Add unresolved questions to `human_open_questions.md` only for required or genuinely ambiguous source/evidence needs. Do not ask for `inputs_human/**` uploads solely because none exist.
 9. Update any source manifest, update runbook, or **category coverage ledger** required by the project.
 

@@ -15,6 +15,7 @@ import { createCursorModelService } from "./services/cursorModels.js";
 import { createDesignIdentityService } from "./services/designIdentity.js";
 import { createHarnessStateService } from "./services/harnessState.js";
 import { apiErrorHandler, httpError } from "./services/httpErrors.js";
+import { createKissAiUpdateService } from "./services/kissAiUpdate.js";
 import { createProjectAgentLock } from "./services/projectAgentLock.js";
 import { createProjectFileService } from "./services/projectFiles.js";
 import { createProjectService } from "./services/projects.js";
@@ -23,6 +24,7 @@ import { createRequirementsSyncService } from "./services/requirementsSync.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(__dirname, "..");
+const HUB_ROOT = path.resolve(WEB_ROOT, "..");
 const PROJECTS_ROOT = path.resolve(process.env.KISS_AI_PROJECTS_ROOT ?? path.resolve(WEB_ROOT, "..", ".."));
 const PORT = Number(process.env.KISS_AI_UI_PORT ?? 8787);
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
@@ -102,6 +104,7 @@ function hashText(value) {
   return createHash("sha256").update(String(value)).digest("hex");
 }
 
+// Keep this behavior aligned with src/domain/files.ts for server-generated labels.
 function humanizePathSegment(pathSegment) {
   const withoutExtension = pathSegment.replace(/\.[^.]+$/i, "");
   const spaced = withoutExtension
@@ -174,6 +177,13 @@ const { buildLogTabState } = createBuildLogService({
 });
 
 const { getHumanAttentionItems, readProjectHarness } = createHarnessStateService({ httpError });
+
+const { updateKissAi } = createKissAiUpdateService({
+  HUB_ROOT,
+  WEB_ROOT,
+  execFileText,
+  httpError,
+});
 
 const { readProjectUiState, writeProjectUiState } = createProjectUiStateService({
   httpError,
@@ -328,6 +338,7 @@ registerApiRoutes(app, {
   treeRoots,
   updateConversation,
   updateEditProposal,
+  updateKissAi,
   uploadHumanInputFiles,
   writeTextFile,
   writeProjectUiState,

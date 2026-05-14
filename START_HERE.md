@@ -1,5 +1,5 @@
-# Start here
+# Start Here
 
-**Use [`README.md`](README.md)** — that is the single place to begin.
+Start with [`README.md`](README.md). It explains the web application workflow, setup guides, project creation, builds, privacy, and where to find the rest of the documentation.
 
-For step-by-step project creation (copy-paste prompt, folder list, framework notes), see **[`docs/create-new-research-project.md`](docs/create-new-research-project.md)**.
+If you already have the web app running and only need to create a project, go to [`docs/create-new-research-project.md`](docs/create-new-research-project.md).

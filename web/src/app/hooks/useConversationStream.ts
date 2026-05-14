@@ -51,13 +51,22 @@ export function useConversationStream({
 }) {
   const pendingDeltasRef = useRef<Array<Extract<ChatConversationEvent, { type: "message_delta" }>>>([]);
   const deltaFrameRef = useRef<number | null>(null);
+  const onConversationTruncatedRef = useRef(onConversationTruncated);
+  const onNoticeRef = useRef(onNotice);
+  const refreshConversationsRef = useRef(refreshConversations);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
   useEffect(() => {
+    onConversationTruncatedRef.current = onConversationTruncated;
+    onNoticeRef.current = onNotice;
+    refreshConversationsRef.current = refreshConversations;
+  }, [onConversationTruncated, onNotice, refreshConversations]);
+
+  useEffect(() => {
     if (!projectSlug || !conversationId) return;
+    if (typeof EventSource !== "undefined") return;
 
     let closed = false;
-    let reconnectTimeoutId: number | null = null;
     let pollTimeoutId: number | null = null;
     const pollConversation = async () => {
       try {
@@ -65,7 +74,7 @@ export function useConversationStream({
         if (closed) return;
 
         setActiveConversation(conversation);
-        void refreshConversations();
+        void refreshConversationsRef.current();
 
         const settled = hasSettledAssistantReply(conversation);
         if (settled) {
@@ -78,36 +87,61 @@ export function useConversationStream({
       }
     };
 
-    if (typeof EventSource === "undefined") {
-      if (!sending) return;
+    if (!sending) return;
 
-      let pollAttempts = 0;
-      const pollDelayMs = 3000;
-      const maxPollAttempts = 20;
-      const pollUntilSettled = () => {
-        pollTimeoutId = window.setTimeout(() => {
-          void (async () => {
-            const settled = await pollConversation();
-            if (closed || settled) return;
+    let pollAttempts = 0;
+    const pollDelayMs = 3000;
+    const maxPollAttempts = 20;
+    const pollUntilSettled = () => {
+      pollTimeoutId = window.setTimeout(() => {
+        void (async () => {
+          const settled = await pollConversation();
+          if (closed || settled) return;
 
-            pollAttempts += 1;
-            if (pollAttempts >= maxPollAttempts) {
-              setSending(false);
-              onNotice("Live chat updates are unavailable. The latest saved conversation was refreshed.");
-              return;
-            }
+          pollAttempts += 1;
+          if (pollAttempts >= maxPollAttempts) {
+            setSending(false);
+            onNoticeRef.current("Live chat updates are unavailable. The latest saved conversation was refreshed.");
+            return;
+          }
 
-            pollUntilSettled();
-          })();
-        }, pollDelayMs);
-      };
+          pollUntilSettled();
+        })();
+      }, pollDelayMs);
+    };
 
-      pollUntilSettled();
-      return () => {
-        closed = true;
-        if (pollTimeoutId !== null) window.clearTimeout(pollTimeoutId);
-      };
-    }
+    pollUntilSettled();
+    return () => {
+      closed = true;
+      if (pollTimeoutId !== null) window.clearTimeout(pollTimeoutId);
+    };
+  }, [conversationId, projectSlug, sending, setActiveConversation, setSending]);
+
+  useEffect(() => {
+    if (!projectSlug || !conversationId) return;
+    if (typeof EventSource === "undefined") return;
+
+    let closed = false;
+    let reconnectTimeoutId: number | null = null;
+    let pollTimeoutId: number | null = null;
+    const pollConversation = async () => {
+      try {
+        const conversation = await api.conversation(projectSlug, conversationId);
+        if (closed) return;
+
+        setActiveConversation(conversation);
+        void refreshConversationsRef.current();
+
+        const settled = hasSettledAssistantReply(conversation);
+        if (settled) {
+          setSending(false);
+        }
+        return settled;
+      } catch {
+        // Reconnect remains the primary recovery path.
+        return false;
+      }
+    };
 
     const eventSource = api.openConversationEventSource(projectSlug, conversationId);
     const flushDeltas = () => {
@@ -136,11 +170,11 @@ export function useConversationStream({
           pendingDeltasRef.current = [];
           setActiveConversation((current) => {
             if (current?.id === payload.conversation.id && payload.conversation.messages.length < current.messages.length) {
-              onConversationTruncated();
+              onConversationTruncatedRef.current();
             }
             return payload.conversation;
           });
-          void refreshConversations();
+          void refreshConversationsRef.current();
         } else if (payload.type === "message_delta") {
           pendingDeltasRef.current.push(payload);
           if (deltaFrameRef.current === null) {
@@ -151,9 +185,9 @@ export function useConversationStream({
           flushDeltas();
           setActiveConversation(payload.conversation);
           setSending(false);
-          void refreshConversations();
+          void refreshConversationsRef.current();
         } else if (payload.type === "error") {
-          onNotice(payload.message);
+          onNoticeRef.current(payload.message);
           setSending(false);
         }
       } catch {
@@ -177,7 +211,7 @@ export function useConversationStream({
       if (nextAttempt >= 5) {
         pollTimeoutId = window.setTimeout(() => {
           void pollConversation().finally(() => setSending(false));
-          onNotice("Live chat updates disconnected. The latest saved conversation was refreshed.");
+          onNoticeRef.current("Live chat updates disconnected. The latest saved conversation was refreshed.");
         }, 15000);
       }
     };
@@ -193,5 +227,5 @@ export function useConversationStream({
         deltaFrameRef.current = null;
       }
     };
-  }, [conversationId, onConversationTruncated, onNotice, projectSlug, reconnectAttempt, refreshConversations, sending, setActiveConversation, setSending]);
+  }, [conversationId, projectSlug, reconnectAttempt, setActiveConversation, setSending]);
 }

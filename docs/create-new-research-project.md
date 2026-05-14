@@ -1,71 +1,76 @@
-# Create a new research project
+# Create a New Research Project
 
-Use this when you want a **new** folder under `kiss_ai_projects/` with the standard layout, the centralized framework recorded as its build source, and Git initialized. You do **not** need the command line.
+Use this guide when you want to create a new project in the `kiss_ai` web app.
 
-**Start from the repo root:** open [`README.md`](../README.md) first; this page is the detailed reference.
+Start with [`../README.md`](../README.md) if the app is not running yet.
 
-## What you get
+## Before You Start
 
-The agent will follow [`../framework/commands/do_init_project.md`](../framework/commands/do_init_project.md) and create something like:
+Open the local `kiss_ai` web app in your browser.
+
+Have three things ready:
+
+- **Project folder name:** a short `snake_case` name, such as `competitor_scan_q2`.
+- **Display name:** a readable name, such as `Competitor Scan Q2`.
+- **Goal:** one sentence describing what the project should help you decide, understand, or produce.
+
+## Create The Project In The Web App
+
+Use the project picker or new-project flow in the web app. The app should create the project as a sibling of `_kiss_ai/`, copy the standard template, initialize project history, and prepare it for the guided workflow.
+
+The project should appear in the browser after creation. Select it to start defining the project.
+
+## Define The Project
+
+Use the left-side workflow in the web app:
+
+- **Define the requirements:** describe the goal, source needs, expected outputs, and open questions.
+- **Build the project:** launch the AI build when the requirements are ready.
+- **Source data view:** review sources and AI-prepared source notes.
+- **Outputs Built:** review generated reports, wiki pages, and other deliverables.
+
+## What The App Creates Behind The Scenes
+
+The app stores the project as local files:
 
 ```text
 kiss_ai_projects/
+  _kiss_ai/
   your_project_name/
+    README.md
     human_goal_requirements.md
     human_input_requirements.md
     human_output_requirements.md
     human_open_questions.md
+    human_design_identity.md
     .harness-state.json
-    README.md
     change_logs/
+      change_logs.md
+      annotation_change_logs.md
+      human_attention_queue.md
+      summaries/
     inputs_human/
     inputs_ai/
     outputs_ai/
-    .cursor/rules/        # hints for the AI (do not edit unless you want)
+    .cursor/rules/
 ```
 
-Projects live under `kiss_ai_projects/` as siblings of `_kiss_ai/`, not inside `_kiss_ai/`.
+Do not create projects inside `_kiss_ai/`.
 
-## Before you start
+## Advanced Direct Creation
 
-1. Open the **`kiss_ai_projects`** workspace or the **`_kiss_ai`** folder in Cursor.
-2. Have three things ready:
-   - **Project folder name** — use `snake_case` (e.g. `competitor_scan_q2`).
-   - **Display name** — human-readable (e.g. `Competitor scan Q2`).
-   - **One-sentence goal** — what you want the research to help with.
+The normal path is to create projects in the web app. Maintainers or recovery workflows may create a project by asking an agent to follow `_kiss_ai/framework/commands/do_init_project.md`, but that is not the primary user experience.
 
-## Copy-paste prompt for the AI
+## Next Step
 
-Paste this into chat and fill in the three placeholders:
+When the project definition is ready, build it from the web app. See [`how-to-run-a-rebuild.md`](how-to-run-a-rebuild.md).
 
-```text
-Create a new kiss_ai research project.
+## Common Mistakes
 
-Follow _kiss_ai/framework/commands/do_init_project.md exactly.
-
-Project folder name: YOUR_SNAKE_CASE_NAME
-Display name: Your Human Readable Name
-Goal: One sentence describing what this project should help you decide, understand, or produce.
-```
-
-The agent should create `kiss_ai_projects/YOUR_SNAKE_CASE_NAME/`, copy the project template (including hidden files), record `_kiss_ai/framework/` as the centralized framework source, initialize Git in the project root, prepend an entry to `change_logs/change_logs.md`, and **stop** before running a full rebuild or generating `inputs_ai/` / `outputs_ai/` content.
-
-## After the project exists
-
-1. Open the **new project folder** in Cursor (or keep a multi-root workspace that includes it).
-2. Edit only the files you own for research intent:
-   - `human_goal_requirements.md`
-   - `human_input_requirements.md`
-   - `human_output_requirements.md`
-   - `human_open_questions.md`
-3. Add notes, lists, and documents under `inputs_human/`.
-4. When ready, ask the agent to follow `../_kiss_ai/framework/commands/do_all_rebuild.md` **from the project root** (same instructions as in the new project’s `README.md`).
-
-## About the centralized `framework/` folder
-
-- The canonical framework lives at `_kiss_ai/framework/` and is shared by all managed projects.
-- Do not recreate project-local `framework/` folders. If you change `_kiss_ai/framework/` on purpose, commit that change in the `_kiss_ai` repo separately from project rebuild snapshots.
-- Normal research work belongs in the human requirement files and `inputs_human/`.
+- Creating the project inside `_kiss_ai/` instead of beside it.
+- Renaming `_kiss_ai/`; the web app and framework expect that folder name.
+- Copying `_kiss_ai/framework/` into the project. Use the shared framework in place.
+- Editing implementation files directly when the web app already has a screen for that work.
 
 ## Privacy
 

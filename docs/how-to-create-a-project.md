@@ -1,7 +1,7 @@
-# How to create a project
+# How To Create A Project
 
-This page is superseded.
+This page is kept only for older links.
 
-**Start here:** [`README.md`](../README.md)
+Use [`create-new-research-project.md`](create-new-research-project.md) for the current guide.
 
-**Detailed create-project guide:** [`create-new-research-project.md`](create-new-research-project.md)
+For the full onboarding path, start with [`../README.md`](../README.md).

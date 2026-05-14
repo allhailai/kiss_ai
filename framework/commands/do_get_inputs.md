@@ -42,10 +42,13 @@ Create or refresh AI-managed source inputs according to `human_input_requirement
    - create the required AI-managed source files in `inputs_ai/`
    - use the schema and quality standards from `human_input_requirements.md`
    - record source URLs and check dates when available
+   - start generated Markdown source files with reader-facing source content such as a title, summary, claim note, gap status, or extraction note; do **not** put YAML/frontmatter-style technical metadata at the top unless `human_input_requirements.md` explicitly requires top-of-file frontmatter for a downstream tool
+   - preserve useful source metadata, provenance, confidence, timing, and traceability details when they help review or future rebuilds, but put them at the bottom in a section such as `## Source metadata` or `## Technical source notes`; omit agent-only metadata that is already captured in `.harness-state.json`, ledgers, manifests, citations, or change logs
 8. For refresh runs (when not solely establishing first acquisition):
    - compare existing source files against the required source inventory and **source_category_coverage.md**
    - check due dates, source URLs, file paths, source metadata, content hashes, modified times when available, and user-requested refresh scope
    - update files whose source material changed, whose metadata needs a check-date update, or whose categories are stale, missing, or newly required by updated requirements
+   - when updating Markdown source files, keep any useful technical metadata at the bottom rather than reintroducing top-of-file YAML/frontmatter
    - prefer broader refresh when dependency maps are uncertain or when missing/stale categories could affect outputs (see **First-build vs subsequent builds**)
 9. Collect source-side scaling signals for the rebuild-level scaling assessment:
    - number and size of human-owned files, including binary files;

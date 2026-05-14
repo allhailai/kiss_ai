@@ -9,6 +9,8 @@ import { panelForKind, useRightPanelSurface, type RightPanelKind } from "./hooks
 import { useRightPanelWidth } from "./hooks/useRightPanelWidth";
 import { useAgentChatPanel } from "./hooks/useAgentChatPanel";
 import { useProjectChat } from "./hooks/useProjectChat";
+import { api } from "../data/apiClient";
+import { errorMessage } from "../domain/errors";
 import { type View } from "../navigation/views";
 import { BuildLogWorkspace } from "../features/buildLog/BuildLogWorkspace";
 import { ProjectChatConversationHistory } from "../features/chat/ProjectChatConversationHistory";
@@ -27,7 +29,7 @@ import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
 import { RightPanelModeSwitch } from "../shared/rightPanel/RightPanelModeSwitch";
 import { makeEditableTargetForFile, useAgentFileContext } from "./hooks/useAgentFileContext";
 import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
-import type { ChatMessageFileEdit } from "../contracts/api";
+import type { ChatMessageFileEdit, KissAiUpdateResponse } from "../contracts/api";
 import { openQuestionsFilePath } from "../domain/projectPaths";
 
 const aiFileAssistPrompt =
@@ -53,6 +55,8 @@ export function App() {
   const rightPanelSurface = useRightPanelSurface();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [agentDraftSeed, setAgentDraftSeed] = useState<{ id: string; draft: string } | null>(null);
+  const [latestUpdate, setLatestUpdate] = useState<KissAiUpdateResponse | null>(null);
+  const [latestUpdateLoading, setLatestUpdateLoading] = useState(false);
   const themeStyle = useMemo(() => buildThemeStyle(designWorkspace.design), [designWorkspace.design]);
   const rightPanelWidth = useRightPanelWidth({
     panelKind: rightPanelSurface.rightPanel?.kind ?? null,
@@ -142,6 +146,22 @@ export function App() {
 
     rightPanelSurface.closePanel();
   };
+  const getLatestKissAi = async () => {
+    if (latestUpdateLoading) return;
+
+    setLatestUpdateLoading(true);
+    try {
+      const result = await api.updateKissAi();
+      setLatestUpdate(result);
+      toastWorkspace.setNotice(result.status === "updated" ? "kiss_ai updated. Refresh the browser if the app looks unchanged." : "kiss_ai is already up to date.");
+      await project.refreshProjects();
+      if (project.selectedProjectSlug) await rebuildWorkspace.refreshStatus();
+    } catch (error) {
+      toastWorkspace.setNotice(errorMessage(error, "Could not get the latest kiss_ai update."));
+    } finally {
+      setLatestUpdateLoading(false);
+    }
+  };
   useEffect(() => {
     if (rightPanelSurface.rightPanel?.kind === "requirements-sync" && !requirementsSync.open) {
       requirementsSync.showController();
@@ -193,7 +213,10 @@ export function App() {
         <ProjectPicker
           creatingProject={project.creatingProject}
           error={project.projectsError}
+          latestUpdate={latestUpdate}
+          latestUpdateLoading={latestUpdateLoading}
           onCreateProject={project.createProject}
+          onGetLatest={() => void getLatestKissAi()}
           onSelect={project.selectProject}
           projects={project.projects}
           projectsRoot={project.projectsRoot}

@@ -2,28 +2,22 @@
 
 This is a tiny `kiss_ai` example showing the basic project shape before a rebuild has generated AI-managed outputs.
 
-This folder is a static example only. It is not intended to run rebuild commands directly.
+This folder is a static example only. It is not intended to run builds directly.
 
-## First Steps
+## How To Use This Example
 
-1. Fill in `human_goal_requirements.md` in plain language.
-2. Fill in `human_input_requirements.md` in plain language.
-3. Fill in `human_output_requirements.md` in plain language.
-4. Use `human_open_questions.md` to answer questions that need human review.
-5. Put human-owned context, notes, files, and source lists in `inputs_human/`.
-6. In a real project created under `kiss_ai_projects/`, ask the agent to run `../_kiss_ai/framework/commands/do_all_rebuild.md`.
+Open or recreate a real project in the `kiss_ai` web app, then use the browser workflow:
 
-## Log Files
+1. **Define the requirements** in the web app.
+2. **Build the project** when the definition is ready.
+3. **Source data view** shows source material and AI-prepared source notes.
+4. **Outputs Built** shows generated outputs after a build.
 
-- `change_logs/change_logs.md` records requirement, source-process, wiki, and output changes.
-- `change_logs/annotation_change_logs.md` records annotations extracted from AI-managed paths.
+## Behind-The-Scenes Files
 
-## Folder Ownership
+These files show how the web app stores a simple project:
 
-- `inputs_human/` is human-owned.
-- `inputs_ai/` is AI-managed.
-- `outputs_ai/` is AI-managed.
-
-Human edits in AI-managed folders are treated as annotations and processed during rebuild.
-
-After the first successful generated baseline is reviewed, ask the agent to commit it so future annotation detection has a clean comparison point.
+- `human_*.md` files store the project definition.
+- `inputs_human/` stores optional human-provided context.
+- `inputs_ai/` and `outputs_ai/` are AI-managed.
+- `change_logs/` records build and annotation history.

@@ -6,15 +6,17 @@ The project organizes evergreen strategy, workflow, evidence, and implementation
 
 This folder is a static example only. It is not intended to run rebuild commands directly.
 
-## First Steps
+## How To Use This Example
 
-1. Refine `human_goal_requirements.md`.
-2. Add source lists, internal notes, or example workflows to `inputs_human/`.
-3. Refine `human_input_requirements.md` and `human_output_requirements.md`.
-4. In a real project created under `kiss_ai_projects/`, ask the agent to run `../_kiss_ai/framework/commands/do_all_rebuild.md`.
+Open or recreate a real project in the `kiss_ai` web app, then use the browser workflow:
 
-## Ownership
+1. **Define the requirements** for goals, source needs, outputs, and review questions.
+2. **Build the project** when the definition is ready.
+3. **Source data view** shows source material and AI-prepared source notes.
+4. **Outputs Built** shows generated strategy outputs and wiki pages.
 
-- `human_*.md` and `inputs_human/` are human-owned.
-- `inputs_ai/` and `outputs_ai/` are AI-managed.
-- Edits under `inputs_ai/` or `outputs_ai/` are treated as annotations during rebuild.
+## Behind-The-Scenes Files
+
+- `human_*.md`, `human_design_identity.md`, and `inputs_human/` store the human-controlled project definition and context.
+- `inputs_ai/` and `outputs_ai/` are AI-managed source notes and generated outputs.
+- `change_logs/` records build and annotation history.

@@ -38,8 +38,8 @@ Generate deliverables from the compiled wiki and the project requirements.
 - Do not batch outputs in a way that truncates or homogenizes project-specific detail.
 - Use clickable relative Markdown links for source and wiki references, such as `[inputs_ai/example.md](../inputs_ai/example.md)`. Do not use code-formatted paths when the reference is intended to be navigable in Obsidian.
 - Prefer plain English unless the output requirements require a technical or legal style.
-- Start Markdown reports with reader-facing content, not YAML/frontmatter or internal build metadata, unless the output requirements explicitly require top-of-file frontmatter for a downstream tool.
-- Omit agent-only metadata when it is already captured in state, ledgers, citations, or logs. If technical metadata materially helps future rebuilds or review, put it at the bottom in `## Technical build notes`.
+- Start generated Markdown with reader-facing content, not YAML/frontmatter or internal build metadata, unless the relevant human requirements explicitly require top-of-file frontmatter for a downstream tool.
+- Omit agent-only metadata when it is already captured in state, ledgers, citations, or logs. If technical metadata materially helps future rebuilds or review, put it at the bottom in `## Technical build notes`, `## Source metadata`, or another clearly labeled bottom section.
 
 ## Output
 

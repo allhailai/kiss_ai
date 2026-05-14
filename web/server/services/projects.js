@@ -17,6 +17,17 @@ export function createProjectService({
     return results.some(Boolean);
   }
 
+  async function readDiscoveryHarness(projectRoot) {
+    try {
+      return await readProjectHarness(projectRoot);
+    } catch (error) {
+      if (error?.code === "corrupt_harness_state" || error?.code === "harness_state_unreadable") {
+        return {};
+      }
+      throw error;
+    }
+  }
+
   async function discoverProjects() {
     const projectsRootReal = await fs.realpath(PROJECTS_ROOT);
     const entries = await fs.readdir(projectsRootReal, { withFileTypes: true });
@@ -41,7 +52,7 @@ export function createProjectService({
 
       if (!isProjectSignalPresent(signals)) continue;
 
-      const harness = await readProjectHarness(projectRootReal);
+      const harness = await readDiscoveryHarness(projectRootReal);
       const stat = await fs.stat(projectRootReal);
 
       projects.push({

@@ -14,9 +14,20 @@
 .project-picker-header {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: 12px;
   min-height: 34px;
+}
+
+.project-picker-title,
+.project-picker-update {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.project-picker-title {
+  min-width: 0;
 }
 
 .project-picker-header h1 {
@@ -34,6 +45,27 @@
   background: color-mix(in srgb, var(--color-background) 80%, white);
   color: var(--color-secondary);
   font-size: 0.78rem;
+}
+
+.project-picker-update {
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.project-picker-update span {
+  color: var(--color-secondary);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.project-picker-update button {
+  min-height: 34px;
+  white-space: nowrap;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--color-accent);
+  color: white;
+  font-weight: 800;
 }
 
 .project-create-panel {

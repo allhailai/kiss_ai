@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { MAX_STORED_MESSAGE_BYTES } from "../contracts/chatLimits.js";
 import { createChatAgentService, extractApplyResult, extractConceptualDiffs, extractFileEditProposals } from "./chatAgent.js";
 import { emptyConceptualDiffMemory, normalizeConceptualDiffMemoryFile, updateConceptualDiffRejectionMemory } from "./conceptualDiffMemory.js";
 import { httpError } from "./httpErrors.js";
@@ -110,6 +111,7 @@ function createChatAgentHarness({
     });
     return { status: "finished" };
   },
+  notifyConversation = () => undefined,
 } = {}) {
   let currentConversation = structuredClone(conversation);
   const project = { slug: "demo", name: "Demo", path: projectPath };
@@ -128,7 +130,7 @@ function createChatAgentHarness({
     gitFileDiffText,
     httpError,
     listCursorModels: async () => [{ id: "model-a" }],
-    notifyConversation: () => undefined,
+    notifyConversation,
     pickRebuildModelId: () => "model-a",
     projectAgentLock,
     readConversation: async () => currentConversation,
@@ -372,6 +374,33 @@ describe("extractApplyResult", () => {
     expect(extractApplyResult("not json", ["diff_allowed"])).toMatchObject({
       failedConceptualDiffIds: [],
       valid: false,
+    });
+  });
+});
+
+describe("chat message lifecycle", () => {
+  it("stores a controlled error when assistant streaming exceeds the stored message limit", async () => {
+    const completed = createDeferred();
+    const { project, service } = createChatAgentHarness({
+      notifyConversation: (_projectSlug, _conversationId, event) => {
+        if (event.type === "message_complete") completed.resolve(event.conversation);
+      },
+      runCursorAgent: async ({ onEvent }) => {
+        await onEvent({ type: "assistant_delta", text: "x".repeat(MAX_STORED_MESSAGE_BYTES + 1) });
+        return { status: "finished" };
+      },
+    });
+
+    await service.sendChatMessage(project, "conv_1", {
+      modelId: "model-a",
+      content: "Please review the project.",
+    });
+
+    const finalConversation = await completed.promise;
+    expect(finalConversation.messages.at(-1)).toMatchObject({
+      content: "Assistant response is too large.",
+      role: "assistant",
+      status: "error",
     });
   });
 });
