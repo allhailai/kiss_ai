@@ -21,6 +21,7 @@ import { createProjectFileService } from "./services/projectFiles.js";
 import { createProjectService } from "./services/projects.js";
 import { createProjectUiStateService } from "./services/projectUiState.js";
 import { createRequirementsSyncService } from "./services/requirementsSync.js";
+import { createSystemSettingsService } from "./services/systemSettings.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(__dirname, "..");
@@ -209,6 +210,13 @@ const { listCursorModels, pickRebuildModelId, resolveCursorApiKey } = createCurs
   warnedCursorKeyMessages,
 });
 
+const { saveCursorApiKey, systemSettings } = createSystemSettingsService({
+  execFileText,
+  httpError,
+  listCursorModels,
+  resolveCursorApiKey,
+});
+
 const { lintDesignIdentity, parseDesignIdentity } = createDesignIdentityService();
 
 const {
@@ -322,6 +330,7 @@ registerApiRoutes(app, {
   readTextFile,
   resolveCursorApiKey,
   restoreFileFromHead,
+  saveCursorApiKey,
   searchFiles,
   applyEditProposal,
   applyRequirementsSyncBatch,
@@ -336,6 +345,7 @@ registerApiRoutes(app, {
   startRebuild,
   subscribeToConversation,
   subscribeToRebuild,
+  systemSettings,
   treeRoots,
   updateConversation,
   updateEditProposal,

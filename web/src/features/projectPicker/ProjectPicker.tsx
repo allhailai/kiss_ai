@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { KissAiUpdateCheckResponse, ProjectSummary } from "../../contracts/api";
+import type { KissAiUpdateCheckResponse, ProjectSummary, SystemSettingsResponse } from "../../contracts/api";
 import { errorMessage } from "../../domain/errors";
 
 const projectNameTakenMessage = "That project name is taken. Please use another one.";
@@ -22,12 +22,21 @@ export function ProjectPicker({
   onCheckLatest,
   onCloseUpdateModal,
   onDownloadLatest,
+  onOpenSettings,
+  onCloseSettings,
   onSelect,
+  onSaveCursorApiKey,
   updateCheck,
   updateCheckLoading,
   updateDownloadLoading,
   updateError,
   updateModalOpen,
+  settings,
+  settingsError,
+  settingsLoading,
+  settingsMessage,
+  settingsModalOpen,
+  settingsSaving,
 }: {
   creatingProject: boolean;
   error: string;
@@ -37,15 +46,25 @@ export function ProjectPicker({
   onCheckLatest: () => void;
   onCloseUpdateModal: () => void;
   onDownloadLatest: () => void;
+  onOpenSettings: () => void;
+  onCloseSettings: () => void;
   onSelect: (projectSlug: string) => void;
+  onSaveCursorApiKey: (cursorApiKey: string) => Promise<void>;
   updateCheck: KissAiUpdateCheckResponse | null;
   updateCheckLoading: boolean;
   updateDownloadLoading: boolean;
   updateError: string;
   updateModalOpen: boolean;
+  settings: SystemSettingsResponse | null;
+  settingsError: string;
+  settingsLoading: boolean;
+  settingsMessage: string;
+  settingsModalOpen: boolean;
+  settingsSaving: boolean;
 }) {
   const [projectName, setProjectName] = useState("");
   const [createError, setCreateError] = useState("");
+  const [cursorApiKey, setCursorApiKey] = useState("");
   const selectedSlug = slugifyProjectName(projectName);
   const slugIsValid = !selectedSlug || /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(selectedSlug);
   const projectNameIsTaken = Boolean(selectedSlug && projects.some((project) => project.slug === selectedSlug));
@@ -80,6 +99,14 @@ export function ProjectPicker({
       setCreateError(errorMessage(submitError, "Could not create the project."));
     }
   };
+  const submitCursorApiKey = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextCursorApiKey = cursorApiKey.trim();
+    if (!nextCursorApiKey || settingsSaving) return;
+
+    await onSaveCursorApiKey(nextCursorApiKey);
+    setCursorApiKey("");
+  };
 
   return (
     <section className="project-picker">
@@ -89,6 +116,9 @@ export function ProjectPicker({
           {projectsRoot ? <code>{projectsRoot}</code> : null}
         </div>
         <div className="project-picker-update">
+          <button disabled={settingsLoading || settingsSaving} onClick={onOpenSettings} type="button">
+            Settings
+          </button>
           <button disabled={updateCheckLoading || updateDownloadLoading} onClick={onCheckLatest} type="button">
             {updateCheckLoading ? "Checking..." : "Get Latest KISS AI Version"}
           </button>
@@ -130,6 +160,56 @@ export function ProjectPicker({
                 </button>
               </div>
             ) : null}
+          </section>
+        </div>
+      ) : null}
+
+      {settingsModalOpen ? (
+        <div className="kiss-ai-update-modal-backdrop" role="presentation">
+          <section className="kiss-ai-update-modal" role="dialog" aria-modal="true" aria-labelledby="kiss-ai-settings-title">
+            <div className="kiss-ai-update-modal-header">
+              <div>
+                <span className="eyebrow">Settings</span>
+                <h2 id="kiss-ai-settings-title">KISS AI Settings</h2>
+              </div>
+              <button className="kiss-ai-update-close" onClick={onCloseSettings} type="button" aria-label="Close settings dialog">
+                x
+              </button>
+            </div>
+
+            {settingsLoading ? <p>Checking Cursor API key status...</p> : null}
+            {!settingsLoading && settings?.cursorApiKeyAvailable ? <p>Cursor API Key Found</p> : null}
+            {!settingsLoading && settings && !settings.cursorApiKeyAvailable ? <p>No Cursor API key found.</p> : null}
+
+            {settingsError ? (
+              <div className="warning-callout" role="alert">
+                <strong>Settings error</strong>
+                <p>{settingsError}</p>
+              </div>
+            ) : null}
+
+            {settingsMessage ? (
+              <div className="settings-success-callout" role="status">
+                <p>{settingsMessage}</p>
+              </div>
+            ) : null}
+
+            <form className="settings-api-key-form" onSubmit={submitCursorApiKey}>
+              <label>
+                <span>CURSOR_API_KEY</span>
+                <input
+                  autoComplete="off"
+                  disabled={settingsSaving}
+                  onChange={(event) => setCursorApiKey(event.target.value)}
+                  placeholder="Paste your Cursor API key"
+                  type="password"
+                  value={cursorApiKey}
+                />
+              </label>
+              <button disabled={settingsSaving || !cursorApiKey.trim()} type="submit">
+                {settingsSaving ? "Saving..." : "Save API Key"}
+              </button>
+            </form>
           </section>
         </div>
       ) : null}

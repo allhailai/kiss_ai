@@ -29,7 +29,7 @@ import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
 import { RightPanelModeSwitch } from "../shared/rightPanel/RightPanelModeSwitch";
 import { makeEditableTargetForFile, useAgentFileContext } from "./hooks/useAgentFileContext";
 import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
-import type { ChatMessageFileEdit, KissAiUpdateCheckResponse } from "../contracts/api";
+import type { ChatMessageFileEdit, KissAiUpdateCheckResponse, SystemSettingsResponse } from "../contracts/api";
 import { openQuestionsFilePath } from "../domain/projectPaths";
 
 const aiFileAssistPrompt =
@@ -60,6 +60,12 @@ export function App() {
   const [updateCheckLoading, setUpdateCheckLoading] = useState(false);
   const [updateDownloadLoading, setUpdateDownloadLoading] = useState(false);
   const [updateError, setUpdateError] = useState("");
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [settings, setSettings] = useState<SystemSettingsResponse | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState("");
+  const [settingsMessage, setSettingsMessage] = useState("");
   const themeStyle = useMemo(() => buildThemeStyle(designWorkspace.design), [designWorkspace.design]);
   const rightPanelWidth = useRightPanelWidth({
     panelKind: rightPanelSurface.rightPanel?.kind ?? null,
@@ -177,6 +183,38 @@ export function App() {
       setUpdateDownloadLoading(false);
     }
   };
+  const openSettingsModal = async () => {
+    if (settingsLoading || settingsSaving) return;
+
+    setSettingsModalOpen(true);
+    setSettings(null);
+    setSettingsError("");
+    setSettingsMessage("");
+    setSettingsLoading(true);
+    try {
+      setSettings(await api.systemSettings());
+    } catch (error) {
+      setSettingsError(errorMessage(error, "Could not load settings."));
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+  const saveCursorApiKey = async (cursorApiKey: string) => {
+    if (settingsSaving) return;
+
+    setSettingsError("");
+    setSettingsMessage("");
+    setSettingsSaving(true);
+    try {
+      const result = await api.saveCursorApiKey({ cursorApiKey });
+      setSettingsMessage(result.message);
+      setSettings(await api.systemSettings());
+    } catch {
+      setSettingsError("Failed! Please try again. If this issue persists, contact AllHail.AI");
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
   useEffect(() => {
     if (rightPanelSurface.rightPanel?.kind === "requirements-sync" && !requirementsSync.open) {
       requirementsSync.showController();
@@ -232,9 +270,18 @@ export function App() {
           onCheckLatest={() => void checkLatestKissAi()}
           onCloseUpdateModal={() => setUpdateModalOpen(false)}
           onDownloadLatest={() => void downloadLatestKissAi()}
+          onOpenSettings={() => void openSettingsModal()}
+          onCloseSettings={() => setSettingsModalOpen(false)}
+          onSaveCursorApiKey={saveCursorApiKey}
           onSelect={project.selectProject}
           projects={project.projects}
           projectsRoot={project.projectsRoot}
+          settings={settings}
+          settingsError={settingsError}
+          settingsLoading={settingsLoading}
+          settingsMessage={settingsMessage}
+          settingsModalOpen={settingsModalOpen}
+          settingsSaving={settingsSaving}
           updateCheck={updateCheck}
           updateCheckLoading={updateCheckLoading}
           updateDownloadLoading={updateDownloadLoading}

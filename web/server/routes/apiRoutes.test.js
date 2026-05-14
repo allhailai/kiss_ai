@@ -103,6 +103,9 @@ describe("API routes", () => {
         pullOutput: "Updated",
         dependencyInstall: { ran: false, output: "" },
       }),
+      httpError,
+      saveCursorApiKey: async () => ({}),
+      systemSettings: async () => ({ cursorApiKeyAvailable: false, cursorApiKeySource: null, cursorApiKeyWarnings: [] }),
     });
     app.use(apiErrorHandler);
 
@@ -128,6 +131,9 @@ describe("API routes", () => {
         remoteRevision: "aaa111",
         upstream: "target/master",
       }),
+      httpError,
+      saveCursorApiKey: async () => ({}),
+      systemSettings: async () => ({ cursorApiKeyAvailable: false, cursorApiKeySource: null, cursorApiKeyWarnings: [] }),
       updateKissAi: async () => ({}),
     });
     app.use(apiErrorHandler);
@@ -142,6 +148,70 @@ describe("API routes", () => {
         remoteRevision: "aaa111",
       });
       expect(response.status).toBe(200);
+    });
+  });
+
+  it("reads system settings without returning API key material", async () => {
+    const app = express();
+    app.use(express.json());
+    registerSystemRoutes(app, {
+      checkKissAiUpdate: async () => ({}),
+      httpError,
+      saveCursorApiKey: async () => ({}),
+      systemSettings: async () => ({
+        cursorApiKeyAvailable: true,
+        cursorApiKeySource: "macOS Keychain item cursor_api_key",
+        cursorApiKeyWarnings: [],
+      }),
+      updateKissAi: async () => ({}),
+    });
+    app.use(apiErrorHandler);
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/system/settings`);
+      const body = await response.json();
+
+      expect(body).toEqual({
+        cursorApiKeyAvailable: true,
+        cursorApiKeySource: "macOS Keychain item cursor_api_key",
+        cursorApiKeyWarnings: [],
+      });
+      expect(JSON.stringify(body)).not.toContain("secret");
+      expect(response.status).toBe(200);
+    });
+  });
+
+  it("validates Cursor API key settings requests", async () => {
+    const app = express();
+    app.use(express.json());
+    registerSystemRoutes(app, {
+      checkKissAiUpdate: async () => ({}),
+      httpError,
+      saveCursorApiKey: async (cursorApiKey) => ({
+        ok: true,
+        message: `saved ${cursorApiKey.length}`,
+      }),
+      systemSettings: async () => ({ cursorApiKeyAvailable: false, cursorApiKeySource: null, cursorApiKeyWarnings: [] }),
+      updateKissAi: async () => ({}),
+    });
+    app.use(apiErrorHandler);
+
+    await withServer(app, async (baseUrl) => {
+      const invalid = await fetch(`${baseUrl}/api/system/settings/cursor-api-key`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cursorApiKey: "" }),
+      });
+      await expect(invalid.json()).resolves.toMatchObject({ code: "invalid_request" });
+      expect(invalid.status).toBe(400);
+
+      const valid = await fetch(`${baseUrl}/api/system/settings/cursor-api-key`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cursorApiKey: "cursor-secret" }),
+      });
+      await expect(valid.json()).resolves.toMatchObject({ ok: true, message: "saved 13" });
+      expect(valid.status).toBe(200);
     });
   });
 

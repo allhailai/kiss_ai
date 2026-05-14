@@ -108,6 +108,21 @@ export type KissAiUpdateResponse = {
   };
 };
 
+export type SystemSettingsResponse = {
+  cursorApiKeyAvailable: boolean;
+  cursorApiKeySource: string | null;
+  cursorApiKeyWarnings: string[];
+};
+
+export type SaveCursorApiKeyRequest = {
+  cursorApiKey: string;
+};
+
+export type SaveCursorApiKeyResponse = {
+  ok: boolean;
+  message: string;
+};
+
 export type CreateProjectRequest = {
   name: string;
   slug?: string;

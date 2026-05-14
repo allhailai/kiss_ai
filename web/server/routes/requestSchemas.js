@@ -61,6 +61,10 @@ export const createProjectBodySchema = z.object({
   slug: optionalTrimmedString(160),
 });
 
+export const saveCursorApiKeyBodySchema = z.object({
+  cursorApiKey: z.string().trim().min(1).max(500),
+});
+
 const projectRouteHashSchema = z
   .string()
   .trim()

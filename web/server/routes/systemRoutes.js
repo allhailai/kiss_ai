@@ -1,4 +1,23 @@
-export function registerSystemRoutes(app, { checkKissAiUpdate, updateKissAi }) {
+import { parseRequestBody, saveCursorApiKeyBodySchema } from "./requestSchemas.js";
+
+export function registerSystemRoutes(app, { checkKissAiUpdate, httpError, saveCursorApiKey, systemSettings, updateKissAi }) {
+  app.get("/api/system/settings", async (_request, response, next) => {
+    try {
+      response.json(await systemSettings());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/system/settings/cursor-api-key", async (request, response, next) => {
+    try {
+      const body = parseRequestBody(saveCursorApiKeyBodySchema, request.body, httpError);
+      response.json(await saveCursorApiKey(body.cursorApiKey));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post("/api/system/update/check", async (_request, response, next) => {
     try {
       response.json(await checkKissAiUpdate());

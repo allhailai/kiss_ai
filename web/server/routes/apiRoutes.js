@@ -11,6 +11,9 @@ export function registerApiRoutes(app, deps) {
 
   registerSystemRoutes(app, {
     checkKissAiUpdate: deps.checkKissAiUpdate,
+    httpError: deps.httpError,
+    saveCursorApiKey: deps.saveCursorApiKey,
+    systemSettings: deps.systemSettings,
     updateKissAi: deps.updateKissAi,
   });
 
