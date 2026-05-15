@@ -2,11 +2,8 @@
 
 This is an internal backlog for maintainers. It is not setup or usage documentation for external users. Start with [`README.md`](README.md) for the public onboarding path.
 
-When the user first sets up the app, form to save the Cursor API key to the keychain
-- Need to check that the project guards against revealing the cursor API key
-
-Auto-pull the latest kiss_ai changes (from git) -> public project
-
+- Need the agent proposed conceptual diffs to have Apply Proposal button in the chat area not beneath the conceptual diffs - easy to not see / miss that button
+- The propose edits... needs to not activate when user Asks & vice versa.. currently both buttons look like they are active
 
 
 
