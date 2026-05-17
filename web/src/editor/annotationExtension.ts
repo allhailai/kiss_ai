@@ -1,11 +1,9 @@
-import { type Extension, StateEffect } from "@codemirror/state";
+import { type Extension, StateEffect, StateField } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
-  ViewPlugin,
   WidgetType,
   type DecorationSet,
-  type ViewUpdate,
   GutterMarker,
   gutter,
 } from "@codemirror/view";
@@ -142,10 +140,6 @@ class CommentWidget extends WidgetType {
     wrapper.className = "cm-annotation cm-annotation-comment";
     wrapper.setAttribute("aria-label", "Comment");
 
-    const label = document.createElement("span");
-    label.className = "cm-annotation-label";
-    label.textContent = "Comment";
-
     const content = document.createElement("span");
     content.className = "cm-annotation-text";
     content.style.whiteSpace = "pre-wrap";
@@ -179,7 +173,6 @@ class CommentWidget extends WidgetType {
 
     actions.appendChild(editBtn);
     actions.appendChild(deleteBtn);
-    wrapper.appendChild(label);
     wrapper.appendChild(content);
     wrapper.appendChild(actions);
 
@@ -232,16 +225,25 @@ class CommentWidget extends WidgetType {
     textarea.addEventListener("input", autoSize);
 
     textarea.addEventListener("keydown", (e) => {
-      // Ctrl/Cmd+Enter to save
-      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      // Prevent CM6 from intercepting keystrokes meant for the textarea
+      e.stopPropagation();
+
+      // Shift+Enter inserts a newline
+      if (e.key === "Enter" && e.shiftKey) {
+        // Allow default textarea newline behavior
+        return;
+      }
+      // Enter (no modifier) saves and exits
+      if (e.key === "Enter") {
         e.preventDefault();
         commitEdit();
+        return;
       }
-      // Escape to cancel
+      // Escape cancels
       if (e.key === "Escape") {
+        e.preventDefault();
         cleanup();
       }
-      // Plain Enter inserts a newline naturally (default textarea behavior)
     });
 
     // Save / Cancel buttons
@@ -360,7 +362,20 @@ class CommentGutterMarker extends GutterMarker {
   }
 }
 
+// Persistent indicator shown in the gutter where a comment already exists
+class CommentIndicatorGutterMarker extends GutterMarker {
+  toDOM() {
+    const el = document.createElement("div");
+    el.className = "cm-feedback-gutter-indicator";
+    el.title = "Comment";
+    el.textContent = "+";
+    el.setAttribute("aria-label", "Has comment");
+    return el;
+  }
+}
+
 const commentGutterMarker = new CommentGutterMarker();
+const commentIndicatorGutterMarker = new CommentIndicatorGutterMarker();
 
 // ─────────────────────────────────────────────────────────
 // State effect for inserting feedback
@@ -389,72 +404,67 @@ export function buildAnnotationExtension({
 }): Extension[] {
   const extensions: Extension[] = [];
 
-  // Single plugin using Decoration.replace — replaces the raw HTML comment text
-  // with a styled widget. This avoids both the "block decorations via plugins" and
-  // the "line + widget ordering" issues.
-  const annotationPlugin = ViewPlugin.fromClass(
-    class {
-      decorations: DecorationSet;
+  // StateField-based decoration — required because Decoration.replace that spans
+  // line breaks is forbidden from ViewPlugins but allowed from StateFields.
+  function buildAnnotationDecorations(doc: { lines: number; line(n: number): { text: string; from: number; to: number } }): DecorationSet {
+    const entries: Array<{ from: number; to: number; decoration: Decoration }> = [];
+    const annotations = parseAnnotations(doc);
 
-      constructor(view: EditorView) {
-        this.decorations = this.buildDecorations(view);
+    for (const annotation of annotations) {
+      const from = doc.line(annotation.lineFrom).from;
+      const to = doc.line(annotation.lineTo).to;
+
+      if (annotation.kind === "feedback") {
+        entries.push({
+          from,
+          to,
+          decoration: Decoration.replace({
+            widget: new CommentWidget(
+              annotation.text,
+              annotation.lineFrom,
+              annotation.lineTo,
+              onEditComment,
+              onDeleteComment,
+            ),
+          }),
+        });
+      } else if (annotation.kind === "ai_suggestion") {
+        entries.push({
+          from,
+          to,
+          decoration: Decoration.replace({
+            widget: new AiSuggestionWidget(
+              annotation.text,
+              annotation.lineFrom,
+              onAcceptSuggestion,
+              onDismissSuggestion,
+              annotation.lineTo,
+            ),
+          }),
+        });
       }
+    }
 
-      update(update: ViewUpdate) {
-        if (update.docChanged || update.viewportChanged) {
-          this.decorations = this.buildDecorations(update.view);
-        }
-      }
+    return Decoration.set(
+      entries.map((e) => e.decoration.range(e.from, e.to)),
+      true,
+    );
+  }
 
-      buildDecorations(view: EditorView): DecorationSet {
-        const entries: Array<{ from: number; to: number; decoration: Decoration }> = [];
-        const annotations = parseAnnotations(view.state.doc);
-
-        for (const annotation of annotations) {
-          const from = view.state.doc.line(annotation.lineFrom).from;
-          const to = view.state.doc.line(annotation.lineTo).to;
-
-          if (annotation.kind === "feedback") {
-            entries.push({
-              from,
-              to,
-              decoration: Decoration.replace({
-                widget: new CommentWidget(
-                  annotation.text,
-                  annotation.lineFrom,
-                  annotation.lineTo,
-                  onEditComment,
-                  onDeleteComment,
-                ),
-              }),
-            });
-          } else if (annotation.kind === "ai_suggestion") {
-            entries.push({
-              from,
-              to,
-              decoration: Decoration.replace({
-                widget: new AiSuggestionWidget(
-                  annotation.text,
-                  annotation.lineFrom,
-                  onAcceptSuggestion,
-                  onDismissSuggestion,
-                  annotation.lineTo,
-                ),
-              }),
-            });
-          }
-        }
-
-        return Decoration.set(
-          entries.map((e) => e.decoration.range(e.from, e.to)),
-          true,
-        );
-      }
+  const annotationField = StateField.define<DecorationSet>({
+    create(state) {
+      return buildAnnotationDecorations(state.doc);
     },
-    { decorations: (plugin) => plugin.decorations },
-  );
+    update(decorations, transaction) {
+      if (transaction.docChanged) {
+        return buildAnnotationDecorations(transaction.state.doc);
+      }
+      return decorations;
+    },
+    provide: (field) => EditorView.decorations.from(field),
+  });
 
-  extensions.push(annotationPlugin);
+  extensions.push(annotationField);
 
   // Comment gutter — [+] button to add comments (on AI-managed files with annotation enabled)
   if (editable && isAiManaged) {
@@ -466,7 +476,7 @@ export function buildAnnotationExtension({
         const isAnnotationLine = annotations.some(
           (a) => lineNumber >= a.lineFrom && lineNumber <= a.lineTo,
         );
-        if (isAnnotationLine) return null;
+        if (isAnnotationLine) return commentIndicatorGutterMarker;
         const lineText = view.state.doc.lineAt(line.from).text;
         if (!lineText.trim()) return null;
         return commentGutterMarker;
@@ -474,18 +484,59 @@ export function buildAnnotationExtension({
       domEventHandlers: {
         click(view, line) {
           const lineNumber = view.state.doc.lineAt(line.from).number;
+          const annotations = parseAnnotations(view.state.doc);
+          const existingAnnotation = annotations.find(
+            (a) => a.kind === "feedback" && lineNumber >= a.lineFrom && lineNumber <= a.lineTo,
+          );
+
+          if (existingAnnotation) {
+            // Find the rendered annotation widget and click it to enter edit mode
+            const annotationFrom = view.state.doc.line(existingAnnotation.lineFrom).from;
+            const coords = view.coordsAtPos(annotationFrom);
+            if (coords) {
+              const widgetEl = view.dom.querySelector(
+                `.cm-annotation-comment`,
+              ) as HTMLElement | null;
+              // Walk all comment widgets to find the one at this line
+              const widgets = view.dom.querySelectorAll(".cm-annotation-comment");
+              for (const w of widgets) {
+                const wRect = w.getBoundingClientRect();
+                if (Math.abs(wRect.top - coords.top) < 30) {
+                  (w as HTMLElement).click();
+                  return true;
+                }
+              }
+            }
+            return true;
+          }
+
+          // New comment — insert and immediately enter edit mode
           const lineEnd = view.state.doc.line(lineNumber).to;
-          const commentTemplate = `\n<!-- COMMENT: Your note here -->`;
+          const commentTemplate = `\n<!-- COMMENT:  -->`;
           view.dispatch({
             changes: { from: lineEnd, insert: commentTemplate },
           });
-          const insertPos = lineEnd + `\n<!-- COMMENT: `.length;
+          // After the doc update, find the newly created widget and click it
           window.setTimeout(() => {
-            view.dispatch({
-              selection: { anchor: insertPos, head: insertPos + "Your note here".length },
-            });
-            view.focus();
-          }, 50);
+            const newAnnotations = parseAnnotations(view.state.doc);
+            const newAnnotation = newAnnotations.find(
+              (a) => a.kind === "feedback" && a.lineFrom === lineNumber + 1,
+            );
+            if (newAnnotation) {
+              const newFrom = view.state.doc.line(newAnnotation.lineFrom).from;
+              const newCoords = view.coordsAtPos(newFrom);
+              if (newCoords) {
+                const widgets = view.dom.querySelectorAll(".cm-annotation-comment");
+                for (const w of widgets) {
+                  const wRect = w.getBoundingClientRect();
+                  if (Math.abs(wRect.top - newCoords.top) < 30) {
+                    (w as HTMLElement).click();
+                    break;
+                  }
+                }
+              }
+            }
+          }, 80);
           return true;
         },
       },

@@ -244,6 +244,7 @@ function EditorPane({
         onChange={onDraft}
         onNotice={onNotice}
         onOpenFile={onOpenFile}
+        onSave={onSave}
         savedDiff={selectedDiff}
         selectedPath={selected.path}
         value={draft}

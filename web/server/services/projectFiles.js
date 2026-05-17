@@ -209,7 +209,13 @@ export function createProjectFileService({
   }
 
   async function readProjectJson(projectRoot, relativePath, fallback = null) {
-    const { absolute } = await resolveProjectFileTarget(projectRoot, relativePath, { allowMissing: fallback !== undefined });
+    let absolute;
+    try {
+      ({ absolute } = await resolveProjectFileTarget(projectRoot, relativePath, { allowMissing: fallback !== undefined }));
+    } catch (error) {
+      if (error?.code === "ENOENT" && fallback !== undefined) return fallback;
+      throw error;
+    }
     try {
       return JSON.parse(await fs.readFile(absolute, "utf8"));
     } catch (error) {

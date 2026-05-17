@@ -2,7 +2,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FileDiff, ProjectFile } from "../contracts/api";
 import { buildLineDiff } from "../domain/diffs";
 import { buildAnnotationExtension } from "./annotationExtension";
@@ -22,6 +22,7 @@ export function MarkdownEditor({
   onChange,
   onNotice,
   onOpenFile,
+  onSave,
 }: {
   baselineValue: string;
   editable: boolean;
@@ -34,9 +35,14 @@ export function MarkdownEditor({
   onChange: (value: string) => void;
   onNotice: (message: string) => void;
   onOpenFile: (path: string) => void;
+  onSave?: () => void;
 }) {
   // Annotation-mode files are read-only for direct typing but allow annotation-driven onChange
   const allowAnnotationEdits = !editable && annotation;
+
+  // Keep a ref to the latest onSave to avoid stale closures in useCallback
+  const onSaveRef = useRef(onSave);
+  useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
 
   const [diffInput, setDiffInput] = useState({ baselineValue, value });
   useEffect(() => {
@@ -73,6 +79,8 @@ export function MarkdownEditor({
       : [`<!-- COMMENT: ${newText} -->`];
     lines.splice(lineFrom - 1, lineTo - lineFrom + 1, ...commentLines);
     onChange(lines.join("\n"));
+    // Auto-save after annotation edit (delay lets React process the state update)
+    window.setTimeout(() => onSaveRef.current?.(), 500);
   }, [value, onChange]);
 
   const handleDeleteComment = useCallback((lineFrom: number, lineTo: number) => {
@@ -83,6 +91,8 @@ export function MarkdownEditor({
     });
     onChange(filtered.join("\n"));
     onNotice("Comment removed.");
+    // Auto-save after annotation delete
+    window.setTimeout(() => onSaveRef.current?.(), 500);
   }, [value, onChange, onNotice]);
 
   const extensions = useMemo(
