@@ -785,7 +785,7 @@
   min-width: 0;
   display: grid;
   gap: 6px;
-  padding: 0 12px;
+  padding: 0;
 }
 
 .agent-context-label {
@@ -1050,7 +1050,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 7px;
-  margin: 0 12px;
+  margin: 0;
   padding: 6px 34px 6px 9px;
   border: 1px solid color-mix(in srgb, var(--color-secondary) 24%, var(--color-border));
   border-radius: 12px;
@@ -1370,7 +1370,7 @@
 
 .right-panel-surface .chat-composer {
   min-width: 0;
-  margin: 4px 12px 0;
+  margin: 4px 0 0;
   padding: 7px;
 }
 
