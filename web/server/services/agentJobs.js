@@ -30,12 +30,11 @@ export function createAgentJobService({
 
   function createRebuildPrompt(project) {
     return [
-      "Run the kiss_ai rebuild for this project.",
+      "Run the kiss_ai build for this project.",
       "",
-      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_all_rebuild.md")} exactly.`,
-      "This is a non-interactive web-triggered rebuild. Never ask the user for confirmation or wait for input mid-run.",
-      "When a human decision is needed, choose the conservative default supported by current requirements, record a human-attention item with resolution_options, and continue when technically possible.",
-      "Do not stop before downstream outputs for material source or output-impact findings; rebuild affected artifacts and record caveats clearly.",
+      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build.md")} exactly.`,
+      "This is a non-interactive web-triggered build. Never ask the user for confirmation or wait for input mid-run.",
+      "When a decision is needed, choose the conservative default, leave an AI_SUGGESTION marker in the relevant output file, and continue.",
       `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
       "Do not create or depend on a project-local framework/ folder.",
       "Do not operate outside this project root.",

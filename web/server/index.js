@@ -20,7 +20,6 @@ import { createProjectAgentLock } from "./services/projectAgentLock.js";
 import { createProjectFileService } from "./services/projectFiles.js";
 import { createProjectService } from "./services/projects.js";
 import { createProjectUiStateService } from "./services/projectUiState.js";
-import { createRequirementsSyncService } from "./services/requirementsSync.js";
 import { createSystemSettingsService } from "./services/systemSettings.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -45,6 +44,12 @@ const buildLogDefinitions = [
     emptyMessage: "No build summaries found in change_logs/summaries/ yet.",
   },
   {
+    id: "build-log",
+    label: "Build Log",
+    path: "change_logs/builds.md",
+    emptyMessage: "No build log found yet.",
+  },
+  {
     id: "change-log",
     label: "Change Log",
     path: "change_logs/change_logs.md",
@@ -56,12 +61,7 @@ const buildLogDefinitions = [
     path: "change_logs/annotation_change_logs.md",
     emptyMessage: "No annotation change log found yet.",
   },
-  {
-    id: "requirements-sync-log",
-    label: "Requirements Sync Log",
-    path: "change_logs/requirements_sync_log.md",
-    emptyMessage: "No requirements sync log found yet.",
-  },
+
   {
     id: "human-attention-queue",
     label: "Review Notes",
@@ -72,6 +72,10 @@ const buildLogDefinitions = [
 const buildLogDefinitionById = new Map(buildLogDefinitions.map((definition) => [definition.id, definition]));
 
 const humanFiles = new Map([
+  // v2 files
+  ["project.md", { kind: "human", editable: true, annotation: false }],
+  ["questions.md", { kind: "human", editable: true, annotation: false }],
+  // v1 backwards compatibility
   ["human_goal_requirements.md", { kind: "human", editable: true, annotation: false }],
   ["human_input_requirements.md", { kind: "human", editable: true, annotation: false }],
   ["human_output_requirements.md", { kind: "human", editable: true, annotation: false }],
@@ -81,8 +85,9 @@ const humanFiles = new Map([
 
 const treeRoots = new Map([
   ["human", { root: "inputs_human", kind: "human", editable: false, annotation: false }],
-  ["inputs-ai", { root: "inputs_ai", kind: "ai", editable: true, annotation: true }],
-  ["outputs", { root: "outputs_ai", kind: "output", editable: true, annotation: true }],
+  ["sources", { root: "sources", kind: "ai", editable: false, annotation: true }],
+  ["inputs-ai", { root: "inputs_ai", kind: "ai", editable: false, annotation: true }],
+  ["outputs", { root: "outputs_ai", kind: "output", editable: false, annotation: true }],
   ["logs", { root: "change_logs", kind: "log", editable: false, annotation: false }],
 ]);
 
@@ -273,20 +278,7 @@ const { startHumanAttentionResolution, startRebuild } = createAgentJobService({
   setRebuildState,
 });
 
-const { applyRequirementsSyncBatch, applyRequirementsSync, proposeRequirementsSync, recordRequirementsSyncReview, requirementsSyncSignals } = createRequirementsSyncService({
-  FRAMEWORK_ROOT,
-  gitFileDiffText,
-  gitFileDiffTexts,
-  gitStatus,
-  httpError,
-  listCursorModels,
-  listProjectFiles,
-  pickRebuildModelId,
-  projectAgentLock,
-  readTextFile,
-  resolveCursorApiKey,
-  runCursorAgent,
-});
+
 
 function execFileText(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -333,14 +325,9 @@ registerApiRoutes(app, {
   saveCursorApiKey,
   searchFiles,
   applyEditProposal,
-  applyRequirementsSyncBatch,
-  applyRequirementsSync,
   editChatMessage,
   generateEditProposal,
   sendChatMessage,
-  proposeRequirementsSync,
-  recordRequirementsSyncReview,
-  requirementsSyncSignals,
   startHumanAttentionResolution,
   startRebuild,
   subscribeToConversation,

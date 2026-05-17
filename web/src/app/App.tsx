@@ -21,8 +21,7 @@ import { SimplifiedNavigator } from "../features/navigation/WorkflowMenus";
 import { ProjectPicker } from "../features/projectPicker/ProjectPicker";
 import { BuildProjectRightPanel } from "../features/rebuild/BuildProjectRightPanel";
 import { RebuildWorkspace } from "../features/rebuild/RebuildWorkspace";
-import { RequirementsSyncRightPanel } from "../features/requirementsSync/RequirementsSyncRightPanel";
-import { useRequirementsSync } from "../features/requirementsSync/useRequirementsSync";
+
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
 import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
@@ -30,22 +29,22 @@ import { RightPanelModeSwitch } from "../shared/rightPanel/RightPanelModeSwitch"
 import { makeEditableTargetForFile, useAgentFileContext } from "./hooks/useAgentFileContext";
 import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
 import type { ChatMessageFileEdit, KissAiUpdateCheckResponse, SystemSettingsResponse } from "../contracts/api";
-import { openQuestionsFilePath } from "../domain/projectPaths";
+import { questionsFilePath } from "../domain/projectPaths";
 
 const aiFileAssistPrompt =
   "Review the saved annotations in this file. Interpret the Git diff as user guidance, then propose edits that integrate those annotations cleanly throughout the document while preserving the document's intent, structure, and voice.";
 
 const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: string }>> = {
   requirements: {
-    title: "Human-Owned Requirements",
+    title: "Project Definition",
   },
   inputs: {
     title: "Source Data",
-    explainer: "AI Inputs are AI-managed. Edits are treated as annotations for requirements sync / build.",
+    explainer: "Sources are AI-managed. Use annotations to guide the AI.",
   },
   outputs: {
     title: "Outputs",
-    explainer: "Outputs are AI-managed. Edits are treated as annotations for requirements sync / build.",
+    explainer: "Outputs are AI-managed. Use annotations to guide the AI.",
   },
 };
 
@@ -96,16 +95,7 @@ export function App() {
     onNotice: toastWorkspace.setNotice,
     onProposalApplied: refreshAfterAiFileAssistApply,
   });
-  const requirementsSync = useRequirementsSync({
-    projectSlug: project.selectedProjectSlug,
-    selectedModelId: rebuildWorkspace.selectedModelId,
-    onNotice: toastWorkspace.setNotice,
-    onApplied: async () => {
-      await fileWorkspace.refreshProjectFiles();
-      await fileWorkspace.refreshSelectedFile();
-      await rebuildWorkspace.refreshStatus();
-    },
-  });
+
   const navigateTo = (view: View, filePath?: string | null, context?: Record<string, string>) => route.navigateTo(view, filePath, context);
   const { closeAgentPanel, isAgentPanelOpen, openAgentChatPanel, selectProjectChatConversation, toggleAgentPanel } = useAgentChatPanel({
     projectChat,
@@ -127,10 +117,7 @@ export function App() {
   const openProjectFileWithAgentContext = (path: string) => {
     agentFileContext.openProjectFileWithAgentContext(path, isAgentPanelOpen);
   };
-  const openRequirementsSyncPanel = () => {
-    requirementsSync.showController();
-    rightPanelSurface.openPanel(panelForKind("requirements-sync"));
-  };
+
   const openBuildProjectPanel = () => {
     rightPanelSurface.openPanel(panelForKind("build-project"));
     void rebuildWorkspace.refreshRebuild();
@@ -138,10 +125,6 @@ export function App() {
   const selectRightPanelKind = (kind: RightPanelKind) => {
     if (kind === "agent-chat") {
       openAgentChatPanel();
-      return;
-    }
-    if (kind === "requirements-sync") {
-      openRequirementsSyncPanel();
       return;
     }
 
@@ -215,11 +198,7 @@ export function App() {
       setSettingsSaving(false);
     }
   };
-  useEffect(() => {
-    if (rightPanelSurface.rightPanel?.kind === "requirements-sync" && !requirementsSync.open) {
-      requirementsSync.showController();
-    }
-  }, [requirementsSync.open, requirementsSync.showController, rightPanelSurface.rightPanel?.kind]);
+
   useEffect(() => {
     if (rightPanelSurface.rightPanel?.kind === "build-project") {
       void rebuildWorkspace.refreshRebuild();
@@ -365,7 +344,7 @@ export function App() {
             onDraft={fileWorkspace.setDraft}
             onAiFileAssist={() => void assistCurrentFile()}
             onNotice={toastWorkspace.setNotice}
-            onOpenRequirementsSync={route.view === "requirements" ? openRequirementsSyncPanel : undefined}
+
             onOpenFile={openProjectFileWithAgentContext}
             onUploadFiles={route.view === "inputs" ? fileWorkspace.uploadHumanInputFiles : undefined}
             onRevert={() => void fileWorkspace.revertSelected()}
@@ -398,9 +377,8 @@ export function App() {
             status={rebuildWorkspace.status}
             rebuild={rebuildWorkspace.rebuild}
             onOpenBuildProject={openBuildProjectPanel}
-            onOpenQuestions={() => navigateTo("requirements", openQuestionsFilePath)}
-            onOpenRequirementsSync={openRequirementsSyncPanel}
-            requirementsSyncSignals={requirementsSync.signals}
+            onOpenQuestions={() => navigateTo("requirements", questionsFilePath)}
+
           />
         ) : null}
       </section>
@@ -421,15 +399,7 @@ export function App() {
               : undefined
           }
         >
-          {rightPanelSurface.rightPanel.kind === "requirements-sync" ? (
-            <RequirementsSyncRightPanel
-              controller={requirementsSync}
-              models={rebuildWorkspace.models}
-              onModelChange={rebuildWorkspace.setSelectedModelId}
-              onSelectPanel={selectRightPanelKind}
-              selectedModelId={rebuildWorkspace.selectedModelId}
-            />
-          ) : rightPanelSurface.rightPanel.kind === "build-project" ? (
+          {rightPanelSurface.rightPanel.kind === "build-project" ? (
             <BuildProjectRightPanel
               models={rebuildWorkspace.models}
               onModelChange={rebuildWorkspace.setSelectedModelId}

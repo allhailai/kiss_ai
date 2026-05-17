@@ -1,5 +1,5 @@
 import type { View } from "./views";
-import { openQuestionsFilePath, requirementAutoUpdatePaths, requirementNavLabels } from "../domain/projectPaths";
+import { projectFilePath, questionsFilePath, designIdentityFilePath } from "../domain/projectPaths";
 
 export type SimplifiedNavSectionId = "chat" | "define" | "build" | "source-data" | "results";
 
@@ -17,21 +17,22 @@ export type SimplifiedNavSection = {
 
 export const simplifiedNavSections: SimplifiedNavSection[] = [
   { id: "chat", label: "Chat" },
-  { id: "define", label: "1) Define the requirements" },
+  { id: "define", label: "1) Define the project" },
   { id: "build", label: "2) Build the project" },
   { id: "source-data", label: "3) Source data view" },
   { id: "results", label: "4) Outputs Built" },
 ];
 
 export const requirementNavLeaves: SimplifiedNavLeaf[] = [
-  ...requirementAutoUpdatePaths.map((path) => ({ id: path.replace(/^human_|_requirements\.md$/g, ""), label: requirementNavLabels[path], view: "requirements" as const, path })),
+  { id: "project", label: "Define: Project Brief", view: "requirements", path: projectFilePath },
+  { id: "design", label: "Define: Design Identity", view: "design", path: designIdentityFilePath },
 ];
 
 export const openQuestionsNavLeaf: SimplifiedNavLeaf = {
   id: "open-questions",
-  label: "Answer: AI's Questions",
+  label: "Review: Questions",
   view: "requirements",
-  path: openQuestionsFilePath,
+  path: questionsFilePath,
 };
 
 export const chatNavLeaf: SimplifiedNavLeaf = {

@@ -38,7 +38,7 @@ export function SimplifiedNavigator({
     () => new Set(defaultExpandedSections),
   );
   const humanInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.humanInput)), [projectFiles]);
-  const aiInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.aiInput)), [projectFiles]);
+  const sourceFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.sources)), [projectFiles]);
   const outputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.output)), [projectFiles]);
 
   useEffect(() => {
@@ -156,19 +156,19 @@ export function SimplifiedNavigator({
 
           <button
             className={
-              selectedPath?.startsWith(projectPathPrefixes.aiInput)
+              selectedPath?.startsWith(projectPathPrefixes.sources)
                 ? "simple-nav-item simple-nav-subheader active"
                 : "simple-nav-item simple-nav-subheader"
             }
             onClick={() => onOpenView("inputs")}
             type="button"
           >
-            <span>AI acquired</span>
-            <small>{projectPathPrefixes.aiInput}</small>
+            <span>Sources</span>
+            <small>{projectPathPrefixes.sources}</small>
           </button>
           <FileTreeBlock
-            emptyLabel="No AI-acquired Markdown files yet."
-            files={aiInputFiles}
+            emptyLabel="No source files yet. Run a build to gather sources."
+            files={sourceFiles}
             loading={loading && currentView === "inputs"}
             onOpenFile={onOpenFile}
             selectedPath={selectedPath}

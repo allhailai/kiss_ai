@@ -27,9 +27,10 @@ export const designProjectFile: ProjectFile = {
 
 export function viewForProjectPath(path: string): View | null {
   if (isDesignIdentityPath(path)) return "design";
+  if (path === "project.md" || path === "questions.md") return "requirements";
   if (path.startsWith("human_")) return "requirements";
   if (path.startsWith(projectPathPrefixes.humanInput)) return "inputs";
-  if (path.startsWith(projectPathPrefixes.aiInput)) return "inputs";
+  if (path.startsWith(projectPathPrefixes.sources)) return "inputs";
   if (path.startsWith(projectPathPrefixes.output)) return "outputs";
   return null;
 }

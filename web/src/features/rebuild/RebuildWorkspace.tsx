@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { ProjectStatus, RebuildState, RequirementsSyncSignalsResponse } from "../../contracts/api";
+import type { ProjectStatus, RebuildState } from "../../contracts/api";
 
 export function RebuildWorkspace({
   buildLog,
@@ -7,18 +7,16 @@ export function RebuildWorkspace({
   rebuild,
   onOpenBuildProject,
   onOpenQuestions,
-  onOpenRequirementsSync,
-  requirementsSyncSignals,
 }: {
   buildLog: ReactNode;
   status: ProjectStatus | null;
   rebuild: RebuildState | null;
   onOpenBuildProject: () => void;
   onOpenQuestions: () => void;
-  onOpenRequirementsSync: () => void;
-  requirementsSyncSignals: RequirementsSyncSignalsResponse | null;
 }) {
   const openQuestionsCount = status?.openQuestionsCount ?? 0;
+  const counts = status?.annotationCounts;
+  const pendingSuggestions = counts ? counts.suggestionsAdded - counts.suggestionsAccepted - counts.suggestionsDismissed : 0;
 
   return (
     <div className="panel-stack rebuild-launcher-workspace">
@@ -36,12 +34,38 @@ export function RebuildWorkspace({
         </section>
       ) : null}
 
+      {counts ? (
+        <section className="rebuild-annotation-summary" aria-label="Annotation summary">
+          {status?.buildNotes ? <p className="rebuild-build-notes">{status.buildNotes}</p> : null}
+          <div className="rebuild-annotation-stats">
+            <div className="rebuild-annotation-stat">
+              <span className="rebuild-annotation-stat-value">{counts.feedbackApplied}</span>
+              <span className="rebuild-annotation-stat-label">Comments applied</span>
+            </div>
+            <div className="rebuild-annotation-stat">
+              <span className="rebuild-annotation-stat-value">{counts.suggestionsAdded}</span>
+              <span className="rebuild-annotation-stat-label">Suggestions added</span>
+            </div>
+            {pendingSuggestions > 0 ? (
+              <div className="rebuild-annotation-stat rebuild-annotation-stat-pending">
+                <span className="rebuild-annotation-stat-value">{pendingSuggestions}</span>
+                <span className="rebuild-annotation-stat-label">Pending review</span>
+              </div>
+            ) : null}
+            <div className="rebuild-annotation-stat">
+              <span className="rebuild-annotation-stat-value">{counts.suggestionsAccepted}</span>
+              <span className="rebuild-annotation-stat-label">Accepted</span>
+            </div>
+            <div className="rebuild-annotation-stat">
+              <span className="rebuild-annotation-stat-value">{counts.suggestionsDismissed}</span>
+              <span className="rebuild-annotation-stat-label">Dismissed</span>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <section className="content-card rebuild-launcher-card" aria-label="Build actions">
         <div className="rebuild-launcher-actions">
-          <button className="rebuild-launcher-action rebuild-launcher-sync" onClick={onOpenRequirementsSync} type="button">
-            <span>Synchronize Requirements</span>
-            <small>{requirementsSyncSignals?.summary ?? "Review Goal, Inputs, and Outputs before building."}</small>
-          </button>
           <button className="rebuild-launcher-action rebuild-launcher-build" onClick={onOpenBuildProject} type="button">
             <span>Build Project</span>
             <small>{rebuild?.running ? "Build is running. Open the right panel for live progress." : rebuild?.message || "Open the build panel."}</small>

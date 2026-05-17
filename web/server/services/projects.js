@@ -17,14 +17,21 @@ export function createProjectService({
     return results.some(Boolean);
   }
 
-  async function readDiscoveryHarness(projectRoot) {
+  async function readDiscoveryManifest(projectRoot) {
     try {
-      return await readProjectHarness(projectRoot);
-    } catch (error) {
-      if (error?.code === "corrupt_harness_state" || error?.code === "harness_state_unreadable") {
-        return {};
+      const manifestPath = path.join(projectRoot, ".build", "manifest.json");
+      const content = await fs.readFile(manifestPath, "utf8");
+      return JSON.parse(content);
+    } catch {
+      // Fall back to v1 harness-state for backwards compatibility
+      try {
+        if (readProjectHarness) {
+          return await readProjectHarness(projectRoot);
+        }
+      } catch {
+        // ignore
       }
-      throw error;
+      return {};
     }
   }
 
@@ -44,22 +51,25 @@ export function createProjectService({
 
       const signals = await Promise.all([
         fileExists(path.join(projectRootReal, ".git")),
-        fileExists(path.join(projectRootReal, ".harness-state.json")),
-        fileExists(path.join(projectRootReal, "human_goal_requirements.md")),
+        fileExists(path.join(projectRootReal, "project.md")),
+        fileExists(path.join(projectRootReal, ".build", "manifest.json")),
         fileExists(path.join(projectRootReal, "inputs_human")),
         fileExists(path.join(projectRootReal, "outputs_ai")),
+        // v1 backwards compatibility signals
+        fileExists(path.join(projectRootReal, ".harness-state.json")),
+        fileExists(path.join(projectRootReal, "human_goal_requirements.md")),
       ]);
 
       if (!isProjectSignalPresent(signals)) continue;
 
-      const harness = await readDiscoveryHarness(projectRootReal);
+      const manifest = await readDiscoveryManifest(projectRootReal);
       const stat = await fs.stat(projectRootReal);
 
       projects.push({
         slug: entry.name,
-        name: displayProjectName(harness.project_name, harness.project_slug ?? entry.name),
+        name: manifest.project_name ?? displayProjectName(null, entry.name),
         path: projectRootReal,
-        setupStatus: harness.setup?.status ?? "unknown",
+        setupStatus: manifest.last_build ? "built" : "initialized",
         modifiedAt: stat.mtime.toISOString(),
       });
     }
@@ -83,22 +93,25 @@ export function createProjectService({
 
     const signals = await Promise.all([
       fileExists(path.join(projectRootReal, ".git")),
-      fileExists(path.join(projectRootReal, ".harness-state.json")),
-      fileExists(path.join(projectRootReal, "human_goal_requirements.md")),
+      fileExists(path.join(projectRootReal, "project.md")),
+      fileExists(path.join(projectRootReal, ".build", "manifest.json")),
       fileExists(path.join(projectRootReal, "inputs_human")),
       fileExists(path.join(projectRootReal, "outputs_ai")),
+      // v1 backwards compatibility signals
+      fileExists(path.join(projectRootReal, ".harness-state.json")),
+      fileExists(path.join(projectRootReal, "human_goal_requirements.md")),
     ]);
 
     if (!isProjectSignalPresent(signals)) {
       throw httpError("Project was not found under the configured projects root.", 404, "project_not_found");
     }
 
-    const harness = await readProjectHarness(projectRootReal);
+    const manifest = await readDiscoveryManifest(projectRootReal);
     return {
       slug: projectSlug,
-      name: displayProjectName(harness.project_name, harness.project_slug ?? projectSlug),
+      name: manifest.project_name ?? displayProjectName(null, projectSlug),
       path: projectRootReal,
-      setupStatus: harness.setup?.status ?? "unknown",
+      setupStatus: manifest.last_build ? "built" : "initialized",
       modifiedAt: stat.mtime.toISOString(),
     };
   }
@@ -186,54 +199,13 @@ export function createProjectService({
     }
   }
 
-  async function initializeHarness(projectRoot, { name, slug }) {
-    const harnessPath = path.join(projectRoot, ".harness-state.json");
-    const harness = JSON.parse(await fs.readFile(harnessPath, "utf8"));
-    const initializedAt = new Date().toISOString();
+  async function initializeManifest(projectRoot, { name, slug }) {
+    const manifestPath = path.join(projectRoot, ".build", "manifest.json");
+    const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
 
-    harness.project_slug = slug;
-    harness.project_name = name;
-    harness.setup = {
-      ...(harness.setup ?? {}),
-      status: "initialized",
-      initialized_at: initializedAt,
-      initial_human_baseline_commit: null,
-      initial_human_baseline_at: null,
-    };
-    harness.paths = {
-      ...(harness.paths ?? {}),
-      inputs_human: "inputs_human/",
-      inputs_ai: "inputs_ai/",
-      outputs_ai: "outputs_ai/",
-      wiki: "outputs_ai/wiki/",
-      human_design_identity: "human_design_identity.md",
-      human_open_questions: "human_open_questions.md",
-      change_logs: "change_logs/",
-      build_summaries: "change_logs/summaries/",
-      human_attention_queue: "change_logs/human_attention_queue.md",
-      change_log: "change_logs/change_logs.md",
-      annotation_change_log: "change_logs/annotation_change_logs.md",
-    };
-    harness.extensions = {
-      ...(harness.extensions ?? {}),
-      human_attention: {
-        queue_path: "change_logs/human_attention_queue.md",
-        last_updated_at: null,
-        open_items: [],
-      },
-      rebuild_summaries: {
-        latest_summary_path: null,
-        latest_summary_section_timestamp: null,
-        latest_summary_status: "not_run",
-        latest_summary_notes: [],
-      },
-      framework_guard: {
-        ...((harness.extensions ?? {}).framework_guard ?? {}),
-        framework_copy_source: "centralized: ../_kiss_ai/framework",
-      },
-    };
+    manifest.project_name = name;
 
-    await fs.writeFile(harnessPath, `${JSON.stringify(harness, null, 2)}\n`, "utf8");
+    await fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
   }
 
   function replaceMarkdownSection(content, heading, body) {
@@ -246,28 +218,30 @@ export function createProjectService({
     return content.replace(pattern, `$1${body.trim()}\n`);
   }
 
-  async function initializeGoalFile(projectRoot, projectName) {
-    const goalPath = path.join(projectRoot, "human_goal_requirements.md");
-    const content = await fs.readFile(goalPath, "utf8");
-    const objective = `Describe the objective for ${projectName}. Add one or two paragraphs explaining what this project should help you decide, understand, or produce.`;
-
-    await fs.writeFile(goalPath, replaceMarkdownSection(content, "Project Objective", objective), "utf8");
+  async function initializeProjectFile(projectRoot, projectName) {
+    const projectPath = path.join(projectRoot, "project.md");
+    let content = await fs.readFile(projectPath, "utf8");
+    content = content.replace(
+      "# Project: New kiss_ai Research Project",
+      `# Project: ${projectName}`,
+    );
+    await fs.writeFile(projectPath, content, "utf8");
   }
 
   async function prependInitializationLog(projectRoot, { name, slug }) {
-    const logPath = path.join(projectRoot, "change_logs", "change_logs.md");
+    const logPath = path.join(projectRoot, "change_logs", "builds.md");
     const content = await fs.readFile(logPath, "utf8");
     const entry = [
-      `## ${new Date().toISOString()} - Project initialized`,
+      `## ${new Date().toISOString()} — Project initialized`,
       "",
       `- Created project scaffold for ${name} (${slug}).`,
       "- Initialized a local Git repository and recorded the setup baseline.",
       "",
     ].join("\n");
 
-    const headerPattern = /^(# Change Logs\s*\n\s*Entries are prepended in reverse chronological order\.\s*)/;
+    const headerPattern = /^(# Build Log\s*\n\s*Build history for this project\..*\n)/;
     const nextContent = headerPattern.test(content)
-      ? content.replace(headerPattern, `$1\n\n${entry}`)
+      ? content.replace(headerPattern, `$1\n${entry}`)
       : `${entry}\n${content.trimStart()}`;
 
     await fs.writeFile(logPath, nextContent, "utf8");
@@ -305,8 +279,8 @@ export function createProjectService({
       await fs.mkdir(project.projectRoot);
       created = true;
       await copyProjectTemplate(templateRoot, project.projectRoot);
-      await initializeHarness(project.projectRoot, project);
-      await initializeGoalFile(project.projectRoot, project.name);
+      await initializeManifest(project.projectRoot, project);
+      await initializeProjectFile(project.projectRoot, project.name);
       await prependInitializationLog(project.projectRoot, project);
       await gitInitProject(project.projectRoot);
     } catch (error) {

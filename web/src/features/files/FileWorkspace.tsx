@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import type { FileContent, FileDiff, ProjectFile } from "../../contracts/api";
 import { countDeletedLines, countDiffRangeLines } from "../../domain/diffs";
 import { humanizeFilePath } from "../../domain/files";
-import { projectPathPrefixes } from "../../domain/projectPaths";
+import { isAiManagedPath, projectPathPrefixes } from "../../domain/projectPaths";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
 
 export function FileWorkspace({
@@ -17,7 +17,7 @@ export function FileWorkspace({
   onDraft,
   onAiFileAssist,
   onNotice,
-  onOpenRequirementsSync,
+
   onOpenFile,
   onUploadFiles,
   onRevert,
@@ -34,7 +34,7 @@ export function FileWorkspace({
   onDraft: (value: string) => void;
   onAiFileAssist?: () => void;
   onNotice: (message: string) => void;
-  onOpenRequirementsSync?: () => void;
+
   onOpenFile: (path: string) => void;
   onUploadFiles?: (files: File[]) => Promise<void>;
   onRevert: () => void;
@@ -47,11 +47,7 @@ export function FileWorkspace({
           <span className="eyebrow">{title}</span>
           {explainer ? <p>{explainer}</p> : null}
         </div>
-        {onOpenRequirementsSync ? (
-          <button className="editor-secondary-button" onClick={onOpenRequirementsSync} type="button">
-            Sync Requirements
-          </button>
-        ) : null}
+
       </header>
       {onUploadFiles ? <HumanInputDropzone onUploadFiles={onUploadFiles} onNotice={onNotice} /> : null}
       <EditorPane
@@ -196,7 +192,8 @@ function EditorPane({
           savedChangedLineCount + savedDeletedLineCount === 1 ? "line" : "lines"
         }`
       : "No saved Git diff";
-  const showAiFileAssist = Boolean(onAiFileAssist && selected.editable && (hasUnsavedChanges || hasSavedDiff));
+  const canWrite = selected.editable || selected.annotation;
+  const showAiFileAssist = Boolean(onAiFileAssist && canWrite && (hasUnsavedChanges || hasSavedDiff));
 
   return (
     <section className={selected.annotation ? "editor-pane annotation-mode" : "editor-pane"}>
@@ -214,11 +211,11 @@ function EditorPane({
             </button>
           ) : null}
           {hasSavedDiff ? (
-            <button className="editor-secondary-button" disabled={!selected.editable} onClick={onRevert} type="button">
+            <button className="editor-secondary-button" disabled={!canWrite} onClick={onRevert} type="button">
               Revert to Committed State
             </button>
           ) : null}
-          {selected.editable && hasUnsavedChanges ? (
+          {canWrite && hasUnsavedChanges ? (
             <>
               <button className="editor-secondary-button" onClick={() => onDraft(selected.content)} type="button">
                 Undo Changes
@@ -239,9 +236,11 @@ function EditorPane({
       </div>
 
       <MarkdownEditor
+        annotation={selected.annotation}
         baselineValue={selected.content}
         editable={selected.editable}
         files={projectFiles}
+        isAiManaged={isAiManagedPath(selected.path)}
         onChange={onDraft}
         onNotice={onNotice}
         onOpenFile={onOpenFile}

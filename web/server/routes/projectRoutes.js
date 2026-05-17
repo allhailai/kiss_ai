@@ -21,12 +21,16 @@ function extractOpenQuestions(content) {
 }
 
 async function readOpenQuestions(readTextFile, projectRoot) {
-  try {
-    const file = await readTextFile(projectRoot, "human_open_questions.md");
-    return extractOpenQuestions(file.content);
-  } catch {
-    return [];
+  // Try v2 questions.md first, then fall back to v1 human_open_questions.md
+  for (const questionsPath of ["questions.md", "human_open_questions.md"]) {
+    try {
+      const file = await readTextFile(projectRoot, questionsPath);
+      return extractOpenQuestions(file.content);
+    } catch {
+      // try next
+    }
   }
+  return [];
 }
 
 export function registerProjectRoutes(app, {
@@ -115,18 +119,20 @@ export function registerProjectRoutes(app, {
   app.get("/api/projects/:projectSlug/status", async (request, response, next) => {
     try {
       const project = request.project;
-      const harness = await readProjectJson(project.path, ".harness-state.json", {});
+      // Try v2 manifest first, fall back to v1 harness-state
+      const manifest = await readProjectJson(project.path, ".build/manifest.json", null);
+      const harness = manifest ? {} : await readProjectJson(project.path, ".harness-state.json", {});
       const cursorApiKey = await resolveCursorApiKey();
       const humanAttentionItems = getHumanAttentionItems(harness);
       const openQuestions = await readOpenQuestions(readTextFile, project.path);
 
       response.json({
-        projectSlug: harness.project_slug ?? project.slug,
-        projectName: displayProjectName(harness.project_name ?? project.name, harness.project_slug ?? project.slug),
-        setupStatus: harness.setup?.status ?? "unknown",
-        setupInitializedAt: harness.setup?.initialized_at ?? null,
-        lastRunAt: harness.last_run_at ?? null,
-        lastSuccessfulRunAt: harness.last_successful_run_at ?? null,
+        projectSlug: manifest?.project_slug ?? harness.project_slug ?? project.slug,
+        projectName: displayProjectName(manifest?.project_name ?? harness.project_name ?? project.name, project.slug),
+        setupStatus: manifest ? (manifest.last_build ? "built" : "initialized") : (harness.setup?.status ?? "unknown"),
+        setupInitializedAt: manifest?.created_at ?? harness.setup?.initialized_at ?? null,
+        lastRunAt: manifest?.last_build?.finished_at ?? harness.last_run_at ?? null,
+        lastSuccessfulRunAt: manifest?.last_build?.finished_at ?? harness.last_successful_run_at ?? null,
         scalingMode: harness.scaling_assessment?.selected_mode ?? null,
         rebuildStatus: harness.rebuild_scope?.status ?? null,
         lintStatus: harness.last_lint?.status ?? null,
@@ -141,6 +147,14 @@ export function registerProjectRoutes(app, {
         cursorApiKeySource: cursorApiKey.source,
         cursorApiKeyWarnings: cursorApiKey.warnings,
         gitStatus: await gitStatus(project.path),
+        // v2 annotation counts from manifest
+        annotationCounts: manifest ? {
+          feedbackApplied: manifest.feedback_applied ?? 0,
+          suggestionsAdded: manifest.suggestions_added ?? 0,
+          suggestionsAccepted: manifest.suggestions_accepted ?? 0,
+          suggestionsDismissed: manifest.suggestions_dismissed ?? 0,
+        } : null,
+        buildNotes: manifest?.build_notes ?? null,
       });
     } catch (error) {
       next(error);

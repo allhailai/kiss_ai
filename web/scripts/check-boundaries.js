@@ -125,7 +125,6 @@ const serverRules = [
         "projectFiles.js",
         "projectUiState.js",
         "projects.js",
-        "requirementsSync.js",
       ]).has(path.basename(filePath)),
     message: "server services must keep filesystem access in approved service modules",
   },

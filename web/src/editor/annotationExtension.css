@@ -1,0 +1,273 @@
+/* ─────────────────────────────────────────────────────────
+   Annotation Extension — COMMENT and AI_SUGGESTION blocks
+   Uses --color-annotation from the design system (human_design_identity.md)
+   ───────────────────────────────────────────────────────── */
+
+/* ── Shared annotation styling ────────────────────────── */
+
+/* Collapse the CM line wrapper around annotation widgets.
+   Must override the editor theme (line-height: 1.7) and the diff extension
+   (cm-diff-line, cm-diff-saved-line backgrounds). */
+.cm-line:has(.cm-annotation),
+.cm-diff-line:has(.cm-annotation),
+.cm-diff-saved-line:has(.cm-annotation),
+.cm-diff-unsaved-line:has(.cm-annotation) {
+  line-height: 1 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  background: none !important;
+}
+
+/* Hide the diff ::before pill on annotation lines */
+.cm-diff-line:has(.cm-annotation)::before {
+  display: none !important;
+}
+
+/* CM6 inserts .cm-widgetBuffer <img> elements around replaced widgets */
+.cm-line:has(.cm-annotation) > .cm-widgetBuffer {
+  display: none !important;
+}
+
+.cm-annotation {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: -1px 0;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: var(--font-sans, Inter, ui-sans-serif, system-ui, sans-serif);
+  font-size: 0.8rem;
+  line-height: 1.25;
+  cursor: default;
+}
+
+/* ── COMMENT annotations (user-authored) ──────────────── */
+
+.cm-annotation-comment {
+  background: color-mix(in srgb, var(--color-annotation) 8%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--color-annotation) 40%, transparent);
+  color: color-mix(in srgb, var(--color-annotation) 85%, var(--color-primary, #333));
+}
+
+.cm-annotation-comment:hover {
+  background: color-mix(in srgb, var(--color-annotation) 14%, transparent);
+}
+
+.cm-annotation-comment .cm-annotation-label {
+  color: var(--color-annotation);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.cm-annotation-comment .cm-annotation-text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+  color: color-mix(in srgb, var(--color-annotation) 75%, var(--color-primary, #333));
+}
+
+.cm-annotation-text-placeholder {
+  font-style: italic;
+  opacity: 0.4;
+}
+
+/* Inline edit textarea — shown when editing a comment */
+.cm-annotation-edit-input {
+  flex: 1 1 auto;
+  min-width: 100px;
+  max-width: calc(100% - 120px);
+  min-height: 1.4em;
+  padding: 2px 4px;
+  border: 1px solid color-mix(in srgb, var(--color-annotation) 35%, transparent);
+  border-radius: 3px;
+  background: white;
+  color: var(--color-primary, #333);
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  outline: none;
+  resize: vertical;
+  overflow: hidden;
+  field-sizing: content;
+}
+
+.cm-annotation-edit-input:focus {
+  border-color: var(--color-annotation);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-annotation) 20%, transparent);
+}
+
+/* Save / Cancel buttons shown during edit mode */
+.cm-annotation-edit-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.cm-annotation-edit-actions .cm-annotation-hover-action {
+  opacity: 1;
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+/* Hover actions — pencil / trash icons, appear on hover */
+.cm-annotation-hover-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.cm-annotation-comment:hover .cm-annotation-hover-actions {
+  opacity: 1;
+}
+
+.cm-annotation-hover-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: color-mix(in srgb, var(--color-annotation) 50%, var(--color-primary, #666));
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.cm-annotation-hover-action:hover {
+  background: color-mix(in srgb, var(--color-annotation) 16%, transparent);
+  color: var(--color-annotation);
+}
+
+.cm-annotation-hover-action-delete:hover {
+  background: color-mix(in srgb, #e53935 12%, transparent);
+  color: #e53935;
+}
+
+/* ── AI_SUGGESTION annotations (AI-authored) ──────────── */
+
+.cm-annotation-suggestion {
+  background: color-mix(in srgb, var(--color-annotation) 6%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--color-annotation) 25%, #43a047);
+  color: var(--color-primary, #333);
+}
+
+.cm-annotation-suggestion:hover {
+  background: color-mix(in srgb, var(--color-annotation) 10%, transparent);
+}
+
+.cm-annotation-suggestion .cm-annotation-label {
+  color: color-mix(in srgb, var(--color-annotation) 50%, #43a047);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.cm-annotation-suggestion .cm-annotation-text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* ── Action buttons (Accept / Dismiss on suggestions) ─── */
+
+.cm-annotation-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.cm-annotation-suggestion:hover .cm-annotation-actions {
+  opacity: 1;
+}
+
+.cm-annotation-action {
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.cm-annotation-action:active {
+  transform: scale(0.96);
+}
+
+.cm-annotation-accept {
+  background: transparent;
+  color: #43a047;
+  border-color: transparent;
+}
+
+.cm-annotation-accept:hover {
+  background: color-mix(in srgb, #43a047 12%, transparent);
+}
+
+.cm-annotation-dismiss {
+  background: transparent;
+  color: #999;
+  border-color: transparent;
+}
+
+.cm-annotation-dismiss:hover {
+  background: color-mix(in srgb, #e53935 8%, transparent);
+  color: #e53935;
+}
+
+/* ── Comment gutter [+] button ────────────────────────── */
+
+.cm-feedback-gutter {
+  width: 20px;
+  min-width: 20px;
+  max-width: 20px;
+}
+
+.cm-feedback-gutter-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 2px 2px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: transparent;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  line-height: 1;
+}
+
+.cm-gutterElement:hover .cm-feedback-gutter-button,
+.cm-activeLine ~ .cm-gutter .cm-feedback-gutter-button {
+  color: color-mix(in srgb, var(--color-annotation) 30%, transparent);
+}
+
+.cm-feedback-gutter-button:hover {
+  color: var(--color-annotation) !important;
+  background: color-mix(in srgb, var(--color-annotation) 10%, transparent);
+}

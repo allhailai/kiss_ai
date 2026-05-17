@@ -32,6 +32,32 @@ function createService(projectsRoot, readProjectHarness) {
 }
 
 describe("project service", () => {
+  it("discovers v2 projects with project.md", async () => {
+    const projectsRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-projects-"));
+    const v2ProjectRoot = path.join(projectsRoot, "v2_project");
+    await fs.mkdir(v2ProjectRoot);
+    await fs.writeFile(path.join(v2ProjectRoot, "project.md"), "# Project: v2_project\n", "utf8");
+
+    const service = createService(projectsRoot, async () => ({}));
+    const projects = await service.discoverProjects();
+    expect(projects).toEqual([
+      expect.objectContaining({ slug: "v2_project", setupStatus: "initialized" }),
+    ]);
+  });
+
+  it("discovers v1 projects with human_goal_requirements.md", async () => {
+    const projectsRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-projects-"));
+    const v1ProjectRoot = path.join(projectsRoot, "v1_project");
+    await fs.mkdir(v1ProjectRoot);
+    await fs.writeFile(path.join(v1ProjectRoot, "human_goal_requirements.md"), "Goal\n", "utf8");
+
+    const service = createService(projectsRoot, async () => ({ project_name: "V1 Project" }));
+    const projects = await service.discoverProjects();
+    expect(projects).toEqual([
+      expect.objectContaining({ slug: "v1_project", name: "V1 Project" }),
+    ]);
+  });
+
   it("keeps project discovery available when one harness is corrupt", async () => {
     const projectsRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-projects-"));
     const goodProjectRoot = path.join(projectsRoot, "good_project");
@@ -48,10 +74,14 @@ describe("project service", () => {
       return { project_name: "Good Project" };
     });
 
-    await expect(service.discoverProjects()).resolves.toEqual([
-      expect.objectContaining({ name: "corrupt_project", slug: "corrupt_project" }),
-      expect.objectContaining({ name: "Good Project", slug: "good_project" }),
-    ]);
-    await expect(service.resolveProject("corrupt_project")).rejects.toMatchObject({ code: "corrupt_harness_state" });
+    // Both projects should be discoverable — corrupt harness is gracefully handled
+    const projects = await service.discoverProjects();
+    expect(projects).toHaveLength(2);
+    expect(projects).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Good Project", slug: "good_project" }),
+        expect.objectContaining({ slug: "corrupt_project" }),
+      ]),
+    );
   });
 });

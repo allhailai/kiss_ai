@@ -1,8 +1,7 @@
-export type RightPanelModeKind = "agent-chat" | "requirements-sync" | "build-project";
+export type RightPanelModeKind = "agent-chat" | "build-project";
 
 const rightPanelModes: Array<{ kind: RightPanelModeKind; label: string }> = [
   { kind: "agent-chat", label: "Agent" },
-  { kind: "requirements-sync", label: "Requirements Sync" },
   { kind: "build-project", label: "Build Project" },
 ];
 

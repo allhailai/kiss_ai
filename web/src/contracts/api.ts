@@ -74,6 +74,13 @@ export type ProjectStatus = {
   cursorApiKeySource: string | null;
   cursorApiKeyWarnings: string[];
   gitStatus: string[];
+  annotationCounts: {
+    feedbackApplied: number;
+    suggestionsAdded: number;
+    suggestionsAccepted: number;
+    suggestionsDismissed: number;
+  } | null;
+  buildNotes: string | null;
 };
 
 export type ProjectSummary = {
@@ -428,82 +435,8 @@ export type ApplyEditProposalRequest = {
   modelId: string;
 };
 
-export type RequirementsSyncStep = "goal" | "inputs" | "outputs";
 
-export type RequirementsSyncConceptualDiff = ConceptualDiff;
 
-export type RequirementsSyncProposal = {
-  step: RequirementsSyncStep;
-  targetFilePath: "human_goal_requirements.md" | "human_input_requirements.md" | "human_output_requirements.md";
-  originalContentHash: string;
-  summary: string;
-  conceptualDiffs: RequirementsSyncConceptualDiff[];
-  sourceSignalsUsed: string[];
-  generatedAt: string;
-  modelId?: string;
-  notice?: string;
-};
-
-export type RequirementsSyncSignalsResponse = {
-  hasSignals: boolean;
-  gitStatus: string[];
-  openQuestions: string[];
-  summary: string;
-};
-
-export type ProposeRequirementsSyncRequest = {
-  step: RequirementsSyncStep;
-  modelId: string;
-  userInstruction?: string;
-};
-
-export type ProposeRequirementsSyncResponse = {
-  proposal: RequirementsSyncProposal;
-};
-
-export type ApplyRequirementsSyncRequest = {
-  modelId: string;
-  proposal: RequirementsSyncProposal;
-};
-
-export type ApplyRequirementsSyncResponse = {
-  appliedFile: {
-    path: string;
-    contentHash: string;
-  } | null;
-  failedConceptualDiffIds: string[];
-  summary: string;
-};
-
-export type ApplyRequirementsSyncBatchRequest = {
-  modelId: string;
-  proposals: RequirementsSyncProposal[];
-};
-
-export type RequirementsSyncBatchApplyResult = {
-  step: RequirementsSyncStep;
-  targetFilePath: RequirementsSyncProposal["targetFilePath"];
-  status: "applied" | "skipped" | "failed";
-  appliedFile: {
-    path: string;
-    contentHash: string;
-  } | null;
-  failedConceptualDiffIds: string[];
-  summary: string;
-};
-
-export type ApplyRequirementsSyncBatchResponse = {
-  results: RequirementsSyncBatchApplyResult[];
-  summary: string;
-};
-
-export type ReviewRequirementsSyncRequest = {
-  proposal: RequirementsSyncProposal;
-};
-
-export type ReviewRequirementsSyncResponse = {
-  recordedRejectedConceptualDiffIds: string[];
-};
 
 export type ChatConversationEvent =
   | {

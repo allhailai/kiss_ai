@@ -13,8 +13,8 @@ describe("route hash contract", () => {
         input: ["demo-project", "outputs", "outputs_ai/wiki/Market notes.md"] as const,
       },
       {
-        context: { panel: "requirements-sync" },
-        hash: "#/p/demo_project/requirements/human_goal_requirements.md?panel=requirements-sync",
+        context: { panel: "build-project" },
+        hash: "#/p/demo_project/requirements/human_goal_requirements.md?panel=build-project",
         input: ["demo_project", "requirements", "human_goal_requirements.md"] as const,
       },
     ];

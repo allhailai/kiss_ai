@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { registerChatRoutes } from "./chatRoutes.js";
 import { registerFileRoutes } from "./fileRoutes.js";
 import { registerProjectRoutes } from "./projectRoutes.js";
-import { registerRequirementsSyncRoutes } from "./requirementsSyncRoutes.js";
+
 import { registerSystemRoutes } from "./systemRoutes.js";
 import { apiErrorHandler, httpError } from "../services/httpErrors.js";
 import { createProjectFileService } from "../services/projectFiles.js";
@@ -385,34 +385,7 @@ describe("API routes", () => {
     });
   });
 
-  it("validates requirements sync route bodies at the route boundary", async () => {
-    const app = express();
-    app.use(express.json());
-    app.use("/api/projects/:projectSlug", (request, _response, next) => {
-      request.project = { slug: request.params.projectSlug, path: "/tmp/demo" };
-      next();
-    });
-    registerRequirementsSyncRoutes(app, {
-      applyRequirementsSyncBatch: async () => ({}),
-      applyRequirementsSync: async () => ({}),
-      httpError,
-      proposeRequirementsSync: async () => ({}),
-      recordRequirementsSyncReview: async () => ({}),
-      requirementsSyncSignals: async () => ({ hasSignals: false, gitStatus: [], openQuestions: [], summary: "No signals." }),
-    });
-    app.use(apiErrorHandler);
 
-    await withServer(app, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/api/projects/demo/requirements-sync/propose`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step: "unknown", modelId: "model-a" }),
-      });
-
-      await expect(response.json()).resolves.toMatchObject({ code: "invalid_request" });
-      expect(response.status).toBe(400);
-    });
-  });
 
   it("validates file route params and oversized write bodies at the route boundary", async () => {
     const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-route-project-"));

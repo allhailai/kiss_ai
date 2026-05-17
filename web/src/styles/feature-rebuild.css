@@ -114,94 +114,6 @@
   color: var(--color-primary);
 }
 
-.requirements-sync-rebuild-controller {
-  display: grid;
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, var(--color-border));
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
-}
-
-.requirements-sync-rebuild-controller > div:first-child,
-.requirements-sync-rebuild-controller-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.requirements-sync-rebuild-controller p {
-  margin: 2px 0 0;
-  color: var(--color-secondary);
-  font-size: 0.82rem;
-  line-height: 1.35;
-}
-
-.requirements-sync-rebuild-controller strong {
-  color: var(--color-primary);
-}
-
-.requirements-sync-rebuild-controller button {
-  white-space: nowrap;
-}
-
-.requirements-sync-rebuild-steps {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 8px;
-}
-
-.requirements-sync-rebuild-step {
-  display: grid;
-  gap: 2px;
-  padding: 8px 9px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: var(--color-surface);
-  color: var(--color-primary);
-  text-align: left;
-}
-
-.requirements-sync-rebuild-step.active {
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 9%, var(--color-surface));
-}
-
-.requirements-sync-rebuild-step.status-generating,
-.requirements-sync-rebuild-step.status-applying {
-  border-color: color-mix(in srgb, var(--color-warning) 55%, var(--color-border));
-  background: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface));
-}
-
-.requirements-sync-rebuild-step.status-ready,
-.requirements-sync-rebuild-step.status-applied {
-  border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border));
-  background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface));
-}
-
-.requirements-sync-rebuild-step.status-error,
-.requirements-sync-rebuild-step.status-failed {
-  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
-  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
-}
-
-.requirements-sync-rebuild-step span,
-.requirements-sync-rebuild-step small {
-  color: var(--color-secondary);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.requirements-sync-rebuild-step strong {
-  overflow: hidden;
-  font-size: 0.8rem;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 .rebuild-status-controls {
   display: grid;
@@ -381,3 +293,58 @@
   color: var(--color-primary);
   overflow-wrap: anywhere;
 }
+
+/* ── Annotation summary card ──────────────────────────── */
+
+.rebuild-annotation-summary {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-annotation) 25%, var(--color-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-annotation) 4%, var(--color-surface));
+}
+
+.rebuild-build-notes {
+  margin: 0 0 8px;
+  color: var(--color-secondary);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.rebuild-annotation-stats {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rebuild-annotation-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.rebuild-annotation-stat-value {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--color-primary);
+}
+
+.rebuild-annotation-stat-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-secondary);
+  white-space: nowrap;
+}
+
+.rebuild-annotation-stat-pending {
+  border-color: color-mix(in srgb, var(--color-annotation) 40%, var(--color-border));
+  background: color-mix(in srgb, var(--color-annotation) 8%, var(--color-surface));
+}
+
+.rebuild-annotation-stat-pending .rebuild-annotation-stat-value {
+  color: var(--color-annotation);
+}
+

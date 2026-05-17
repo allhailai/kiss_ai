@@ -140,87 +140,8 @@ export const resolveHumanAttentionBodySchema = z
     path: ["resolutionOptionId"],
   });
 
-const requirementsSyncStepSchema = z.enum(["goal", "inputs", "outputs"]);
-const conceptualDiffStringArraySchema = z.array(z.string().trim().min(1).max(260)).max(8).optional();
-const conceptualDiffMemorySchema = z
-  .object({
-    fingerprint: optionalTrimmedString(80),
-    reconsidersRejectedId: optionalTrimmedString(120),
-    reconsiderReason: optionalTrimmedString(600),
-    suppressionState: z.enum(["new", "reconsidered", "near_rejected"]).optional(),
-  })
-  .optional();
-const conceptualDiffSchema = z.object({
-  id: z.string().trim().min(1).max(80),
-  filePath: z.string().trim().min(1).max(300),
-  title: z.string().trim().min(1).max(160),
-  summary: z.string().trim().min(1).max(1200),
-  status: z.enum(["accepted", "rejected"]),
-  target: z
-    .object({
-      scope: z.enum(["local", "section", "multi_section", "document"]),
-      sections: conceptualDiffStringArraySchema,
-      anchors: conceptualDiffStringArraySchema,
-    })
-    .optional(),
-  intent: z
-    .object({
-      objective: z.string().trim().min(1).max(800),
-      rationale: optionalTrimmedString(800),
-      mustPreserve: conceptualDiffStringArraySchema,
-      avoid: conceptualDiffStringArraySchema,
-    })
-    .optional(),
-  evidence: z
-    .object({
-      userGuidance: conceptualDiffStringArraySchema,
-      gitDiffSignals: conceptualDiffStringArraySchema,
-      contextSignals: conceptualDiffStringArraySchema,
-    })
-    .optional(),
-  applyNotes: z
-    .object({
-      expectedChangeShape: optionalTrimmedString(600),
-      nonGoals: conceptualDiffStringArraySchema,
-      riskLevel: z.enum(["low", "medium", "high"]).optional(),
-    })
-    .optional(),
-  memory: conceptualDiffMemorySchema,
-});
-const requirementsSyncConceptualDiffSchema = z.object({
-  ...conceptualDiffSchema.shape,
-});
-const requirementsSyncProposalSchema = z.object({
-  step: requirementsSyncStepSchema,
-  targetFilePath: z.enum(["human_goal_requirements.md", "human_input_requirements.md", "human_output_requirements.md"]),
-  originalContentHash: z.string().trim().min(1).max(160),
-  summary: z.string().trim().min(1).max(1600),
-  conceptualDiffs: z.array(requirementsSyncConceptualDiffSchema).max(100),
-  sourceSignalsUsed: z.array(z.string().trim().max(1200)).max(80).optional(),
-  generatedAt: optionalTrimmedString(80),
-  modelId: optionalTrimmedString(160),
-  notice: optionalTrimmedString(1200),
-});
 
-export const proposeRequirementsSyncBodySchema = z.object({
-  step: requirementsSyncStepSchema,
-  modelId: z.string().trim().min(1).max(160),
-  userInstruction: optionalTrimmedString(20_000),
-});
 
-export const applyRequirementsSyncBodySchema = z.object({
-  modelId: z.string().trim().min(1).max(160),
-  proposal: requirementsSyncProposalSchema,
-});
-
-export const applyRequirementsSyncBatchBodySchema = z.object({
-  modelId: z.string().trim().min(1).max(160),
-  proposals: z.array(requirementsSyncProposalSchema).min(1).max(3),
-});
-
-export const reviewRequirementsSyncBodySchema = z.object({
-  proposal: requirementsSyncProposalSchema,
-});
 
 export const uploadHumanInputsBodySchema = z.object({
   files: z

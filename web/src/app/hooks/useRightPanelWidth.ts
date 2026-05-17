@@ -6,7 +6,7 @@ import { readRightPanelWidth, writeRightPanelWidth } from "../rightPanelWidthSto
 export const projectChatDefaultPanelWidth = "55%";
 
 const defaultPanelWidth = "420px";
-const requirementsSyncDefaultPanelWidth = "40%";
+
 const buildProjectDefaultPanelWidth = "40%";
 const minPanelWidthPx = 320;
 const maxPanelWidthPx = 1200;
@@ -26,7 +26,6 @@ function maxUsablePanelWidthPx() {
 }
 
 function defaultWidthFor(view: View, panelKind: RightPanelKind | null) {
-  if (panelKind === "requirements-sync") return requirementsSyncDefaultPanelWidth;
   if (panelKind === "build-project") return buildProjectDefaultPanelWidth;
   return view === "chat" && panelKind ? projectChatDefaultPanelWidth : defaultPanelWidth;
 }

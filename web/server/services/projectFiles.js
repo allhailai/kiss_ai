@@ -46,8 +46,11 @@ export function createProjectFileService({
   function isChatContextReadablePath(relativePath, previewable = true) {
     if (!previewable) return false;
     return (
+      relativePath === "project.md" ||
+      relativePath === "questions.md" ||
       /^human_[^/]+\.md$/i.test(relativePath) ||
       relativePath.startsWith("inputs_human/") ||
+      relativePath.startsWith("sources/") ||
       relativePath.startsWith("inputs_ai/") ||
       relativePath.startsWith("outputs_ai/")
     );
@@ -166,16 +169,32 @@ export function createProjectFileService({
       return { path: normalized, ...human };
     }
 
+    // v2 user-owned files
+    if (normalized === "project.md") {
+      return { path: normalized, kind: "human", editable: true, annotation: false };
+    }
+
+    // v2 AI-managed files
+    if (normalized === "questions.md") {
+      return { path: normalized, kind: "human", editable: true, annotation: false };
+    }
+
     if (/^human_[^/]+\.md$/i.test(normalized)) {
       return { path: normalized, kind: "human", editable: true, annotation: false };
     }
 
+    // v2 sources (AI-managed, annotation-mode — not directly editable)
+    if (normalized.startsWith("sources/")) {
+      return { path: normalized, kind: "ai", editable: false, annotation: true };
+    }
+
+    // v1 backwards compatibility (AI-managed, annotation-mode — not directly editable)
     if (normalized.startsWith("inputs_ai/")) {
-      return { path: normalized, kind: "ai", editable: true, annotation: true };
+      return { path: normalized, kind: "ai", editable: false, annotation: true };
     }
 
     if (normalized.startsWith("outputs_ai/")) {
-      return { path: normalized, kind: "output", editable: true, annotation: true };
+      return { path: normalized, kind: "output", editable: false, annotation: true };
     }
 
     if (normalized.startsWith("inputs_human/")) {
@@ -233,7 +252,7 @@ export function createProjectFileService({
   async function writeTextFile(projectRoot, relativePath, content, { expectedContentHash = null } = {}) {
     const meta = classifyPath(projectRoot, relativePath);
 
-    if (!meta.editable) {
+    if (!meta.editable && !meta.annotation) {
       throw httpError("This file is read-only in the lab UI.", 403, "file_read_only");
     }
 
@@ -701,7 +720,7 @@ export function createProjectFileService({
   async function restoreFileFromHead(projectRoot, relativePath) {
     const meta = classifyPath(projectRoot, relativePath);
 
-    if (!meta.editable) {
+    if (!meta.editable && !meta.annotation) {
       throw httpError("This file is read-only in the lab UI.", 403, "file_read_only");
     }
 

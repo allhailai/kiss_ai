@@ -10,7 +10,7 @@ curl -fsSL https://raw.githubusercontent.com/allhailai/kiss_ai/master/scripts/in
 
 `kiss_ai` is a local web application for creating, managing, and evolving AI-assisted research projects.
 
-The web app is the primary interface. It replaces working directly in Cursor and Obsidian for day-to-day project work. Behind the scenes, the app stores project files locally and uses Cursor CLI agent runs through its API layer.
+The web app is the primary interface. Behind the scenes, the app stores project files locally and uses Cursor CLI agent runs through its API layer.
 
 The normal workflow is:
 
@@ -18,10 +18,11 @@ The normal workflow is:
 flowchart LR
   downloadProject["Download kiss_ai_projects"] --> runWebApp["Run the web app"]
   runWebApp --> createProject["Create a project"]
-  createProject --> defineProject["Define goals, inputs, and outputs"]
-  defineProject --> buildProject["Build the project"]
-  buildProject --> reviewOutputs["Review outputs and questions"]
-  reviewOutputs --> iterate["Iterate"]
+  createProject --> writeProject["Write project.md"]
+  writeProject --> buildProject["Build the project"]
+  buildProject --> reviewOutputs["Review outputs"]
+  reviewOutputs --> annotate["Add annotations"]
+  annotate --> buildProject
 ```
 
 ## Folder Layout
@@ -35,7 +36,31 @@ kiss_ai_projects/
   another_project/       # another research project
 ```
 
-Research projects should be siblings of `_kiss_ai/`, not inside it. Each research project has its own saved history so the agent can track changes and annotations safely.
+Research projects should be siblings of `_kiss_ai/`, not inside it.
+
+## Project Structure
+
+Each project has a simple file layout:
+
+```text
+my_project/
+  project.md                 # Your project brief (the one file you write)
+  human_design_identity.md   # Visual identity and design preferences
+  questions.md               # Open questions needing your input
+  inputs_human/              # Your documents, notes, PDFs
+  sources/                   # AI's evidence cache
+    source_log.md            # What was gathered, freshness, gaps
+    web_research/            # Downloaded web content
+    extracted/               # Extracted content from your files
+  outputs_ai/                # The deliverables
+    wiki/                    # Research wiki
+    reports/                 # Dated reports
+    ...                      # Other directed outputs
+  .build/                    # Build machinery
+    manifest.json            # Build record
+  change_logs/               # Build history
+    builds.md
+```
 
 ## Quick Start
 
@@ -51,7 +76,8 @@ npm run dev
 
 4. Open the local web app in your browser.
 5. Use the app to create or select a project.
-6. Follow the left-side workflow: define requirements, build the project, review source data, and review outputs.
+6. Edit `project.md` to describe your goal, topics, and desired outputs.
+7. Build the project and review outputs.
 
 Read the setup guide for your computer:
    - [Mac setup](docs/setup-mac.md)
@@ -61,38 +87,44 @@ If something goes wrong, use [Troubleshooting](docs/troubleshooting.md). For ter
 
 ## How You Work
 
-In the web app, you work through screens instead of managing raw files directly:
+1. **Write `project.md`** — describe your goal, context, topics, and what outputs you want.
+2. **Add documents** to `inputs_human/` — optional notes, PDFs, data files.
+3. **Build the project** — the AI gathers sources, builds a wiki, and creates your directed outputs.
+4. **Review outputs** — read the wiki and reports in the web app.
+5. **Add annotations** — use the [+] button to give feedback on any AI output.
+6. **Build again** — the AI applies your feedback and refreshes with latest data.
 
-- **Chat:** ask project questions and request help.
-- **Define the requirements:** describe goals, source needs, outputs, and open questions.
-- **Build the project:** run or monitor the AI build process.
-- **Source data view:** review source material and AI-prepared source notes.
-- **Outputs built:** review generated reports, wiki pages, and other deliverables.
+## Annotations
 
-The app stores this work in local project files such as `human_goal_requirements.md`, `inputs_ai/`, `outputs_ai/`, and `change_logs/`. Those files are implementation details for normal users, but they remain available for advanced review and troubleshooting.
+When reviewing AI-generated outputs, you can add feedback using the [+] annotation button:
+
+- **Blue annotations (FEEDBACK)** — your feedback to the AI. Applied on the next build.
+- **Green annotations (AI_SUGGESTION)** — AI suggestions for improvements. Accept, dismiss, or modify.
+
+This replaces the old git-diff annotation system. Annotations are explicit, visible, and intentional.
+
+## Framework Commands
+
+The shared framework lives in `_kiss_ai/framework/`. Three commands:
+
+- `do_build.md` — Build the project (the main command).
+- `do_assist.md` — AI Assist for editing project.md and drafting annotations.
+- `do_init_project.md` — Create a new project from template.
 
 ## Agent Runtime
 
-The web app calls local API routes, and those routes launch Cursor CLI agent work behind the scenes. Users should normally start builds from the web app, not by pasting command files into Cursor.
-
-The shared framework lives in `_kiss_ai/framework/`. Maintainers may see command paths such as:
-
-```text
-../_kiss_ai/framework/commands/do_all_rebuild.md
-```
-
-Do not copy or recreate a `framework/` folder inside each research project.
-
-## Advanced Direct File Access
-
-Direct Cursor or filesystem access is useful for maintainers, debugging, or recovery. It is not the main user workflow.
+The web app calls local API routes, and those routes launch Cursor CLI agent work behind the scenes. Users should normally start builds from the web app.
 
 Runtime settings:
 
-- `KISS_AI_PROJECTS_ROOT` overrides the projects folder. By default, the hub looks two levels above `web/`.
-- `CURSOR_API_KEY` enables web-app-triggered Cursor agent runs. The server also checks `web/.env` and the macOS Keychain item `cursor_api_key`.
+- `KISS_AI_PROJECTS_ROOT` overrides the projects folder.
+- `CURSOR_API_KEY` enables web-app-triggered agent runs.
 - `KISS_AI_UI_PORT` controls the Express API port.
-- `CURSOR_MODEL` optionally controls the Cursor model selection.
+- `CURSOR_MODEL` optionally controls the model selection.
+
+## Migration
+
+If you have projects created with the v1 architecture (three requirement files, `.harness-state.json`), see [migration.md](migration.md) for how to convert them.
 
 ## Privacy
 

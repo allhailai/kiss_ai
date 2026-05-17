@@ -154,12 +154,12 @@ async function readAiEditableFiles({ project, readTextFile, aiEditableFiles }) {
   return await Promise.all(aiEditableFiles.map(async (editableFile) => {
     try {
       const file = await readTextFile(project.path, editableFile.path);
-      if (!file.editable) {
+      if (!file.editable && !file.annotation) {
         return {
           path: file.path,
           label: editableFile.label || file.path,
           intent: "editable_target",
-          error: "This path is not editable in the lab UI.",
+          error: "This path is not writable in the lab UI.",
         };
       }
 
@@ -244,7 +244,7 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     readAiEditableFiles({ project, readTextFile, aiEditableFiles: uniqueAiEditableFiles }),
     readContextFiles({ project, readTextFile, contextFiles: uniqueContextFiles }),
   ]);
-  const authorizedAiEditableFiles = aiEditableFileResults.filter((file) => !file.error && file.editable);
+  const authorizedAiEditableFiles = aiEditableFileResults.filter((file) => !file.error && (file.editable || file.annotation));
   const rejectedAiEditableFiles = aiEditableFileResults.filter((file) => file.error);
   const authorizedEditablePaths = new Set(authorizedAiEditableFiles.map((file) => file.path));
   const history = conversation.messages.slice(-maxPromptHistoryMessages).map(formatHistoryMessage);
@@ -339,7 +339,7 @@ async function readScopedFilePayload({ project, readTextFile, gitFileDiffText, g
     readAiEditableFiles({ project, readTextFile, aiEditableFiles }),
     readContextFiles({ project, readTextFile, contextFiles }),
   ]);
-  const authorizedAiEditableFiles = aiEditableFileResults.filter((file) => !file.error && file.editable);
+  const authorizedAiEditableFiles = aiEditableFileResults.filter((file) => !file.error && (file.editable || file.annotation));
   const rejectedAiEditableFiles = aiEditableFileResults.filter((file) => file.error);
   const readableContextFiles = contextFileResults.filter((file) => !file.error);
   const diffPaths = uniqueByPath([...authorizedAiEditableFiles, ...readableContextFiles], maxAiEditableFiles + maxContextFiles);

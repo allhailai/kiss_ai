@@ -3,18 +3,17 @@ import { MAX_USER_MESSAGE_BYTES } from "../contracts/chatLimits.js";
 import { httpError } from "../services/httpErrors.js";
 import {
   applyEditProposalBodySchema,
-  applyRequirementsSyncBatchBodySchema,
-  applyRequirementsSyncBodySchema,
+
   buildLogQuerySchema,
   conversationParamsSchema,
   editProposalParamsSchema,
   filePathQuerySchema,
   generateEditProposalBodySchema,
   parseRequestBody,
-  proposeRequirementsSyncBodySchema,
+
   parseRequestParams,
   parseRequestQuery,
-  reviewRequirementsSyncBodySchema,
+
   searchFilesQuerySchema,
   sendChatMessageBodySchema,
   treeSectionParamsSchema,
@@ -145,56 +144,7 @@ describe("request schemas", () => {
     ).toThrow("expectedContentHash");
   });
 
-  it("validates requirements sync requests", () => {
-    expect(
-      parseRequestBody(
-        proposeRequirementsSyncBodySchema,
-        {
-          step: "goal",
-          modelId: "gpt-test",
-        },
-        httpError,
-      ),
-    ).toMatchObject({
-      step: "goal",
-      modelId: "gpt-test",
-    });
 
-    const proposal = {
-      step: "goal",
-      targetFilePath: "human_goal_requirements.md",
-      originalContentHash: "hash-before",
-      summary: "Clarify goal.",
-      conceptualDiffs: [
-        {
-          id: "diff_1",
-          filePath: "human_goal_requirements.md",
-          title: "Clarify",
-          summary: "Clarifies the goal.",
-          status: "accepted",
-          memory: {
-            fingerprint: "abc",
-            reconsidersRejectedId: "rej_1",
-            reconsiderReason: "New source signal.",
-            suppressionState: "reconsidered",
-          },
-        },
-      ],
-    };
-
-    expect(parseRequestBody(applyRequirementsSyncBodySchema, { modelId: "gpt-test", proposal }, httpError)).toMatchObject({
-      modelId: "gpt-test",
-      proposal,
-    });
-    expect(parseRequestBody(applyRequirementsSyncBatchBodySchema, { modelId: "gpt-test", proposals: [proposal] }, httpError)).toMatchObject({
-      modelId: "gpt-test",
-      proposals: [proposal],
-    });
-    expect(parseRequestBody(reviewRequirementsSyncBodySchema, { proposal }, httpError)).toMatchObject({ proposal });
-    expect(() => parseRequestBody(proposeRequirementsSyncBodySchema, { step: "bad", modelId: "gpt-test" }, httpError)).toThrow(
-      "Invalid request body.",
-    );
-  });
 
   it("validates file write content before service-level file handling", () => {
     expect(() =>
@@ -231,7 +181,7 @@ describe("request schemas", () => {
     const hashes = [
       "#/p/demo_project/dashboard",
       "#/p/demo-project/outputs/outputs_ai%2Fwiki%2FMarket%20notes.md",
-      "#/p/demo_project/requirements/human_goal_requirements.md?panel=requirements-sync",
+      "#/p/demo_project/requirements/human_goal_requirements.md?panel=build-project",
     ];
 
     for (const hash of hashes) {

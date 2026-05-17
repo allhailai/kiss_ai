@@ -1,14 +1,15 @@
 ---
-description: kiss_ai project — human vs centralized framework vs AI-managed paths
+description: kiss_ai project — file ownership and annotation rules
 alwaysApply: true
 ---
 
 # kiss_ai project ownership
 
-## Prefer these for normal research work
+## User-owned files (direct edit)
 
-- Root `human_*.md` requirement files
-- `inputs_human/` for notes, sources, and uploads
+- `project.md` — the project brief (goal, topics, outputs, constraints)
+- `human_design_identity.md` — project identity and design tokens
+- `inputs_human/` — user documents, notes, uploads
 
 ## Centralized framework
 
@@ -17,6 +18,9 @@ alwaysApply: true
 - **Do not** edit files under `_kiss_ai/framework/**` unless the user **explicitly** asks to customize the shared framework.
 - If the user intentionally changes the shared framework, say so in your reply. Framework changes should be committed in the `_kiss_ai` repo, separate from this project's rebuild snapshot.
 
-## AI-managed areas
+## AI-managed areas (annotation-only)
 
-- Treat edits under `inputs_ai/**` and `outputs_ai/**` per the centralized `do_process_annotations.md` command (annotations), not as silent overwrites.
+- `sources/**`, `outputs_ai/**`, `questions.md`, `.build/**`, and `change_logs/**` are AI-managed.
+- Users interact with AI-managed files through `<!-- FEEDBACK: ... -->` annotation markers, not direct editing.
+- The AI may leave `<!-- AI_SUGGESTION: ... -->` markers in output files for user review.
+- Do not silently overwrite user annotations. Process them per `do_build.md`.

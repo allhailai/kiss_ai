@@ -11,7 +11,7 @@ import {
 import { buildRouteHash, parseRouteHash } from "../navigation/routes";
 import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type RouteState, type View } from "../navigation/views";
 import { errorMessage } from "../domain/errors";
-import { requirementAutoUpdatePaths } from "../domain/projectPaths";
+import { projectFilePath } from "../domain/projectPaths";
 import { useProjectDataLoaders } from "./hooks/useProjectDataLoaders";
 import { useHumanInputs } from "./hooks/useHumanInputs";
 import { useRebuildSync } from "./hooks/useRebuildSync";
@@ -207,13 +207,13 @@ export function useProjectWorkspace() {
 
   const selectProject = useCallback(
     (projectSlug: string) => {
-      const goalPath = requirementAutoUpdatePaths[0];
-      if (!canLeaveCurrentRoute({ projectSlug, view: "requirements", filePath: goalPath, context: {} })) return;
+      const defaultFilePath = projectFilePath;
+      if (!canLeaveCurrentRoute({ projectSlug, view: "requirements", filePath: defaultFilePath, context: {} })) return;
       const requestId = selectProjectRequestRef.current + 1;
       selectProjectRequestRef.current = requestId;
 
       void (async () => {
-        const firstProjectHash = buildRouteHash(projectSlug, "requirements", goalPath);
+        const firstProjectHash = buildRouteHash(projectSlug, "requirements", defaultFilePath);
         let nextHash = firstProjectHash;
 
         try {
