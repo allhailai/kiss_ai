@@ -176,11 +176,9 @@
   border: 0;
   border-right: 1px solid var(--color-border);
   outline: none;
-  padding: 20px;
+  padding: 5px;
   color: var(--color-primary);
   background: white;
-  font-family:
-    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 0.94rem;
   line-height: 1.65;
 }

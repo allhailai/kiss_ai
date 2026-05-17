@@ -43,6 +43,18 @@
   cursor: default;
 }
 
+/* Clickable comment — shows pointer cursor */
+.cm-annotation-comment {
+  cursor: pointer;
+}
+
+/* Editing state */
+.cm-annotation-editing {
+  background: color-mix(in srgb, var(--color-annotation) 4%, transparent);
+  cursor: default;
+  flex-wrap: wrap;
+}
+
 /* ── COMMENT annotations (user-authored) ──────────────── */
 
 .cm-annotation-comment {
@@ -79,17 +91,15 @@
 
 /* Inline edit textarea — shown when editing a comment */
 .cm-annotation-edit-input {
-  flex: 1 1 auto;
+  flex: 1 1 100%;
   min-width: 100px;
-  max-width: calc(100% - 120px);
   min-height: 1.4em;
-  padding: 2px 4px;
-  border: 1px solid color-mix(in srgb, var(--color-annotation) 35%, transparent);
-  border-radius: 3px;
+  padding: 5px;
+  border: 2px solid var(--color-annotation);
+  border-radius: 4px;
   background: white;
   color: var(--color-primary, #333);
   font: inherit;
-  font-size: 0.8rem;
   line-height: 1.4;
   outline: none;
   resize: vertical;
@@ -104,17 +114,34 @@
 
 /* Save / Cancel buttons shown during edit mode */
 .cm-annotation-edit-actions {
+  flex: 1 1 100%;
   display: flex;
-  gap: 4px;
-  flex-shrink: 0;
+  gap: 6px;
+  padding-left: 20px;
+  margin: 6px 0;
   white-space: nowrap;
 }
 
 .cm-annotation-edit-actions .cm-annotation-hover-action {
   opacity: 1;
-  font-size: 0.68rem;
-  padding: 1px 6px;
+  min-width: 56px;
+  padding: 4px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 40%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-secondary) 18%, white);
+  font-size: 0.72rem;
+  font-weight: 700;
   white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.cm-annotation-edit-actions .cm-annotation-hover-action + .cm-annotation-hover-action {
+  border-left: none;
+}
+
+.cm-annotation-edit-actions .cm-annotation-hover-action:hover {
+  background: color-mix(in srgb, var(--color-secondary) 30%, white);
+  color: var(--color-secondary);
 }
 
 /* Hover actions — pencil / trash icons, appear on hover */
@@ -241,33 +268,42 @@
   width: 20px;
   min-width: 20px;
   max-width: 20px;
+  overflow: visible;
+}
+
+.cm-feedback-gutter .cm-gutterElement {
+  overflow: visible;
 }
 
 .cm-feedback-gutter-button {
+  position: relative;
+  z-index: 4;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  margin: 2px 2px;
+  width: 24px;
+  height: 24px;
+  margin: -2px 0;
   padding: 0;
-  border: none;
-  border-radius: 3px;
-  background: transparent;
-  color: transparent;
-  font-size: 0.7rem;
+  border: 1.5px solid color-mix(in srgb, var(--color-annotation) 24%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-annotation) 6%, white);
+  color: var(--color-annotation);
+  font-size: 0.88rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.1s ease;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   line-height: 1;
 }
 
-.cm-gutterElement:hover .cm-feedback-gutter-button,
-.cm-activeLine ~ .cm-gutter .cm-feedback-gutter-button {
-  color: color-mix(in srgb, var(--color-annotation) 30%, transparent);
+.cm-gutterElement:hover .cm-feedback-gutter-button {
+  opacity: 0.45;
 }
 
 .cm-feedback-gutter-button:hover {
-  color: var(--color-annotation) !important;
-  background: color-mix(in srgb, var(--color-annotation) 10%, transparent);
+  opacity: 1 !important;
+  border-color: var(--color-annotation);
+  background: color-mix(in srgb, var(--color-annotation) 14%, white);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-annotation) 18%, transparent);
 }

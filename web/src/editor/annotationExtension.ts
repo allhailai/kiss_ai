@@ -182,12 +182,23 @@ class CommentWidget extends WidgetType {
     wrapper.appendChild(label);
     wrapper.appendChild(content);
     wrapper.appendChild(actions);
+
+    // Click on the comment to enter edit mode directly
+    wrapper.addEventListener("click", (event) => {
+      // Don't trigger if clicking action buttons or already editing
+      if (wrapper.classList.contains("cm-annotation-editing")) return;
+      if ((event.target as HTMLElement).closest(".cm-annotation-hover-actions")) return;
+      event.stopPropagation();
+      this.enterEditMode(wrapper, content, actions);
+    });
+
     return wrapper;
   }
 
   private enterEditMode(wrapper: HTMLElement, contentEl: HTMLElement, actionsEl: HTMLElement) {
     contentEl.style.display = "none";
     actionsEl.style.display = "none";
+    wrapper.classList.add("cm-annotation-editing");
 
     const textarea = document.createElement("textarea");
     textarea.className = "cm-annotation-edit-input";
@@ -204,6 +215,7 @@ class CommentWidget extends WidgetType {
     const cleanup = () => {
       contentEl.style.display = "";
       actionsEl.style.display = "";
+      wrapper.classList.remove("cm-annotation-editing");
       textarea.remove();
       editActions.remove();
     };
