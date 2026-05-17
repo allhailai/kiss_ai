@@ -308,10 +308,13 @@ export function App() {
         {!sidebarCollapsed ? (
           <SimplifiedNavigator
             currentView={route.view}
+            humanInputEmptyDirectories={fileWorkspace.humanInputEmptyDirectories}
             loading={fileWorkspace.treeLoading}
             projectFiles={fileWorkspace.projectFiles}
             selectedPath={fileWorkspace.selected?.path ?? null}
+            onCreateFolder={(name) => void fileWorkspace.createHumanInputFolder(name)}
             onDeleteHumanInputFile={(path) => void fileWorkspace.deleteHumanInputFile(path)}
+            onMoveFile={(sourcePath, targetFolder) => void fileWorkspace.moveHumanInputFile(sourcePath, targetFolder)}
             onOpenFile={openProjectFileWithAgentContext}
             onOpenView={(nextView, filePath) => navigateTo(nextView, filePath)}
           />

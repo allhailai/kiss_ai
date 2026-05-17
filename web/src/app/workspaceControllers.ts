@@ -22,10 +22,13 @@ export type RouteController = {
 };
 
 export type FileWorkspaceController = {
+  createHumanInputFolder: (name: string) => Promise<void>;
   deleteHumanInputFile: (path: string) => Promise<void>;
+  moveHumanInputFile: (sourcePath: string, targetFolder: string) => Promise<void>;
   draft: string;
   fileLoading: boolean;
   hasUnsavedChanges: boolean;
+  humanInputEmptyDirectories: string[];
   inputMutationLoading: boolean;
   loading: boolean;
   projectFiles: ProjectFile[];

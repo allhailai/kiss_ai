@@ -1,6 +1,9 @@
 import {
+  createHumanInputFolderBodySchema,
+  createHumanInputTextFileBodySchema,
   filePathBodySchema,
   filePathQuerySchema,
+  moveHumanInputFileBodySchema,
   parseRequestBody,
   parseRequestParams,
   parseRequestQuery,
@@ -11,12 +14,15 @@ import {
 } from "./requestSchemas.js";
 
 export function registerFileRoutes(app, {
+  createHumanInputFolder,
+  createHumanInputTextFile,
   deleteHumanInputFile,
   gitFileDiff,
   humanFiles,
   httpError,
   listMarkdownFiles,
   listProjectFiles,
+  moveHumanInputFile,
   readTextFile,
   restoreFileFromHead,
   searchFiles: searchPathFiles,
@@ -56,9 +62,14 @@ export function registerFileRoutes(app, {
       const config = treeRoots.get(section);
       if (!config) throw httpError("Unknown tree section.", 404, "unknown_tree_section");
 
-      response.json({
-        files: section === "human" ? await listProjectFiles(project.path, config.root) : await listMarkdownFiles(project.path, config.root, config.kind, config.editable, config.annotation),
-      });
+      if (section === "human") {
+        const result = await listProjectFiles(project.path, config.root);
+        response.json({ files: result.files, emptyDirectories: result.emptyDirectories });
+      } else {
+        response.json({
+          files: await listMarkdownFiles(project.path, config.root, config.kind, config.editable, config.annotation),
+        });
+      }
     } catch (error) {
       next(error);
     }
@@ -68,6 +79,33 @@ export function registerFileRoutes(app, {
     try {
       const body = parseRequestBody(uploadHumanInputsBodySchema, request.body, httpError);
       response.status(201).json(await uploadHumanInputFiles(request.project.path, body.files));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/inputs-human/create-text", async (request, response, next) => {
+    try {
+      const body = parseRequestBody(createHumanInputTextFileBodySchema, request.body, httpError);
+      response.status(201).json(await createHumanInputTextFile(request.project.path, body.name, body.content));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/inputs-human/create-folder", async (request, response, next) => {
+    try {
+      const body = parseRequestBody(createHumanInputFolderBodySchema, request.body, httpError);
+      response.status(201).json(await createHumanInputFolder(request.project.path, body.name));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/inputs-human/move", async (request, response, next) => {
+    try {
+      const body = parseRequestBody(moveHumanInputFileBodySchema, request.body, httpError);
+      response.json(await moveHumanInputFile(request.project.path, body.sourcePath, body.targetFolder));
     } catch (error) {
       next(error);
     }

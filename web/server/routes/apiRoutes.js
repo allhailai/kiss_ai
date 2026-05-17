@@ -49,12 +49,15 @@ export function registerApiRoutes(app, deps) {
   });
 
   registerFileRoutes(app, {
+    createHumanInputFolder: deps.createHumanInputFolder,
+    createHumanInputTextFile: deps.createHumanInputTextFile,
     deleteHumanInputFile: deps.deleteHumanInputFile,
     gitFileDiff: deps.gitFileDiff,
     humanFiles: deps.humanFiles,
     httpError: deps.httpError,
     listMarkdownFiles: deps.listMarkdownFiles,
     listProjectFiles: deps.listProjectFiles,
+    moveHumanInputFile: deps.moveHumanInputFile,
     readTextFile: deps.readTextFile,
     restoreFileFromHead: deps.restoreFileFromHead,
     searchFiles: deps.searchFiles,

@@ -189,6 +189,7 @@ export type FileDiff = {
 
 export type TreeResponse = {
   files: ProjectFile[];
+  emptyDirectories?: string[];
 };
 
 export type UploadHumanInputsResponse = {
@@ -197,6 +198,34 @@ export type UploadHumanInputsResponse = {
 
 export type DeleteHumanInputResponse = {
   path: string;
+};
+
+export type CreateHumanInputTextFileRequest = {
+  name: string;
+  content?: string;
+};
+
+export type CreateHumanInputTextFileResponse = {
+  file: ProjectFile;
+};
+
+export type CreateHumanInputFolderRequest = {
+  name: string;
+};
+
+export type CreateHumanInputFolderResponse = {
+  folder: string;
+};
+
+export type MoveHumanInputFileRequest = {
+  sourcePath: string;
+  targetFolder: string;
+};
+
+export type MoveHumanInputFileResponse = {
+  oldPath: string;
+  newPath: string;
+  file: ProjectFile;
 };
 
 export type FileSearchResponse = {

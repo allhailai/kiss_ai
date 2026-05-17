@@ -31,7 +31,7 @@ function sortTreeNodes(nodes: FileTreeNode[]) {
   }
 }
 
-export function buildFileTree(files: ProjectFile[]) {
+export function buildFileTree(files: ProjectFile[], emptyDirectories?: string[]) {
   const root: FileTreeNode[] = [];
 
   for (const file of files) {
@@ -71,6 +71,30 @@ export function buildFileTree(files: ProjectFile[]) {
       name: fileName,
       file,
     });
+  }
+
+  // Inject empty directories so they appear as expandable folder nodes.
+  if (emptyDirectories?.length) {
+    for (const dirPath of emptyDirectories) {
+      const segments = dirPath.split("/").filter(Boolean);
+      // The directory name is the last segment; everything before it is the root prefix.
+      const dirName = segments.at(-1);
+      if (!dirName) continue;
+
+      // Check if a node for this directory already exists at the root level.
+      const exists = root.some(
+        (node) => node.type === "directory" && node.name === dirName,
+      );
+      if (exists) continue;
+
+      root.push({
+        type: "directory",
+        key: dirName,
+        name: dirName,
+        fullPath: dirPath,
+        children: [],
+      });
+    }
   }
 
   sortTreeNodes(root);

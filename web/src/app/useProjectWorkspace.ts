@@ -46,6 +46,7 @@ export function useProjectWorkspace() {
   const [rebuild, setRebuild] = useState<RebuildState | null>(null);
   const [design, setDesign] = useState<DesignState | null>(null);
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([designProjectFile]);
+  const [humanInputEmptyDirectories, setHumanInputEmptyDirectories] = useState<string[]>([]);
   const [treeLoading, setTreeLoading] = useState(false);
   const [fileLoading, setFileLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -90,6 +91,7 @@ export function useProjectWorkspace() {
     selectedProjectSlug,
     setBuildLog,
     setDesign,
+    setHumanInputEmptyDirectories,
     setProjectFiles,
     setRebuild,
     setStatus,
@@ -194,7 +196,7 @@ export function useProjectWorkspace() {
     [navigateTo, projectFiles, setNotice],
   );
 
-  const { deleteHumanInputFile, uploadHumanInputFiles } = useHumanInputs({
+  const { createHumanInputFolder, deleteHumanInputFile, moveHumanInputFile, uploadHumanInputFiles } = useHumanInputs({
     clearSelectedFile,
     loadTree,
     refreshProjectFiles,
@@ -203,6 +205,7 @@ export function useProjectWorkspace() {
     setInputMutationLoading,
     setNotice,
     view,
+    onOpenFile: openProjectFile,
   });
 
   const selectProject = useCallback(
@@ -323,10 +326,13 @@ export function useProjectWorkspace() {
     view,
   } satisfies RouteController;
   const fileWorkspace = {
+    createHumanInputFolder,
     deleteHumanInputFile,
+    moveHumanInputFile,
     draft,
     fileLoading,
     hasUnsavedChanges,
+    humanInputEmptyDirectories,
     inputMutationLoading,
     loading: treeLoading || fileLoading || saving || reverting || inputMutationLoading,
     projectFiles,

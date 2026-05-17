@@ -307,3 +307,108 @@
   border-color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 8%, white);
 }
+
+.file-tree-drop-target {
+  border-color: var(--color-accent) !important;
+  background: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface)) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  border-radius: 8px;
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+
+.file-tree.file-tree-drop-target {
+  border: 2px dashed color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.file-tree-file[draggable="true"] {
+  cursor: grab;
+}
+
+.file-tree-file[draggable="true"]:active {
+  cursor: grabbing;
+  opacity: 0.6;
+}
+
+/* Human Input Actions (sidebar inline add buttons) */
+
+.human-input-actions {
+  display: grid;
+  gap: 3px;
+  padding: 4px 0;
+}
+
+.human-input-action-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px dashed color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
+  color: var(--color-accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.human-input-action-button:hover {
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface));
+  border-color: var(--color-accent);
+}
+
+.human-input-action-icon {
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.human-input-name-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.human-input-name-input {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 0.78rem;
+  font-family: inherit;
+  outline: none;
+}
+
+.human-input-name-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.human-input-name-submit {
+  padding: 5px 10px;
+  border-radius: 7px;
+  background: var(--color-accent);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.human-input-name-submit:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.human-input-name-submit:not(:disabled):hover {
+  background: color-mix(in srgb, var(--color-accent) 85%, var(--color-primary));
+}
+

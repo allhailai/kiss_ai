@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   chatNavLeaf,
   openQuestionsNavLeaf,
@@ -18,18 +18,24 @@ const defaultExpandedSections = new Set<SimplifiedNavSectionId>(
 
 export function SimplifiedNavigator({
   currentView,
+  humanInputEmptyDirectories,
   projectFiles,
   loading,
   selectedPath,
+  onCreateFolder,
   onDeleteHumanInputFile,
+  onMoveFile,
   onOpenView,
   onOpenFile,
 }: {
   currentView: View;
+  humanInputEmptyDirectories?: string[];
   projectFiles: ProjectFile[];
   loading: boolean;
   selectedPath: string | null;
+  onCreateFolder?: (name: string) => void;
   onDeleteHumanInputFile?: (path: string) => void;
+  onMoveFile?: (sourcePath: string, targetFolder: string) => void;
   onOpenView: (view: View, path?: string | null) => void;
   onOpenFile: (path: string) => void;
 }) {
@@ -145,11 +151,18 @@ export function SimplifiedNavigator({
             <span>Human acquired</span>
             <small>{projectPathPrefixes.humanInput}</small>
           </button>
+
+          {onCreateFolder ? (
+            <HumanInputActions onCreateFolder={onCreateFolder} />
+          ) : null}
+
           <FileTreeBlock
             emptyLabel="No human-acquired files yet."
+            emptyDirectories={humanInputEmptyDirectories}
             files={humanInputFiles}
             loading={loading && currentView === "inputs"}
             onDeleteFile={onDeleteHumanInputFile}
+            onMoveFile={onMoveFile}
             onOpenFile={onOpenFile}
             selectedPath={selectedPath}
           />
@@ -189,25 +202,103 @@ export function SimplifiedNavigator({
   }
 }
 
+function HumanInputActions({
+  onCreateFolder,
+}: {
+  onCreateFolder: (name: string) => void;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (showForm && nameInputRef.current) {
+      nameInputRef.current.focus();
+    }
+  }, [showForm]);
+
+  function handleSubmit() {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+
+    onCreateFolder(trimmed);
+    setNewName("");
+    setShowForm(false);
+  }
+
+  function toggleForm() {
+    setShowForm((current) => {
+      if (!current) setNewName("");
+      return !current;
+    });
+  }
+
+  return (
+    <div className="human-input-actions">
+      <button
+        className="human-input-action-button"
+        onClick={toggleForm}
+        type="button"
+        title="Create a new folder in human inputs"
+        aria-expanded={showForm}
+      >
+        <span className="human-input-action-icon" aria-hidden="true">📁</span>
+        <span>Add folder</span>
+      </button>
+
+      {showForm ? (
+        <form
+          className="human-input-name-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleSubmit();
+          }}
+        >
+          <input
+            ref={nameInputRef}
+            className="human-input-name-input"
+            type="text"
+            placeholder="Folder name…"
+            value={newName}
+            onChange={(event) => setNewName(event.target.value)}
+            maxLength={200}
+          />
+          <button
+            className="human-input-name-submit"
+            type="submit"
+            disabled={!newName.trim()}
+          >
+            Create
+          </button>
+        </form>
+      ) : null}
+    </div>
+  );
+}
+
 function FileTreeBlock({
   emptyLabel,
+  emptyDirectories,
   files,
   loading,
   selectedPath,
   onDeleteFile,
+  onMoveFile,
   onOpenFile,
 }: {
   emptyLabel: string;
+  emptyDirectories?: string[];
   files: ProjectFile[];
   loading: boolean;
   selectedPath: string | null;
   onDeleteFile?: (path: string) => void;
+  onMoveFile?: (sourcePath: string, targetFolder: string) => void;
   onOpenFile: (path: string) => void;
 }) {
   if (loading) return <p className="simple-nav-state">Loading...</p>;
-  if (files.length === 0) return <p className="simple-nav-state">{emptyLabel}</p>;
+  if (files.length === 0 && (!emptyDirectories || emptyDirectories.length === 0)) return <p className="simple-nav-state">{emptyLabel}</p>;
 
-  return <FileTreeNav files={files} selectedPath={selectedPath} onDeleteFile={onDeleteFile} onSelectFile={onOpenFile} />;
+  return <FileTreeNav files={files} emptyDirectories={emptyDirectories} selectedPath={selectedPath} onDeleteFile={onDeleteFile} onMoveFile={onMoveFile} onSelectFile={onOpenFile} />;
 }
 
 function DefineNavLabel({ label }: { label: string }) {

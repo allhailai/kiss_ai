@@ -14,6 +14,7 @@ export function useHumanInputs({
   setInputMutationLoading,
   setNotice,
   view,
+  onOpenFile,
 }: {
   clearSelectedFile: () => void;
   loadTree: (section: string) => Promise<void>;
@@ -23,6 +24,7 @@ export function useHumanInputs({
   setInputMutationLoading: (loading: boolean) => void;
   setNotice: (message: string) => void;
   view: View;
+  onOpenFile?: (path: string) => void;
 }) {
   const uploadHumanInputFiles = useCallback(
     async (files: File[]) => {
@@ -70,5 +72,44 @@ export function useHumanInputs({
     [clearSelectedFile, loadTree, refreshProjectFiles, requireSelectedProjectSlug, selected?.path, setInputMutationLoading, setNotice, view],
   );
 
-  return { deleteHumanInputFile, uploadHumanInputFiles };
+  const createHumanInputFolder = useCallback(
+    async (name: string) => {
+      setInputMutationLoading(true);
+      setNotice("");
+      try {
+        const response = await api.createHumanInputFolder(requireSelectedProjectSlug(), name);
+        await refreshProjectFiles();
+        if (view === "inputs") await loadTree("human");
+        setNotice(`Created folder ${response.folder}.`);
+      } catch (error) {
+        setNotice(errorMessage(error, "Could not create the folder."));
+        throw error;
+      } finally {
+        setInputMutationLoading(false);
+      }
+    },
+    [loadTree, refreshProjectFiles, requireSelectedProjectSlug, setInputMutationLoading, setNotice, view],
+  );
+
+  const moveHumanInputFile = useCallback(
+    async (sourcePath: string, targetFolder: string) => {
+      setInputMutationLoading(true);
+      setNotice("");
+      try {
+        const response = await api.moveHumanInputFile(requireSelectedProjectSlug(), sourcePath, targetFolder);
+        await refreshProjectFiles();
+        if (view === "inputs") await loadTree("human");
+        setNotice(`Moved to ${response.newPath}.`);
+        if (onOpenFile) onOpenFile(response.newPath);
+      } catch (error) {
+        setNotice(errorMessage(error, "Could not move the file."));
+        throw error;
+      } finally {
+        setInputMutationLoading(false);
+      }
+    },
+    [loadTree, onOpenFile, refreshProjectFiles, requireSelectedProjectSlug, setInputMutationLoading, setNotice, view],
+  );
+
+  return { createHumanInputFolder, deleteHumanInputFile, moveHumanInputFile, uploadHumanInputFiles };
 }

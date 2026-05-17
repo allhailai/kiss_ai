@@ -8,6 +8,7 @@ export function useProjectDataLoaders({
   selectedProjectSlug,
   setBuildLog,
   setDesign,
+  setHumanInputEmptyDirectories,
   setProjectFiles,
   setRebuild,
   setStatus,
@@ -16,6 +17,7 @@ export function useProjectDataLoaders({
   selectedProjectSlug: string | null;
   setBuildLog: (buildLog: BuildLogState | null) => void;
   setDesign: (design: DesignState | null) => void;
+  setHumanInputEmptyDirectories: (dirs: string[]) => void;
   setProjectFiles: (files: ProjectFile[]) => void;
   setRebuild: (rebuild: RebuildState | null) => void;
   setStatus: (status: ProjectStatus | null) => void;
@@ -83,8 +85,9 @@ export function useProjectDataLoaders({
 
     if (selectedProjectSlugRef.current === projectSlug) {
       setProjectFiles(uniqueFiles([...requirements.files, ...human.files, ...inputsAi.files, ...outputs.files, designProjectFile]));
+      setHumanInputEmptyDirectories(human.emptyDirectories ?? []);
     }
-  }, [requireSelectedProjectSlug, setProjectFiles]);
+  }, [requireSelectedProjectSlug, setHumanInputEmptyDirectories, setProjectFiles]);
 
   const loadTree = useCallback(
     async (section: string) => {

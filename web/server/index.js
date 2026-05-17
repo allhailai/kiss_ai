@@ -146,6 +146,8 @@ function displayProjectName(projectName, projectSlug) {
 
 const {
   classifyPath,
+  createHumanInputFolder,
+  createHumanInputTextFile,
   deleteHumanInputFile,
   fileExists,
   gitFileDiff,
@@ -155,6 +157,7 @@ const {
   isPathInsideRoot,
   listMarkdownFiles,
   listProjectFiles,
+  moveHumanInputFile,
   projectPath,
   readProjectJson,
   readTextFile,
@@ -298,6 +301,8 @@ registerApiRoutes(app, {
   attachProject,
   buildLogTabState,
   checkKissAiUpdate,
+  createHumanInputFolder,
+  createHumanInputTextFile,
   createProjectFromTemplate,
   createConversation,
   deleteHumanInputFile,
@@ -314,6 +319,7 @@ registerApiRoutes(app, {
   listCursorModels,
   listMarkdownFiles,
   listProjectFiles,
+  moveHumanInputFile,
   parseDesignIdentity,
   pickRebuildModelId,
   readConversation,

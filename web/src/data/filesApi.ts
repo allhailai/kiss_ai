@@ -1,8 +1,14 @@
 import type {
+  CreateHumanInputFolderRequest,
+  CreateHumanInputFolderResponse,
+  CreateHumanInputTextFileRequest,
+  CreateHumanInputTextFileResponse,
   DeleteHumanInputResponse,
   FileContent,
   FileDiff,
   FileSearchResponse,
+  MoveHumanInputFileRequest,
+  MoveHumanInputFileResponse,
   TreeResponse,
   UploadHumanInputsResponse,
   WriteFileRequest,
@@ -50,6 +56,21 @@ export const filesApi = {
     request<DeleteHumanInputResponse>(`${projectBase(projectSlug)}/inputs-human/file`, {
       method: "DELETE",
       body: JSON.stringify({ path }),
+    }),
+  createHumanInputTextFile: (projectSlug: string, name: string, content?: string) =>
+    request<CreateHumanInputTextFileResponse>(`${projectBase(projectSlug)}/inputs-human/create-text`, {
+      method: "POST",
+      body: JSON.stringify({ name, content } satisfies CreateHumanInputTextFileRequest),
+    }),
+  createHumanInputFolder: (projectSlug: string, name: string) =>
+    request<CreateHumanInputFolderResponse>(`${projectBase(projectSlug)}/inputs-human/create-folder`, {
+      method: "POST",
+      body: JSON.stringify({ name } satisfies CreateHumanInputFolderRequest),
+    }),
+  moveHumanInputFile: (projectSlug: string, sourcePath: string, targetFolder: string) =>
+    request<MoveHumanInputFileResponse>(`${projectBase(projectSlug)}/inputs-human/move`, {
+      method: "POST",
+      body: JSON.stringify({ sourcePath, targetFolder } satisfies MoveHumanInputFileRequest),
     }),
   searchFiles: searchProjectFiles,
   file: (projectSlug: string, path: string) => request<FileContent>(`${projectBase(projectSlug)}/file?${filePathQuery(path)}`),

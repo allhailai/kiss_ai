@@ -362,7 +362,32 @@ export function createProjectFileService({
       if (error.code !== "ENOENT") throw error;
     }
 
-    return files.sort((a, b) => a.path.localeCompare(b.path));
+    // Collect immediate empty subdirectories so newly created folders are visible in the tree.
+    const emptyDirectories = [];
+    try {
+      const rootEntries = await fs.readdir(root.absolute, { withFileTypes: true });
+      const populatedDirectories = new Set(
+        files
+          .map((file) => file.name.split("/")[0])
+          .filter(Boolean),
+      );
+
+      for (const entry of rootEntries) {
+        if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+        if (populatedDirectories.has(entry.name)) continue;
+
+        const absolute = path.join(root.absolute, entry.name);
+        await rejectSymlinkEntry(absolute);
+        emptyDirectories.push(`${root.relative}/${entry.name}`);
+      }
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+
+    return {
+      files: files.sort((a, b) => a.path.localeCompare(b.path)),
+      emptyDirectories: emptyDirectories.sort(),
+    };
   }
 
   function safeUploadFileName(rawName) {
@@ -412,6 +437,43 @@ export function createProjectFileService({
     return { files: uploaded };
   }
 
+  async function createHumanInputTextFile(projectRoot, rawName, content = "") {
+    const safeName = safeUploadFileName(rawName);
+    const fileName = safeName.endsWith(".md") ? safeName : `${safeName}.md`;
+    const relativePath = `inputs_human/${fileName}`;
+    const target = projectPath(projectRoot, relativePath);
+    await fs.mkdir(path.dirname(target.absolute), { recursive: true });
+    const { absolute, relative } = await resolveProjectFileTarget(projectRoot, target.relative, { allowMissing: true });
+
+    if (await fileExists(absolute)) {
+      throw httpError(`A file named ${fileName} already exists in inputs_human/.`, 409, "file_already_exists");
+    }
+
+    const fileContent = typeof content === "string" ? content : "";
+    await fs.writeFile(absolute, fileContent, "utf8");
+
+    const meta = classifyPath(projectRoot, relative);
+    const stat = await fs.stat(absolute);
+    const file = projectFileItem("inputs_human", relative, meta, stat);
+    invalidateSearchCache(projectRoot);
+    return { file };
+  }
+
+  async function createHumanInputFolder(projectRoot, rawName) {
+    const safeName = safeUploadFileName(rawName);
+    const relativePath = `inputs_human/${safeName}`;
+    const target = projectPath(projectRoot, relativePath);
+    const { absolute } = await resolveProjectDirectory(projectRoot, target.relative, { allowMissing: true });
+
+    if (await fileExists(absolute)) {
+      throw httpError(`A folder named ${safeName} already exists in inputs_human/.`, 409, "folder_already_exists");
+    }
+
+    await fs.mkdir(absolute, { recursive: true });
+    invalidateSearchCache(projectRoot);
+    return { folder: relativePath };
+  }
+
   async function pruneEmptyDirectories(rootAbsolute, currentAbsolute) {
     if (currentAbsolute === rootAbsolute || !isPathInsideRoot(rootAbsolute, currentAbsolute)) return;
 
@@ -446,6 +508,77 @@ export function createProjectFileService({
     invalidateSearchCache(projectRoot);
 
     return { path: meta.path };
+  }
+
+  async function moveHumanInputFile(projectRoot, sourcePath, targetFolder) {
+    const sourceMeta = classifyPath(projectRoot, sourcePath);
+
+    if (!sourceMeta.path.startsWith("inputs_human/")) {
+      throw httpError("Only human input files can be moved here.", 403, "move_not_allowed");
+    }
+
+    if (isHiddenProjectPath(sourceMeta.path)) {
+      throw httpError("Hidden project files cannot be managed in the lab UI.", 403, "hidden_file");
+    }
+
+    const sourceTarget = await resolveProjectFileTarget(projectRoot, sourceMeta.path);
+    const sourceStat = await fs.stat(sourceTarget.absolute);
+
+    if (!sourceStat.isFile()) {
+      throw httpError("Only files can be moved.", 400, "move_not_file");
+    }
+
+    // Validate targetFolder: must be empty string (root) or a single segment (1-level subfolder)
+    const normalizedFolder = targetFolder.replace(/\/+$/, "").trim();
+    let destRelative;
+
+    if (!normalizedFolder) {
+      // Move to inputs_human root
+      destRelative = `inputs_human/${path.basename(sourceTarget.absolute)}`;
+    } else {
+      // Must be a single segment (1-level deep only)
+      const folderSegments = normalizedFolder.split("/").filter(Boolean);
+      if (folderSegments.length > 1) {
+        throw httpError("Folders can only be 1 level deep in human inputs.", 400, "move_too_deep");
+      }
+
+      if (hasTraversalSegment(normalizedFolder)) {
+        throw httpError("Path escapes the project root.", 403, "path_escape");
+      }
+
+      const folderPath = `inputs_human/${folderSegments[0]}`;
+      const folderTarget = await resolveProjectDirectory(projectRoot, folderPath, { allowMissing: false });
+      const folderStat = await fs.stat(folderTarget.absolute);
+      if (!folderStat.isDirectory()) {
+        throw httpError(`${folderPath} is not a folder.`, 400, "move_target_not_folder");
+      }
+
+      destRelative = `${folderPath}/${path.basename(sourceTarget.absolute)}`;
+    }
+
+    if (destRelative === sourceMeta.path) {
+      throw httpError("File is already in that location.", 409, "move_same_location");
+    }
+
+    const destTarget = projectPath(projectRoot, destRelative);
+    const { absolute: destAbsolute, relative: destFinal } = await resolveProjectFileTarget(projectRoot, destTarget.relative, { allowMissing: true });
+
+    if (await fileExists(destAbsolute)) {
+      throw httpError(`A file named ${path.basename(destAbsolute)} already exists in that folder.`, 409, "move_file_exists");
+    }
+
+    await fs.rename(sourceTarget.absolute, destAbsolute);
+
+    // Prune empty directories left behind
+    const inputRoot = projectPath(projectRoot, "inputs_human");
+    await pruneEmptyDirectories(inputRoot.absolute, path.dirname(sourceTarget.absolute));
+
+    const meta = classifyPath(projectRoot, destFinal);
+    const stat = await fs.stat(destAbsolute);
+    const file = projectFileItem("inputs_human", destFinal, meta, stat);
+    invalidateSearchCache(projectRoot);
+
+    return { oldPath: sourceMeta.path, newPath: meta.path, file };
   }
 
   async function readSearchAllowedPaths() {
@@ -747,8 +880,11 @@ export function createProjectFileService({
 
   return {
     classifyPath,
+    createHumanInputFolder,
+    createHumanInputTextFile,
     deleteHumanInputFile,
     fileExists,
+    moveHumanInputFile,
     gitFileDiff,
     gitFileDiffText,
     gitFileDiffTexts,
