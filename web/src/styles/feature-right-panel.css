@@ -132,7 +132,7 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
-  padding: 12px;
+  padding: 12px 12px 6px;
 }
 
 .right-panel-body > * {
