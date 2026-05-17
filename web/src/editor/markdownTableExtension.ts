@@ -800,6 +800,41 @@ class MarkdownTableWidget extends WidgetType {
 
     table.appendChild(tbody);
     wrapper.appendChild(table);
+
+    // Floating [+] comment buttons (top-left and top-right) for table-level annotation
+    const handleTableComment = (e: MouseEvent) => {
+      e.stopPropagation();
+      const insertPos = this.table.to;
+      const template = `\n<!-- COMMENT:  -->`;
+      view.dispatch({ changes: { from: insertPos, insert: template } });
+      // After doc update, find the new comment widget and click it to enter edit mode
+      window.setTimeout(() => {
+        const widgets = view.dom.querySelectorAll(".cm-annotation-comment");
+        const newFrom = insertPos + 1;
+        const coords = view.coordsAtPos(newFrom);
+        if (coords) {
+          for (const w of widgets) {
+            const wRect = w.getBoundingClientRect();
+            if (Math.abs(wRect.top - coords.top) < 40) {
+              (w as HTMLElement).click();
+              break;
+            }
+          }
+        }
+      }, 500);
+    };
+
+    for (const position of ["left", "right"] as const) {
+      const btn = document.createElement("button");
+      btn.className = `cm-table-comment-button cm-table-comment-button-${position}`;
+      btn.type = "button";
+      btn.textContent = "+";
+      btn.title = "Add comment on this table";
+      btn.addEventListener("mousedown", (e) => e.stopPropagation());
+      btn.addEventListener("click", handleTableComment);
+      wrapper.appendChild(btn);
+    }
+
     refreshSelection();
     return wrapper;
   }
