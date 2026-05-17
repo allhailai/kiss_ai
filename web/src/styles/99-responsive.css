@@ -34,6 +34,10 @@
   .app-shell.right-panel-open .right-panel-resize-handle {
     display: none;
   }
+
+  .app-shell.right-panel-open .sidebar-resize-handle {
+    display: none;
+  }
 }
 
 @media (max-width: 980px) {
@@ -102,6 +106,10 @@
   }
 
   .right-panel-resize-handle {
+    display: none;
+  }
+
+  .sidebar-resize-handle {
     display: none;
   }
 

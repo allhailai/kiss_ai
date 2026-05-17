@@ -96,3 +96,79 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* ── Sidebar Resize Handle ── */
+
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -14px;
+  z-index: 5;
+  width: 28px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.sidebar-resize-handle::before,
+.sidebar-resize-handle::after {
+  position: absolute;
+  content: "";
+}
+
+.sidebar-resize-handle::before {
+  top: 50%;
+  right: 8px;
+  width: 12px;
+  height: 72px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 86%, var(--color-accent));
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--color-secondary) 72%, transparent) 1.5px, transparent 2px) center / 6px 10px repeat-y,
+    var(--color-surface);
+  box-shadow: var(--shadow-soft);
+  opacity: 0.72;
+  transform: translateY(-50%);
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.sidebar-resize-handle::after {
+  top: 0;
+  bottom: 0;
+  right: 13px;
+  width: 2px;
+  background: color-mix(in srgb, var(--color-border) 68%, transparent);
+  transition:
+    background 0.16s ease,
+    width 0.16s ease;
+}
+
+.sidebar-resize-handle:hover::before,
+.sidebar-resize-handle:focus-visible::before {
+  border-color: var(--color-accent);
+  background:
+    radial-gradient(circle, var(--color-accent) 1.5px, transparent 2px) center / 6px 10px repeat-y,
+    var(--color-surface);
+  opacity: 1;
+  transform: translateY(-50%) scale(1.08);
+}
+
+.sidebar-resize-handle:hover::after,
+.sidebar-resize-handle:focus-visible::after {
+  width: 3px;
+  background: color-mix(in srgb, var(--color-accent) 64%, var(--color-border));
+}
+
+.sidebar-resize-handle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 28%, transparent);
+  outline-offset: -2px;
+}
+
+.sidebar-collapsed .sidebar-resize-handle {
+  display: none;
+}
+

@@ -1,24 +1,25 @@
 .app-shell {
   --right-panel-width: 420px;
+  --left-nav-width: 300px;
   height: 100vh;
   max-height: 100dvh;
   min-height: 0;
   display: grid;
   grid-template-rows: 55px minmax(0, 1fr);
-  grid-template-columns: 300px minmax(0, 1fr);
+  grid-template-columns: var(--left-nav-width) minmax(0, 1fr);
   overflow: hidden;
   background: var(--color-background);
   color: var(--color-primary);
 }
 
 .app-shell.sidebar-collapsed {
-  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-columns: var(--left-nav-width) minmax(0, 1fr);
 }
 
 .app-shell.right-panel-open {
-  grid-template-columns: 300px minmax(0, 1fr) minmax(320px, var(--right-panel-width));
+  grid-template-columns: var(--left-nav-width) minmax(0, 1fr) minmax(320px, var(--right-panel-width));
 }
 
 .app-shell.sidebar-collapsed.right-panel-open {
-  grid-template-columns: 52px minmax(0, 1fr) minmax(320px, var(--right-panel-width));
+  grid-template-columns: var(--left-nav-width) minmax(0, 1fr) minmax(320px, var(--right-panel-width));
 }

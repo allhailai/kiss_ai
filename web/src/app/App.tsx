@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { projectPathPrefixes } from "../domain/projectPaths";
 import { resolveChatFileEditApplication } from "./chatFileEdits";
 import { buildThemeStyle } from "./theme";
@@ -7,6 +7,7 @@ import { RightPanelSurface } from "./RightPanelSurface";
 import { RightPanelToggle } from "./RightPanelToggle";
 import { panelForKind, useRightPanelSurface, type RightPanelKind } from "./hooks/useRightPanelSurface";
 import { useRightPanelWidth } from "./hooks/useRightPanelWidth";
+import { useLeftNavWidth } from "./hooks/useLeftNavWidth";
 import { useAgentChatPanel } from "./hooks/useAgentChatPanel";
 import { useProjectChat } from "./hooks/useProjectChat";
 import { api } from "../data/apiClient";
@@ -53,6 +54,8 @@ export function App() {
   const { designWorkspace, fileWorkspace, project, rebuildWorkspace, route, toastWorkspace } = workspace;
   const rightPanelSurface = useRightPanelSurface();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const sidebarResizingRef = useRef(false);
+  const leftNavWidth = useLeftNavWidth({ projectSlug: project.selectedProjectSlug ?? "", collapsed: sidebarCollapsed });
   const [agentDraftSeed, setAgentDraftSeed] = useState<{ id: string; draft: string } | null>(null);
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [updateCheck, setUpdateCheck] = useState<KissAiUpdateCheckResponse | null>(null);
@@ -75,8 +78,9 @@ export function App() {
       ({
         ...themeStyle,
         "--right-panel-width": rightPanelWidth.cssValue,
+        "--left-nav-width": leftNavWidth.cssValue,
       }) as CSSProperties,
-    [rightPanelWidth.cssValue, themeStyle],
+    [leftNavWidth.cssValue, rightPanelWidth.cssValue, themeStyle],
   );
   const preferredAgentChatConversationId = useMemo(
     () => readAgentChatConversationId(project.selectedProjectSlug),
@@ -289,6 +293,50 @@ export function App() {
       <ToastViewport toasts={toastWorkspace.toasts} onDismiss={toastWorkspace.dismissToast} />
 
       <aside className="sidebar" aria-label="Project navigation">
+        {leftNavWidth.isResizable ? (
+          <div
+            aria-label="Resize navigation"
+            aria-orientation="vertical"
+            aria-valuemax={Math.round(leftNavWidth.maxWidthPx)}
+            aria-valuemin={Math.round(leftNavWidth.minWidthPx)}
+            aria-valuenow={Math.round(leftNavWidth.widthPx)}
+            className="sidebar-resize-handle"
+            onKeyDown={(event: ReactKeyboardEvent<HTMLDivElement>) => {
+              if (event.key === "ArrowRight") {
+                event.preventDefault();
+                leftNavWidth.resizeByKeyboard("wider");
+              } else if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                leftNavWidth.resizeByKeyboard("narrower");
+              }
+            }}
+            onPointerCancel={(event: ReactPointerEvent<HTMLDivElement>) => {
+              if (!sidebarResizingRef.current) return;
+              sidebarResizingRef.current = false;
+              event.currentTarget.releasePointerCapture(event.pointerId);
+              leftNavWidth.commitWidth();
+            }}
+            onPointerDown={(event: ReactPointerEvent<HTMLDivElement>) => {
+              event.preventDefault();
+              sidebarResizingRef.current = true;
+              event.currentTarget.setPointerCapture(event.pointerId);
+              leftNavWidth.resizeFromClientX(event.clientX);
+            }}
+            onPointerMove={(event: ReactPointerEvent<HTMLDivElement>) => {
+              if (!sidebarResizingRef.current) return;
+              leftNavWidth.resizeFromClientX(event.clientX);
+            }}
+            onPointerUp={(event: ReactPointerEvent<HTMLDivElement>) => {
+              if (!sidebarResizingRef.current) return;
+              sidebarResizingRef.current = false;
+              event.currentTarget.releasePointerCapture(event.pointerId);
+              leftNavWidth.commitWidth();
+            }}
+            role="separator"
+            tabIndex={0}
+            title="Drag to resize navigation"
+          />
+        ) : null}
         <button
           className="sidebar-toggle"
           type="button"
