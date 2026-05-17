@@ -225,12 +225,15 @@ describe("API routes", () => {
       next();
     });
     registerFileRoutes(app, {
+      createHumanInputFolder: async () => ({ folder: "" }),
+      createHumanInputTextFile: async () => ({ file: {} }),
       deleteHumanInputFile: service.deleteHumanInputFile,
       gitFileDiff: service.gitFileDiff,
       humanFiles: new Map([["human_goal_requirements.md", { kind: "human", editable: true, annotation: false }]]),
       httpError,
       listMarkdownFiles: service.listMarkdownFiles,
       listProjectFiles: service.listProjectFiles,
+      moveHumanInputFile: async () => ({ oldPath: "", newPath: "", file: {} }),
       readTextFile: service.readTextFile,
       restoreFileFromHead: service.restoreFileFromHead,
       searchFiles: service.searchFiles,
@@ -399,12 +402,15 @@ describe("API routes", () => {
       next();
     });
     registerFileRoutes(app, {
+      createHumanInputFolder: async () => ({ folder: "" }),
+      createHumanInputTextFile: async () => ({ file: {} }),
       deleteHumanInputFile: service.deleteHumanInputFile,
       gitFileDiff: service.gitFileDiff,
       humanFiles: new Map([["human_goal_requirements.md", { kind: "human", editable: true, annotation: false }]]),
       httpError,
       listMarkdownFiles: service.listMarkdownFiles,
       listProjectFiles: service.listProjectFiles,
+      moveHumanInputFile: async () => ({ oldPath: "", newPath: "", file: {} }),
       readTextFile: service.readTextFile,
       restoreFileFromHead: service.restoreFileFromHead,
       searchFiles: service.searchFiles,

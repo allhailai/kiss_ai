@@ -43,7 +43,7 @@ function importsFeatureSubdirectory(specifier, filePath) {
 const srcRules = [
   {
     from: "main.tsx",
-    test: (specifier) => !["react", "react-dom/client", "./app/App", "./styles.css", "./editor/MarkdownEditor.css", "./editor/markdownTableExtension.css"].includes(specifier),
+    test: (specifier) => !["react", "react-dom/client", "./app/App", "./styles.css", "./editor/MarkdownEditor.css", "./editor/annotationExtension.css", "./editor/markdownTableExtension.css"].includes(specifier),
     message: "main.tsx must stay a thin entrypoint that imports only React, the app shell, and global styles",
   },
   {

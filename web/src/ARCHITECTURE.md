@@ -55,7 +55,7 @@ Global hub actions that are not scoped to a research project should use `/api/sy
 
 App-owned orchestration belongs in `app/`. If state drives more than one workflow surface, keep the controller in `app/` or a focused `app/hooks/` module and pass behavior into features as props.
 
-Right-panel behavior is app shell state. Panel persistence, panel width, panel kind, selected agent conversation mirroring, mode switching, and file context selection belong in `app/`. `features/agents/` owns the AI File Assist / agent chat panel body, and `features/requirementsSync/` owns the Requirements Sync panel body.
+Right-panel behavior is app shell state. Panel persistence, panel width, panel kind, selected agent conversation mirroring, mode switching, and file context selection belong in `app/`. `features/agents/` owns the AI File Assist / agent chat panel body.
 
 `app/useProjectWorkspace.ts` owns the shared `projectFiles` index used by navigation, editor link resolution, and agent file context selection. View-specific file content stays in the selected file state; features should not maintain a parallel project tree unless the data is truly local to that workflow.
 
@@ -74,7 +74,7 @@ Use `domain/` for deterministic helpers that can be understood and tested withou
 - `links.ts`: wiki/markdown link resolution and display helpers.
 - `modelLabels.ts`: model display labels, tier labels, grouping, and sorting.
 - `projectPaths.ts`: project path constants and path classification policy.
-- `requirementsSync.ts`: Requirements Sync step metadata.
+
 
 Domain modules should not import React, components, hooks, CodeMirror widgets, app view types, or transport clients. They may import API contract types from `contracts/api.ts`.
 
@@ -113,7 +113,7 @@ Current features:
 - `navigation/`
 - `projectPicker/`
 - `rebuild/`
-- `requirementsSync/`
+
 - `search/`
 - `toast/`
 
@@ -133,13 +133,13 @@ Long-running server work should have an explicit lifecycle state. Rebuilds persi
 
 Conceptual diffs are the first-class review contract for AI file edits in the local web UI. A proposal agent describes intended file changes as conceptual diffs; the human accepts or rejects those diffs; an apply agent may then edit only the approved targets while treating rejected diffs as negative constraints.
 
-The right-panel chat, AI File Assist, and Requirements Sync are implementations of this protocol. Requirements Sync uses the same conceptual diff contract with its own goal/input/output authority prompts. Both flows also share rejection memory so previously rejected conceptual intent is treated consistently across proposal runs.
+The right-panel chat and AI File Assist are implementations of this protocol. Rejection memory ensures previously rejected conceptual intent is treated consistently across proposal runs.
 
 Start here for the current protocol contract. Keep this section aligned with the implementation whenever proposal, review, or apply behavior changes.
 
-The frontend keeps shared conversation state and API orchestration in `app/hooks/useProjectChat.ts`; `features/agents/RightPanelAgentChat.tsx` owns the AI File Assist conversation composition. Requirements Sync orchestration lives in `features/requirementsSync/useRequirementsSync.ts`, and `features/requirementsSync/RequirementsSyncRightPanel.tsx` owns the `Goal > Inputs > Outputs` conceptual diff wizard. Shared conceptual diff review primitives live under `shared/conceptualDiff/` so AI File Assist and Requirements Sync render the same target, risk, evidence, and rejection-memory details.
+The frontend keeps shared conversation state and API orchestration in `app/hooks/useProjectChat.ts`; `features/agents/RightPanelAgentChat.tsx` owns the AI File Assist conversation composition. Shared conceptual diff review primitives live under `shared/conceptualDiff/`.
 
-Proposal requests use route-specific stacks. `contracts/api.ts` defines shared request/response shapes. AI File Assist uses `data/chatApi.ts`, `server/routes/chatRoutes.js`, and `server/services/chatAgent.js`. Requirements Sync uses `data/requirementsSyncApi.ts`, `server/routes/requirementsSyncRoutes.js`, `server/services/requirementsSync.js`, and sync-specific prompts under `FRAMEWORK_ROOT/prompts/requirements_sync/**`. `FRAMEWORK_ROOT` defaults to `_kiss_ai/framework` in this workspace layout and can be overridden with `KISS_AI_FRAMEWORK_ROOT`. Shared conceptual diff parsing lives in `server/services/conceptualDiffs.js`; shared rejection memory lives in `server/services/conceptualDiffMemory.js`.
+Proposal requests use route-specific stacks. `contracts/api.ts` defines shared request/response shapes. AI File Assist uses `data/chatApi.ts`, `server/routes/chatRoutes.js`, and `server/services/chatAgent.js`. `FRAMEWORK_ROOT` defaults to `_kiss_ai/framework` in this workspace layout and can be overridden with `KISS_AI_FRAMEWORK_ROOT`. Shared conceptual diff parsing lives in `server/services/conceptualDiffs.js`; shared rejection memory lives in `server/services/conceptualDiffMemory.js`.
 
 The lifecycle is:
 
@@ -153,7 +153,7 @@ flowchart LR
 
 Conceptual diffs are read-only review artifacts: users accept or reject them, then the server runs a constrained local Cursor agent to edit approved files directly on disk. The compact review surface is title and summary, with expandable details for scope, intent, evidence, preservation constraints, non-goals, risk, and reconsideration memory. Context files remain read-only unless the same path is also selected as AI Editable and has an accepted conceptual diff. Rejected conceptual diffs are sent to apply runs as explicit negative constraints.
 
-Rejected conceptual diffs are also persisted as soft project memory. Future proposal prompts receive relevant active memory for the selected editable files or Requirements Sync step, suppressing exact repeats unless changed evidence or explicit user guidance justifies reconsideration. Reconsidered diffs show a small “Previously rejected” badge and explanation when available.
+Rejected conceptual diffs are also persisted as soft project memory. Future proposal prompts receive relevant active memory for the selected editable files, suppressing exact repeats unless changed evidence or explicit user guidance justifies reconsideration. Reconsidered diffs show a small “Previously rejected” badge and explanation when available.
 
 Applied proposal state remains in conversation-level `editProposals` and links back to the originating user message with `sourceMessageId`. The chat thread renders compact applied-proposal chips on those messages, while the large proposal review card hides fully applied proposals unless a chip reopens the read-only details.
 

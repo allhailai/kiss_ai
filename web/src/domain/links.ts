@@ -1,5 +1,5 @@
 import type { ProjectFile } from "../contracts/api";
-import { fileBasename } from "./files";
+import { fileBasename, uniqueFiles } from "./files";
 import { projectPathRoots } from "./projectPaths";
 
 export type WikiLinkResolution =
@@ -81,9 +81,7 @@ function selectedDirectoryFromPath(selectedPath: string | null) {
   return selectedPath?.includes("/") ? selectedPath.split("/").slice(0, -1).join("/") : "";
 }
 
-function uniqueFiles(files: ProjectFile[]) {
-  return [...new Map(files.map((file) => [file.path, file])).values()];
-}
+
 
 function resolutionFromMatches(matches: ProjectFile[]): WikiLinkResolution {
   const uniqueMatches = uniqueFiles(matches);
