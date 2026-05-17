@@ -11,7 +11,7 @@
 
 .markdown-editor-shell .cm-markdown-table-corner-handle:hover,
 .markdown-editor-shell .cm-markdown-table-row-handle:hover {
-  background: color-mix(in srgb, var(--color-accent) 7%, white);
+  background: color-mix(in srgb, var(--color-secondary) 7%, white);
 }
 
 .markdown-editor-shell .cm-markdown-table-corner-handle,
@@ -35,17 +35,17 @@
   background:
     linear-gradient(
       0deg,
-      color-mix(in srgb, var(--color-accent) 10%, transparent),
-      color-mix(in srgb, var(--color-accent) 10%, transparent)
+      color-mix(in srgb, var(--color-secondary) 10%, transparent),
+      color-mix(in srgb, var(--color-secondary) 10%, transparent)
     ),
     white;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-secondary) 30%, transparent);
 }
 
 .markdown-editor-shell .cm-markdown-table th:has(.cm-markdown-table-cell-display.cm-markdown-table-cell-active),
 .markdown-editor-shell .cm-markdown-table td:has(.cm-markdown-table-cell-display.cm-markdown-table-cell-active) {
-  background: color-mix(in srgb, var(--color-accent) 12%, white);
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 70%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 12%, white);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-secondary) 70%, var(--color-border));
 }
 
 .markdown-editor-shell .cm-markdown-table-cell-display.cm-markdown-table-cell-selected {
@@ -92,7 +92,7 @@
 }
 
 .markdown-editor-shell .cm-markdown-table-context-menu button:hover {
-  background: color-mix(in srgb, var(--color-accent) 8%, white);
+  background: color-mix(in srgb, var(--color-secondary) 8%, white);
 }
 
 .markdown-editor-shell .cm-markdown-table-context-menu kbd {

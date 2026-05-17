@@ -7,9 +7,9 @@
   display: grid;
   gap: 12px;
   padding: 16px 18px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 32%, var(--color-border));
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 32%, var(--color-border));
   border-radius: 18px;
-  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+  background: color-mix(in srgb, var(--color-secondary) 8%, var(--color-surface));
 }
 
 .build-log-review-notes > strong {
@@ -51,7 +51,7 @@
 }
 
 .build-log-review-note > strong {
-  color: var(--color-accent);
+  color: var(--color-secondary);
   font-size: 0.84rem;
 }
 
@@ -154,7 +154,7 @@
   border-color: var(--color-border);
   border-bottom-color: var(--color-surface);
   background: var(--color-surface);
-  color: var(--color-accent);
+  color: var(--color-secondary);
 }
 
 .build-log-tab.active::after {
@@ -169,7 +169,7 @@
 
 .build-log-tab:hover,
 .build-log-tab:focus-visible {
-  color: var(--color-accent);
+  color: var(--color-secondary);
 }
 
 .build-log-tab-panel {
@@ -195,7 +195,7 @@
 }
 
 .build-log-file-picker span {
-  color: var(--color-accent);
+  color: var(--color-secondary);
   font-size: 0.66rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -205,17 +205,17 @@
 
 .build-log-file-picker select {
   width: 100%;
-  border-color: color-mix(in srgb, var(--color-accent) 72%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-secondary) 72%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 10%, var(--color-surface));
   color: var(--color-primary);
   font-weight: 800;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 10%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-secondary) 10%, transparent);
 }
 
 .build-log-file-picker select:hover,
 .build-log-file-picker select:focus {
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface));
+  border-color: var(--color-secondary);
+  background: color-mix(in srgb, var(--color-secondary) 14%, var(--color-surface));
 }
 
 .build-log-markdown {
@@ -269,7 +269,7 @@
 .build-log-section-list button.active,
 .build-log-section-list button:hover,
 .build-log-section-list button:focus-visible {
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 10%, white);
+  border-color: var(--color-secondary);
+  background: color-mix(in srgb, var(--color-secondary) 10%, white);
   color: var(--color-primary);
 }

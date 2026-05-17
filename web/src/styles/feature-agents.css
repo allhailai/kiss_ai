@@ -34,8 +34,8 @@
 }
 
 .agent-event-assistant_message {
-  border-color: color-mix(in srgb, var(--color-accent) 44%, var(--color-border));
-  background: color-mix(in srgb, var(--color-surface) 86%, var(--color-accent));
+  border-color: color-mix(in srgb, var(--color-secondary) 44%, var(--color-border));
+  background: color-mix(in srgb, var(--color-surface) 86%, var(--color-secondary));
 }
 
 .agent-event-error {

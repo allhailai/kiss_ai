@@ -392,6 +392,39 @@ export function RightPanelAgentChat({
           <span className="agent-current-file-status">No file open</span>
         )}
       </div>
+      {visibleEditableTargets.length ? (
+        <div className="agent-file-context agent-file-context-editable" aria-label="Editable target files">
+          <div className="agent-context-header">
+            <span className="agent-context-label">AI Editable</span>
+          </div>
+          <div className="agent-context-chips">
+            {visibleEditableTargets.map(({ file, isCurrent }) => (
+              <span
+                className={
+                  highlightedContext?.target === "editable" && highlightedContext.path === file.path
+                    ? "agent-context-chip highlighted"
+                    : "agent-context-chip"
+                }
+                key={file.path}
+              >
+                <code title={file.path}>
+                  {labeledFileDisplayName(file)}
+                  {file.draftState === "unsaved" ? " (unsaved)" : ""}
+                </code>
+                {isCurrent ? <small>Current</small> : null}
+                <button
+                  aria-label={`Remove ${file.path} from editable targets`}
+                  disabled={controlsDisabled}
+                  onClick={() => onRemoveAiEditableFile(file.path)}
+                  type="button"
+                >
+                  x
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {activeProposal ? (
         <section className="agent-edit-proposal" aria-label={proposalReadOnly ? "Edit Proposal Details" : "Proposed Changes"}>
           <div className="agent-edit-proposal-header">
@@ -535,39 +568,6 @@ export function RightPanelAgentChat({
         submitLabel="Ask"
         textareaRef={textareaRef}
       />
-      {visibleEditableTargets.length ? (
-        <div className="agent-file-context agent-file-context-editable" aria-label="Editable target files">
-          <div className="agent-context-header">
-            <span className="agent-context-label">AI Editable</span>
-          </div>
-          <div className="agent-context-chips">
-            {visibleEditableTargets.map(({ file, isCurrent }) => (
-              <span
-                className={
-                  highlightedContext?.target === "editable" && highlightedContext.path === file.path
-                    ? "agent-context-chip highlighted"
-                    : "agent-context-chip"
-                }
-                key={file.path}
-              >
-                <code title={file.path}>
-                  {labeledFileDisplayName(file)}
-                  {file.draftState === "unsaved" ? " (unsaved)" : ""}
-                </code>
-                {isCurrent ? <small>Current</small> : null}
-                <button
-                  aria-label={`Remove ${file.path} from editable targets`}
-                  disabled={controlsDisabled}
-                  onClick={() => onRemoveAiEditableFile(file.path)}
-                  type="button"
-                >
-                  x
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

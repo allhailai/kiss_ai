@@ -37,7 +37,7 @@
 .chat-sidebar .section-heading button {
   padding: 7px 10px;
   border-radius: 10px;
-  background: var(--color-accent);
+  background: var(--color-secondary);
   color: white;
   font-size: 0.82rem;
   font-weight: 800;
@@ -63,8 +63,8 @@
 .chat-filter:focus,
 .chat-context-popover input:focus,
 .chat-composer textarea:focus {
-  border-color: color-mix(in srgb, var(--color-accent) 54%, var(--color-border));
-  outline-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  border-color: color-mix(in srgb, var(--color-secondary) 54%, var(--color-border));
+  outline-color: color-mix(in srgb, var(--color-secondary) 20%, transparent);
 }
 
 .chat-conversation-list {
@@ -98,8 +98,8 @@
 .chat-sidebar .chat-conversation-item:hover,
 .chat-sidebar .chat-conversation-item:focus-visible,
 .chat-sidebar .chat-conversation-item.active {
-  border-color: color-mix(in srgb, var(--color-accent) 34%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent) 8%, white);
+  border-color: color-mix(in srgb, var(--color-secondary) 34%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 8%, white);
   outline: none;
 }
 
@@ -132,7 +132,7 @@
   grid-template-rows: minmax(0, 1fr);
   border-top: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);
-  background: color-mix(in srgb, white 70%, var(--color-surface));
+  background: color-mix(in srgb, var(--color-secondary) 12%, var(--color-surface));
 }
 
 .chat-thread {
@@ -169,14 +169,15 @@
   display: grid;
   gap: 6px;
   padding: 10px 12px;
-  border: 1px solid var(--color-border);
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 22%, var(--color-border));
   border-radius: 14px;
-  background: white;
+  background: color-mix(in srgb, var(--color-secondary) 6%, white);
 }
 
 .chat-message-user {
   justify-self: stretch;
-  background: color-mix(in srgb, var(--color-background) 70%, var(--color-border));
+  border-color: color-mix(in srgb, var(--color-secondary) 32%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 14%, var(--color-surface));
 }
 
 .chat-message-assistant,
@@ -190,7 +191,7 @@
 
 .chat-message-thinking {
   border-style: dashed;
-  background: color-mix(in srgb, var(--color-background) 58%, white);
+  background: color-mix(in srgb, var(--color-secondary) 8%, var(--color-surface));
 }
 
 .chat-message header {
@@ -279,7 +280,7 @@
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-accent) 72%, var(--color-secondary));
+  background: color-mix(in srgb, var(--color-secondary) 72%, var(--color-secondary));
   animation: chat-thinking-pulse 1s ease-in-out infinite;
 }
 
@@ -323,8 +324,8 @@
 }
 
 .chat-message-edit-textarea:focus {
-  border-color: color-mix(in srgb, var(--color-accent) 54%, var(--color-border));
-  outline: 2px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--color-secondary) 54%, var(--color-border));
+  outline: 2px solid color-mix(in srgb, var(--color-secondary) 18%, transparent);
 }
 
 .chat-message-edit-actions {
@@ -341,7 +342,7 @@
 }
 
 .chat-message-edit-actions button[type="submit"] {
-  background: var(--color-accent);
+  background: var(--color-secondary);
   color: white;
 }
 
@@ -391,7 +392,7 @@
 
 .chat-context-chip-remove {
   flex: 0 0 auto;
-  color: var(--color-accent);
+  color: var(--color-secondary);
   font-weight: 900;
 }
 
@@ -400,7 +401,7 @@
   gap: 8px;
   margin: 10px 12px 12px;
   padding: 8px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 24%, var(--color-border));
   border-radius: 18px;
   background: color-mix(in srgb, var(--color-surface) 96%, var(--color-background));
   box-shadow: 0 12px 36px rgba(23, 32, 42, 0.1);
@@ -484,7 +485,7 @@
   display: grid;
   place-items: center;
   border-radius: 999px;
-  background: var(--color-accent);
+  background: var(--color-secondary);
   color: white;
   font-size: 1rem;
   line-height: 1;
@@ -496,9 +497,9 @@
 .chat-model-trigger:focus-visible,
 .chat-composer-model-adjacent-action:hover,
 .chat-composer-model-adjacent-action:focus-visible {
-  border-color: color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent) 8%, white);
-  outline: 2px solid color-mix(in srgb, var(--color-accent) 20%, transparent);
+  border-color: color-mix(in srgb, var(--color-secondary) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 8%, white);
+  outline: 2px solid color-mix(in srgb, var(--color-secondary) 20%, transparent);
   outline-offset: 2px;
 }
 
@@ -596,16 +597,16 @@
 .chat-model-option:hover,
 .chat-model-option:focus-visible,
 .chat-model-option.active {
-  background: color-mix(in srgb, var(--color-accent) 9%, white);
+  background: color-mix(in srgb, var(--color-secondary) 9%, white);
   outline: none;
 }
 
 .chat-context-result.active {
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 24%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-secondary) 24%, transparent);
 }
 
 .chat-model-option.selected {
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-secondary) 42%, var(--color-border));
 }
 
 .chat-context-state {
@@ -678,7 +679,7 @@
 .chat-composer-actions > button[type="submit"],
 .chat-composer-secondary-action {
   padding: 8px 12px;
-  background: var(--color-accent);
+  background: var(--color-secondary);
   color: white;
 }
 
@@ -723,7 +724,7 @@
 }
 
 .chat-markdown a {
-  color: var(--color-accent);
+  color: var(--color-secondary);
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -749,7 +750,7 @@
 
 .chat-markdown blockquote {
   padding-left: 10px;
-  border-left: 3px solid color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+  border-left: 3px solid color-mix(in srgb, var(--color-secondary) 35%, var(--color-border));
   color: var(--color-secondary);
 }
 

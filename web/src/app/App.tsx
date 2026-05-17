@@ -289,8 +289,17 @@ export function App() {
         onOpenProjectHome={() => navigateTo("rebuild")}
         onSwitchProject={project.clearSelectedProject}
       />
-      <RightPanelToggle active={isAgentPanelOpen} label="Agent" onToggle={toggleAgentPanel} />
+      <RightPanelToggle active={isAgentPanelOpen} label="AI" onToggle={toggleAgentPanel} />
       <ToastViewport toasts={toastWorkspace.toasts} onDismiss={toastWorkspace.dismissToast} />
+
+      <button
+        aria-label="Open navigation"
+        className="sidebar-open-button"
+        onClick={() => setSidebarCollapsed(false)}
+        type="button"
+      >
+        Nav
+      </button>
 
       <aside className="sidebar" aria-label="Project navigation">
         {leftNavWidth.isResizable ? (
@@ -338,35 +347,26 @@ export function App() {
           />
         ) : null}
         <button
-          className="sidebar-toggle"
+          aria-label="Close navigation"
+          className="sidebar-close-button"
+          onClick={() => setSidebarCollapsed(true)}
+          title="Close navigation"
           type="button"
-          aria-expanded={!sidebarCollapsed}
-          aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
-          aria-describedby="sidebar-toggle-tooltip"
-          onClick={() => setSidebarCollapsed((current) => !current)}
         >
-          <span aria-hidden="true" className="sidebar-toggle-icon">
-            {sidebarCollapsed ? ">" : "<"}
-          </span>
-          <span className="sidebar-toggle-tooltip" id="sidebar-toggle-tooltip" role="tooltip">
-            {sidebarCollapsed ? "Expand navigation" : "Minimize left navigation"}
-          </span>
-          <span className="sidebar-toggle-label">{sidebarCollapsed ? "Expand" : "Collapse"}</span>
+          x
         </button>
-        {!sidebarCollapsed ? (
-          <SimplifiedNavigator
-            currentView={route.view}
-            humanInputEmptyDirectories={fileWorkspace.humanInputEmptyDirectories}
-            loading={fileWorkspace.treeLoading}
-            projectFiles={fileWorkspace.projectFiles}
-            selectedPath={fileWorkspace.selected?.path ?? null}
-            onCreateFolder={(name) => void fileWorkspace.createHumanInputFolder(name)}
-            onDeleteHumanInputFile={(path) => void fileWorkspace.deleteHumanInputFile(path)}
-            onMoveFile={(sourcePath, targetFolder) => void fileWorkspace.moveHumanInputFile(sourcePath, targetFolder)}
-            onOpenFile={openProjectFileWithAgentContext}
-            onOpenView={(nextView, filePath) => navigateTo(nextView, filePath)}
-          />
-        ) : null}
+        <SimplifiedNavigator
+          currentView={route.view}
+          humanInputEmptyDirectories={fileWorkspace.humanInputEmptyDirectories}
+          loading={fileWorkspace.treeLoading}
+          projectFiles={fileWorkspace.projectFiles}
+          selectedPath={fileWorkspace.selected?.path ?? null}
+          onCreateFolder={(name) => void fileWorkspace.createHumanInputFolder(name)}
+          onDeleteHumanInputFile={(path) => void fileWorkspace.deleteHumanInputFile(path)}
+          onMoveFile={(sourcePath, targetFolder) => void fileWorkspace.moveHumanInputFile(sourcePath, targetFolder)}
+          onOpenFile={openProjectFileWithAgentContext}
+          onOpenView={(nextView, filePath) => navigateTo(nextView, filePath)}
+        />
       </aside>
 
       <section className="workspace">

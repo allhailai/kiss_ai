@@ -13,7 +13,7 @@
 }
 
 .app-shell.sidebar-collapsed {
-  grid-template-columns: var(--left-nav-width) minmax(0, 1fr);
+  grid-template-columns: 0px minmax(0, 1fr);
 }
 
 .app-shell.right-panel-open {
@@ -21,5 +21,6 @@
 }
 
 .app-shell.sidebar-collapsed.right-panel-open {
-  grid-template-columns: var(--left-nav-width) minmax(0, 1fr) minmax(320px, var(--right-panel-width));
+  grid-template-columns: 0px minmax(0, 1fr) minmax(320px, var(--right-panel-width));
 }
+

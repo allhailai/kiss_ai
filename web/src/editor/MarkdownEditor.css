@@ -40,12 +40,12 @@
 }
 
 .markdown-editor-shell .cm-activeLine {
-  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
+  background: color-mix(in srgb, var(--color-secondary) 7%, transparent);
 }
 
 .markdown-editor-shell .cm-selectionBackground,
 .markdown-editor-shell .cm-content ::selection {
-  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  background: color-mix(in srgb, var(--color-secondary) 22%, transparent);
 }
 
 .markdown-editor-shell .cm-diff-line {
@@ -122,7 +122,7 @@
 }
 
 .markdown-editor-shell .cm-wiki-link-resolved {
-  color: var(--color-accent);
+  color: var(--color-secondary);
 }
 
 .markdown-editor-shell .cm-wiki-link-ambiguous {

@@ -24,7 +24,8 @@
   background: var(--color-surface);
 }
 
-.right-panel-build-project .right-panel-surface {
+.right-panel-build-project .right-panel-surface,
+.right-panel-agent-chat .right-panel-surface {
   background: color-mix(in srgb, var(--color-secondary) 30%, transparent);
 }
 
@@ -50,7 +51,7 @@
   left: 8px;
   width: 12px;
   height: 72px;
-  border: 1px solid color-mix(in srgb, var(--color-border) 86%, var(--color-accent));
+  border: 1px solid color-mix(in srgb, var(--color-border) 86%, var(--color-secondary));
   border-radius: 999px;
   background:
     radial-gradient(circle, color-mix(in srgb, var(--color-secondary) 72%, transparent) 1.5px, transparent 2px) center / 6px 10px repeat-y,
@@ -78,9 +79,9 @@
 
 .right-panel-resize-handle:hover::before,
 .right-panel-resize-handle:focus-visible::before {
-  border-color: var(--color-accent);
+  border-color: var(--color-secondary);
   background:
-    radial-gradient(circle, var(--color-accent) 1.5px, transparent 2px) center / 6px 10px repeat-y,
+    radial-gradient(circle, var(--color-secondary) 1.5px, transparent 2px) center / 6px 10px repeat-y,
     var(--color-surface);
   opacity: 1;
   transform: translateY(-50%) scale(1.08);
@@ -89,11 +90,11 @@
 .right-panel-resize-handle:hover::after,
 .right-panel-resize-handle:focus-visible::after {
   width: 3px;
-  background: color-mix(in srgb, var(--color-accent) 64%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 64%, var(--color-border));
 }
 
 .right-panel-resize-handle:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-accent) 28%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--color-secondary) 28%, transparent);
   outline-offset: -2px;
 }
 
@@ -119,9 +120,9 @@
 
 .right-panel-close-button:hover,
 .right-panel-close-button:focus-visible {
-  border-color: color-mix(in srgb, var(--color-accent) 44%, var(--color-border));
+  border-color: color-mix(in srgb, var(--color-secondary) 44%, var(--color-border));
   color: var(--color-primary);
-  outline: 2px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--color-secondary) 22%, transparent);
   outline-offset: 2px;
 }
 
@@ -141,12 +142,12 @@
 
 .right-panel-open-button {
   position: fixed;
-  top: 69px;
+  top: 58px;
   right: 18px;
   z-index: 60;
-  padding: 9px 12px;
+  padding: 5px 12px;
   border-radius: 999px;
-  background: var(--color-accent);
+  background: var(--color-secondary);
   color: white;
   font-size: 0.82rem;
   font-weight: 900;
@@ -155,8 +156,8 @@
 .right-panel-open-button.active,
 .right-panel-open-button:hover,
 .right-panel-open-button:focus-visible {
-  background: color-mix(in srgb, var(--color-accent) 86%, var(--color-console-background));
-  outline: 2px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--color-secondary) 86%, var(--color-console-background));
+  outline: 2px solid color-mix(in srgb, var(--color-secondary) 30%, transparent);
   outline-offset: 2px;
 }
 
@@ -215,15 +216,9 @@
 .right-panel-mode-switch button[aria-pressed="true"],
 .right-panel-mode-switch button:hover,
 .right-panel-mode-switch button:focus-visible {
-  background: var(--color-accent);
-  color: white;
-  outline: none;
-}
-
-.build-project-panel .right-panel-mode-switch button.active,
-.build-project-panel .right-panel-mode-switch button[aria-pressed="true"] {
   background: var(--color-secondary);
   color: white;
+  outline: none;
 }
 
 
@@ -665,7 +660,7 @@
 
 .agent-conversation-title-trigger:hover,
 .agent-conversation-title-trigger:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--color-secondary) 18%, transparent);
   outline-offset: 4px;
 }
 
@@ -699,8 +694,8 @@
 }
 
 .agent-history-filter:focus {
-  border-color: color-mix(in srgb, var(--color-accent) 54%, var(--color-border));
-  outline-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  border-color: color-mix(in srgb, var(--color-secondary) 54%, var(--color-border));
+  outline-color: color-mix(in srgb, var(--color-secondary) 20%, transparent);
 }
 
 .agent-history-list {
@@ -752,8 +747,8 @@
 .agent-history-item:hover,
 .agent-history-item:focus-visible,
 .agent-history-item.active {
-  border-color: color-mix(in srgb, var(--color-accent) 34%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent) 8%, white);
+  border-color: color-mix(in srgb, var(--color-secondary) 34%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 8%, white);
   outline: none;
 }
 
@@ -803,7 +798,7 @@
 }
 
 .agent-file-context-editable .agent-context-label {
-  color: var(--color-accent);
+  color: var(--color-secondary);
 }
 
 .agent-context-label-button {
@@ -821,7 +816,7 @@
 
 .agent-context-label-button:hover,
 .agent-context-label-button:focus-visible {
-  color: var(--color-accent);
+  color: var(--color-secondary);
   outline: none;
 }
 
@@ -839,9 +834,9 @@
   gap: 9px;
   margin: 0 12px;
   padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 36%, var(--color-border));
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 36%, var(--color-border));
   border-radius: 14px;
-  background: color-mix(in srgb, var(--color-accent) 7%, var(--color-surface));
+  background: color-mix(in srgb, var(--color-secondary) 7%, var(--color-surface));
 }
 
 .agent-edit-proposal-header {
@@ -891,8 +886,8 @@
 
 .agent-edit-proposal-apply {
   justify-self: end;
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-secondary);
+  background: var(--color-secondary);
   color: white;
 }
 
@@ -989,9 +984,9 @@
 }
 
 .agent-edit-proposal-badge.memory {
-  border-color: color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
-  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-secondary) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 10%, var(--color-surface));
+  color: var(--color-secondary);
 }
 
 .agent-edit-proposal-details {
@@ -1001,7 +996,7 @@
 
 .agent-edit-proposal-details summary {
   cursor: pointer;
-  color: var(--color-accent);
+  color: var(--color-secondary);
   font-size: 0.7rem;
   font-weight: 900;
 }
@@ -1057,7 +1052,7 @@
   gap: 7px;
   margin: 0 12px;
   padding: 6px 34px 6px 9px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 24%, var(--color-border));
   border-radius: 12px;
   background: color-mix(in srgb, var(--color-surface) 92%, var(--color-background));
 }
@@ -1092,10 +1087,10 @@
 
 .agent-current-file-action-button {
   padding: 4px 7px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 44%, var(--color-border));
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 44%, var(--color-border));
   border-radius: 999px;
   background: transparent;
-  color: var(--color-accent);
+  color: var(--color-secondary);
   font-size: 0.72rem;
   font-weight: 800;
   white-space: nowrap;
@@ -1112,10 +1107,10 @@
 
 .agent-current-file-action-button:hover:not(:disabled),
 .agent-current-file-action-button:focus-visible {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-secondary);
+  background: var(--color-secondary);
   color: white;
-  outline: 2px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--color-secondary) 22%, transparent);
   outline-offset: 2px;
 }
 
@@ -1150,9 +1145,9 @@
 
 .agent-current-file-help summary:hover,
 .agent-current-file-help summary:focus-visible {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-  outline: 2px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+  border-color: var(--color-secondary);
+  color: var(--color-secondary);
+  outline: 2px solid color-mix(in srgb, var(--color-secondary) 18%, transparent);
   outline-offset: 2px;
 }
 
@@ -1223,14 +1218,14 @@
 }
 
 .agent-file-context-editable .agent-context-chip {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  border-color: var(--color-secondary);
+  color: var(--color-secondary);
 }
 
 .agent-context-chip.highlighted {
-  border-color: color-mix(in srgb, var(--color-accent) 52%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent) 14%, white);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--color-secondary) 52%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 14%, white);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-secondary) 18%, transparent);
 }
 
 .agent-context-chips code {
@@ -1247,7 +1242,7 @@
 
 .agent-context-chip small {
   flex: 0 0 auto;
-  color: var(--color-accent);
+  color: var(--color-secondary);
   font-size: 0.62rem;
   font-weight: 900;
   letter-spacing: 0.04em;
@@ -1348,7 +1343,7 @@
 
 .agent-file-picker-results button:hover,
 .agent-file-picker-results button:focus-visible {
-  background: color-mix(in srgb, var(--color-accent) 8%, white);
+  background: color-mix(in srgb, var(--color-secondary) 8%, white);
   outline: none;
 }
 
