@@ -180,7 +180,7 @@ export const writeFileBodySchema = filePathBodySchema.extend({
 });
 
 export const treeSectionParamsSchema = z.object({
-  section: z.enum(["requirements", "human", "inputs-ai", "outputs", "logs"]),
+  section: z.enum(["requirements", "human", "sources", "inputs-ai", "outputs", "logs"]),
 });
 
 export const filePathQuerySchema = z.object({

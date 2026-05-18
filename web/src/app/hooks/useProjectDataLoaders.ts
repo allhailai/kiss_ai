@@ -76,15 +76,16 @@ export function useProjectDataLoaders({
 
   const refreshProjectFiles = useCallback(async () => {
     const projectSlug = requireSelectedProjectSlug();
-    const [requirements, human, inputsAi, outputs] = await Promise.all([
+    const [requirements, human, sources, inputsAi, outputs] = await Promise.all([
       api.tree(projectSlug, "requirements"),
       api.tree(projectSlug, "human"),
+      api.tree(projectSlug, "sources"),
       api.tree(projectSlug, "inputs-ai"),
       api.tree(projectSlug, "outputs"),
     ]);
 
     if (selectedProjectSlugRef.current === projectSlug) {
-      setProjectFiles(uniqueFiles([...requirements.files, ...human.files, ...inputsAi.files, ...outputs.files, designProjectFile]));
+      setProjectFiles(uniqueFiles([...requirements.files, ...human.files, ...sources.files, ...inputsAi.files, ...outputs.files, designProjectFile]));
       setHumanInputEmptyDirectories(human.emptyDirectories ?? []);
     }
   }, [requireSelectedProjectSlug, setHumanInputEmptyDirectories, setProjectFiles]);
