@@ -24,11 +24,11 @@ class DiffDeletionWidget extends WidgetType {
 }
 
 export function buildEditorDiffExtension({
-  unsavedDiff,
-  savedDiff,
+  getUnsavedDiff,
+  getSavedDiff,
 }: {
-  unsavedDiff: EditorDiff;
-  savedDiff: FileDiff | null;
+  getUnsavedDiff: () => EditorDiff;
+  getSavedDiff: () => FileDiff | null;
 }): Extension {
   type DiffDecorationEntry = {
     from: number;
@@ -69,6 +69,8 @@ export function buildEditorDiffExtension({
   }
 
   function buildDecorations(view: EditorView) {
+    const unsavedDiff = getUnsavedDiff();
+    const savedDiff = getSavedDiff();
     const entries: DiffDecorationEntry[] = [];
 
     addRangeDecorations(entries, view, savedDiff?.ranges ?? [], "cm-diff-line cm-diff-saved-line");
@@ -101,3 +103,4 @@ export function buildEditorDiffExtension({
     },
   );
 }
+

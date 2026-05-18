@@ -10,6 +10,8 @@ This agent run should complete in 1–3 minutes. The output is a single JSON fil
 
 ## Instructions
 
+### Phase 1: Read Context
+
 1. Read `project.md` to understand:
    - The project's thesis, topics, and key questions.
    - The directed outputs list (what evidence is needed to build them).
@@ -25,11 +27,15 @@ This agent run should complete in 1–3 minutes. The output is a single JSON fil
    - Remove URLs that are no longer relevant (e.g., if a topic was removed from project.md).
    - If no previous plan exists, generate from scratch.
 
+### Phase 2: Search
+
 5. **Search the web** for evidence that supports, refutes, or expands on the project's topics. For each topic area:
    - Search for primary sources: government data, corporate filings, annual reports, technical papers.
    - Search for secondary sources: trade press, industry analysis, expert commentary.
    - Search for contrarian sources: evidence that challenges the project thesis.
    - Aim for 2–4 URLs per major topic. Quality over quantity.
+
+### Phase 3: Write Plan
 
 6. Write `sources/research_plan.json` with this structure:
 
@@ -52,7 +58,7 @@ This agent run should complete in 1–3 minutes. The output is a single JSON fil
 }
 ```
 
-### Freshness values
+#### Freshness values
 
 - **`stable`**: Source content will not change. Corporate annual reports, academic papers, static government data, historical datasets. The pipeline will never re-fetch these.
 - **`default`**: Source content may change over weeks. Trade press articles, industry analysis, consultancy reports. The pipeline will re-fetch these after 7 days.

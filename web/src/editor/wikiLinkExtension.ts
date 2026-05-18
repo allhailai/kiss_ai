@@ -59,17 +59,18 @@ class MarkdownLinkWidget extends WidgetType {
 }
 
 export function buildWikiLinkExtension({
-  files,
+  getFiles,
   selectedPath,
-  onOpenFile,
+  getOnOpenFile,
 }: {
-  files: ProjectFile[];
+  getFiles: () => ProjectFile[];
   selectedPath: string | null;
-  onOpenFile: (path: string) => void;
+  getOnOpenFile: () => (path: string) => void;
 }): Extension {
-  const linkIndex = createLinkResolutionIndex(files, selectedPath);
-
   function buildDecorations(view: import("@codemirror/view").EditorView) {
+    const files = getFiles();
+    const onOpenFile = getOnOpenFile();
+    const linkIndex = createLinkResolutionIndex(files, selectedPath);
     const builder = new RangeSetBuilder<Decoration>();
 
     for (const { from, to } of view.visibleRanges) {

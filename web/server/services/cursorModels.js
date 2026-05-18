@@ -165,6 +165,24 @@ export function createCursorModelService({ WEB_ROOT, httpError, warnedCursorKeyM
       }));
   }
 
+  /**
+   * Find the latest Composer model by scanning available models for IDs matching
+   * "composer-<version>" and selecting the one with the highest version number.
+   * Returns the model ID string, or null if no Composer models are available.
+   */
+  function findLatestComposerModelId(models) {
+    const composerModels = models
+      .filter((model) => /^composer-/i.test(model.id))
+      .map((model) => {
+        const versionMatch = model.id.match(/^composer-(.+)$/i);
+        return { id: model.id, version: versionMatch ? parseFloat(versionMatch[1]) : 0 };
+      })
+      .filter((entry) => !Number.isNaN(entry.version))
+      .sort((a, b) => b.version - a.version);
+
+    return composerModels[0]?.id ?? null;
+  }
+
   function pickRebuildModelId(models, requestedModelId) {
     const availableModelIds = new Set(models.map((model) => model.id));
     const trimmedRequestedModelId = requestedModelId?.trim() || "";
@@ -174,9 +192,10 @@ export function createCursorModelService({ WEB_ROOT, httpError, warnedCursorKeyM
       throw httpError(`Cannot use this model: ${trimmedRequestedModelId}. Available models: ${models.map((model) => model.id).join(", ")}.`);
     }
 
+    const latestComposer = findLatestComposerModelId(models);
     const mediumOpenAiModel = models.find((model) => model.tier === "medium" && /^gpt-/.test(model.id));
     const mediumModel = models.find((model) => model.tier === "medium");
-    const preferredModelIds = [process.env.CURSOR_MODEL?.trim(), "composer-2", mediumOpenAiModel?.id, mediumModel?.id].filter(Boolean);
+    const preferredModelIds = [process.env.CURSOR_MODEL?.trim(), latestComposer, mediumOpenAiModel?.id, mediumModel?.id].filter(Boolean);
     return preferredModelIds.find((modelId) => availableModelIds.has(modelId)) ?? models[0]?.id ?? "composer-2";
   }
 

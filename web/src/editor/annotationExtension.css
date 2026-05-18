@@ -261,6 +261,79 @@
   color: #e53935;
 }
 
+/* ── Accepted suggestion state ───────────────────────── */
+
+.cm-annotation-accepted {
+  background: color-mix(in srgb, #43a047 8%, transparent);
+  border-left-color: #43a047;
+}
+
+.cm-annotation-accepted .cm-annotation-label {
+  color: #43a047;
+  opacity: 1;
+}
+
+.cm-annotation-accepted .cm-annotation-status {
+  font-size: 0.65rem;
+  font-style: italic;
+  color: #666;
+  margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── Dismissed suggestion state ──────────────────────── */
+
+.cm-annotation-dismissed {
+  background: color-mix(in srgb, var(--color-annotation) 3%, transparent);
+  border-left-color: #999;
+  opacity: 0.6;
+}
+
+.cm-annotation-dismissed .cm-annotation-label {
+  color: #999;
+  opacity: 1;
+}
+
+.cm-annotation-dismissed .cm-annotation-text {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.cm-annotation-dismissed .cm-annotation-status {
+  font-size: 0.65rem;
+  font-style: italic;
+  color: #999;
+  margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── Undo button (shared by accepted and dismissed) ── */
+
+.cm-annotation-undo {
+  background: transparent;
+  color: #666;
+  border-color: transparent;
+}
+
+.cm-annotation-undo:hover {
+  background: color-mix(in srgb, var(--color-annotation) 12%, transparent);
+  color: var(--color-annotation);
+}
+
+/* Show actions on hover for accepted/dismissed states */
+.cm-annotation-accepted .cm-annotation-actions,
+.cm-annotation-dismissed .cm-annotation-actions {
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.cm-annotation-accepted:hover .cm-annotation-actions,
+.cm-annotation-dismissed:hover .cm-annotation-actions {
+  opacity: 1;
+}
+
 /* ── Comment gutter [+] button ────────────────────────── */
 
 .cm-feedback-gutter {

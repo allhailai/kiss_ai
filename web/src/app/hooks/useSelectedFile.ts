@@ -91,7 +91,13 @@ export function useSelectedFile({
 
       setSelected(saved);
       setSelectedDiff(diff);
-      setDraft(saved.content);
+      // Only update draft if the server returned different content (e.g. server-side
+      // normalization). If the content is identical to what we sent, skip setDraft —
+      // this prevents CodeMirror from receiving a new value prop, which would reset
+      // scroll position (the main cause of jumping to top on annotation accept/dismiss).
+      if (saved.content !== draft) {
+        setDraft(saved.content);
+      }
 
       if (isDesignIdentityPath(saved.path)) {
         await refreshDesign();

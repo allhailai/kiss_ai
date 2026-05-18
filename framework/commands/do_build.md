@@ -61,13 +61,13 @@ Two marker types exist in AI-managed markdown files:
 1. Read `project.md` in full. This is the single source of truth for project goals, topics, context, constraints, directed output requirements, and output guidance.
 2. Read `human_design_identity.md` for project identity and design tokens.
 3. Read `.build/manifest.json` if it exists. If it does not exist, this is a first build.
-4. Read `questions.md` if it exists, for context on unresolved decisions.
+4. Read `questions.md` if it exists. Scan each item under `## Open Questions` for a user-provided answer — the user answers inline by appending text such as `Answer:` to the question line. Collect all answered questions for processing in Phase 10. Treat unanswered open questions as context for the current build.
 
 ### Phase 2: Scan Annotations
 
 5. Scan all markdown files under `sources/**` and `outputs_ai/**` for `<!-- FEEDBACK: ... -->` markers. Collect them with their file path and position.
-6. Scan all markdown files under `sources/**` and `outputs_ai/**` for `<!-- AI_SUGGESTION: ... -->` markers. Check whether each has been accepted or dismissed by the user. Collect accepted suggestions for execution.
-7. Remove dismissed `AI_SUGGESTION` markers from files.
+6. Scan all markdown files under `sources/**` and `outputs_ai/**` for `<!-- AI_SUGGESTION: ... -->` markers. The user flags suggestions via the UI: accepted markers contain `[ACCEPTED]` (e.g., `<!-- AI_SUGGESTION: [ACCEPTED] add a row ... -->`), dismissed markers contain `[DISMISSED]`. Unflagged markers are carried forward. Collect accepted suggestions for execution.
+7. Remove `[DISMISSED]` AI_SUGGESTION markers from files (delete the entire HTML comment line).
 
 ### Phase 3: Follow Build Scope Directive
 
@@ -124,7 +124,7 @@ Source files have been fetched and written to `sources/web_research/` by the bui
     - On subsequent builds: update current-data sections with fresh evidence. Leave stable analytical content (definitions, historical context, mechanisms) unless `project.md` has changed those topics or FEEDBACK markers request changes.
 19. The wiki structure is dynamic. The AI may add, split, merge, or rename pages when doing so improves readability and organization. When restructuring, mention the change in the build log entry.
 20. Wiki pages should:
-    - Begin with a Summary section.
+    - **Big Idea Up Front (BLUF):** Begin with an executive summary that states the most important finding or conclusion from the gathered evidence. The reader should understand the key takeaway without reading further. Then within each section and subsection, lead with the section-level conclusion or key finding before expanding into supporting evidence and detail. The goal: a reader can stop at any depth and still have the most important information for that level.
     - Cite sources with links to source files or URLs for every factual claim.
     - Include specific data: numbers, dates, named entities, direct quotes where available.
     - Surface open questions near the end.
@@ -140,6 +140,7 @@ Source files have been fetched and written to `sources/web_research/` by the bui
     - On subsequent builds: refresh current-data sections. Leave stable analytical content unless affected by a FEEDBACK marker or `project.md` change.
 23. For dated reports (e.g., `outputs_ai/reports/YYYY_MM_DD_*.md`): always generate fresh for the current date. Do not overwrite prior dated reports.
 24. All directed outputs should:
+    - **Big Idea Up Front (BLUF):** Open with an executive summary or key-finding statement that gives the reader the most important conclusion immediately. Within each section, lead with the section-level takeaway before presenting supporting data. Within tables or dashboards, surface the most critical rows or rankings prominently. The reader should be able to stop reading at any level and still hold the most important information for that level.
     - Cite sources for every factual claim. If a claim has no source, mark it as unsourced.
     - Distinguish facts from forecasts, scenarios, and interpretations.
     - Surface low-confidence areas and evidence gaps explicitly.
@@ -175,7 +176,11 @@ Each suggestion should be:
 - Actionable — clear what happens if the user accepts.
 - Self-contained — understandable without reading other files.
 
-30. Update `questions.md` with any new items that require user judgment or information the AI cannot infer. Do not duplicate items already in `questions.md`.
+30. Process answered questions collected in Step 4:
+    - For each answered question, determine where the answer should be applied: update `project.md` (e.g., add to `## Output Guidance` or `## Constraints`), adjust output content, or both.
+    - Apply the answer: make the concrete changes to the relevant files so the answer is reflected in the project going forward.
+    - Move the question from `## Open Questions` to `## Resolved Questions`, preserving both the original question text and the user's answer.
+31. Add any new items to `## Open Questions` in `questions.md` that require user judgment or information the AI cannot infer. Do not duplicate items already present.
 
 ### Phase 11: Record and Snapshot
 
