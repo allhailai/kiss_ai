@@ -323,6 +323,27 @@
   padding: 4px;
 }
 
+/* OS file-upload drop zone wrapper (always rendered by FileTreeBlock) */
+
+.file-tree-upload-zone {
+  min-height: 60px;
+  border: 2px dashed transparent;
+  border-radius: 8px;
+  padding: 4px;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.file-tree-upload-zone.drag-active {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 20%, transparent);
+}
+
+.file-tree-upload-zone.drag-active .simple-nav-state {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
 .file-tree-file[draggable="true"] {
   cursor: grab;
 }

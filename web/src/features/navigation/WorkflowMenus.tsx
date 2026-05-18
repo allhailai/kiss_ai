@@ -27,6 +27,7 @@ export function SimplifiedNavigator({
   onDeleteFolder,
   onDeleteHumanInputFile,
   onMoveFile,
+  onUploadFiles,
   onOpenView,
   onOpenFile,
 }: {
@@ -40,6 +41,7 @@ export function SimplifiedNavigator({
   onDeleteFolder?: (folder: string) => void;
   onDeleteHumanInputFile?: (path: string) => void;
   onMoveFile?: (sourcePath: string, targetFolder: string) => void;
+  onUploadFiles?: (files: File[]) => Promise<void>;
   onOpenView: (view: View, path?: string | null) => void;
   onOpenFile: (path: string) => void;
 }) {
@@ -169,6 +171,7 @@ export function SimplifiedNavigator({
             onDeleteFile={onDeleteHumanInputFile}
             onDeleteFolder={onDeleteFolder}
             onMoveFile={onMoveFile}
+            onUploadFiles={onUploadFiles}
             onOpenFile={onOpenFile}
             selectedPath={selectedPath}
           />
@@ -318,6 +321,7 @@ function FileTreeBlock({
   onDeleteFile,
   onDeleteFolder,
   onMoveFile,
+  onUploadFiles,
   onOpenFile,
 }: {
   emptyLabel: string;
@@ -329,12 +333,81 @@ function FileTreeBlock({
   onDeleteFile?: (path: string) => void;
   onDeleteFolder?: (folder: string) => void;
   onMoveFile?: (sourcePath: string, targetFolder: string) => void;
+  onUploadFiles?: (files: File[]) => Promise<void>;
   onOpenFile: (path: string) => void;
 }) {
-  if (loading) return <p className="simple-nav-state">Loading...</p>;
-  if (files.length === 0 && (!emptyDirectories || emptyDirectories.length === 0)) return <p className="simple-nav-state">{emptyLabel}</p>;
+  const [dragActive, setDragActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const dragDepthRef = useRef(0);
 
-  return <FileTreeNav files={files} emptyDirectories={emptyDirectories} selectedPath={selectedPath} onCreateTextFile={onCreateTextFile} onDeleteFile={onDeleteFile} onDeleteFolder={onDeleteFolder} onMoveFile={onMoveFile} onSelectFile={onOpenFile} />;
+  if (loading) return <p className="simple-nav-state">Loading...</p>;
+
+  const hasContent = files.length > 0 || (emptyDirectories && emptyDirectories.length > 0);
+
+  async function handleUpload(fileList: FileList | File[]) {
+    const uploadFiles = Array.from(fileList);
+    if (!uploadFiles.length || !onUploadFiles) return;
+
+    setUploading(true);
+    try {
+      await onUploadFiles(uploadFiles);
+    } catch {
+      // Parent upload handler owns the user-facing error notice.
+    } finally {
+      setUploading(false);
+      dragDepthRef.current = 0;
+      setDragActive(false);
+    }
+  }
+
+  const content = hasContent ? (
+    <FileTreeNav
+      files={files}
+      emptyDirectories={emptyDirectories}
+      selectedPath={selectedPath}
+      onCreateTextFile={onCreateTextFile}
+      onDeleteFile={onDeleteFile}
+      onDeleteFolder={onDeleteFolder}
+      onMoveFile={onMoveFile}
+      onSelectFile={onOpenFile}
+    />
+  ) : (
+    <p className="simple-nav-state">
+      {uploading ? "Uploading..." : dragActive ? "Drop files here" : emptyLabel}
+    </p>
+  );
+
+  // Without upload support, render content directly (no drop wrapper needed).
+  if (!onUploadFiles) return content;
+
+  return (
+    <div
+      className={`file-tree-upload-zone${dragActive ? " drag-active" : ""}`}
+      onDragEnter={(event) => {
+        event.preventDefault();
+        dragDepthRef.current += 1;
+        setDragActive(true);
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+      }}
+      onDragLeave={() => {
+        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+        if (dragDepthRef.current === 0) setDragActive(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        dragDepthRef.current = 0;
+        setDragActive(false);
+        if (event.dataTransfer.files.length > 0) {
+          void handleUpload(event.dataTransfer.files);
+        }
+      }}
+    >
+      {content}
+    </div>
+  );
 }
 
 function DefineNavLabel({ label }: { label: string }) {

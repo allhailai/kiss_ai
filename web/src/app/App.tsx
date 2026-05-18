@@ -366,6 +366,7 @@ export function App() {
           onDeleteFolder={(folder) => void fileWorkspace.deleteHumanInputFolder(folder)}
           onDeleteHumanInputFile={(path) => void fileWorkspace.deleteHumanInputFile(path)}
           onMoveFile={(sourcePath, targetFolder) => void fileWorkspace.moveHumanInputFile(sourcePath, targetFolder)}
+          onUploadFiles={fileWorkspace.uploadHumanInputFiles}
           onOpenFile={openProjectFileWithAgentContext}
           onOpenView={(nextView, filePath) => navigateTo(nextView, filePath)}
         />

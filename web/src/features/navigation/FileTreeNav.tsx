@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import type { ProjectFile } from "../../contracts/api";
 import { buildFileTree, getAncestorDirectoryKeys, humanizePathSegment, type FileTreeNode } from "../../domain/files";
 
@@ -29,6 +29,9 @@ export function FileTreeNav({
   const [expandedDirectories, setExpandedDirectories] = useState<Set<string>>(new Set());
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
   const [inlineCreateFolder, setInlineCreateFolder] = useState<string | null>(null);
+
+  // Track the path being dragged in a ref so it survives across events reliably.
+  const draggingPathRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (selectedAncestorKeys.length === 0) return;
@@ -61,44 +64,6 @@ export function FileTreeNav({
     });
   }
 
-  const handleDragOver = useCallback((event: DragEvent, target: string) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    setDragOverTarget(target);
-  }, []);
-
-  const handleDragLeave = useCallback(() => {
-    setDragOverTarget(null);
-  }, []);
-
-  const handleDrop = useCallback(
-    (event: DragEvent, targetFolder: string) => {
-      event.preventDefault();
-      setDragOverTarget(null);
-
-      const sourcePath = event.dataTransfer.getData("text/x-kiss-file-path");
-      if (!sourcePath || !onMoveFile) return;
-
-      onMoveFile(sourcePath, targetFolder);
-    },
-    [onMoveFile],
-  );
-
-  const handleRootDragOver = useCallback(
-    (event: DragEvent) => {
-      if (!onMoveFile) return;
-      handleDragOver(event, "__root__");
-    },
-    [handleDragOver, onMoveFile],
-  );
-
-  const handleRootDrop = useCallback(
-    (event: DragEvent) => {
-      handleDrop(event, "");
-    },
-    [handleDrop],
-  );
-
   const handleToggleInlineCreate = useCallback((folderName: string) => {
     setInlineCreateFolder((current) => (current === folderName ? null : folderName));
   }, []);
@@ -113,13 +78,50 @@ export function FileTreeNav({
     [onCreateTextFile],
   );
 
+  const handleFileDragStart = useCallback(
+    (event: DragEvent<HTMLButtonElement | HTMLDivElement>, filePath: string) => {
+      draggingPathRef.current = filePath;
+      event.dataTransfer.setData("text/x-kiss-file-path", filePath);
+      event.dataTransfer.effectAllowed = "move";
+    },
+    [],
+  );
+
+  const handleDrop = useCallback(
+    (event: DragEvent, targetFolder: string) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setDragOverTarget(null);
+
+      const sourcePath = draggingPathRef.current ?? event.dataTransfer.getData("text/x-kiss-file-path");
+      draggingPathRef.current = null;
+      if (!sourcePath || !onMoveFile) return;
+
+      onMoveFile(sourcePath, targetFolder);
+    },
+    [onMoveFile],
+  );
+
   return (
     <div
       className={`file-tree${dragOverTarget === "__root__" ? " file-tree-drop-target" : ""}`}
       role="tree"
-      onDragOver={onMoveFile ? handleRootDragOver : undefined}
-      onDragLeave={onMoveFile ? handleDragLeave : undefined}
-      onDrop={onMoveFile ? handleRootDrop : undefined}
+      onDragOver={onMoveFile ? (event) => {
+        event.preventDefault();
+        if (!draggingPathRef.current) return;
+        event.dataTransfer.dropEffect = "move";
+        setDragOverTarget("__root__");
+      } : undefined}
+      onDragLeave={onMoveFile ? (event) => {
+        const related = event.relatedTarget as Node | null;
+        if (!event.currentTarget.contains(related)) {
+          setDragOverTarget(null);
+        }
+      } : undefined}
+      onDrop={onMoveFile ? (event) => {
+        if (!draggingPathRef.current) return;
+        handleDrop(event, "");
+      } : undefined}
     >
       {tree.map((node) => (
         <FileTreeNodeRow
@@ -132,9 +134,10 @@ export function FileTreeNav({
           onCreateTextFile={onCreateTextFile}
           onDeleteFile={onDeleteFile}
           onDeleteFolder={onDeleteFolder}
-          onDragLeave={onMoveFile ? handleDragLeave : undefined}
-          onDragOver={onMoveFile ? handleDragOver : undefined}
+          onFileDragStart={onMoveFile ? handleFileDragStart : undefined}
           onDrop={onMoveFile ? handleDrop : undefined}
+          setDragOverTarget={onMoveFile ? setDragOverTarget : undefined}
+          draggingPathRef={onMoveFile ? draggingPathRef : undefined}
           onInlineCreateSubmit={handleInlineCreateSubmit}
           onMoveFile={onMoveFile}
           onSelectFile={onSelectFile}
@@ -147,6 +150,7 @@ export function FileTreeNav({
   );
 }
 
+
 function FileTreeNodeRow({
   node,
   depth,
@@ -157,14 +161,15 @@ function FileTreeNodeRow({
   onCreateTextFile,
   onDeleteFile,
   onDeleteFolder,
-  onDragLeave,
-  onDragOver,
   onDrop,
+  onFileDragStart,
   onInlineCreateSubmit,
   onMoveFile,
   onSelectFile,
   onToggleDirectory,
   onToggleInlineCreate,
+  setDragOverTarget,
+  draggingPathRef,
 }: {
   node: FileTreeNode;
   depth: number;
@@ -175,14 +180,15 @@ function FileTreeNodeRow({
   onCreateTextFile?: (name: string, folder?: string) => void;
   onDeleteFile?: (path: string) => void;
   onDeleteFolder?: (folder: string) => void;
-  onDragLeave?: () => void;
-  onDragOver?: (event: DragEvent, target: string) => void;
   onDrop?: (event: DragEvent, targetFolder: string) => void;
+  onFileDragStart?: (event: DragEvent<HTMLButtonElement | HTMLDivElement>, filePath: string) => void;
   onInlineCreateSubmit: (name: string, folder: string) => void;
   onMoveFile?: (sourcePath: string, targetFolder: string) => void;
   onSelectFile: (path: string) => void;
   onToggleDirectory: (directoryKey: string) => void;
   onToggleInlineCreate: (folderName: string) => void;
+  setDragOverTarget?: (target: string | null) => void;
+  draggingPathRef?: React.RefObject<string | null>;
 }) {
   const depthStyle = { "--tree-depth": String(Math.min(depth, 6)) } as CSSProperties;
 
@@ -194,6 +200,8 @@ function FileTreeNodeRow({
     const hasDirectoryActions = onDeleteFolder || onCreateTextFile;
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [pendingDeleteFolder, setPendingDeleteFolder] = useState(false);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const dragDepthRef = useRef(0);
 
     return (
       <div className="file-tree-node">
@@ -201,31 +209,40 @@ function FileTreeNodeRow({
           className={`file-tree-row file-tree-directory${isDragOver ? " file-tree-drop-target" : ""}${hasDirectoryActions ? " with-dir-actions" : ""}`}
           style={depthStyle}
           title={node.fullPath}
-          onDragOver={
-            onDragOver
-              ? (event: DragEvent<HTMLDivElement>) => {
-                  event.stopPropagation();
-                  onDragOver(event, node.key);
-                }
-              : undefined
-          }
-          onDragLeave={
-            onDragLeave
-              ? (event: DragEvent<HTMLDivElement>) => {
-                  event.stopPropagation();
-                  onDragLeave();
-                }
-              : undefined
-          }
-          onDrop={
-            onDrop
-              ? (event: DragEvent<HTMLDivElement>) => {
-                  event.stopPropagation();
-                  onDrop(event, node.name);
-                }
-              : undefined
-          }
+          onDragEnter={setDragOverTarget && draggingPathRef
+            ? (event: DragEvent<HTMLDivElement>) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!draggingPathRef.current) return;
+                dragDepthRef.current += 1;
+                setDragOverTarget(node.key);
+              }
+            : undefined}
+          onDragLeave={setDragOverTarget && draggingPathRef
+            ? (event: DragEvent<HTMLDivElement>) => {
+                event.stopPropagation();
+                if (!draggingPathRef.current) return;
+                dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+                if (dragDepthRef.current === 0) setDragOverTarget(null);
+              }
+            : undefined}
+          onDragOver={setDragOverTarget && draggingPathRef
+            ? (event: DragEvent<HTMLDivElement>) => {
+                // Always prevent default to stop browser from navigating to dropped OS files.
+                event.preventDefault();
+                event.stopPropagation();
+                if (!draggingPathRef.current) return;
+                event.dataTransfer.dropEffect = "move";
+              }
+            : undefined}
+          onDrop={onDrop
+            ? (event: DragEvent<HTMLDivElement>) => {
+                dragDepthRef.current = 0;
+                onDrop(event, node.name);
+              }
+            : undefined}
         >
+
           <button
             aria-expanded={isExpanded}
             className="file-tree-dir-toggle"
@@ -318,14 +335,15 @@ function FileTreeNodeRow({
                 onCreateTextFile={onCreateTextFile}
                 onDeleteFile={onDeleteFile}
                 onDeleteFolder={onDeleteFolder}
-                onDragLeave={onDragLeave}
-                onDragOver={onDragOver}
                 onDrop={onDrop}
+                onFileDragStart={onFileDragStart}
                 onInlineCreateSubmit={onInlineCreateSubmit}
                 onMoveFile={onMoveFile}
                 onSelectFile={onSelectFile}
                 onToggleDirectory={onToggleDirectory}
                 onToggleInlineCreate={onToggleInlineCreate}
+                setDragOverTarget={setDragOverTarget}
+                draggingPathRef={draggingPathRef}
                 selectedPath={selectedPath}
               />
             ))}
@@ -344,13 +362,6 @@ function FileTreeNodeRow({
     .filter(Boolean)
     .join(" ");
 
-  const handleDragStart = onMoveFile
-    ? (event: DragEvent<HTMLButtonElement | HTMLDivElement>) => {
-        event.dataTransfer.setData("text/x-kiss-file-path", node.file.path);
-        event.dataTransfer.effectAllowed = "move";
-      }
-    : undefined;
-
   const fileLabel = (
     <>
       <span className="file-tree-toggle" aria-hidden="true" />
@@ -367,7 +378,7 @@ function FileTreeNodeRow({
         draggable={!!onMoveFile}
         fileLabel={fileLabel}
         filePath={node.file.path}
-        handleDragStart={handleDragStart}
+        onDragStart={onFileDragStart}
         onDeleteFile={onDeleteFile}
         onSelectFile={onSelectFile}
       />
@@ -378,7 +389,7 @@ function FileTreeNodeRow({
     <button
       className={className}
       draggable={!!onMoveFile}
-      onDragStart={handleDragStart}
+      onDragStart={onFileDragStart ? (event) => onFileDragStart(event, node.file.path) : undefined}
       onClick={() => onSelectFile(node.file.path)}
       role="treeitem"
       style={depthStyle}
@@ -395,7 +406,7 @@ function FileRowWithDelete({
   draggable,
   fileLabel,
   filePath,
-  handleDragStart,
+  onDragStart,
   onDeleteFile,
   onSelectFile,
 }: {
@@ -404,7 +415,7 @@ function FileRowWithDelete({
   draggable: boolean;
   fileLabel: React.ReactNode;
   filePath: string;
-  handleDragStart?: (event: DragEvent<HTMLButtonElement | HTMLDivElement>) => void;
+  onDragStart?: (event: DragEvent<HTMLButtonElement | HTMLDivElement>, filePath: string) => void;
   onDeleteFile: (path: string) => void;
   onSelectFile: (path: string) => void;
 }) {
@@ -413,13 +424,17 @@ function FileRowWithDelete({
   return (
     <div
       className={`${className} with-actions`}
-      draggable={draggable}
-      onDragStart={handleDragStart}
       role="treeitem"
       style={depthStyle}
       title={filePath}
     >
-      <button className="file-tree-open-button" onClick={() => onSelectFile(filePath)} type="button">
+      <button
+        className="file-tree-open-button"
+        draggable={draggable}
+        onClick={() => onSelectFile(filePath)}
+        onDragStart={onDragStart ? (event) => onDragStart(event, filePath) : undefined}
+        type="button"
+      >
         {fileLabel}
       </button>
       {pendingDelete ? (
