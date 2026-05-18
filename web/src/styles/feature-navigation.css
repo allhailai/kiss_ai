@@ -275,6 +275,7 @@
   color: var(--color-danger);
 }
 
+
 .file-tree-file.not-previewable {
   grid-template-columns: 0.75rem minmax(0, 1fr) auto;
   color: var(--color-secondary);
@@ -410,5 +411,156 @@
 
 .human-input-name-submit:not(:disabled):hover {
   background: color-mix(in srgb, var(--color-accent) 85%, var(--color-primary));
+}
+
+/* Human Input Action Row (side-by-side buttons) */
+
+.human-input-action-row {
+  display: flex;
+  gap: 3px;
+}
+
+.human-input-action-row .human-input-action-button {
+  flex: 1 1 0%;
+}
+
+/* Directory Row with Actions */
+
+.file-tree-directory.with-dir-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.file-tree-dir-toggle {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 0.75rem minmax(0, 1fr);
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+}
+
+.file-tree-dir-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.file-tree-directory:hover .file-tree-dir-actions,
+.file-tree-directory:focus-within .file-tree-dir-actions {
+  opacity: 1;
+}
+
+.file-tree-dir-action-button {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-secondary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.file-tree-dir-add:hover,
+.file-tree-dir-add:focus-visible {
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface));
+  color: var(--color-accent);
+}
+
+.file-tree-dir-delete:hover,
+.file-tree-dir-delete:focus-visible {
+  background: color-mix(in srgb, var(--color-danger) 12%, white);
+  color: var(--color-danger);
+}
+
+.file-tree-dir-confirm-yes {
+  color: var(--color-danger);
+  font-size: 0.66rem;
+}
+
+.file-tree-dir-confirm-yes:hover,
+.file-tree-dir-confirm-yes:focus-visible {
+  background: color-mix(in srgb, var(--color-danger) 14%, white);
+  color: var(--color-danger);
+}
+
+.file-tree-dir-confirm-no {
+  font-size: 0.66rem;
+}
+
+.file-tree-dir-confirm-no:hover,
+.file-tree-dir-confirm-no:focus-visible {
+  background: color-mix(in srgb, var(--color-secondary) 10%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+/* Inline Create File Form (inside directory) */
+
+.file-tree-inline-form {
+  display: flex;
+  gap: 3px;
+  padding: 2px 4px 2px calc(4px + (var(--tree-depth, 0) * 5px));
+}
+
+.file-tree-inline-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 0.74rem;
+  font-family: inherit;
+  outline: none;
+}
+
+.file-tree-inline-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.file-tree-inline-submit,
+.file-tree-inline-cancel {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.file-tree-inline-submit {
+  color: var(--color-accent);
+}
+
+.file-tree-inline-submit:not(:disabled):hover {
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface));
+}
+
+.file-tree-inline-submit:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.file-tree-inline-cancel {
+  color: var(--color-secondary);
+}
+
+.file-tree-inline-cancel:hover {
+  background: color-mix(in srgb, var(--color-secondary) 10%, var(--color-surface));
 }
 

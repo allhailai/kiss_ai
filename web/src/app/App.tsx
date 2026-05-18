@@ -362,6 +362,8 @@ export function App() {
           projectFiles={fileWorkspace.projectFiles}
           selectedPath={fileWorkspace.selected?.path ?? null}
           onCreateFolder={(name) => void fileWorkspace.createHumanInputFolder(name)}
+          onCreateTextFile={(name, folder) => void fileWorkspace.createHumanInputTextFile(name, folder)}
+          onDeleteFolder={(folder) => void fileWorkspace.deleteHumanInputFolder(folder)}
           onDeleteHumanInputFile={(path) => void fileWorkspace.deleteHumanInputFile(path)}
           onMoveFile={(sourcePath, targetFolder) => void fileWorkspace.moveHumanInputFile(sourcePath, targetFolder)}
           onOpenFile={openProjectFileWithAgentContext}

@@ -1,6 +1,7 @@
 import {
   createHumanInputFolderBodySchema,
   createHumanInputTextFileBodySchema,
+  deleteHumanInputFolderBodySchema,
   filePathBodySchema,
   filePathQuerySchema,
   moveHumanInputFileBodySchema,
@@ -17,6 +18,7 @@ export function registerFileRoutes(app, {
   createHumanInputFolder,
   createHumanInputTextFile,
   deleteHumanInputFile,
+  deleteHumanInputFolder,
   gitFileDiff,
   humanFiles,
   httpError,
@@ -87,7 +89,7 @@ export function registerFileRoutes(app, {
   app.post("/api/projects/:projectSlug/inputs-human/create-text", async (request, response, next) => {
     try {
       const body = parseRequestBody(createHumanInputTextFileBodySchema, request.body, httpError);
-      response.status(201).json(await createHumanInputTextFile(request.project.path, body.name, body.content));
+      response.status(201).json(await createHumanInputTextFile(request.project.path, body.name, body.content, body.folder));
     } catch (error) {
       next(error);
     }
@@ -115,6 +117,15 @@ export function registerFileRoutes(app, {
     try {
       const body = parseRequestBody(filePathBodySchema, request.body, httpError);
       response.json(await deleteHumanInputFile(request.project.path, body.path));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/projects/:projectSlug/inputs-human/folder", async (request, response, next) => {
+    try {
+      const body = parseRequestBody(deleteHumanInputFolderBodySchema, request.body, httpError);
+      response.json(await deleteHumanInputFolder(request.project.path, body.folder));
     } catch (error) {
       next(error);
     }

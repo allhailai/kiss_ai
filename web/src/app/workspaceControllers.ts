@@ -23,7 +23,9 @@ export type RouteController = {
 
 export type FileWorkspaceController = {
   createHumanInputFolder: (name: string) => Promise<void>;
+  createHumanInputTextFile: (name: string, folder?: string) => Promise<void>;
   deleteHumanInputFile: (path: string) => Promise<void>;
+  deleteHumanInputFolder: (folder: string) => Promise<void>;
   moveHumanInputFile: (sourcePath: string, targetFolder: string) => Promise<void>;
   draft: string;
   fileLoading: boolean;

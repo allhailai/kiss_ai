@@ -23,6 +23,8 @@ export function SimplifiedNavigator({
   loading,
   selectedPath,
   onCreateFolder,
+  onCreateTextFile,
+  onDeleteFolder,
   onDeleteHumanInputFile,
   onMoveFile,
   onOpenView,
@@ -34,6 +36,8 @@ export function SimplifiedNavigator({
   loading: boolean;
   selectedPath: string | null;
   onCreateFolder?: (name: string) => void;
+  onCreateTextFile?: (name: string, folder?: string) => void;
+  onDeleteFolder?: (folder: string) => void;
   onDeleteHumanInputFile?: (path: string) => void;
   onMoveFile?: (sourcePath: string, targetFolder: string) => void;
   onOpenView: (view: View, path?: string | null) => void;
@@ -153,7 +157,7 @@ export function SimplifiedNavigator({
           </button>
 
           {onCreateFolder ? (
-            <HumanInputActions onCreateFolder={onCreateFolder} />
+            <HumanInputActions onCreateFolder={onCreateFolder} onCreateTextFile={onCreateTextFile} />
           ) : null}
 
           <FileTreeBlock
@@ -161,7 +165,9 @@ export function SimplifiedNavigator({
             emptyDirectories={humanInputEmptyDirectories}
             files={humanInputFiles}
             loading={loading && currentView === "inputs"}
+            onCreateTextFile={onCreateTextFile}
             onDeleteFile={onDeleteHumanInputFile}
+            onDeleteFolder={onDeleteFolder}
             onMoveFile={onMoveFile}
             onOpenFile={onOpenFile}
             selectedPath={selectedPath}
@@ -204,49 +210,72 @@ export function SimplifiedNavigator({
 
 function HumanInputActions({
   onCreateFolder,
+  onCreateTextFile,
 }: {
   onCreateFolder: (name: string) => void;
+  onCreateTextFile?: (name: string, folder?: string) => void;
 }) {
-  const [showForm, setShowForm] = useState(false);
+  const [activeForm, setActiveForm] = useState<"folder" | "file" | null>(null);
   const [newName, setNewName] = useState("");
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (showForm && nameInputRef.current) {
+    if (activeForm && nameInputRef.current) {
       nameInputRef.current.focus();
     }
-  }, [showForm]);
+  }, [activeForm]);
 
   function handleSubmit() {
     const trimmed = newName.trim();
     if (!trimmed) return;
 
-    onCreateFolder(trimmed);
+    if (activeForm === "folder") {
+      onCreateFolder(trimmed);
+    } else if (activeForm === "file" && onCreateTextFile) {
+      onCreateTextFile(trimmed);
+    }
+
     setNewName("");
-    setShowForm(false);
+    setActiveForm(null);
   }
 
-  function toggleForm() {
-    setShowForm((current) => {
-      if (!current) setNewName("");
-      return !current;
+  function toggleForm(kind: "folder" | "file") {
+    setActiveForm((current) => {
+      if (current === kind) return null;
+      setNewName("");
+      return kind;
     });
   }
 
   return (
     <div className="human-input-actions">
-      <button
-        className="human-input-action-button"
-        onClick={toggleForm}
-        type="button"
-        title="Create a new folder in human inputs"
-        aria-expanded={showForm}
-      >
-        <span className="human-input-action-icon" aria-hidden="true">📁</span>
-        <span>Add folder</span>
-      </button>
+      <div className="human-input-action-row">
+        <button
+          className="human-input-action-button"
+          onClick={() => toggleForm("folder")}
+          type="button"
+          title="Create a new folder in human inputs"
+          aria-expanded={activeForm === "folder"}
+        >
+          <span className="human-input-action-icon" aria-hidden="true">📁</span>
+          <span>Add folder</span>
+        </button>
 
-      {showForm ? (
+        {onCreateTextFile ? (
+          <button
+            className="human-input-action-button"
+            onClick={() => toggleForm("file")}
+            type="button"
+            title="Create a new Markdown text file"
+            aria-expanded={activeForm === "file"}
+          >
+            <span className="human-input-action-icon" aria-hidden="true">📝</span>
+            <span>New text file</span>
+          </button>
+        ) : null}
+      </div>
+
+      {activeForm ? (
         <form
           className="human-input-name-form"
           onSubmit={(event) => {
@@ -258,9 +287,12 @@ function HumanInputActions({
             ref={nameInputRef}
             className="human-input-name-input"
             type="text"
-            placeholder="Folder name…"
+            placeholder={activeForm === "folder" ? "Folder name…" : "File name…"}
             value={newName}
             onChange={(event) => setNewName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setActiveForm(null);
+            }}
             maxLength={200}
           />
           <button
@@ -282,7 +314,9 @@ function FileTreeBlock({
   files,
   loading,
   selectedPath,
+  onCreateTextFile,
   onDeleteFile,
+  onDeleteFolder,
   onMoveFile,
   onOpenFile,
 }: {
@@ -291,14 +325,16 @@ function FileTreeBlock({
   files: ProjectFile[];
   loading: boolean;
   selectedPath: string | null;
+  onCreateTextFile?: (name: string, folder?: string) => void;
   onDeleteFile?: (path: string) => void;
+  onDeleteFolder?: (folder: string) => void;
   onMoveFile?: (sourcePath: string, targetFolder: string) => void;
   onOpenFile: (path: string) => void;
 }) {
   if (loading) return <p className="simple-nav-state">Loading...</p>;
   if (files.length === 0 && (!emptyDirectories || emptyDirectories.length === 0)) return <p className="simple-nav-state">{emptyLabel}</p>;
 
-  return <FileTreeNav files={files} emptyDirectories={emptyDirectories} selectedPath={selectedPath} onDeleteFile={onDeleteFile} onMoveFile={onMoveFile} onSelectFile={onOpenFile} />;
+  return <FileTreeNav files={files} emptyDirectories={emptyDirectories} selectedPath={selectedPath} onCreateTextFile={onCreateTextFile} onDeleteFile={onDeleteFile} onDeleteFolder={onDeleteFolder} onMoveFile={onMoveFile} onSelectFile={onOpenFile} />;
 }
 
 function DefineNavLabel({ label }: { label: string }) {

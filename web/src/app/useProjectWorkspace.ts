@@ -196,7 +196,7 @@ export function useProjectWorkspace() {
     [navigateTo, projectFiles, setNotice],
   );
 
-  const { createHumanInputFolder, deleteHumanInputFile, moveHumanInputFile, uploadHumanInputFiles } = useHumanInputs({
+  const { createHumanInputFolder, createHumanInputTextFile, deleteHumanInputFile, deleteHumanInputFolder, moveHumanInputFile, uploadHumanInputFiles } = useHumanInputs({
     clearSelectedFile,
     loadTree,
     refreshProjectFiles,
@@ -327,7 +327,9 @@ export function useProjectWorkspace() {
   } satisfies RouteController;
   const fileWorkspace = {
     createHumanInputFolder,
+    createHumanInputTextFile,
     deleteHumanInputFile,
+    deleteHumanInputFolder,
     moveHumanInputFile,
     draft,
     fileLoading,

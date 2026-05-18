@@ -146,10 +146,15 @@ export const resolveHumanAttentionBodySchema = z
 export const createHumanInputTextFileBodySchema = z.object({
   name: z.string().trim().min(1).max(255),
   content: maxUtf8Bytes(MAX_WRITE_FILE_BYTES, "File content is too large.").optional().default(""),
+  folder: z.string().trim().max(255).optional().default(""),
 });
 
 export const createHumanInputFolderBodySchema = z.object({
   name: z.string().trim().min(1).max(255),
+});
+
+export const deleteHumanInputFolderBodySchema = z.object({
+  folder: z.string().trim().min(1).max(255),
 });
 
 export const moveHumanInputFileBodySchema = z.object({

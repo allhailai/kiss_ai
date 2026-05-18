@@ -3,6 +3,8 @@ import type {
   CreateHumanInputFolderResponse,
   CreateHumanInputTextFileRequest,
   CreateHumanInputTextFileResponse,
+  DeleteHumanInputFolderRequest,
+  DeleteHumanInputFolderResponse,
   DeleteHumanInputResponse,
   FileContent,
   FileDiff,
@@ -57,15 +59,20 @@ export const filesApi = {
       method: "DELETE",
       body: JSON.stringify({ path }),
     }),
-  createHumanInputTextFile: (projectSlug: string, name: string, content?: string) =>
+  createHumanInputTextFile: (projectSlug: string, name: string, content?: string, folder?: string) =>
     request<CreateHumanInputTextFileResponse>(`${projectBase(projectSlug)}/inputs-human/create-text`, {
       method: "POST",
-      body: JSON.stringify({ name, content } satisfies CreateHumanInputTextFileRequest),
+      body: JSON.stringify({ name, content, folder } satisfies CreateHumanInputTextFileRequest),
     }),
   createHumanInputFolder: (projectSlug: string, name: string) =>
     request<CreateHumanInputFolderResponse>(`${projectBase(projectSlug)}/inputs-human/create-folder`, {
       method: "POST",
       body: JSON.stringify({ name } satisfies CreateHumanInputFolderRequest),
+    }),
+  deleteHumanInputFolder: (projectSlug: string, folder: string) =>
+    request<DeleteHumanInputFolderResponse>(`${projectBase(projectSlug)}/inputs-human/folder`, {
+      method: "DELETE",
+      body: JSON.stringify({ folder } satisfies DeleteHumanInputFolderRequest),
     }),
   moveHumanInputFile: (projectSlug: string, sourcePath: string, targetFolder: string) =>
     request<MoveHumanInputFileResponse>(`${projectBase(projectSlug)}/inputs-human/move`, {

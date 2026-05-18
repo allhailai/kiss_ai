@@ -176,8 +176,8 @@ export function createCursorModelService({ WEB_ROOT, httpError, warnedCursorKeyM
 
     const mediumOpenAiModel = models.find((model) => model.tier === "medium" && /^gpt-/.test(model.id));
     const mediumModel = models.find((model) => model.tier === "medium");
-    const preferredModelIds = [process.env.CURSOR_MODEL?.trim(), "gpt-5.5", mediumOpenAiModel?.id, mediumModel?.id].filter(Boolean);
-    return preferredModelIds.find((modelId) => availableModelIds.has(modelId)) ?? models[0]?.id ?? "gpt-5.5";
+    const preferredModelIds = [process.env.CURSOR_MODEL?.trim(), "composer-2", mediumOpenAiModel?.id, mediumModel?.id].filter(Boolean);
+    return preferredModelIds.find((modelId) => availableModelIds.has(modelId)) ?? models[0]?.id ?? "composer-2";
   }
 
   return { listCursorModels, pickRebuildModelId, resolveCursorApiKey };

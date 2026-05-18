@@ -203,6 +203,7 @@ export type DeleteHumanInputResponse = {
 export type CreateHumanInputTextFileRequest = {
   name: string;
   content?: string;
+  folder?: string;
 };
 
 export type CreateHumanInputTextFileResponse = {
@@ -214,6 +215,14 @@ export type CreateHumanInputFolderRequest = {
 };
 
 export type CreateHumanInputFolderResponse = {
+  folder: string;
+};
+
+export type DeleteHumanInputFolderRequest = {
+  folder: string;
+};
+
+export type DeleteHumanInputFolderResponse = {
   folder: string;
 };
 

@@ -443,16 +443,43 @@ export function createProjectFileService({
     return { files: uploaded };
   }
 
-  async function createHumanInputTextFile(projectRoot, rawName, content = "") {
+  async function createHumanInputTextFile(projectRoot, rawName, content = "", folder = "") {
     const safeName = safeUploadFileName(rawName);
     const fileName = safeName.endsWith(".md") ? safeName : `${safeName}.md`;
-    const relativePath = `inputs_human/${fileName}`;
+
+    // Validate optional folder target
+    const normalizedFolder = folder.replace(/\/+$/, "").trim();
+    let relativePath;
+
+    if (normalizedFolder) {
+      const folderSegments = normalizedFolder.split("/").filter(Boolean);
+      if (folderSegments.length > 1) {
+        throw httpError("Folders can only be 1 level deep in human inputs.", 400, "create_text_too_deep");
+      }
+
+      if (hasTraversalSegment(normalizedFolder)) {
+        throw httpError("Path escapes the project root.", 403, "path_escape");
+      }
+
+      const folderPath = `inputs_human/${folderSegments[0]}`;
+      const folderTarget = await resolveProjectDirectory(projectRoot, folderPath, { allowMissing: false });
+      const folderStat = await fs.stat(folderTarget.absolute);
+      if (!folderStat.isDirectory()) {
+        throw httpError(`${folderPath} is not a folder.`, 400, "create_text_target_not_folder");
+      }
+
+      relativePath = `${folderPath}/${fileName}`;
+    } else {
+      relativePath = `inputs_human/${fileName}`;
+    }
+
     const target = projectPath(projectRoot, relativePath);
     await fs.mkdir(path.dirname(target.absolute), { recursive: true });
     const { absolute, relative } = await resolveProjectFileTarget(projectRoot, target.relative, { allowMissing: true });
 
     if (await fileExists(absolute)) {
-      throw httpError(`A file named ${fileName} already exists in inputs_human/.`, 409, "file_already_exists");
+      const location = normalizedFolder ? `inputs_human/${normalizedFolder}/` : "inputs_human/";
+      throw httpError(`A file named ${fileName} already exists in ${location}.`, 409, "file_already_exists");
     }
 
     const fileContent = typeof content === "string" ? content : "";
@@ -476,6 +503,36 @@ export function createProjectFileService({
     }
 
     await fs.mkdir(absolute, { recursive: true });
+    invalidateSearchCache(projectRoot);
+    return { folder: relativePath };
+  }
+
+  async function deleteHumanInputFolder(projectRoot, rawFolder) {
+    const normalizedFolder = String(rawFolder ?? "").replace(/\/+$/, "").trim();
+
+    if (!normalizedFolder) {
+      throw httpError("A folder name is required.", 400, "delete_folder_empty");
+    }
+
+    // Must be a single segment (1-level only)
+    const folderSegments = normalizedFolder.split("/").filter(Boolean);
+    if (folderSegments.length > 1) {
+      throw httpError("Only top-level human input folders can be deleted.", 400, "delete_folder_too_deep");
+    }
+
+    if (hasTraversalSegment(normalizedFolder)) {
+      throw httpError("Path escapes the project root.", 403, "path_escape");
+    }
+
+    const relativePath = `inputs_human/${folderSegments[0]}`;
+    const target = await resolveProjectDirectory(projectRoot, relativePath, { allowMissing: false });
+    const stat = await fs.stat(target.absolute);
+
+    if (!stat.isDirectory()) {
+      throw httpError(`${relativePath} is not a folder.`, 400, "delete_not_folder");
+    }
+
+    await fs.rm(target.absolute, { recursive: true, force: true });
     invalidateSearchCache(projectRoot);
     return { folder: relativePath };
   }
@@ -509,8 +566,6 @@ export function createProjectFileService({
     }
 
     await fs.unlink(absolute);
-    const inputRoot = projectPath(projectRoot, "inputs_human");
-    await pruneEmptyDirectories(inputRoot.absolute, path.dirname(absolute));
     invalidateSearchCache(projectRoot);
 
     return { path: meta.path };
@@ -889,6 +944,7 @@ export function createProjectFileService({
     createHumanInputFolder,
     createHumanInputTextFile,
     deleteHumanInputFile,
+    deleteHumanInputFolder,
     fileExists,
     moveHumanInputFile,
     gitFileDiff,

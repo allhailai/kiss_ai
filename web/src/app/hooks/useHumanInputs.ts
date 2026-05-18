@@ -51,9 +51,6 @@ export function useHumanInputs({
 
   const deleteHumanInputFile = useCallback(
     async (path: string) => {
-      const confirmed = window.confirm(`Delete ${path} from ${projectPathPrefixes.humanInput}? This cannot be undone.`);
-      if (!confirmed) return;
-
       setInputMutationLoading(true);
       setNotice("");
       try {
@@ -91,6 +88,45 @@ export function useHumanInputs({
     [loadTree, refreshProjectFiles, requireSelectedProjectSlug, setInputMutationLoading, setNotice, view],
   );
 
+  const createHumanInputTextFile = useCallback(
+    async (name: string, folder?: string) => {
+      setInputMutationLoading(true);
+      setNotice("");
+      try {
+        const response = await api.createHumanInputTextFile(requireSelectedProjectSlug(), name, "", folder);
+        await refreshProjectFiles();
+        if (view === "inputs") await loadTree("human");
+        setNotice(`Created ${response.file.path}.`);
+        if (onOpenFile) onOpenFile(response.file.path);
+      } catch (error) {
+        setNotice(errorMessage(error, "Could not create the text file."));
+        throw error;
+      } finally {
+        setInputMutationLoading(false);
+      }
+    },
+    [loadTree, onOpenFile, refreshProjectFiles, requireSelectedProjectSlug, setInputMutationLoading, setNotice, view],
+  );
+
+  const deleteHumanInputFolder = useCallback(
+    async (folder: string) => {
+      setInputMutationLoading(true);
+      setNotice("");
+      try {
+        const response = await api.deleteHumanInputFolder(requireSelectedProjectSlug(), folder);
+        await refreshProjectFiles();
+        if (view === "inputs") await loadTree("human");
+        setNotice(`Deleted folder ${response.folder}.`);
+      } catch (error) {
+        setNotice(errorMessage(error, "Could not delete the folder."));
+        throw error;
+      } finally {
+        setInputMutationLoading(false);
+      }
+    },
+    [loadTree, refreshProjectFiles, requireSelectedProjectSlug, setInputMutationLoading, setNotice, view],
+  );
+
   const moveHumanInputFile = useCallback(
     async (sourcePath: string, targetFolder: string) => {
       setInputMutationLoading(true);
@@ -111,5 +147,5 @@ export function useHumanInputs({
     [loadTree, onOpenFile, refreshProjectFiles, requireSelectedProjectSlug, setInputMutationLoading, setNotice, view],
   );
 
-  return { createHumanInputFolder, deleteHumanInputFile, moveHumanInputFile, uploadHumanInputFiles };
+  return { createHumanInputFolder, createHumanInputTextFile, deleteHumanInputFile, deleteHumanInputFolder, moveHumanInputFile, uploadHumanInputFiles };
 }
