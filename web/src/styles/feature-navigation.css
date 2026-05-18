@@ -455,6 +455,7 @@
 
 .file-tree-dir-toggle {
   flex: 1 1 auto;
+  grid-column: 1 / -1;
   min-width: 0;
   display: grid;
   grid-template-columns: 0.75rem minmax(0, 1fr);
