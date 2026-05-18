@@ -388,3 +388,186 @@ async function writeSourceLog(projectPath, entries, fetchDate) {
   lines.push("");
   await fs.writeFile(logPath, lines.join("\n"), "utf-8");
 }
+
+// ── Source Digest Generation ────────────────────────────────────────
+// Heuristic compaction: extract key sentences from full source articles
+// to create ~200-word digests for progressive discovery.
+
+const DATA_SENTENCE_PATTERN = /(?:\d[\d,.]*%?|\$[\d,.]+|€[\d,.]+|£[\d,.]+|\d{4}(?:-\d{2})?(?:-\d{2})?|(?:billion|million|trillion|Mt|GW|MW|TWh|kt|bbl|mcf|t\/t))/i;
+const STRONG_SIGNAL_WORDS = /(?:increase|decrease|decline|growth|rose|fell|dropped|surged|peaked|forecast|projected|estimated|reported|announced|according to|compared to|year-over-year|quarter|annual)/i;
+
+function isDataSentence(sentence) {
+  return DATA_SENTENCE_PATTERN.test(sentence) || STRONG_SIGNAL_WORDS.test(sentence);
+}
+
+function extractKeySentences(content, maxSentences = 15) {
+  // Split content into sentences (rough heuristic)
+  const sentences = content
+    .replace(/\n#+\s/g, ". ")  // treat headings as sentence breaks
+    .replace(/\n[-*]\s/g, ". ") // treat list items as sentence breaks
+    .replace(/\|\s/g, ". ")     // treat table cells as sentence breaks
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 20 && s.length < 500);
+
+  // Score and rank sentences
+  const scored = sentences.map((sentence) => {
+    let score = 0;
+    if (DATA_SENTENCE_PATTERN.test(sentence)) score += 3;
+    if (STRONG_SIGNAL_WORDS.test(sentence)) score += 2;
+    // Bonus for sentences with specific numbers
+    const numberCount = (sentence.match(/\d+/g) || []).length;
+    score += Math.min(numberCount, 3);
+    return { sentence, score };
+  });
+
+  // Take highest-scoring sentences, preserving original order
+  const threshold = scored.filter((s) => s.score > 0);
+  const top = threshold
+    .sort((a, b) => b.score - a.score)
+    .slice(0, maxSentences);
+
+  // Re-sort by original position to maintain narrative flow
+  const originalOrder = top.sort(
+    (a, b) => sentences.indexOf(a.sentence) - sentences.indexOf(b.sentence),
+  );
+
+  return originalOrder.map((s) => s.sentence);
+}
+
+function formatDigest({ slug, title, url, type, relevance, keySentences, wordCount, fetchDate }) {
+  const lines = [
+    `# ${title || "Untitled"}`,
+    "",
+    `- Source file: \`sources/web_research/${slug}.md\``,
+    `- URL: ${url}`,
+    `- Type: ${type}`,
+    `- Date fetched: ${fetchDate}`,
+    `- Full article: ${wordCount} words`,
+    "",
+    "## Key Claims & Data Points",
+    "",
+  ];
+
+  if (keySentences.length > 0) {
+    for (const sentence of keySentences) {
+      lines.push(`- ${sentence}`);
+    }
+  } else {
+    lines.push("- No quantitative data points extracted. Read the full source for qualitative content.");
+  }
+
+  lines.push("", "## Relevance", "", relevance || "General project coverage.", "");
+
+  return lines.join("\n");
+}
+
+export async function generateSourceDigests(projectPath, onProgress) {
+  const webResearchDir = path.join(projectPath, "sources", "web_research");
+  const digestsDir = path.join(projectPath, "sources", "digests");
+  await fs.mkdir(digestsDir, { recursive: true });
+
+  let entries;
+  try {
+    entries = await fs.readdir(webResearchDir);
+  } catch {
+    return { generated: 0, skipped: 0, total: 0 };
+  }
+
+  const mdFiles = entries.filter((f) => f.endsWith(".md"));
+  const results = { generated: 0, skipped: 0, total: mdFiles.length };
+
+  for (const filename of mdFiles) {
+    const sourcePath = path.join(webResearchDir, filename);
+    const digestPath = path.join(digestsDir, filename);
+
+    // Skip if digest already exists and is newer than source
+    try {
+      const [sourceStat, digestStat] = await Promise.all([
+        fs.stat(sourcePath),
+        fs.stat(digestPath),
+      ]);
+
+      if (digestStat.mtimeMs >= sourceStat.mtimeMs) {
+        results.skipped++;
+        continue;
+      }
+    } catch {
+      // Digest doesn't exist yet — generate it
+    }
+
+    try {
+      const content = await fs.readFile(sourcePath, "utf-8");
+
+      // Skip failed-fetch notes
+      if (content.startsWith("# Fetch Failed")) {
+        // Write a minimal digest noting the failure
+        const urlMatch = content.match(/^- URL:\s*(.+)$/m);
+        const typeMatch = content.match(/^- Type:\s*(.+)$/m);
+        await fs.writeFile(
+          digestPath,
+          [
+            "# Fetch Failed",
+            "",
+            `- Source file: \`sources/web_research/${filename}\``,
+            urlMatch ? `- URL: ${urlMatch[1]}` : "",
+            typeMatch ? `- Type: ${typeMatch[1]}` : "",
+            "- Status: **Unfetched** — no content available for digest",
+            "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          "utf-8",
+        );
+        results.generated++;
+        continue;
+      }
+
+      // Parse metadata from the source note
+      const titleMatch = content.match(/^# (.+)$/m);
+      const urlMatch = content.match(/^- URL:\s*(.+)$/m);
+      const typeMatch = content.match(/^- Type:\s*(.+)$/m);
+      const dateMatch = content.match(/^- Date fetched:\s*(.+)$/m);
+      const wcMatch = content.match(/^- Word count:\s*(\d+)/m);
+      const relevanceMatch = content.match(/## Relevance\n\n(.+)/);
+
+      // Extract the article content section
+      const contentStart = content.indexOf("## Extracted Content");
+      const contentEnd = content.indexOf("## Relevance");
+      const articleContent =
+        contentStart >= 0 && contentEnd >= 0
+          ? content.slice(contentStart + "## Extracted Content".length, contentEnd).trim()
+          : content;
+
+      const keySentences = extractKeySentences(articleContent);
+      const slug = filename.replace(/\.md$/, "");
+
+      const digest = formatDigest({
+        slug,
+        title: titleMatch?.[1] || "Untitled",
+        url: urlMatch?.[1] || "",
+        type: typeMatch?.[1] || "unknown",
+        relevance: relevanceMatch?.[1] || "",
+        keySentences,
+        wordCount: wcMatch ? Number(wcMatch[1]) : 0,
+        fetchDate: dateMatch?.[1] || "",
+      });
+
+      await fs.writeFile(digestPath, digest, "utf-8");
+      results.generated++;
+    } catch {
+      results.skipped++;
+    }
+
+    if (onProgress) {
+      onProgress({
+        completed: results.generated + results.skipped,
+        total: results.total,
+        lastFile: filename,
+      });
+    }
+  }
+
+  return results;
+}
+

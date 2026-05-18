@@ -1,5 +1,5 @@
 import path from "node:path";
-import { parseResearchPlan, executeResearchPlan } from "./webResearch.js";
+import { parseResearchPlan, executeResearchPlan, generateSourceDigests } from "./webResearch.js";
 import { computeBuildScope } from "./buildScope.js";
 
 export function createAgentJobService({
@@ -56,7 +56,10 @@ export function createAgentJobService({
       `Project root: ${project.path}`,
       "",
       "IMPORTANT: Source files have already been fetched and written to sources/web_research/ by the build pipeline.",
-      "Do NOT search the web. Use only the pre-fetched sources in sources/web_research/.",
+      "Source digests have been generated in sources/digests/ — these are compact key-claim summaries (~200 words each).",
+      "Do NOT search the web. Use only the pre-fetched sources.",
+      "Read sources/digests/ FIRST to understand the evidence landscape.",
+      "Read full source files from sources/web_research/ ONLY when actively writing a specific wiki page or directed output that needs detailed evidence from that source.",
       "Read sources/source_log.md for the full inventory of what was fetched.",
     ];
 
@@ -508,11 +511,49 @@ export function createAgentJobService({
         fetchResults = { fetched: 0, failed: 0, skipped: 0, total: 0 };
       }
 
+      // ── Phase 2.5: Generate Source Digests ──
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: "Generating source digests",
+        text: "Compacting full source articles into key-claim digests for progressive discovery.",
+        status: "generating_digests",
+        runtime: "server",
+      });
+
+      try {
+        const digestResults = await generateSourceDigests(project.path, async (progress) => {
+          await appendRunEvent(project.slug, {
+            type: "system",
+            title: `Digested ${progress.completed}/${progress.total} sources`,
+            text: `Processing: ${progress.lastFile}`,
+            status: "generating_digests",
+            runtime: "server",
+          });
+        });
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Digests complete: ${digestResults.generated} generated, ${digestResults.skipped} cached`,
+          text: `Source digests ready in sources/digests/. ${digestResults.generated} newly generated, ${digestResults.skipped} already current.`,
+          status: "digests_complete",
+          runtime: "server",
+        });
+      } catch (digestError) {
+        const errorMsg = digestError instanceof Error ? digestError.message : "Unknown digest error";
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Digest generation skipped",
+          text: `Could not generate source digests: ${errorMsg}. The synthesis agent will read full sources.`,
+          status: "digests_skipped",
+          runtime: "server",
+        });
+      }
+
       // ── Phase 3: Synthesis (agent builds outputs from fetched sources) ──
       await appendRunEvent(project.slug, {
         type: "system",
         title: "Phase 3: Building outputs from fetched sources",
-        text: "Agent is synthesizing wiki pages and directed outputs from real source content.",
+        text: "Agent is synthesizing wiki pages and directed outputs using source digests for progressive discovery.",
         status: "synthesis",
         runtime: "cursor",
       });
