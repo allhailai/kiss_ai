@@ -392,9 +392,35 @@ async function writeSourceLog(projectPath, entries, fetchDate) {
 // ── Source Digest Generation ────────────────────────────────────────
 // Heuristic compaction: extract key sentences from full source articles
 // to create ~200-word digests for progressive discovery.
+//
+// Domain-agnostic: works for any research topic by detecting universal
+// data patterns (numbers, dates, percentages, measurements) rather than
+// enumerating domain-specific units or jargon.
 
-const DATA_SENTENCE_PATTERN = /(?:\d[\d,.]*%?|\$[\d,.]+|€[\d,.]+|£[\d,.]+|\d{4}(?:-\d{2})?(?:-\d{2})?|(?:billion|million|trillion|Mt|GW|MW|TWh|kt|bbl|mcf|t\/t))/i;
-const STRONG_SIGNAL_WORDS = /(?:increase|decrease|decline|growth|rose|fell|dropped|surged|peaked|forecast|projected|estimated|reported|announced|according to|compared to|year-over-year|quarter|annual)/i;
+const DATA_SENTENCE_PATTERN = new RegExp(
+  [
+    // Any number followed by a short unit-like word (catches kg, mg, GW, bbl, years, etc.)
+    "\\d+(?:[.,]\\d+)*\\s*[A-Za-z]{1,6}\\b",
+    // Percentages
+    "\\d+(?:[.,]\\d+)*\\s*%",
+    // Currency (common symbols)
+    "(?:\\$|€|£|¥)\\s*\\d+",
+    // Ranges with hyphens or "to" (e.g., "12-15 years", "3.2 to 4.8")
+    "\\d+(?:\\.\\d+)?\\s*(?:–|-|to)\\s*\\d+",
+    // Dates (four-digit years, with optional month/day)
+    "(?:20\\d{2}|19\\d{2})(?:[/-]\\d{2}){0,2}",
+    // Large-number words
+    "(?:billion|million|trillion|thousand)",
+    // Ratio patterns (e.g., "3/4", "1.5:1", "2 out of 3")
+    "\\d+(?:\\.\\d+)?\\s*(?:/|:|out of)\\s*\\d+",
+    // Numbered references (e.g., "Section 4", "Chapter 12", "Phase III", "Table 3")
+    "(?:Section|Chapter|Phase|Table|Figure|Appendix|Part)\\s+\\w+",
+  ].join("|"),
+  "i",
+);
+
+// Universal analytical/research language — not domain-specific
+const STRONG_SIGNAL_WORDS = /(?:increase|decrease|decline|growth|rose|fell|dropped|surged|peaked|forecast|projected|estimated|reported|announced|found|concluded|showed|demonstrated|compared|averaged|ranked|exceeded|totaled|according to|resulted in|associated with|correlated|significant|approximately|whereas|however|in contrast|notably|specifically|respectively)/i;
 
 function isDataSentence(sentence) {
   return DATA_SENTENCE_PATTERN.test(sentence) || STRONG_SIGNAL_WORDS.test(sentence);
