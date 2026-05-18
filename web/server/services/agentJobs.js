@@ -1,4 +1,5 @@
 import path from "node:path";
+import { parseResearchPlan, executeResearchPlan } from "./webResearch.js";
 
 export function createAgentJobService({
   FRAMEWORK_ROOT,
@@ -28,7 +29,20 @@ export function createAgentJobService({
     });
   }
 
-  function createRebuildPrompt(project) {
+  function createResearchPrompt(project) {
+    return [
+      "Generate a research plan for this kiss_ai project.",
+      "",
+      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build_research.md")} exactly.`,
+      "This is a non-interactive web-triggered research run. Never ask the user for confirmation or wait for input mid-run.",
+      `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
+      "Do not create or depend on a project-local framework/ folder.",
+      "Do not operate outside this project root.",
+      `Project root: ${project.path}`,
+    ].join("\n");
+  }
+
+  function createSynthesisPrompt(project) {
     return [
       "Run the kiss_ai build for this project.",
       "",
@@ -39,6 +53,10 @@ export function createAgentJobService({
       "Do not create or depend on a project-local framework/ folder.",
       "Do not operate outside this project root.",
       `Project root: ${project.path}`,
+      "",
+      "IMPORTANT: Source files have already been fetched and written to sources/web_research/ by the build pipeline.",
+      "Do NOT search the web. Use only the pre-fetched sources in sources/web_research/.",
+      "Read sources/source_log.md for the full inventory of what was fetched.",
     ].join("\n");
   }
 
@@ -287,12 +305,12 @@ export function createAgentJobService({
       project,
       requestedModelId,
       runKind: "rebuild",
-      startMessage: "Starting local Cursor agent rebuild.",
+      startMessage: "Starting three-phase research build.",
       noApiKeyMessage:
         "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Rebuilds are unavailable from the UI.",
       noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
       jobName: "Rebuild run",
-      prompt: createRebuildPrompt(project),
+      prompt: createResearchPrompt(project),
     });
   }
 
@@ -313,35 +331,131 @@ export function createAgentJobService({
     });
   }
 
+  async function runSingleAgentPhase({ project, apiKey, modelId, prompt, phaseName }) {
+    const result = await runCursorAgent({
+      project,
+      apiKey,
+      modelId,
+      prompt,
+      onEvent: async (event) => {
+        if (event.type === "assistant_delta") {
+          await appendAssistantDelta(project.slug, event.text, event.metadata);
+          return;
+        }
+
+        const current = await getRebuildState(project.slug);
+        await setRebuildState(project.slug, {
+          ...current,
+          agentId: typeof event.metadata?.agentId === "string" ? event.metadata.agentId : current.agentId,
+          runId: typeof event.metadata?.runId === "string" ? event.metadata.runId : current.runId,
+        });
+        await appendRunEvent(project.slug, event);
+      },
+    });
+
+    await finishAssistantMessage(project.slug);
+    return result;
+  }
+
   async function runAgentJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent }) {
     activeRebuilds.add(project.slug);
 
     try {
-      const result = await runCursorAgent({
+      // ── Phase 1: Research Plan (agent searches web, outputs JSON) ──
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: "Phase 1: Generating research plan",
+        text: "Agent is searching the web and producing a research plan.",
+        status: "research_plan",
+        runtime: "cursor",
+      });
+
+      const researchResult = await runSingleAgentPhase({
         project,
         apiKey,
         modelId,
-        prompt,
-        onEvent: async (event) => {
-          if (event.type === "assistant_delta") {
-            await appendAssistantDelta(project.slug, event.text, event.metadata);
-            return;
-          }
-
-          const current = await getRebuildState(project.slug);
-          await setRebuildState(project.slug, {
-            ...current,
-            agentId: typeof event.metadata?.agentId === "string" ? event.metadata.agentId : current.agentId,
-            runId: typeof event.metadata?.runId === "string" ? event.metadata.runId : current.runId,
-          });
-          await appendRunEvent(project.slug, event);
-        },
+        prompt, // This is the research prompt
+        phaseName: "Research Plan",
       });
 
-      await finishAssistantMessage(project.slug);
+      if (researchResult.status !== "finished") {
+        throw new Error(`Research plan phase failed: ${researchResult.result || "unknown error"}`);
+      }
+
+      // ── Phase 2: Server-Side Fetch ──
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: "Phase 2: Fetching web sources",
+        text: "Server is fetching and extracting content from URLs in the research plan.",
+        status: "fetching_sources",
+        runtime: "server",
+      });
+
+      let fetchResults;
+      try {
+        const plan = await parseResearchPlan(project.path);
+        const totalUrls = plan.queries.reduce((sum, q) => sum + q.urls.length, 0);
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Fetching ${totalUrls} URLs`,
+          text: `Research plan contains ${plan.queries.length} topics with ${totalUrls} URLs to fetch.`,
+          status: "fetching_sources",
+          runtime: "server",
+        });
+
+        fetchResults = await executeResearchPlan(project.path, plan, async (progress) => {
+          await appendRunEvent(project.slug, {
+            type: "system",
+            title: `Fetched ${progress.completed}/${progress.total} sources`,
+            text: `${progress.lastStatus === "ok" ? "✓" : "✗"} ${progress.lastUrl}`,
+            status: "fetching_sources",
+            runtime: "server",
+          });
+        });
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Fetch complete: ${fetchResults.fetched} succeeded, ${fetchResults.failed} failed`,
+          text: `Server-side fetch finished. ${fetchResults.fetched} sources with content, ${fetchResults.failed} failed or unfetchable.`,
+          status: "fetch_complete",
+          runtime: "server",
+        });
+      } catch (fetchError) {
+        // If research_plan.json doesn't exist or is malformed, log and continue
+        // The synthesis agent will work with whatever sources exist
+        const errorMsg = fetchError instanceof Error ? fetchError.message : "Unknown fetch error";
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Phase 2: Fetch skipped or failed",
+          text: `Server-side fetch could not run: ${errorMsg}. The synthesis agent will proceed with any existing sources.`,
+          status: "fetch_skipped",
+          runtime: "server",
+        });
+        fetchResults = { fetched: 0, failed: 0, total: 0 };
+      }
+
+      // ── Phase 3: Synthesis (agent builds outputs from fetched sources) ──
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: "Phase 3: Building outputs from fetched sources",
+        text: "Agent is synthesizing wiki pages and directed outputs from real source content.",
+        status: "synthesis",
+        runtime: "cursor",
+      });
+
+      const synthesisPrompt = createSynthesisPrompt(project);
+      const synthesisResult = await runSingleAgentPhase({
+        project,
+        apiKey,
+        modelId,
+        prompt: synthesisPrompt,
+        phaseName: "Synthesis",
+      });
+
+      // ── Completion ──
       const completedState = await getRebuildState(project.slug);
-      const resultDetail = typeof result.result === "string" ? result.result.trim() : "";
-      const { attentionCount, finishedWithAttention, message, status } = await createAgentJobCompletionMessage(jobName)({ project, result });
+      const { attentionCount, finishedWithAttention, message, status } = await createAgentJobCompletionMessage(jobName)({ project, result: synthesisResult });
       await setRebuildState(project.slug, {
         ...completedState,
         running: false,
@@ -350,12 +464,17 @@ export function createAgentJobService({
         message,
       });
       await appendRunEvent(project.slug, {
-        type: result.status === "finished" ? "run_status" : "error",
-        title: finishedWithAttention ? `${jobName} complete` : result.status === "finished" ? `${jobName} finished` : `${jobName} stopped before finishing`,
+        type: synthesisResult.status === "finished" ? "run_status" : "error",
+        title: finishedWithAttention ? `${jobName} complete` : synthesisResult.status === "finished" ? `${jobName} finished` : `${jobName} stopped before finishing`,
         text: message,
         status,
         runtime: "cursor",
-        metadata: { resultStatus: result.status, attentionCount, resultDetail },
+        metadata: {
+          resultStatus: synthesisResult.status,
+          attentionCount,
+          resultDetail: typeof synthesisResult.result === "string" ? synthesisResult.result.trim() : "",
+          fetchResults,
+        },
       });
     } catch (error) {
       await finishAssistantMessage(project.slug);
