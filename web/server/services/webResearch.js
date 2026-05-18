@@ -448,8 +448,8 @@ function extractKeySentences(content, maxSentences = 15) {
   });
 
   // Take highest-scoring sentences, preserving original order
-  const threshold = scored.filter((s) => s.score > 0);
-  const top = threshold
+  const withScore = scored.filter((s) => s.score > 0);
+  const top = withScore
     .sort((a, b) => b.score - a.score)
     .slice(0, maxSentences);
 
@@ -458,10 +458,36 @@ function extractKeySentences(content, maxSentences = 15) {
     (a, b) => sentences.indexOf(a.sentence) - sentences.indexOf(b.sentence),
   );
 
-  return originalOrder.map((s) => s.sentence);
+  // Compute coverage: what fraction of the source had extractable data?
+  const scoredRatio = sentences.length > 0 ? withScore.length / sentences.length : 0;
+  let coverage;
+  if (top.length >= 8 || scoredRatio >= 0.3) {
+    coverage = "high";
+  } else if (top.length >= 3) {
+    coverage = "medium";
+  } else {
+    coverage = "low";
+  }
+
+  return {
+    sentences: originalOrder.map((s) => s.sentence),
+    stats: {
+      totalSentences: sentences.length,
+      scoredSentences: withScore.length,
+      extractedSentences: top.length,
+      coverage,
+    },
+  };
 }
 
-function formatDigest({ slug, title, url, type, relevance, keySentences, wordCount, fetchDate }) {
+function formatDigest({ slug, title, url, type, relevance, keySentences, coverage, wordCount, fetchDate }) {
+  const coverageNote =
+    coverage === "low"
+      ? "**low** — heuristic extracted few data points. Read the full source for qualitative content."
+      : coverage === "medium"
+        ? "**medium** — some data points extracted. Full source may contain additional qualitative insights."
+        : "**high** — good data point extraction from this source.";
+
   const lines = [
     `# ${title || "Untitled"}`,
     "",
@@ -470,6 +496,7 @@ function formatDigest({ slug, title, url, type, relevance, keySentences, wordCou
     `- Type: ${type}`,
     `- Date fetched: ${fetchDate}`,
     `- Full article: ${wordCount} words`,
+    `- Digest coverage: ${coverageNote}`,
     "",
     "## Key Claims & Data Points",
     "",
@@ -565,7 +592,7 @@ export async function generateSourceDigests(projectPath, onProgress) {
           ? content.slice(contentStart + "## Extracted Content".length, contentEnd).trim()
           : content;
 
-      const keySentences = extractKeySentences(articleContent);
+      const { sentences: keySentences, stats } = extractKeySentences(articleContent);
       const slug = filename.replace(/\.md$/, "");
 
       const digest = formatDigest({
@@ -575,6 +602,7 @@ export async function generateSourceDigests(projectPath, onProgress) {
         type: typeMatch?.[1] || "unknown",
         relevance: relevanceMatch?.[1] || "",
         keySentences,
+        coverage: stats.coverage,
         wordCount: wcMatch ? Number(wcMatch[1]) : 0,
         fetchDate: dateMatch?.[1] || "",
       });

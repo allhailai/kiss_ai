@@ -100,9 +100,12 @@ Source files have been fetched and written to `sources/web_research/` by the bui
 
 15. Read `sources/source_log.md` to see what was fetched and what gaps exist.
 
-16. Read all files in `sources/digests/`. These are compact summaries of each source containing key claims, data points, and relevance assessments. Use these to understand the evidence landscape without loading full article text. Each digest is ~200 words vs. the full source which may be 3,000+ words.
+16. Read all files in `sources/digests/`. These are compact summaries of each source containing key claims, data points, and relevance assessments. Use these to understand the evidence landscape without loading full article text. Each digest is ~200 words vs. the full source which may be 3,000+ words. Each digest includes a `Digest coverage` indicator:
+    - **high** — the heuristic extracted good data points. You can rely on the digest for topic planning.
+    - **medium** — partial extraction. The digest captures some data but the full source likely contains additional qualitative insights.
+    - **low** — the heuristic could not extract meaningful data points (the source is likely qualitative, narrative, or in an unusual format). **Always read the full source** for low-coverage digests during Phase 7 and 8.
 
-17. **Do not read full source files in `sources/web_research/` at this stage.** You will read specific full sources later in Phase 7 and 8, only when you are actively writing or updating a page that needs detailed evidence from that source.
+17. **Do not read full source files in `sources/web_research/` at this stage.** You will read specific full sources later in Phase 7 and 8, only when you are actively writing or updating a page that needs detailed evidence from that source. **Exception:** plan to read all low-coverage sources during synthesis — the digest alone is insufficient.
 
 18. If `sources/source_log.md` shows gaps (Unfetched sources or missing topic coverage), leave an `AI_SUGGESTION` marker in the most relevant output file noting the gap and what sources to try on the next build.
 
