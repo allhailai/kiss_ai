@@ -69,15 +69,14 @@ Two marker types exist in AI-managed markdown files:
 6. Scan all markdown files under `sources/**` and `outputs_ai/**` for `<!-- AI_SUGGESTION: ... -->` markers. Check whether each has been accepted or dismissed by the user. Collect accepted suggestions for execution.
 7. Remove dismissed `AI_SUGGESTION` markers from files.
 
-### Phase 3: Determine Build Scope
+### Phase 3: Follow Build Scope Directive
 
-8. Determine the build scope:
-   - **First build** (no `.build/manifest.json` or `manifest.last_build` is null): full build. Generate everything.
-   - **`project.md` changed** since the last build (compare file modification time or git diff against the manifest's recorded hash): re-evaluate scope. New topics or directed outputs require generation. Removed items can be left in place (don't delete user-visible files automatically — leave an `AI_SUGGESTION` to the user instead).
-   - **FEEDBACK markers exist**: apply feedback to the specific files. This is a targeted update — only the annotated files and any downstream dependents need updating.
-   - **Accepted AI_SUGGESTION markers**: execute the accepted suggestions.
-   - **New or changed files in `inputs_human/`**: process new inputs, update affected source files and downstream outputs.
-   - **Nothing changed**: refresh current-data sections of outputs. Re-fetch stale or perishable sources per `sources/source_log.md`. Generate new dated reports if the project requests them.
+8. The build pipeline provides a `BUILD SCOPE` directive in the prompt. Follow it exactly:
+   - If the prompt says **"BUILD SCOPE: project.md changed"** with a diff and affected outputs list, update only the listed affected outputs. Do not regenerate unchanged wiki pages or outputs.
+   - If the prompt says **"FEEDBACK markers found in: ..."**, apply feedback to those files and their downstream dependents only.
+   - If the prompt says **"BUILD SCOPE: project.md has NOT changed"**, only process FEEDBACK markers, accepted AI_SUGGESTION markers, and refresh dated reports. Do not regenerate wiki pages or directed outputs that have no pending markers.
+   - If **no BUILD SCOPE directive is present**, this is a first build — generate everything.
+   - **Do not override the provided scope.** Do not choose a broader scope than instructed. The pipeline has already determined what changed.
 
 ### Phase 4: Process Human Inputs
 

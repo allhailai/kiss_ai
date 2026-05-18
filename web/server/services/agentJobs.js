@@ -1,5 +1,6 @@
 import path from "node:path";
 import { parseResearchPlan, executeResearchPlan } from "./webResearch.js";
+import { computeBuildScope } from "./buildScope.js";
 
 export function createAgentJobService({
   FRAMEWORK_ROOT,
@@ -42,8 +43,8 @@ export function createAgentJobService({
     ].join("\n");
   }
 
-  function createSynthesisPrompt(project) {
-    return [
+  function createSynthesisPrompt(project, scope) {
+    const lines = [
       "Run the kiss_ai build for this project.",
       "",
       `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build.md")} exactly.`,
@@ -57,7 +58,43 @@ export function createAgentJobService({
       "IMPORTANT: Source files have already been fetched and written to sources/web_research/ by the build pipeline.",
       "Do NOT search the web. Use only the pre-fetched sources in sources/web_research/.",
       "Read sources/source_log.md for the full inventory of what was fetched.",
-    ].join("\n");
+    ];
+
+    if (scope && !scope.isFirstBuild) {
+      lines.push("");
+
+      if (scope.projectMdChanged && scope.projectMdDiff) {
+        lines.push(
+          "BUILD SCOPE: project.md changed. Here is the diff:",
+          "```diff",
+          scope.projectMdDiff.slice(0, 3000),
+          "```",
+          "",
+          "Update only the outputs affected by this change.",
+          "Do not regenerate unchanged wiki pages or outputs.",
+        );
+
+        if (scope.affectedOutputs.length > 0) {
+          lines.push(`Affected outputs: ${scope.affectedOutputs.join(", ")}`);
+        }
+      } else if (!scope.projectMdChanged) {
+        lines.push(
+          "BUILD SCOPE: project.md has NOT changed since last build.",
+          "Only process FEEDBACK markers, accepted AI_SUGGESTION markers, and refresh dated reports.",
+          "Do not regenerate wiki pages or directed outputs that have no pending markers.",
+        );
+      }
+
+      if (scope.feedbackMarkers.length > 0) {
+        lines.push("", `FEEDBACK markers found in: ${scope.feedbackMarkers.join(", ")}`, "Apply feedback to these files and their downstream dependents only.");
+      }
+
+      if (scope.acceptedSuggestions.length > 0) {
+        lines.push("", `Accepted AI_SUGGESTION markers in: ${scope.acceptedSuggestions.join(", ")}`, "Execute these accepted suggestions.");
+      }
+    }
+
+    return lines.join("\n");
   }
 
   function getResolutionOption(item, resolutionOptionId) {
@@ -361,25 +398,60 @@ export function createAgentJobService({
     activeRebuilds.add(project.slug);
 
     try {
-      // ── Phase 1: Research Plan (agent searches web, outputs JSON) ──
+      // ── Compute build scope ──
+      const scope = await computeBuildScope(project.path);
+
       await appendRunEvent(project.slug, {
         type: "system",
-        title: "Phase 1: Generating research plan",
-        text: "Agent is searching the web and producing a research plan.",
-        status: "research_plan",
-        runtime: "cursor",
+        title: scope.isFirstBuild
+          ? "Build scope: first build (full)"
+          : scope.projectMdChanged
+            ? "Build scope: project.md changed"
+            : scope.feedbackMarkers.length > 0
+              ? `Build scope: ${scope.feedbackMarkers.length} FEEDBACK marker(s)`
+              : "Build scope: no changes detected",
+        text: scope.isFirstBuild
+          ? "No previous build manifest found. Running full build."
+          : scope.projectMdChanged
+            ? `project.md hash changed. Affected outputs: ${scope.affectedOutputs.length > 0 ? scope.affectedOutputs.join(", ") : "all directed outputs"}.`
+            : scope.feedbackMarkers.length > 0
+              ? `FEEDBACK markers in: ${scope.feedbackMarkers.join(", ")}`
+              : "No changes detected. Refreshing dated reports only.",
+        status: "scope_computed",
+        runtime: "server",
       });
 
-      const researchResult = await runSingleAgentPhase({
-        project,
-        apiKey,
-        modelId,
-        prompt, // This is the research prompt
-        phaseName: "Research Plan",
-      });
+      // ── Phase 1: Research Plan (conditionally skip) ──
+      if (scope.skipResearchPlan) {
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Phase 1: Skipped (no project changes)",
+          text: "project.md unchanged, no FEEDBACK markers, no new inputs. Keeping existing research plan.",
+          status: "research_plan_skipped",
+          runtime: "server",
+        });
+      } else {
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Phase 1: Generating research plan",
+          text: scope.isFirstBuild
+            ? "Agent is searching the web and producing a research plan."
+            : "Agent is updating the research plan based on project changes.",
+          status: "research_plan",
+          runtime: "cursor",
+        });
 
-      if (researchResult.status !== "finished") {
-        throw new Error(`Research plan phase failed: ${researchResult.result || "unknown error"}`);
+        const researchResult = await runSingleAgentPhase({
+          project,
+          apiKey,
+          modelId,
+          prompt, // This is the research prompt
+          phaseName: "Research Plan",
+        });
+
+        if (researchResult.status !== "finished") {
+          throw new Error(`Research plan phase failed: ${researchResult.result || "unknown error"}`);
+        }
       }
 
       // ── Phase 2: Server-Side Fetch ──
@@ -405,10 +477,11 @@ export function createAgentJobService({
         });
 
         fetchResults = await executeResearchPlan(project.path, plan, async (progress) => {
+          const statusIcon = progress.lastStatus === "ok" ? "✓" : progress.lastStatus === "skipped" ? "↩" : "✗";
           await appendRunEvent(project.slug, {
             type: "system",
-            title: `Fetched ${progress.completed}/${progress.total} sources`,
-            text: `${progress.lastStatus === "ok" ? "✓" : "✗"} ${progress.lastUrl}`,
+            title: `Processed ${progress.completed}/${progress.total} sources`,
+            text: `${statusIcon} ${progress.lastUrl}`,
             status: "fetching_sources",
             runtime: "server",
           });
@@ -416,8 +489,8 @@ export function createAgentJobService({
 
         await appendRunEvent(project.slug, {
           type: "system",
-          title: `Fetch complete: ${fetchResults.fetched} succeeded, ${fetchResults.failed} failed`,
-          text: `Server-side fetch finished. ${fetchResults.fetched} sources with content, ${fetchResults.failed} failed or unfetchable.`,
+          title: `Fetch complete: ${fetchResults.fetched} new, ${fetchResults.skipped} cached, ${fetchResults.failed} failed`,
+          text: `Server-side fetch finished. ${fetchResults.fetched} newly fetched, ${fetchResults.skipped} skipped (already current), ${fetchResults.failed} failed or unfetchable.`,
           status: "fetch_complete",
           runtime: "server",
         });
@@ -432,7 +505,7 @@ export function createAgentJobService({
           status: "fetch_skipped",
           runtime: "server",
         });
-        fetchResults = { fetched: 0, failed: 0, total: 0 };
+        fetchResults = { fetched: 0, failed: 0, skipped: 0, total: 0 };
       }
 
       // ── Phase 3: Synthesis (agent builds outputs from fetched sources) ──
@@ -444,7 +517,7 @@ export function createAgentJobService({
         runtime: "cursor",
       });
 
-      const synthesisPrompt = createSynthesisPrompt(project);
+      const synthesisPrompt = createSynthesisPrompt(project, scope);
       const synthesisResult = await runSingleAgentPhase({
         project,
         apiKey,

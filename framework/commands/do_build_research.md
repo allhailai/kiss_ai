@@ -19,13 +19,19 @@ This agent run should complete in 1–3 minutes. The output is a single JSON fil
 
 3. Read `sources/source_log.md` if it exists. Note which sources are already gathered and current.
 
-4. **Search the web** for evidence that supports, refutes, or expands on the project's topics. For each topic area:
+4. **Read `sources/research_plan.json`** if it exists. This is the plan from the previous build. Your job is to **update** it, not replace it from scratch:
+   - Keep existing URLs that are still relevant to the project.
+   - Add new URLs for new or changed topics.
+   - Remove URLs that are no longer relevant (e.g., if a topic was removed from project.md).
+   - If no previous plan exists, generate from scratch.
+
+5. **Search the web** for evidence that supports, refutes, or expands on the project's topics. For each topic area:
    - Search for primary sources: government data, corporate filings, annual reports, technical papers.
    - Search for secondary sources: trade press, industry analysis, expert commentary.
    - Search for contrarian sources: evidence that challenges the project thesis.
    - Aim for 2–4 URLs per major topic. Quality over quantity.
 
-5. Write `sources/research_plan.json` with this structure:
+6. Write `sources/research_plan.json` with this structure:
 
 ```json
 {
@@ -37,13 +43,22 @@ This agent run should complete in 1–3 minutes. The output is a single JSON fil
         {
           "url": "https://full-url-to-fetch",
           "type": "corporate|government|trade_press|academic|news",
-          "relevance": "Why this source matters for the project"
+          "relevance": "Why this source matters for the project",
+          "freshness": "stable|default|perishable"
         }
       ]
     }
   ]
 }
 ```
+
+### Freshness values
+
+- **`stable`**: Source content will not change. Corporate annual reports, academic papers, static government data, historical datasets. The pipeline will never re-fetch these.
+- **`default`**: Source content may change over weeks. Trade press articles, industry analysis, consultancy reports. The pipeline will re-fetch these after 7 days.
+- **`perishable`**: Source content changes frequently. News sites, price trackers, real-time dashboards, daily market commentary. The pipeline will re-fetch these on every build.
+
+When in doubt, use `default`.
 
 ## Rules
 

@@ -7,6 +7,7 @@ const UrlEntry = z.object({
   url: z.string().url(),
   type: z.string().default("unknown"),
   relevance: z.string().default(""),
+  freshness: z.enum(["stable", "default", "perishable"]).default("default"),
 });
 
 const QueryEntry = z.object({
@@ -115,7 +116,7 @@ export async function parseResearchPlan(projectPath) {
 }
 
 // ── Slug helper ─────────────────────────────────────────────────────
-function urlToSlug(url) {
+export function urlToSlug(url) {
   try {
     const u = new URL(url);
     const host = u.hostname.replace(/^www\./, "").replace(/\./g, "_");
@@ -176,6 +177,36 @@ function formatFailedNote({ url, type, relevance, error, fetchDate }) {
 // ── Execute a full research plan ────────────────────────────────────
 const CONCURRENCY_LIMIT = 3;
 
+// ── Freshness check ─────────────────────────────────────────────────
+const DEFAULT_STALE_DAYS = 7;
+
+function parseFetchDate(content) {
+  const match = content.match(/^- Date fetched:\s*(\d{4}-\d{2}-\d{2})/m);
+  return match ? match[1] : null;
+}
+
+function daysSince(dateStr) {
+  const fetched = new Date(dateStr).getTime();
+  const now = Date.now();
+  return Math.floor((now - fetched) / (1000 * 60 * 60 * 24));
+}
+
+async function shouldFetch(filePath, freshness) {
+  try {
+    const content = await fs.readFile(filePath, "utf-8");
+    const fetchDate = parseFetchDate(content);
+    if (!fetchDate) return true; // Can't determine age, re-fetch
+
+    if (freshness === "stable") return false; // Never re-fetch
+    if (freshness === "perishable") return true; // Always re-fetch
+
+    // Default: re-fetch if older than DEFAULT_STALE_DAYS
+    return daysSince(fetchDate) >= DEFAULT_STALE_DAYS;
+  } catch {
+    return true; // File doesn't exist, fetch it
+  }
+}
+
 export async function executeResearchPlan(projectPath, plan, onProgress) {
   const webResearchDir = path.join(projectPath, "sources", "web_research");
   await fs.mkdir(webResearchDir, { recursive: true });
@@ -211,8 +242,16 @@ export async function executeResearchPlan(projectPath, plan, onProgress) {
 
     const batchResults = await Promise.allSettled(
       batch.map(async (entry) => {
+        const slug = urlToSlug(entry.url);
+        const filePath = path.join(webResearchDir, `${slug}.md`);
+        const needsFetch = await shouldFetch(filePath, entry.freshness ?? "default");
+
+        if (!needsFetch) {
+          return { entry, result: null, skipped: true };
+        }
+
         const result = await fetchAndExtract(entry.url);
-        return { entry, result };
+        return { entry, result, skipped: false };
       }),
     );
 
@@ -222,7 +261,40 @@ export async function executeResearchPlan(projectPath, plan, onProgress) {
         continue;
       }
 
-      const { entry, result } = settled.value;
+      const { entry, result, skipped } = settled.value;
+
+      if (skipped) {
+        results.skipped++;
+        // Read existing file for source log
+        const slug = urlToSlug(entry.url);
+        const filePath = path.join(webResearchDir, `${slug}.md`);
+        try {
+          const content = await fs.readFile(filePath, "utf-8");
+          const titleMatch = content.match(/^# (.+)$/m);
+          const wcMatch = content.match(/^- Word count:\s*(\d+)/m);
+          sourceLogEntries.push({
+            name: titleMatch?.[1] || slug,
+            url: entry.url,
+            type: entry.type,
+            status: "Current (cached)",
+            wordCount: wcMatch ? Number(wcMatch[1]) : undefined,
+            topic: entry.topic,
+          });
+        } catch {
+          // File read failed despite skip — shouldn't happen but handle gracefully
+        }
+
+        if (onProgress) {
+          onProgress({
+            completed: results.fetched + results.failed + results.skipped,
+            total: results.total,
+            lastUrl: entry.url,
+            lastStatus: "skipped",
+          });
+        }
+        continue;
+      }
+
       const slug = urlToSlug(entry.url);
       const filePath = path.join(webResearchDir, `${slug}.md`);
 
