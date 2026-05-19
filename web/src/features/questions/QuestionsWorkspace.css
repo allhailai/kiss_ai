@@ -176,11 +176,12 @@
 .question-card-context {
   margin: 0 0 10px;
   font-size: 0.82rem;
-  color: var(--color-secondary);
-  line-height: 1.4;
-  padding: 8px 10px;
-  background: color-mix(in srgb, var(--color-secondary) 6%, var(--color-background));
-  border-radius: 8px;
+  color: var(--color-primary);
+  line-height: 1.5;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--color-secondary) 3%, white);
+  border-left: 3px solid color-mix(in srgb, var(--color-secondary) 30%, var(--color-border));
+  border-radius: 4px;
 }
 
 .question-card-related {
