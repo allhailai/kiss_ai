@@ -39,12 +39,6 @@ const reservedProjectDirectories = new Set(["_kiss_ai", ".obsidian", "_archive",
 const projectSlugPattern = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 const buildLogDefinitions = [
   {
-    id: "build-summary",
-    label: "Build Summary",
-    kind: "summary",
-    emptyMessage: "No build summaries found in change_logs/summaries/ yet.",
-  },
-  {
     id: "build-log",
     label: "Build Log",
     path: "change_logs/builds.md",

@@ -222,6 +222,40 @@ export function BuildProjectRightPanel({
         </div>
       </header>
 
+      {status?.annotationCounts ? (
+        <details className="build-project-annotation-summary" open>
+          <summary>Build Summary</summary>
+          {status.buildNotes ? <p className="build-project-annotation-notes">{status.buildNotes}</p> : null}
+          <div className="build-project-annotation-stats">
+            <div className="build-project-annotation-stat">
+              <span className="build-project-annotation-stat-value">{status.annotationCounts.feedbackApplied}</span>
+              <span className="build-project-annotation-stat-label">Comments applied</span>
+            </div>
+            <div className="build-project-annotation-stat">
+              <span className="build-project-annotation-stat-value">{status.annotationCounts.suggestionsAdded}</span>
+              <span className="build-project-annotation-stat-label">Suggestions added</span>
+            </div>
+            {(() => {
+              const pending = status.annotationCounts.suggestionsAdded - status.annotationCounts.suggestionsAccepted - status.annotationCounts.suggestionsDismissed;
+              return pending > 0 ? (
+                <div className="build-project-annotation-stat build-project-annotation-stat-pending">
+                  <span className="build-project-annotation-stat-value">{pending}</span>
+                  <span className="build-project-annotation-stat-label">Pending review</span>
+                </div>
+              ) : null;
+            })()}
+            <div className="build-project-annotation-stat">
+              <span className="build-project-annotation-stat-value">{status.annotationCounts.suggestionsAccepted}</span>
+              <span className="build-project-annotation-stat-label">Accepted</span>
+            </div>
+            <div className="build-project-annotation-stat">
+              <span className="build-project-annotation-stat-value">{status.annotationCounts.suggestionsDismissed}</span>
+              <span className="build-project-annotation-stat-label">Dismissed</span>
+            </div>
+          </div>
+        </details>
+      ) : null}
+
       <section className="build-project-stream-shell">
         {tone && completion ? (
           <div className={`build-project-completion build-project-completion-${tone}`} role="status">

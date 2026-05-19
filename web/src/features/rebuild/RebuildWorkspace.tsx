@@ -15,8 +15,6 @@ export function RebuildWorkspace({
   onOpenQuestions: () => void;
 }) {
   const openQuestionsCount = status?.openQuestionsCount ?? 0;
-  const counts = status?.annotationCounts;
-  const pendingSuggestions = counts ? counts.suggestionsAdded - counts.suggestionsAccepted - counts.suggestionsDismissed : 0;
 
   return (
     <div className="panel-stack rebuild-launcher-workspace">
@@ -31,36 +29,6 @@ export function RebuildWorkspace({
           <button onClick={onOpenQuestions} type="button">
             Answer Questions
           </button>
-        </section>
-      ) : null}
-
-      {counts ? (
-        <section className="rebuild-annotation-summary" aria-label="Annotation summary">
-          {status?.buildNotes ? <p className="rebuild-build-notes">{status.buildNotes}</p> : null}
-          <div className="rebuild-annotation-stats">
-            <div className="rebuild-annotation-stat">
-              <span className="rebuild-annotation-stat-value">{counts.feedbackApplied}</span>
-              <span className="rebuild-annotation-stat-label">Comments applied</span>
-            </div>
-            <div className="rebuild-annotation-stat">
-              <span className="rebuild-annotation-stat-value">{counts.suggestionsAdded}</span>
-              <span className="rebuild-annotation-stat-label">Suggestions added</span>
-            </div>
-            {pendingSuggestions > 0 ? (
-              <div className="rebuild-annotation-stat rebuild-annotation-stat-pending">
-                <span className="rebuild-annotation-stat-value">{pendingSuggestions}</span>
-                <span className="rebuild-annotation-stat-label">Pending review</span>
-              </div>
-            ) : null}
-            <div className="rebuild-annotation-stat">
-              <span className="rebuild-annotation-stat-value">{counts.suggestionsAccepted}</span>
-              <span className="rebuild-annotation-stat-label">Accepted</span>
-            </div>
-            <div className="rebuild-annotation-stat">
-              <span className="rebuild-annotation-stat-value">{counts.suggestionsDismissed}</span>
-              <span className="rebuild-annotation-stat-label">Dismissed</span>
-            </div>
-          </div>
         </section>
       ) : null}
 

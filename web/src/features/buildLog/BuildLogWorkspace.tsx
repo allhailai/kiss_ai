@@ -54,14 +54,10 @@ function BuildLogTabPanel({
   }
 
   const selectedFile = activeTab.selectedFile;
-  const selectedPath = selectedFile?.path ?? "";
-  const showFilePicker = activeTab.id === "build-summary";
   const technicalSummary =
-    activeTab.id === "build-summary"
-      ? "Technical build summary"
-      : activeTab.id === "human-attention-queue"
-        ? "Technical review-note log"
-        : null;
+    activeTab.id === "human-attention-queue"
+      ? "Technical review-note log"
+      : null;
 
   return (
     <section className="content-card build-log-tab-panel">
@@ -69,23 +65,6 @@ function BuildLogTabPanel({
         <div>
           <h3>{activeTab.label}</h3>
         </div>
-        {showFilePicker ? (
-          <label className="build-log-file-picker">
-            <span>Build Summaries</span>
-            <select
-              value={selectedPath}
-              onChange={(event) => onSelectLog(activeTab.id, event.target.value)}
-              disabled={!activeTab.files.length}
-            >
-              {activeTab.files.length ? null : <option value="">No files found</option>}
-              {activeTab.files.map((file) => (
-                <option key={file.path} value={file.path}>
-                  {file.title} ({formatLocalDateTime(file.modifiedAt)})
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
       </div>
 
       <MarkdownBlock content={selectedFile?.content ?? ""} emptyMessage={activeTab.emptyMessage} technicalSummary={technicalSummary} />
@@ -104,9 +83,8 @@ export function BuildLogWorkspace({
   rebuild: RebuildState | null;
   onSelectLog: (tabId: string, path?: string | null, sectionId?: string | null) => void;
 }) {
-  const activeTabId = buildLog?.activeTabId ?? "build-summary";
+  const activeTabId = buildLog?.activeTabId ?? "build-log";
   const activeTab = buildLog?.tabs.find((tab) => tab.id === activeTabId) ?? buildLog?.tabs[0] ?? null;
-  const latestSummary = buildLog?.tabs.find((tab) => tab.id === "build-summary")?.files[0] ?? null;
   const attentionCount = status?.humanAttentionCount ?? 0;
   const reviewNotes = friendlyHumanAttentionItems(status?.humanAttentionItems ?? []);
 
@@ -118,7 +96,7 @@ export function BuildLogWorkspace({
           <BuildLogMetric label="Status" value={rebuildStatusLabel(rebuild?.status ?? status?.rebuildStatus)} />
           <BuildLogMetric label="Last success" value={formatLocalDateTime(status?.lastSuccessfulRunAt)} />
           <BuildLogMetric label="Review notes" value={String(attentionCount)} />
-          <BuildLogMetric label="Latest summary" value={latestSummary ? formatLocalDateTime(latestSummary.modifiedAt) : "None"} />
+
         </div>
       </header>
 

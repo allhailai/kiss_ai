@@ -458,6 +458,70 @@
   background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
 }
 
+/* ── Annotation summary (collapsible) ──────────────────── */
+
+.build-project-annotation-summary {
+  flex: 0 0 auto;
+  margin: 0 12px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--color-annotation) 25%, var(--color-border));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--color-annotation) 4%, var(--color-surface));
+}
+
+.build-project-annotation-summary > summary {
+  color: var(--color-secondary);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 950;
+}
+
+.build-project-annotation-notes {
+  margin: 6px 0 8px;
+  color: var(--color-secondary);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.build-project-annotation-stats {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.build-project-annotation-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 3px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: color-mix(in srgb, white 70%, var(--color-surface));
+}
+
+.build-project-annotation-stat-value {
+  font-size: 0.88rem;
+  font-weight: 900;
+  color: var(--color-primary);
+}
+
+.build-project-annotation-stat-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--color-secondary);
+  white-space: nowrap;
+}
+
+.build-project-annotation-stat-pending {
+  border-color: color-mix(in srgb, var(--color-annotation) 40%, var(--color-border));
+  background: color-mix(in srgb, var(--color-annotation) 8%, var(--color-surface));
+}
+
+.build-project-annotation-stat-pending .build-project-annotation-stat-value {
+  color: var(--color-annotation);
+}
+
 .build-project-details {
   flex: 0 1 auto;
   min-height: 0;
