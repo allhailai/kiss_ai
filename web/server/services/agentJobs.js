@@ -80,6 +80,17 @@ export function createAgentJobService({
         if (scope.affectedOutputs.length > 0) {
           lines.push(`Affected outputs: ${scope.affectedOutputs.join(", ")}`);
         }
+      } else if (scope.sourcesChanged) {
+        lines.push(
+          `BUILD SCOPE: Source inventory changed. ${scope.sourceCount} sources now available (previously ${scope.affectedOutputs.length} outputs depend on these sources).`,
+          "New or updated source files have been fetched since the last build.",
+          "Regenerate all wiki pages and directed outputs using the enriched source base.",
+          "Read all source digests in sources/digests/ to incorporate newly available evidence.",
+        );
+
+        if (scope.affectedOutputs.length > 0) {
+          lines.push(`Affected outputs: ${scope.affectedOutputs.join(", ")}`);
+        }
       } else if (!scope.projectMdChanged) {
         lines.push(
           "BUILD SCOPE: project.md has NOT changed since last build.",
@@ -408,18 +419,22 @@ export function createAgentJobService({
         type: "system",
         title: scope.isFirstBuild
           ? "Build scope: first build (full)"
-          : scope.projectMdChanged
-            ? "Build scope: project.md changed"
-            : scope.feedbackMarkers.length > 0
-              ? `Build scope: ${scope.feedbackMarkers.length} FEEDBACK marker(s)`
-              : "Build scope: no changes detected",
+          : scope.sourcesChanged
+            ? "Build scope: sources changed"
+            : scope.projectMdChanged
+              ? "Build scope: project.md changed"
+              : scope.feedbackMarkers.length > 0
+                ? `Build scope: ${scope.feedbackMarkers.length} FEEDBACK marker(s)`
+                : "Build scope: no changes detected",
         text: scope.isFirstBuild
           ? "No previous build manifest found. Running full build."
-          : scope.projectMdChanged
-            ? `project.md hash changed. Affected outputs: ${scope.affectedOutputs.length > 0 ? scope.affectedOutputs.join(", ") : "all directed outputs"}.`
-            : scope.feedbackMarkers.length > 0
-              ? `FEEDBACK markers in: ${scope.feedbackMarkers.join(", ")}`
-              : "No changes detected. Refreshing dated reports only.",
+          : scope.sourcesChanged
+            ? `Source inventory changed (${scope.sourceCount} sources). All wiki pages and directed outputs will be regenerated.`
+            : scope.projectMdChanged
+              ? `project.md hash changed. Affected outputs: ${scope.affectedOutputs.length > 0 ? scope.affectedOutputs.join(", ") : "all directed outputs"}.`
+              : scope.feedbackMarkers.length > 0
+                ? `FEEDBACK markers in: ${scope.feedbackMarkers.join(", ")}`
+                : "No changes detected. Refreshing dated reports only.",
         status: "scope_computed",
         runtime: "server",
       });

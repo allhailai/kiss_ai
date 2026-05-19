@@ -136,6 +136,35 @@ async function listHumanInputFiles(projectPath) {
   return files.sort();
 }
 
+// ── Compare source inventory ────────────────────────────────────────
+async function listSourceFiles(projectPath) {
+  const sourceDir = path.join(projectPath, "sources", "web_research");
+  try {
+    const entries = await fs.readdir(sourceDir);
+    return entries.filter((f) => f.endsWith(".md")).sort();
+  } catch {
+    return [];
+  }
+}
+
+async function hashSourceInventory(projectPath) {
+  const files = await listSourceFiles(projectPath);
+  if (files.length === 0) return { hash: "", count: 0, files };
+
+  // Hash both the file list AND the size of each file (so replaced stubs are detected)
+  const details = [];
+  for (const f of files) {
+    try {
+      const stat = await fs.stat(path.join(projectPath, "sources", "web_research", f));
+      details.push(`${f}:${stat.size}`);
+    } catch {
+      details.push(`${f}:0`);
+    }
+  }
+
+  return { hash: hashText(details.join("\n")), count: files.length, files };
+}
+
 // ── Main export ─────────────────────────────────────────────────────
 export async function computeBuildScope(projectPath) {
   const manifest = await readManifest(projectPath);
@@ -171,11 +200,23 @@ export async function computeBuildScope(projectPath) {
   const previousHumanInputs = (manifest?.inputs_human_inventory ?? []).sort();
   const humanInputsChanged = JSON.stringify(currentHumanInputs) !== JSON.stringify(previousHumanInputs);
 
+  // Compare source inventory
+  const sourceInventory = await hashSourceInventory(projectPath);
+  const previousSourceHash = manifest?.source_inventory_hash ?? "";
+  const sourcesChanged = isFirstBuild || sourceInventory.hash !== previousSourceHash;
+
   // Determine if we can skip the research plan phase
   const skipResearchPlan = !isFirstBuild && !projectMdChanged && feedbackMarkers.length === 0 && !humanInputsChanged;
 
-  // Detect affected outputs
-  const affectedOutputs = projectMdChanged ? detectAffectedOutputs(projectMdDiff, manifest) : [...feedbackMarkers];
+  // Detect affected outputs — if sources changed, all outputs are affected
+  let affectedOutputs;
+  if (sourcesChanged && !isFirstBuild) {
+    affectedOutputs = [...(manifest?.directed_outputs ?? []), ...(manifest?.wiki_pages ?? [])];
+  } else if (projectMdChanged) {
+    affectedOutputs = detectAffectedOutputs(projectMdDiff, manifest);
+  } else {
+    affectedOutputs = [...feedbackMarkers];
+  }
 
   return {
     isFirstBuild,
@@ -185,6 +226,9 @@ export async function computeBuildScope(projectPath) {
     feedbackMarkers,
     acceptedSuggestions,
     humanInputsChanged,
+    sourcesChanged,
+    sourceInventoryHash: sourceInventory.hash,
+    sourceCount: sourceInventory.count,
     skipResearchPlan,
     affectedOutputs,
   };
