@@ -711,6 +711,15 @@ export async function generateSourceDigests(projectPath, onProgress) {
 
       if (digestStat.mtimeMs >= sourceStat.mtimeMs) {
         results.skipped++;
+
+        if (onProgress) {
+          onProgress({
+            completed: results.generated + results.skipped,
+            total: results.total,
+            lastFile: filename,
+            lastStatus: "cached",
+          });
+        }
         continue;
       }
     } catch {
@@ -786,6 +795,7 @@ export async function generateSourceDigests(projectPath, onProgress) {
         completed: results.generated + results.skipped,
         total: results.total,
         lastFile: filename,
+        lastStatus: "generated",
       });
     }
   }

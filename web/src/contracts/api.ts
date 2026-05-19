@@ -262,6 +262,8 @@ export type RebuildState = {
   attentionContext: Record<string, unknown> | null;
   events: AgentRunEvent[];
   log: string[];
+  buildPhase?: "research" | "fetching" | "digests" | "wiki" | "directed_outputs" | "validation" | null;
+  buildPhaseDetail?: string | null;
 };
 
 export type AgentRunEvent = {

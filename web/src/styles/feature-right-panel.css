@@ -396,6 +396,16 @@
   margin-bottom: 0;
 }
 
+.build-project-event-collapsed {
+  opacity: 0.7;
+}
+
+.build-project-collapsed-count {
+  font-size: 0.75rem;
+  color: var(--color-secondary);
+  font-style: italic;
+}
+
 .build-project-technical-event {
   margin-top: 8px;
 }
@@ -500,6 +510,17 @@
   text-transform: uppercase;
 }
 
+.build-project-extra-details {
+  margin-top: 8px;
+}
+
+.build-project-extra-details summary {
+  color: var(--color-secondary);
+  font-size: 0.76rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
 .build-project-runner-grid strong,
 .build-project-latest-log p {
   margin: 0;
@@ -534,6 +555,15 @@
 
 .build-project-details .agent-debug-log {
   margin-top: 0;
+}
+
+.build-project-details .run-log {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
 
 .build-project-run-controls {
@@ -609,6 +639,118 @@
   cursor: not-allowed;
   opacity: 0.55;
   box-shadow: none;
+}
+
+
+/* ── Build Phase Tracker ── */
+
+.build-phase-tracker {
+  min-width: 0;
+  margin: 0 12px;
+  padding: 10px 12px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 28%, var(--color-border));
+  border-radius: 13px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-secondary) 6%, transparent), transparent 60%),
+    color-mix(in srgb, var(--color-surface) 92%, white);
+}
+
+.build-phase-steps {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.build-phase-step {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.build-phase-indicator {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.build-phase-step-done .build-phase-indicator {
+  background: var(--color-success);
+  color: white;
+}
+
+.build-phase-step-active .build-phase-indicator {
+  background: var(--color-secondary);
+  color: white;
+}
+
+.build-phase-step-pending .build-phase-indicator {
+  border: 1.5px solid color-mix(in srgb, var(--color-secondary) 36%, var(--color-border));
+  background: color-mix(in srgb, var(--color-background) 80%, white);
+}
+
+.build-phase-step-error .build-phase-indicator {
+  background: var(--color-danger);
+  color: white;
+}
+
+.build-phase-dot {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-secondary) 44%, var(--color-border));
+}
+
+.build-phase-pulse {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: white;
+  animation: phase-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes phase-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.7); }
+}
+
+.build-phase-label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-secondary);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.build-phase-step-active .build-phase-label {
+  color: var(--color-primary);
+}
+
+.build-phase-step-done .build-phase-label {
+  color: var(--color-success);
+}
+
+.build-phase-step-error .build-phase-label {
+  color: var(--color-danger);
+}
+
+.build-phase-detail {
+  margin: 6px 0 0;
+  color: var(--color-secondary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 

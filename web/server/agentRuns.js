@@ -69,6 +69,8 @@ export function createIdleRebuildState() {
     attentionContext: null,
     events: [],
     log: [],
+    buildPhase: null,
+    buildPhaseDetail: null,
   };
 }
 
@@ -111,6 +113,8 @@ export function normalizeRebuildState(value) {
         : null,
     events,
     log: deriveLog(events, legacyLog),
+    buildPhase: typeof source.buildPhase === "string" ? source.buildPhase : null,
+    buildPhaseDetail: typeof source.buildPhaseDetail === "string" ? source.buildPhaseDetail : null,
   };
 }
 

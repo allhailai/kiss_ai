@@ -166,6 +166,8 @@ This index is read by future builds (Phase 1, Step 5) to understand the wiki sta
 
 ### Phase 8: Build Directed Outputs
 
+> **Note:** When the build pipeline passes a `WIKI_ONLY` scope directive, skip this phase entirely. Directed outputs will be built in a separate per-file pass with focused context. Only execute this phase if no `WIKI_ONLY` directive is present (e.g., when running do_build manually outside the pipeline).
+
 26. Read the directed outputs list from `project.md`. Each directed output should specify what it is and what it's for. The AI determines the appropriate structure, sections, and depth.
 27. For each directed output:
     - Identify which wiki pages and source digests are relevant to this output. **Read full source files** from `sources/web_research/` only for sources that are directly needed for this specific output and were not already loaded during Phase 7.

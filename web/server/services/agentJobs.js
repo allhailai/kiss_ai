@@ -1,6 +1,8 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import { parseResearchPlan, executeResearchPlan, generateSourceDigests } from "./webResearch.js";
 import { computeBuildScope } from "./buildScope.js";
+import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
 
 export function createAgentJobService({
   FRAMEWORK_ROOT,
@@ -109,6 +111,184 @@ export function createAgentJobService({
     }
 
     return lines.join("\n");
+  }
+
+  function createWikiOnlyPrompt(project, scope) {
+    const lines = [
+      "Run the kiss_ai wiki build for this project.",
+      "",
+      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build.md")} exactly.`,
+      "This is a non-interactive web-triggered build. Never ask the user for confirmation or wait for input mid-run.",
+      "When a decision is needed, choose the conservative default, leave an AI_SUGGESTION marker in the relevant output file, and continue.",
+      `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
+      "Do not create or depend on a project-local framework/ folder.",
+      "Do not operate outside this project root.",
+      `Project root: ${project.path}`,
+      "",
+      "IMPORTANT: Source files have already been fetched and written to sources/web_research/ by the build pipeline.",
+      "Source digests have been generated in sources/digests/ — these are compact key-claim summaries (~200 words each).",
+      "Do NOT search the web. Use only the pre-fetched sources.",
+      "Read sources/digests/ FIRST to understand the evidence landscape.",
+      "Read full source files from sources/web_research/ ONLY when actively writing a specific wiki page that needs detailed evidence from that source.",
+      "Read sources/source_log.md for the full inventory of what was fetched.",
+      "",
+      "WIKI_ONLY: Build wiki pages ONLY (Phase 7). Do NOT write directed outputs (Phase 8).",
+      "Directed outputs will be built in a separate per-file pass with focused context.",
+      "Complete Phases 1-7 and Phase 9-11 (validation, manifest, git snapshot).",
+    ];
+
+    if (scope && !scope.isFirstBuild) {
+      lines.push("");
+      if (scope.projectMdChanged && scope.projectMdDiff) {
+        lines.push(
+          "BUILD SCOPE: project.md changed. Here is the diff:",
+          "```diff",
+          scope.projectMdDiff.slice(0, 3000),
+          "```",
+        );
+      } else if (scope.sourcesChanged) {
+        lines.push(
+          `BUILD SCOPE: Source inventory changed. ${scope.sourceCount} sources now available.`,
+          "Regenerate all wiki pages using the enriched source base.",
+        );
+      }
+
+      if (scope.feedbackMarkers.length > 0) {
+        lines.push("", `FEEDBACK markers found in: ${scope.feedbackMarkers.join(", ")}`);
+      }
+      if (scope.acceptedSuggestions.length > 0) {
+        lines.push("", `Accepted AI_SUGGESTION markers in: ${scope.acceptedSuggestions.join(", ")}`);
+      }
+    }
+
+    return lines.join("\n");
+  }
+
+  async function createFilePrompt(project, outputFile, sourceMap) {
+    const fileMapping = sourceMap[outputFile] || { wikiPages: [], digestFiles: [] };
+    const lines = [
+      `Build the directed output file: ${outputFile}`,
+      "",
+      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build_file.md")} exactly.`,
+      "This is a non-interactive web-triggered build. Never ask the user for confirmation or wait for input mid-run.",
+      `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
+      `Project root: ${project.path}`,
+      "",
+      "CONTEXT: The wiki has already been built. The following files are your primary context:",
+    ];
+
+    // Add wiki pages to read (all available — agent picks relevant ones)
+    if (fileMapping.wikiPages.length > 0) {
+      lines.push("", "WIKI PAGES (read all, focus on pages relevant to this output):");
+      for (const wp of fileMapping.wikiPages) {
+        lines.push(`  - ${wp}`);
+      }
+    }
+
+    // Add digest files (all available — agent skims for relevance)
+    if (fileMapping.digestFiles.length > 0) {
+      lines.push("", "SOURCE DIGESTS (skim headers, read relevant ones in full):");
+      for (const df of fileMapping.digestFiles) {
+        lines.push(`  - ${df}`);
+      }
+    }
+
+    // Discover human inputs dynamically
+    try {
+      const humanInputs = await fs.readdir(path.join(project.path, "inputs_human"));
+      const mdInputs = humanInputs.filter((f) => f.endsWith(".md"));
+      if (mdInputs.length > 0) {
+        lines.push("", "HUMAN INPUTS TO READ:");
+        for (const input of mdInputs) {
+          lines.push(`  - inputs_human/${input}`);
+        }
+      }
+    } catch {
+      // No inputs_human directory
+    }
+
+    // Add questions if available
+    try {
+      await fs.access(path.join(project.path, "questions.md"));
+      lines.push("  - questions.md (for relevant open questions)");
+    } catch {
+      // No questions file
+    }
+
+    // Add the project.md output requirements section
+    lines.push("", "PROJECT REQUIREMENTS:");
+    lines.push("  - Read the output requirements sections of project.md");
+
+    return lines.join("\n");
+  }
+
+  function createValidationPrompt(project, modelId) {
+    return [
+      "Run the kiss_ai validation pass for this project.",
+      "",
+      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build.md")} Phases 9-11 only (Validate, Leave AI Suggestions, Record and Snapshot).`,
+      "This is a non-interactive web-triggered build. Never ask the user for confirmation or wait for input mid-run.",
+      `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
+      `Project root: ${project.path}`,
+      "",
+      "Wiki pages and directed outputs have already been built.",
+      "Your job is to validate, add AI suggestions, update manifest.json, and git snapshot.",
+      "",
+      `Model used for this build: ${modelId}. Include this in the change_logs/builds.md entry.`,
+    ].join("\n");
+  }
+
+  const MAX_FILE_CONCURRENCY = 3;
+
+  async function runFileSynthesisPhase({ project, apiKey, modelId, sourceMap }) {
+    const outputFiles = Object.keys(sourceMap);
+    if (outputFiles.length === 0) return [];
+
+    const results = [];
+    let completed = 0;
+
+    // Process in batches of MAX_FILE_CONCURRENCY
+    for (let i = 0; i < outputFiles.length; i += MAX_FILE_CONCURRENCY) {
+      const batch = outputFiles.slice(i, i + MAX_FILE_CONCURRENCY);
+
+      const batchPromises = batch.map(async (outputFile) => {
+        const filePrompt = await createFilePrompt(project, outputFile, sourceMap);
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Phase 3b: Building ${outputFile}`,
+          text: `Synthesizing directed output with ${sourceMap[outputFile]?.wikiPages?.length || 0} wiki pages, ${sourceMap[outputFile]?.sourceFiles?.length || 0} full sources, ${sourceMap[outputFile]?.digestFiles?.length || 0} digests.`,
+          status: "file_synthesis",
+          runtime: "cursor",
+          metadata: { outputFile, phase: "3b" },
+        });
+
+        const result = await runSingleAgentPhase({
+          project,
+          apiKey,
+          modelId,
+          prompt: filePrompt,
+          phaseName: `File: ${outputFile}`,
+        });
+
+        completed++;
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Phase 3b: ${outputFile} complete (${completed}/${outputFiles.length})`,
+          text: result.status === "finished" ? `Successfully built ${outputFile}` : `${outputFile} ended with status: ${result.status}`,
+          status: result.status === "finished" ? "file_complete" : "file_error",
+          runtime: "cursor",
+          metadata: { outputFile, completed, total: outputFiles.length, phase: "3b" },
+        });
+
+        return { file: outputFile, result };
+      });
+
+      results.push(...(await Promise.all(batchPromises)));
+    }
+
+    return results;
   }
 
   function getResolutionOption(item, resolutionOptionId) {
@@ -325,6 +505,8 @@ export function createAgentJobService({
         log: [],
         runKind,
         attentionContext,
+        buildPhase: null,
+        buildPhaseDetail: null,
       });
 
       await appendRunLog(project.slug, `Using Cursor API key from ${cursorApiKey.source}.`);
@@ -356,7 +538,7 @@ export function createAgentJobService({
       project,
       requestedModelId,
       runKind: "rebuild",
-      startMessage: "Starting three-phase research build.",
+      startMessage: "Starting multi-phase research build (research → fetch → wiki → per-file outputs → validation).",
       noApiKeyMessage:
         "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Rebuilds are unavailable from the UI.",
       noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
@@ -410,6 +592,7 @@ export function createAgentJobService({
 
   async function runAgentJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent }) {
     activeRebuilds.add(project.slug);
+    const buildStartTime = Date.now();
 
     try {
       // ── Compute build scope ──
@@ -440,6 +623,13 @@ export function createAgentJobService({
       });
 
       // ── Phase 1: Research Plan (conditionally skip) ──
+      const stateBeforeResearch = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...stateBeforeResearch,
+        buildPhase: "research",
+        buildPhaseDetail: scope.skipResearchPlan ? "Skipping research (no changes)" : "Generating research plan",
+      });
+
       if (scope.skipResearchPlan) {
         await appendRunEvent(project.slug, {
           type: "system",
@@ -473,6 +663,13 @@ export function createAgentJobService({
       }
 
       // ── Phase 2: Server-Side Fetch ──
+      const stateBeforeFetch = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...stateBeforeFetch,
+        buildPhase: "fetching",
+        buildPhaseDetail: "Fetching web sources from research plan",
+      });
+
       await appendRunEvent(project.slug, {
         type: "system",
         title: "Phase 2: Fetching web sources",
@@ -494,21 +691,37 @@ export function createAgentJobService({
           runtime: "server",
         });
 
+        let lastReportedPercent = -1;
+        const failedUrls = [];
+
         fetchResults = await executeResearchPlan(project.path, plan, async (progress) => {
-          const statusIcon = progress.lastStatus === "ok" ? "✓" : progress.lastStatus === "skipped" ? "↩" : "✗";
+          // Track failed URLs for the completion summary
+          if (progress.lastStatus === "failed") {
+            failedUrls.push(progress.lastUrl);
+          }
+
+          // Only emit at 10% thresholds
+          const percent = Math.floor((progress.completed / progress.total) * 10) * 10;
+          if (percent <= lastReportedPercent) return;
+          lastReportedPercent = percent;
+
           await appendRunEvent(project.slug, {
             type: "system",
-            title: `Processed ${progress.completed}/${progress.total} sources`,
-            text: `${statusIcon} ${progress.lastUrl}`,
+            title: `Fetching sources... ${progress.completed}/${progress.total} (${percent}%)`,
+            text: `Processing research plan URLs.`,
             status: "fetching_sources",
             runtime: "server",
           });
         });
 
+        const failedDetail = failedUrls.length > 0
+          ? ` Failed: ${failedUrls.map((u) => new URL(u).hostname).join(", ")}`
+          : "";
+
         await appendRunEvent(project.slug, {
           type: "system",
           title: `Fetch complete: ${fetchResults.fetched} new, ${fetchResults.skipped} cached, ${fetchResults.failed} failed`,
-          text: `Server-side fetch finished. ${fetchResults.fetched} newly fetched, ${fetchResults.skipped} skipped (already current), ${fetchResults.failed} failed or unfetchable.`,
+          text: `Server-side fetch finished. ${fetchResults.fetched} newly fetched, ${fetchResults.skipped} skipped (already current), ${fetchResults.failed} failed.${failedDetail}`,
           status: "fetch_complete",
           runtime: "server",
         });
@@ -527,6 +740,13 @@ export function createAgentJobService({
       }
 
       // ── Phase 2.5: Generate Source Digests ──
+      const stateBeforeDigests = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...stateBeforeDigests,
+        buildPhase: "digests",
+        buildPhaseDetail: "Generating source digests for progressive discovery",
+      });
+
       await appendRunEvent(project.slug, {
         type: "system",
         title: "Generating source digests",
@@ -536,11 +756,24 @@ export function createAgentJobService({
       });
 
       try {
+        let lastDigestPercent = -1;
+        let digestGenerated = 0;
+        let digestCached = 0;
+
         const digestResults = await generateSourceDigests(project.path, async (progress) => {
+          // Track generated vs cached from the progress status
+          if (progress.lastStatus === "generated") digestGenerated++;
+          else digestCached++;
+
+          // Only emit at 10% thresholds
+          const percent = Math.floor((progress.completed / progress.total) * 10) * 10;
+          if (percent <= lastDigestPercent) return;
+          lastDigestPercent = percent;
+
           await appendRunEvent(project.slug, {
             type: "system",
-            title: `Digested ${progress.completed}/${progress.total} sources`,
-            text: `Processing: ${progress.lastFile}`,
+            title: `Digesting sources... ${progress.completed}/${progress.total} (${digestGenerated} generated, ${digestCached} cached)`,
+            text: `Processing source digests (${percent}% complete).`,
             status: "generating_digests",
             runtime: "server",
           });
@@ -564,26 +797,119 @@ export function createAgentJobService({
         });
       }
 
-      // ── Phase 3: Synthesis (agent builds outputs from fetched sources) ──
+      // ── Phase 3a: Wiki Synthesis (agent builds wiki pages only) ──
       await appendRunEvent(project.slug, {
         type: "system",
-        title: "Phase 3: Building outputs from fetched sources",
-        text: "Agent is synthesizing wiki pages and directed outputs using source digests for progressive discovery.",
-        status: "synthesis",
+        title: "Phase 3a: Building wiki pages",
+        text: "Agent is synthesizing wiki pages from source digests. Directed outputs will be built in a separate focused pass.",
+        status: "wiki_synthesis",
         runtime: "cursor",
+        metadata: { phase: "3a" },
       });
 
-      const synthesisPrompt = createSynthesisPrompt(project, scope);
+      // Update rebuild state with phase tracking
+      const stateBeforeWiki = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...stateBeforeWiki,
+        buildPhase: "wiki",
+        buildPhaseDetail: "Building wiki pages from source digests",
+      });
+
+      const wikiPrompt = createWikiOnlyPrompt(project, scope);
+      const wikiResult = await runSingleAgentPhase({
+        project,
+        apiKey,
+        modelId,
+        prompt: wikiPrompt,
+        phaseName: "Wiki Synthesis",
+      });
+
+      if (wikiResult.status !== "finished") {
+        throw new Error(`Wiki synthesis phase failed: ${wikiResult.result || "unknown error"}`);
+      }
+
+      // ── Phase 3b: Per-File Strategy Synthesis ──
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: "Phase 3b: Building source mapping",
+        text: "Server is mapping sources to directed outputs for focused synthesis.",
+        status: "source_mapping",
+        runtime: "server",
+        metadata: { phase: "3b" },
+      });
+
+      const sourceMap = await buildSourceMapping(project.path);
+      await writeSourceMapping(project.path, sourceMap);
+      const outputFileCount = Object.keys(sourceMap).length;
+
+      if (outputFileCount > 0) {
+        const stateBeforeFiles = await getRebuildState(project.slug);
+        await setRebuildState(project.slug, {
+          ...stateBeforeFiles,
+          buildPhase: "directed_outputs",
+          buildPhaseDetail: `Building ${outputFileCount} directed outputs (max ${MAX_FILE_CONCURRENCY} concurrent)`,
+        });
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Phase 3b: Building ${outputFileCount} directed outputs`,
+          text: `Each output file gets its own agent call with focused context (wiki pages + full source files). Max ${MAX_FILE_CONCURRENCY} concurrent.`,
+          status: "file_synthesis_start",
+          runtime: "server",
+          metadata: { outputFileCount, phase: "3b" },
+        });
+
+        const fileResults = await runFileSynthesisPhase({
+          project,
+          apiKey,
+          modelId,
+          sourceMap,
+        });
+
+        const succeededFiles = fileResults.filter((r) => r.result.status === "finished").length;
+        const failedFiles = fileResults.filter((r) => r.result.status !== "finished").length;
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Phase 3b complete: ${succeededFiles} succeeded, ${failedFiles} failed`,
+          text: failedFiles > 0
+            ? `Failed files: ${fileResults.filter((r) => r.result.status !== "finished").map((r) => r.file).join(", ")}`
+            : `All ${succeededFiles} directed outputs built successfully.`,
+          status: failedFiles > 0 ? "file_synthesis_partial" : "file_synthesis_complete",
+          runtime: "server",
+          metadata: { succeededFiles, failedFiles, phase: "3b" },
+        });
+      }
+
+      // ── Phase 3c: Validation Pass ──
+      const stateBeforeValidation = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...stateBeforeValidation,
+        buildPhase: "validation",
+        buildPhaseDetail: "Validating outputs, adding suggestions, recording snapshot",
+      });
+
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: "Phase 3c: Validating and recording",
+        text: "Agent is validating outputs, adding AI suggestions, updating manifest, and creating git snapshot.",
+        status: "validation",
+        runtime: "cursor",
+        metadata: { phase: "3c" },
+      });
+
+      const validationPrompt = createValidationPrompt(project, modelId);
       const synthesisResult = await runSingleAgentPhase({
         project,
         apiKey,
         modelId,
-        prompt: synthesisPrompt,
-        phaseName: "Synthesis",
+        prompt: validationPrompt,
+        phaseName: "Validation",
       });
 
       // ── Completion ──
       const completedState = await getRebuildState(project.slug);
+      const buildDurationSeconds = Math.round((Date.now() - buildStartTime) / 1000);
       const { attentionCount, finishedWithAttention, message, status } = await createAgentJobCompletionMessage(jobName)({ project, result: synthesisResult });
       await setRebuildState(project.slug, {
         ...completedState,
@@ -591,10 +917,12 @@ export function createAgentJobService({
         status,
         finishedAt: new Date().toISOString(),
         message,
+        buildPhase: "complete",
+        buildPhaseDetail: null,
       });
       await appendRunEvent(project.slug, {
         type: synthesisResult.status === "finished" ? "run_status" : "error",
-        title: finishedWithAttention ? `${jobName} complete` : synthesisResult.status === "finished" ? `${jobName} finished` : `${jobName} stopped before finishing`,
+        title: finishedWithAttention ? `${jobName} complete (${buildDurationSeconds}s)` : synthesisResult.status === "finished" ? `${jobName} finished (${buildDurationSeconds}s)` : `${jobName} stopped before finishing`,
         text: message,
         status,
         runtime: "cursor",
@@ -603,6 +931,8 @@ export function createAgentJobService({
           attentionCount,
           resultDetail: typeof synthesisResult.result === "string" ? synthesisResult.result.trim() : "",
           fetchResults,
+          buildDurationSeconds,
+          modelId,
         },
       });
     } catch (error) {

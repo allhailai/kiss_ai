@@ -14,6 +14,30 @@ import {
 } from "../domain/links";
 import { parseMarkdownTableBlock } from "./markdownTableExtension";
 
+/** Source-file path pattern: sources/web_research/domain_com__slug.md or sources/digests/... */
+const sourcePathPattern = /^`?sources\/(web_research|digests)\/([^`]+)\.md`?$/;
+
+/**
+ * Converts a source file path label into a compact human-readable domain label.
+ * E.g. "sources/web_research/bostonglobe_com__2026_05_17_...md" → "Boston Globe"
+ */
+function humanizeSourceLabel(label: string): string | null {
+  const match = label.match(sourcePathPattern);
+  if (!match) return null;
+
+  const filename = match[2];
+  // Extract the domain part (everything before the first "__")
+  const domainPart = filename.split("__")[0] ?? filename;
+  // Convert domain underscores to readable: "bostonglobe_com" → "bostonglobe.com" → "Boston Globe"
+  const domain = domainPart.replace(/_com$/, ".com").replace(/_org$/, ".org").replace(/_gov$/, ".gov").replace(/_net$/, ".net").replace(/_io$/, ".io");
+  // Capitalize and clean: "bostonglobe.com" → "Bostonglobe" (strip TLD for display)
+  const name = domain.replace(/\.(com|org|gov|net|io)$/, "");
+  // Split camelCase-ish or remaining underscores, capitalize each word
+  const words = name.split(/[_-]+/).filter(Boolean);
+  if (!words.length) return null;
+  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
 class MarkdownLinkWidget extends WidgetType {
   constructor(
     private readonly label: string,
@@ -28,9 +52,13 @@ class MarkdownLinkWidget extends WidgetType {
   }
 
   toDOM() {
+    const humanized = humanizeSourceLabel(this.label);
+    const isSourceCitation = humanized !== null;
+    const displayLabel = humanized ?? this.label;
+
     const link = document.createElement("span");
-    link.className = `cm-wiki-link ${linkResolutionClass(this.resolution)}`;
-    link.textContent = this.label;
+    link.className = `cm-wiki-link ${linkResolutionClass(this.resolution)}${isSourceCitation ? " cm-source-citation" : ""}`;
+    link.textContent = isSourceCitation ? `📄 ${displayLabel}` : displayLabel;
     link.role = "link";
     link.tabIndex = 0;
     link.title = linkResolutionTitle(this.resolution);

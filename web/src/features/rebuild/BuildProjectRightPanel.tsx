@@ -5,6 +5,7 @@ import { formatModelLabel, modelTierLabels } from "../../domain/modelLabels";
 import { CompactModelPicker } from "../../shared/CompactModelPicker";
 import { renderMarkdownMessageContent } from "../../shared/chat/chatRendering";
 import { RightPanelModeSwitch, type RightPanelModeKind } from "../../shared/rightPanel/RightPanelModeSwitch";
+import { BuildPhaseTracker } from "./BuildPhaseTracker";
 
 function formatRunDuration(rebuild: RebuildState | null) {
   if (!rebuild?.startedAt) return "Not started";
@@ -52,6 +53,44 @@ function getEventText(event: AgentRunEvent) {
     return "The build stopped before finishing. You can try again, or open the technical details below.";
   }
   return event.text || event.title || event.status || "No details recorded.";
+}
+
+/** Statuses that should be collapsed when consecutive */
+const COLLAPSIBLE_STATUSES = new Set(["fetching_sources", "generating_digests"]);
+
+type CollapsedItem =
+  | { type: "event"; event: AgentRunEvent }
+  | { type: "collapsed"; id: string; latest: AgentRunEvent; count: number };
+
+/**
+ * Groups consecutive system events with the same collapsible status into a
+ * single entry showing the latest progress value. Non-collapsible events
+ * pass through unchanged.
+ */
+function collapseConsecutiveProgressEvents(events: AgentRunEvent[]): CollapsedItem[] {
+  const result: CollapsedItem[] = [];
+
+  let i = 0;
+  while (i < events.length) {
+    const event = events[i];
+    if (event.type === "system" && event.status && COLLAPSIBLE_STATUSES.has(event.status)) {
+      // Collect the run of consecutive events with this status
+      const status = event.status;
+      let j = i;
+      while (j < events.length && events[j].type === "system" && events[j].status === status) {
+        j++;
+      }
+      const count = j - i;
+      const latest = events[j - 1];
+      result.push({ type: "collapsed", id: `collapsed-${latest.id}`, latest, count });
+      i = j;
+    } else {
+      result.push({ type: "event", event });
+      i++;
+    }
+  }
+
+  return result;
 }
 
 function completionTone(status: RebuildState["status"] | undefined) {
@@ -201,24 +240,40 @@ export function BuildProjectRightPanel({
             </div>
           ) : null}
 
-          {rebuild?.events.map((event) => (
-            <article className={`build-project-event build-project-event-${event.type}`} key={event.id}>
-              <header>
-                <strong>{getEventLabel(event)}</strong>
-                <span>{formatLocalTime(event.updatedAt)}</span>
-              </header>
-              <BuildProjectEventBody event={event} />
-              {event.status === "streaming" ? <span className="build-project-event-status">Streaming</span> : null}
-            </article>
-          ))}
+          {collapseConsecutiveProgressEvents(rebuild?.events ?? []).map((item) =>
+            item.type === "collapsed" ? (
+              <article className="build-project-event build-project-event-system build-project-event-collapsed" key={item.id}>
+                <header>
+                  <strong>{item.latest.title}</strong>
+                  <span>{formatLocalTime(item.latest.updatedAt)}</span>
+                </header>
+                {item.count > 1 ? (
+                  <div className="build-project-event-body build-project-collapsed-count">
+                    {item.count} progress updates collapsed
+                  </div>
+                ) : null}
+              </article>
+            ) : (
+              <article className={`build-project-event build-project-event-${item.event.type}`} key={item.event.id}>
+                <header>
+                  <strong>{getEventLabel(item.event)}</strong>
+                  <span>{formatLocalTime(item.event.updatedAt)}</span>
+                </header>
+                <BuildProjectEventBody event={item.event} />
+                {item.event.status === "streaming" ? <span className="build-project-event-status">Streaming</span> : null}
+              </article>
+            ),
+          )}
 
           {buildRunning ? <AgentThinkingCard /> : null}
         </div>
       </section>
 
+      <BuildPhaseTracker rebuild={rebuild} />
+
       <section className="build-project-details" aria-label="Build details">
         <details>
-          <summary>Runner details</summary>
+          <summary>Build Details</summary>
           <div className="build-project-runner-grid">
             <div>
               <span>Status</span>
@@ -241,23 +296,25 @@ export function BuildProjectRightPanel({
               <strong>{formatLocalDateTime(latestLogTimestamp, "Not recorded")}</strong>
             </div>
           </div>
-          <p className="build-project-technical-details">
-            <span>
-              Run ID: <CopyableValue value={rebuild?.runId ?? "Not started yet"} />
-            </span>
-            <span>
-              Cursor SDK agent: <CopyableValue value={rebuild?.agentId ?? "Not created yet"} />
-            </span>
-          </p>
-          <div className="build-project-latest-log">
-            <span>Latest runner message</span>
-            <p>{getLatestLogText(latestLogEntry)}</p>
-          </div>
-        </details>
-
-        <details className="agent-debug-log">
-          <summary>Raw runner log</summary>
-          <pre className="run-log">{rebuild?.log.length ? rebuild.log.join("\n\n") : "No UI-started build log yet."}</pre>
+          <details className="build-project-extra-details">
+            <summary>Even more details =)</summary>
+            <p className="build-project-technical-details">
+              <span>
+                Run ID: <CopyableValue value={rebuild?.runId ?? "Not started yet"} />
+              </span>
+              <span>
+                Cursor SDK agent: <CopyableValue value={rebuild?.agentId ?? "Not created yet"} />
+              </span>
+            </p>
+            <div className="build-project-latest-log">
+              <span>Latest runner message</span>
+              <p>{getLatestLogText(latestLogEntry)}</p>
+            </div>
+            <details className="agent-debug-log">
+              <summary>Raw runner log</summary>
+              <pre className="run-log">{rebuild?.log.length ? rebuild.log.join("\n\n") : "No UI-started build log yet."}</pre>
+            </details>
+          </details>
         </details>
       </section>
 

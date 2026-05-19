@@ -136,6 +136,27 @@
   text-decoration-style: dashed;
 }
 
+.markdown-editor-shell .cm-source-citation {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 7px 1px 4px;
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 24%, var(--color-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-secondary) 7%, white);
+  font-size: 0.78em;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+  vertical-align: baseline;
+  line-height: 1.6;
+}
+
+.markdown-editor-shell .cm-source-citation:hover {
+  border-color: color-mix(in srgb, var(--color-secondary) 44%, var(--color-border));
+  background: color-mix(in srgb, var(--color-secondary) 14%, white);
+}
+
 .markdown-editor-shell .cm-markdown-table-wrapper {
   position: relative;
   display: block;
