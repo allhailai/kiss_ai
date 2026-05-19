@@ -85,17 +85,59 @@ describe("webResearch", () => {
       expect(result.url).toBe("https://example.com/blocked");
     });
 
-    it("returns an error for non-HTML content types", async () => {
+    it("extracts text from PDF responses", async () => {
       const { fetchAndExtract } = await import("./webResearch.js");
+
+      // Build a minimal valid PDF in memory
+      const pdfContent = [
+        "%PDF-1.4",
+        "1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj",
+        "2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj",
+        "3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj",
+        "4 0 obj<</Length 44>>stream",
+        "BT /F1 12 Tf 100 700 Td (Hello PDF World) Tj ET",
+        "endstream endobj",
+        "5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj",
+        "xref",
+        "0 6",
+        "0000000000 65535 f ",
+        "0000000009 00000 n ",
+        "0000000058 00000 n ",
+        "0000000115 00000 n ",
+        "0000000266 00000 n ",
+        "0000000360 00000 n ",
+        "trailer<</Size 6/Root 1 0 R>>",
+        "startxref",
+        "434",
+        "%%EOF",
+      ].join("\n");
+      const pdfBuffer = Buffer.from(pdfContent);
 
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         statusText: "OK",
         headers: new Headers({ "content-type": "application/pdf" }),
+        arrayBuffer: () => Promise.resolve(pdfBuffer.buffer.slice(pdfBuffer.byteOffset, pdfBuffer.byteOffset + pdfBuffer.byteLength)),
       });
 
       const result = await fetchAndExtract("https://example.com/file.pdf");
+      expect(result.error).toBeUndefined();
+      expect(result.url).toBe("https://example.com/file.pdf");
+      expect(result.content).toBeTruthy();
+    });
+
+    it("returns an error for non-HTML non-PDF content types", async () => {
+      const { fetchAndExtract } = await import("./webResearch.js");
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers({ "content-type": "image/png" }),
+      });
+
+      const result = await fetchAndExtract("https://example.com/photo.png");
       expect(result.error).toContain("Non-HTML");
     });
 

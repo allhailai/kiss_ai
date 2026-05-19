@@ -9,4 +9,14 @@ export default defineConfig({
       "/api": "http://127.0.0.1:8787",
     },
   },
+  test: {
+    server: {
+      deps: {
+        inline: ["pdf-parse"],
+      },
+    },
+    resolve: {
+      conditions: ["node", "import"],
+    },
+  },
 });

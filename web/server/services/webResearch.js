@@ -38,6 +38,65 @@ async function loadDeps() {
   _parseHTML = linkedomMod.parseHTML;
 }
 
+// ── PDF extraction ──────────────────────────────────────────────────
+let _PDFParse;
+
+async function loadPdfDeps() {
+  if (_PDFParse) return;
+  const mod = await import("pdf-parse");
+  _PDFParse = mod.PDFParse;
+}
+
+function cleanPdfText(raw) {
+  // Collapse runs of blank lines to double-newline (paragraph breaks)
+  let text = raw.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n");
+
+  // Detect all-caps lines as headings (at least 4 chars, mostly uppercase)
+  const lines = text.split("\n");
+  const cleaned = lines.map((line) => {
+    const trimmed = line.trim();
+    if (
+      trimmed.length >= 4 &&
+      trimmed === trimmed.toUpperCase() &&
+      /[A-Z]/.test(trimmed) &&
+      !/^\d+$/.test(trimmed)
+    ) {
+      // Title-case it and make it a heading
+      const titleCased = trimmed
+        .toLowerCase()
+        .replace(/\b[a-z]/g, (c) => c.toUpperCase());
+      return `\n## ${titleCased}\n`;
+    }
+    return line;
+  });
+
+  return cleaned.join("\n").trim();
+}
+
+async function extractPdf(url, response) {
+  await loadPdfDeps();
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const parser = new _PDFParse({ data: new Uint8Array(buffer) });
+
+  try {
+    const result = await parser.getText();
+    const content = cleanPdfText(result.text);
+    const wordCount = content.split(/\s+/).filter(Boolean).length;
+
+    return {
+      url,
+      title: "",
+      byline: "",
+      excerpt: "",
+      content,
+      wordCount,
+    };
+  } finally {
+    await parser.destroy();
+  }
+}
+
 // ── Core: fetch a single URL and extract article content ────────────
 const DEFAULT_TIMEOUT_MS = 15_000;
 const USER_AGENT = "kiss-ai-research/1.0 (Node.js; research build pipeline)";
@@ -66,6 +125,9 @@ export async function fetchAndExtract(url, timeoutMs = DEFAULT_TIMEOUT_MS) {
     }
 
     const contentType = response.headers.get("content-type") ?? "";
+    if (contentType.includes("application/pdf")) {
+      return extractPdf(url, response);
+    }
     if (!contentType.includes("text/html") && !contentType.includes("application/xhtml")) {
       return { error: `Non-HTML content type: ${contentType}`, url };
     }
