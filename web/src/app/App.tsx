@@ -422,8 +422,11 @@ export function App() {
         ) : null}
         {route.view === "questions" ? (
           <QuestionsWorkspace
-            projectSlug={project.selectedProjectSlug}
+            models={rebuildWorkspace.models}
+            onModelChange={rebuildWorkspace.setSelectedModelId}
             onNavigateToFile={openProjectFileWithAgentContext}
+            projectSlug={project.selectedProjectSlug}
+            selectedModelId={rebuildWorkspace.selectedModelId}
           />
         ) : null}
         {route.view === "rebuild" ? (

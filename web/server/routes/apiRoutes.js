@@ -18,6 +18,7 @@ export function registerApiRoutes(app, deps) {
 
   registerProjectRoutes(app, {
     PROJECTS_ROOT: deps.PROJECTS_ROOT,
+    assistQuestion: deps.assistQuestion,
     buildLogTabState: deps.buildLogTabState,
     createProjectFromTemplate: deps.createProjectFromTemplate,
     discoverProjects: deps.discoverProjects,

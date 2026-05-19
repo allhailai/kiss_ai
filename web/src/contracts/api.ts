@@ -71,6 +71,20 @@ export type BuildQuestion = {
   answeredAt: string | null;
 };
 
+export type QuestionAiAssistRequest = {
+  modelId: string;
+  questionText: string;
+  questionContext: string;
+  userDraft: string;
+  relatedFiles: string[];
+};
+
+export type QuestionAiAssistResponse = {
+  answer: string;
+  confidence: "high" | "medium" | "low";
+  confidenceReason: string;
+};
+
 export type ProjectStatus = {
   projectSlug: string;
   projectName: string;

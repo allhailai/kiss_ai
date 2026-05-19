@@ -36,6 +36,7 @@ async function readOpenQuestions(readTextFile, projectRoot) {
 
 export function registerProjectRoutes(app, {
   PROJECTS_ROOT,
+  assistQuestion,
   buildLogTabState,
   createProjectFromTemplate,
   discoverProjects,
@@ -202,6 +203,17 @@ export function registerProjectRoutes(app, {
       }
 
       response.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ── Question AI Assist ──
+
+  app.post("/api/projects/:projectSlug/questions/ai-assist", async (request, response, next) => {
+    try {
+      const result = await assistQuestion(request.project, request.body);
+      response.json(result);
     } catch (error) {
       next(error);
     }

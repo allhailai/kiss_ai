@@ -6,6 +6,8 @@ import type {
   ProjectStatus,
   ProjectSummary,
   ProjectUiState,
+  QuestionAiAssistRequest,
+  QuestionAiAssistResponse,
   RebuildModelsResponse,
   UpdateProjectUiStateRequest,
 } from "../contracts/api";
@@ -36,4 +38,9 @@ export const projectsApi = {
 
     return request<BuildLogState>(`${projectBase(projectSlug)}/build-log${query ? `?${query}` : ""}`);
   },
+  questionAiAssist: (projectSlug: string, body: QuestionAiAssistRequest) =>
+    request<QuestionAiAssistResponse>(`${projectBase(projectSlug)}/questions/ai-assist`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };

@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
-import type { BuildQuestion } from "../../contracts/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { BuildQuestion, RebuildModel } from "../../contracts/api";
+import { api } from "../../data/apiClient";
 import { formatLocalDateTime } from "../../domain/formatters";
+import { renderMarkdownMessageContent } from "../../shared/chat/chatRendering";
+import { CompactModelPicker } from "../../shared/CompactModelPicker";
 import "./QuestionsWorkspace.css";
 
 type QuestionsFilter = "all" | "open" | "answered";
@@ -18,16 +21,39 @@ function priorityLabel(priority: BuildQuestion["priority"]) {
 
 function QuestionCard({
   question,
+  models,
   onAnswer,
   onNavigateToFile,
+  projectSlug,
+  selectedModelId,
+  onModelChange,
 }: {
   question: BuildQuestion;
+  models: RebuildModel[];
   onAnswer: (questionId: string, answer: string) => void;
   onNavigateToFile: (path: string) => void;
+  projectSlug: string;
+  selectedModelId: string;
+  onModelChange: (modelId: string) => void;
 }) {
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [aiAnswer, setAiAnswer] = useState<string | null>(null);
+  const [aiConfidence, setAiConfidence] = useState<string | null>(null);
+  const [aiConfidenceReason, setAiConfidenceReason] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const isOpen = question.status === "open";
+
+  // Auto-resize textarea to fit content
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [draft]);
 
   const handleSubmit = useCallback(async () => {
     if (!draft.trim() || saving) return;
@@ -39,6 +65,47 @@ function QuestionCard({
       setSaving(false);
     }
   }, [draft, saving, onAnswer, question.id]);
+
+  const handleAiAssist = useCallback(async () => {
+    if (aiLoading || !selectedModelId) return;
+    setAiLoading(true);
+    setAiError(null);
+    setAiAnswer(null);
+    setAiConfidence(null);
+    setAiConfidenceReason(null);
+    try {
+      const result = await api.questionAiAssist(projectSlug, {
+        modelId: selectedModelId,
+        questionText: question.text,
+        questionContext: question.context,
+        userDraft: draft,
+        relatedFiles: question.relatedFiles,
+      });
+      setAiAnswer(result.answer);
+      setAiConfidence(result.confidence);
+      setAiConfidenceReason(result.confidenceReason);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "AI Assist failed. Please try again.");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [aiLoading, selectedModelId, projectSlug, question.text, question.context, draft, question.relatedFiles]);
+
+  const handleApplyAnswer = useCallback(() => {
+    if (!aiAnswer) return;
+    setDraft(aiAnswer);
+    setAiAnswer(null);
+    setAiConfidence(null);
+    setAiConfidenceReason(null);
+    setAiError(null);
+  }, [aiAnswer]);
+
+  const handleDismissAiAnswer = useCallback(() => {
+    setAiAnswer(null);
+    setAiConfidence(null);
+    setAiConfidenceReason(null);
+    setAiError(null);
+  }, []);
 
   return (
     <article
@@ -84,25 +151,223 @@ function QuestionCard({
       {isOpen ? (
         <div className="question-card-answer-form">
           <textarea
+            ref={textareaRef}
             className="question-card-answer-input"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Type your answer…"
             rows={3}
           />
-          <button
-            className="question-card-answer-submit"
-            disabled={!draft.trim() || saving}
-            onClick={handleSubmit}
-            type="button"
-          >
-            {saving ? "Saving…" : "Save Answer"}
-          </button>
+          <div className="question-card-answer-actions">
+            <button
+              className="question-card-answer-submit"
+              disabled={!draft.trim() || saving}
+              onClick={handleSubmit}
+              type="button"
+            >
+              {saving ? "Saving…" : "Save Answer"}
+            </button>
+            <div className="question-card-ai-controls">
+              <CompactModelPicker
+                disabled={aiLoading}
+                models={models}
+                onModelChange={onModelChange}
+                selectedModelId={selectedModelId}
+              />
+              <button
+                className="question-card-ai-assist-button"
+                disabled={aiLoading || !selectedModelId || !models.length}
+                onClick={handleAiAssist}
+                type="button"
+              >
+                {aiLoading ? "Working…" : "AI Assist"}
+              </button>
+            </div>
+          </div>
+
+          {aiLoading ? (
+            <div className="question-card-ai-thinking" aria-label="AI is thinking">
+              <div className="chat-thinking-indicator" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
+              <span className="question-card-ai-thinking-label">AI is thinking…</span>
+            </div>
+          ) : null}
+
+          {aiError ? (
+            <div className="question-card-ai-error">
+              <span>{aiError}</span>
+            </div>
+          ) : null}
+
+          {aiAnswer ? (
+            <div className="question-card-ai-answer">
+              <div className="question-card-ai-answer-header">
+                <div className="question-card-ai-answer-meta">
+                  <span className="question-card-ai-answer-label">AI Suggested Answer</span>
+                  {aiConfidence ? (
+                    <span className={`question-card-ai-confidence question-card-ai-confidence-${aiConfidence}`}>
+                      Confidence: {aiConfidence.charAt(0).toUpperCase() + aiConfidence.slice(1)}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="question-card-ai-answer-actions">
+                  <button
+                    className="question-card-ai-apply-button"
+                    onClick={handleApplyAnswer}
+                    type="button"
+                  >
+                    Apply Answer
+                  </button>
+                  <button
+                    className="question-card-ai-dismiss-button"
+                    onClick={handleDismissAiAnswer}
+                    type="button"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+              {aiConfidenceReason ? (
+                <p className="question-card-ai-confidence-reason">{aiConfidenceReason}</p>
+              ) : null}
+              <p className="question-card-ai-answer-text">{aiAnswer}</p>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="question-card-answer-display">
-          <span className="question-card-answer-label">Answer</span>
-          <p>{question.answer}</p>
+          <div className="question-card-answer-display-header">
+            <span className="question-card-answer-label">Answer</span>
+            {!editing ? (
+              <button
+                className="question-card-edit-answer-button"
+                onClick={() => {
+                  setDraft(question.answer ?? "");
+                  setEditing(true);
+                }}
+                type="button"
+              >
+                Edit Answer
+              </button>
+            ) : null}
+          </div>
+          {editing ? (
+            <div className="question-card-answer-form">
+              <textarea
+                ref={textareaRef}
+                className="question-card-answer-input"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Update your answer…"
+                rows={4}
+              />
+              <div className="question-card-answer-actions">
+                <div className="question-card-edit-actions">
+                  <button
+                    className="question-card-answer-submit"
+                    disabled={!draft.trim() || saving}
+                    onClick={async () => {
+                      if (!draft.trim() || saving) return;
+                      setSaving(true);
+                      try {
+                        onAnswer(question.id, draft.trim());
+                        setEditing(false);
+                        setDraft("");
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    type="button"
+                  >
+                    {saving ? "Saving…" : "Update Answer"}
+                  </button>
+                  <button
+                    className="question-card-ai-dismiss-button"
+                    onClick={() => {
+                      setEditing(false);
+                      setDraft("");
+                    }}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div className="question-card-ai-controls">
+                  <CompactModelPicker
+                    disabled={aiLoading}
+                    models={models}
+                    onModelChange={onModelChange}
+                    selectedModelId={selectedModelId}
+                  />
+                  <button
+                    className="question-card-ai-assist-button"
+                    disabled={aiLoading || !selectedModelId || !models.length}
+                    onClick={handleAiAssist}
+                    type="button"
+                  >
+                    {aiLoading ? "Working…" : "AI Assist"}
+                  </button>
+                </div>
+              </div>
+
+              {aiLoading ? (
+                <div className="question-card-ai-thinking" aria-label="AI is thinking">
+                  <div className="chat-thinking-indicator" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                  <span className="question-card-ai-thinking-label">AI is thinking…</span>
+                </div>
+              ) : null}
+
+              {aiError ? (
+                <div className="question-card-ai-error">
+                  <span>{aiError}</span>
+                </div>
+              ) : null}
+
+              {aiAnswer ? (
+                <div className="question-card-ai-answer">
+                  <div className="question-card-ai-answer-header">
+                    <div className="question-card-ai-answer-meta">
+                      <span className="question-card-ai-answer-label">AI Suggested Answer</span>
+                      {aiConfidence ? (
+                        <span className={`question-card-ai-confidence question-card-ai-confidence-${aiConfidence}`}>
+                          Confidence: {aiConfidence.charAt(0).toUpperCase() + aiConfidence.slice(1)}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="question-card-ai-answer-actions">
+                      <button
+                        className="question-card-ai-apply-button"
+                        onClick={handleApplyAnswer}
+                        type="button"
+                      >
+                        Apply Answer
+                      </button>
+                      <button
+                        className="question-card-ai-dismiss-button"
+                        onClick={handleDismissAiAnswer}
+                        type="button"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                  {aiConfidenceReason ? (
+                    <p className="question-card-ai-confidence-reason">{aiConfidenceReason}</p>
+                  ) : null}
+                  <p className="question-card-ai-answer-text">{aiAnswer}</p>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="chat-markdown">{renderMarkdownMessageContent(question.answer ?? "")}</div>
+          )}
           {question.answeredAt ? (
             <span className="question-card-answered-at">
               Answered {formatLocalDateTime(question.answeredAt, "")}
@@ -115,11 +380,17 @@ function QuestionCard({
 }
 
 export function QuestionsWorkspace({
-  projectSlug,
+  models,
+  onModelChange,
   onNavigateToFile,
+  projectSlug,
+  selectedModelId,
 }: {
-  projectSlug: string;
+  models: RebuildModel[];
+  onModelChange: (modelId: string) => void;
   onNavigateToFile: (path: string) => void;
+  projectSlug: string;
+  selectedModelId: string;
 }) {
   const [questions, setQuestions] = useState<BuildQuestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -229,9 +500,13 @@ export function QuestionsWorkspace({
           {sortedQuestions.map((q) => (
             <QuestionCard
               key={q.id}
+              models={models}
               onAnswer={handleAnswer}
+              onModelChange={onModelChange}
               onNavigateToFile={onNavigateToFile}
+              projectSlug={projectSlug}
               question={q}
+              selectedModelId={selectedModelId}
             />
           ))}
         </div>

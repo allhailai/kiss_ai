@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createRebuildStore } from "./agentRuns.js";
-import { runCursorAgent } from "./agentRuntimes/cursorSdk.js";
+import { runCursorAgent, runCursorAgentText } from "./agentRuntimes/cursorSdk.js";
 import { listen } from "./adapters/listen.js";
 import { registerApiRoutes } from "./routes/apiRoutes.js";
 import { createAgentJobService } from "./services/agentJobs.js";
@@ -17,6 +17,7 @@ import { createHarnessStateService } from "./services/harnessState.js";
 import { apiErrorHandler, httpError } from "./services/httpErrors.js";
 import { createKissAiUpdateService } from "./services/kissAiUpdate.js";
 import { createProjectAgentLock } from "./services/projectAgentLock.js";
+import { createQuestionAiAssistService } from "./services/questionAiAssist.js";
 import { createProjectFileService } from "./services/projectFiles.js";
 import { createProjectService } from "./services/projects.js";
 import { createProjectUiStateService } from "./services/projectUiState.js";
@@ -263,6 +264,14 @@ const { applyEditProposal, editChatMessage, generateEditProposal, sendChatMessag
   writeConversation,
   writeProjectJson,
 });
+const { assistQuestion } = createQuestionAiAssistService({
+  httpError,
+  listCursorModels,
+  pickRebuildModelId,
+  projectAgentLock,
+  resolveCursorApiKey,
+  runCursorAgentText,
+});
 
 const { startHumanAttentionResolution, startRebuild } = createAgentJobService({
   FRAMEWORK_ROOT,
@@ -298,6 +307,7 @@ function execFileText(command, args, options = {}) {
 }
 
 registerApiRoutes(app, {
+  assistQuestion,
   PROJECTS_ROOT,
   attachProject,
   buildLogTabState,
