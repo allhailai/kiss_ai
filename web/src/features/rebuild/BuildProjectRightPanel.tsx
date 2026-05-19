@@ -179,6 +179,7 @@ function BuildProjectEventBody({ event }: { event: AgentRunEvent }) {
 export function BuildProjectRightPanel({
   models,
   onModelChange,
+  onOpenQuestions,
   onSelectPanel,
   onStart,
   rebuild,
@@ -187,6 +188,7 @@ export function BuildProjectRightPanel({
 }: {
   models: RebuildModel[];
   onModelChange: (modelId: string) => void;
+  onOpenQuestions: () => void;
   onSelectPanel: (kind: RightPanelModeKind) => void;
   onStart: () => void;
   rebuild: RebuildState | null;
@@ -222,38 +224,18 @@ export function BuildProjectRightPanel({
         </div>
       </header>
 
-      {status?.annotationCounts ? (
-        <details className="build-project-annotation-summary" open>
-          <summary>Build Summary</summary>
-          {status.buildNotes ? <p className="build-project-annotation-notes">{status.buildNotes}</p> : null}
-          <div className="build-project-annotation-stats">
-            <div className="build-project-annotation-stat">
-              <span className="build-project-annotation-stat-value">{status.annotationCounts.feedbackApplied}</span>
-              <span className="build-project-annotation-stat-label">Comments applied</span>
-            </div>
-            <div className="build-project-annotation-stat">
-              <span className="build-project-annotation-stat-value">{status.annotationCounts.suggestionsAdded}</span>
-              <span className="build-project-annotation-stat-label">Suggestions added</span>
-            </div>
-            {(() => {
-              const pending = status.annotationCounts.suggestionsAdded - status.annotationCounts.suggestionsAccepted - status.annotationCounts.suggestionsDismissed;
-              return pending > 0 ? (
-                <div className="build-project-annotation-stat build-project-annotation-stat-pending">
-                  <span className="build-project-annotation-stat-value">{pending}</span>
-                  <span className="build-project-annotation-stat-label">Pending review</span>
-                </div>
-              ) : null;
-            })()}
-            <div className="build-project-annotation-stat">
-              <span className="build-project-annotation-stat-value">{status.annotationCounts.suggestionsAccepted}</span>
-              <span className="build-project-annotation-stat-label">Accepted</span>
-            </div>
-            <div className="build-project-annotation-stat">
-              <span className="build-project-annotation-stat-value">{status.annotationCounts.suggestionsDismissed}</span>
-              <span className="build-project-annotation-stat-label">Dismissed</span>
-            </div>
+      {(status?.openQuestionsCount ?? 0) > 0 ? (
+        <div className={`build-project-questions-callout${(status?.blockingQuestionsCount ?? 0) > 0 ? " build-project-questions-blocking" : ""}`}>
+          <div>
+            <strong>
+              {(status?.blockingQuestionsCount ?? 0) > 0
+                ? `${status!.blockingQuestionsCount} blocking question${status!.blockingQuestionsCount === 1 ? "" : "s"}`
+                : `${status!.openQuestionsCount} unanswered question${status!.openQuestionsCount === 1 ? "" : "s"}`}
+            </strong>
+            <p>Answer before the next build for best results.</p>
           </div>
-        </details>
+          <button onClick={onOpenQuestions} type="button">Answer</button>
+        </div>
       ) : null}
 
       <section className="build-project-stream-shell">
@@ -308,28 +290,63 @@ export function BuildProjectRightPanel({
       <section className="build-project-details" aria-label="Build details">
         <details>
           <summary>Build Details</summary>
-          <div className="build-project-runner-grid">
-            <div>
-              <span>Status</span>
+
+          <div className="build-project-details-compact">
+            <span className="build-project-detail-item">
+              <span className="build-project-detail-label">Status</span>
               <strong>{rebuild?.status ?? "idle"}</strong>
-            </div>
-            <div>
-              <span>Model</span>
-              <strong>{rebuild?.modelId ?? (selectedModelId || "Not selected")}</strong>
-            </div>
-            <div>
-              <span>Started</span>
-              <strong>{formatLocalDateTime(rebuild?.startedAt, "Not recorded")}</strong>
-            </div>
-            <div>
-              <span>{buildRunning ? "Elapsed" : "Duration"}</span>
+            </span>
+            <span className="build-project-detail-item">
+              <span className="build-project-detail-label">Model</span>
+              <strong>{rebuild?.modelId ?? (selectedModelId || "—")}</strong>
+            </span>
+            <span className="build-project-detail-item">
+              <span className="build-project-detail-label">Started</span>
+              <strong>{formatLocalDateTime(rebuild?.startedAt, "—")}</strong>
+            </span>
+            <span className="build-project-detail-item">
+              <span className="build-project-detail-label">{buildRunning ? "Elapsed" : "Duration"}</span>
               <strong>{formatRunDuration(rebuild)}</strong>
-            </div>
-            <div>
-              <span>Last update</span>
-              <strong>{formatLocalDateTime(latestLogTimestamp, "Not recorded")}</strong>
-            </div>
+            </span>
           </div>
+          <p className="build-project-detail-footnote">
+            Last update: {formatLocalDateTime(latestLogTimestamp, "Not recorded")}
+          </p>
+
+          {status?.annotationCounts ? (
+            <div className="build-project-details-annotation-section">
+              <strong className="build-project-details-annotation-heading">Annotation Summary</strong>
+              {status.buildNotes ? <p className="build-project-annotation-notes">{status.buildNotes}</p> : null}
+              <div className="build-project-annotation-stats">
+                <div className="build-project-annotation-stat" title="Human [FEEDBACK] comments found in output files that will be incorporated into the next build.">
+                  <span className="build-project-annotation-stat-value">{status.annotationCounts.feedbackApplied}</span>
+                  <span className="build-project-annotation-stat-label">Comments applied</span>
+                </div>
+                <div className="build-project-annotation-stat" title="[AI_SUGGESTION] markers the AI placed in output files for your review.">
+                  <span className="build-project-annotation-stat-value">{status.annotationCounts.suggestionsAdded}</span>
+                  <span className="build-project-annotation-stat-label">Suggestions added</span>
+                </div>
+                {(() => {
+                  const pending = status.annotationCounts.suggestionsAdded - status.annotationCounts.suggestionsAccepted - status.annotationCounts.suggestionsDismissed;
+                  return pending > 0 ? (
+                    <div className="build-project-annotation-stat build-project-annotation-stat-pending" title="AI suggestions you haven't accepted or dismissed yet. Review these in the output files.">
+                      <span className="build-project-annotation-stat-value">{pending}</span>
+                      <span className="build-project-annotation-stat-label">Pending review</span>
+                    </div>
+                  ) : null;
+                })()}
+                <div className="build-project-annotation-stat" title="AI suggestions you approved. These will be kept in future builds.">
+                  <span className="build-project-annotation-stat-value">{status.annotationCounts.suggestionsAccepted}</span>
+                  <span className="build-project-annotation-stat-label">Accepted</span>
+                </div>
+                <div className="build-project-annotation-stat" title="AI suggestions you rejected. These will not appear in future builds.">
+                  <span className="build-project-annotation-stat-value">{status.annotationCounts.suggestionsDismissed}</span>
+                  <span className="build-project-annotation-stat-label">Dismissed</span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <details className="build-project-extra-details">
             <summary>Even more details =)</summary>
             <p className="build-project-technical-details">

@@ -1,14 +1,11 @@
-import type { ReactNode } from "react";
 import type { ProjectStatus, RebuildState } from "../../contracts/api";
 
 export function RebuildWorkspace({
-  buildLog,
   status,
   rebuild,
   onOpenBuildProject,
   onOpenQuestions,
 }: {
-  buildLog: ReactNode;
   status: ProjectStatus | null;
   rebuild: RebuildState | null;
   onOpenBuildProject: () => void;
@@ -45,10 +42,6 @@ export function RebuildWorkspace({
           </p>
         ) : null}
       </section>
-
-      <div className="rebuild-build-log-divider" role="separator" aria-hidden="true" />
-
-      {buildLog}
     </div>
   );
 }

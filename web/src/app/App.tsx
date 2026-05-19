@@ -13,7 +13,6 @@ import { useProjectChat } from "./hooks/useProjectChat";
 import { api } from "../data/apiClient";
 import { errorMessage } from "../domain/errors";
 import { type View } from "../navigation/views";
-import { BuildLogWorkspace } from "../features/buildLog/BuildLogWorkspace";
 import { ProjectChatConversationHistory } from "../features/chat/ProjectChatConversationHistory";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { DesignWorkspace } from "../features/design/DesignWorkspace";
@@ -379,7 +378,10 @@ export function App() {
           <Dashboard
             status={rebuildWorkspace.status}
             design={designWorkspace.design}
+            rebuild={rebuildWorkspace.rebuild}
+            buildLog={rebuildWorkspace.buildLog}
             onOpenDesign={() => navigateTo("design")}
+            onSelectLog={(tabId, path, sectionId) => void rebuildWorkspace.refreshBuildLog(tabId, path, sectionId)}
           />
         ) : null}
         {route.view === "chat" ? (
@@ -431,14 +433,6 @@ export function App() {
         ) : null}
         {route.view === "rebuild" ? (
           <RebuildWorkspace
-            buildLog={
-              <BuildLogWorkspace
-                buildLog={rebuildWorkspace.buildLog}
-                status={rebuildWorkspace.status}
-                rebuild={rebuildWorkspace.rebuild}
-                onSelectLog={(tabId, path, sectionId) => void rebuildWorkspace.refreshBuildLog(tabId, path, sectionId)}
-              />
-            }
             status={rebuildWorkspace.status}
             rebuild={rebuildWorkspace.rebuild}
             onOpenBuildProject={openBuildProjectPanel}
@@ -468,6 +462,7 @@ export function App() {
             <BuildProjectRightPanel
               models={rebuildWorkspace.models}
               onModelChange={rebuildWorkspace.setSelectedModelId}
+              onOpenQuestions={() => navigateTo("questions")}
               onSelectPanel={selectRightPanelKind}
               onStart={startRebuildWithRequirementsCheck}
               rebuild={rebuildWorkspace.rebuild}

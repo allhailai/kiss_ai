@@ -1,4 +1,5 @@
-import type { DesignState, ProjectStatus } from "../../contracts/api";
+import type { BuildLogState, DesignState, ProjectStatus, RebuildState } from "../../contracts/api";
+import { BuildLogWorkspace } from "../buildLog/BuildLogWorkspace";
 import { formatLocalDateTime } from "../../domain/formatters";
 import { rebuildStatusLabel } from "../../domain/rebuild";
 
@@ -20,13 +21,19 @@ function lintStatusLabel(status: string | null | undefined) {
 }
 
 export function Dashboard({
+  buildLog,
   status,
   design,
+  rebuild,
   onOpenDesign,
+  onSelectLog,
 }: {
+  buildLog: BuildLogState | null;
   status: ProjectStatus | null;
   design: DesignState | null;
+  rebuild: RebuildState | null;
   onOpenDesign: () => void;
+  onSelectLog: (tabId: string, path?: string | null, sectionId?: string | null) => void;
 }) {
   return (
     <div className="panel-stack">
@@ -86,6 +93,13 @@ export function Dashboard({
           <p>No local changes reported.</p>
         )}
       </section>
+
+      <BuildLogWorkspace
+        buildLog={buildLog}
+        status={status}
+        rebuild={rebuild}
+        onSelectLog={onSelectLog}
+      />
     </div>
   );
 }
