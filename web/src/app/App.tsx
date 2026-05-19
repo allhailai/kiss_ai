@@ -20,7 +20,6 @@ import { FileWorkspace } from "../features/files/FileWorkspace";
 import { SimplifiedNavigator } from "../features/navigation/WorkflowMenus";
 import { ProjectPicker } from "../features/projectPicker/ProjectPicker";
 import { BuildProjectRightPanel } from "../features/rebuild/BuildProjectRightPanel";
-import { RebuildWorkspace } from "../features/rebuild/RebuildWorkspace";
 import { QuestionsWorkspace } from "../features/questions/QuestionsWorkspace";
 
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
@@ -285,7 +284,7 @@ export function App() {
         projectSlug={project.selectedProjectSlug}
         onOpenFile={openProjectFileWithAgentContext}
         onOpenDashboard={() => navigateTo("dashboard")}
-        onOpenProjectHome={() => navigateTo("rebuild")}
+        onOpenProjectHome={() => navigateTo("dashboard")}
         onSwitchProject={project.clearSelectedProject}
       />
       <RightPanelToggle active={isAgentPanelOpen} label="AI" onToggle={toggleAgentPanel} />
@@ -429,15 +428,6 @@ export function App() {
             onNavigateToFile={openProjectFileWithAgentContext}
             projectSlug={project.selectedProjectSlug}
             selectedModelId={rebuildWorkspace.selectedModelId}
-          />
-        ) : null}
-        {route.view === "rebuild" ? (
-          <RebuildWorkspace
-            status={rebuildWorkspace.status}
-            rebuild={rebuildWorkspace.rebuild}
-            onOpenBuildProject={openBuildProjectPanel}
-            onOpenQuestions={() => navigateTo("questions")}
-
           />
         ) : null}
       </section>

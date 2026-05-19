@@ -86,9 +86,7 @@ export function SimplifiedNavigator({
       {simplifiedNavSections.map((section) => {
         const isExpanded = expandedSections.has(section.id);
         const isActiveSection = activeSection === section.id;
-        const isBuildSection = section.id === "build";
         const isChatSection = section.id === "chat";
-        const isDirectViewSection = isChatSection || isBuildSection;
 
         return (
           <section className={isActiveSection ? "nav-section active" : "nav-section"} key={section.id}>
@@ -97,20 +95,18 @@ export function SimplifiedNavigator({
               onClick={() =>
                 isChatSection
                     ? onOpenView(chatNavLeaf.view)
-                    : isBuildSection
-                      ? onOpenView("rebuild")
-                      : toggleSection(section.id)
+                    : toggleSection(section.id)
               }
               type="button"
-              aria-expanded={isDirectViewSection ? undefined : isExpanded}
+              aria-expanded={isChatSection ? undefined : isExpanded}
             >
               <span className="nav-section-label">
                 <strong>{section.label}</strong>
               </span>
-              {isDirectViewSection ? null : <b aria-hidden="true">{isExpanded ? "-" : "+"}</b>}
+              {isChatSection ? null : <b aria-hidden="true">{isExpanded ? "-" : "+"}</b>}
             </button>
 
-            {!isDirectViewSection && isExpanded ? <div className="nav-section-body">{renderSectionBody(section.id)}</div> : null}
+            {!isChatSection && isExpanded ? <div className="nav-section-body">{renderSectionBody(section.id)}</div> : null}
           </section>
         );
       })}

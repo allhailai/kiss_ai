@@ -61,13 +61,6 @@ export function useRouteDrivenData({
         }
         if (!isCurrentRouteRequest()) return;
 
-        if (nextView === "rebuild") {
-          await refreshRebuild();
-          if (!isCurrentRouteRequest()) return;
-          await refreshBuildLog();
-        }
-        if (!isCurrentRouteRequest()) return;
-
         if (route.filePath && nextView !== "design") {
           await selectFile(route.filePath);
         }

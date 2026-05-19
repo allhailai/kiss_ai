@@ -131,14 +131,6 @@
     min-height: 0;
   }
 
-  .rebuild-status-controls {
-    grid-template-columns: 1fr;
-  }
-
-  .rebuild-status-controls button {
-    justify-self: start;
-  }
-
   .design-editor-pane textarea {
     min-height: 70vh;
   }

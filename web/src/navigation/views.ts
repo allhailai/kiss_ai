@@ -1,7 +1,7 @@
 import type { ProjectFile } from "../contracts/api";
 import { designIdentityFilePath, isDesignIdentityPath, projectPathPrefixes } from "../domain/projectPaths";
 
-export type View = "chat" | "dashboard" | "requirements" | "inputs" | "outputs" | "design" | "rebuild" | "questions";
+export type View = "chat" | "dashboard" | "requirements" | "inputs" | "outputs" | "design" | "questions";
 
 export type RouteState = {
   projectSlug: string | null;
@@ -10,11 +10,11 @@ export type RouteState = {
   context: Record<string, string>;
 };
 
-const views: View[] = ["chat", "requirements", "inputs", "outputs", "design", "rebuild", "dashboard", "questions"];
+const views: View[] = ["chat", "requirements", "inputs", "outputs", "design", "dashboard", "questions"];
 
 export const viewIds = new Set<View>(views);
 export const fileBackedViews = new Set<View>(["requirements", "inputs", "outputs", "design"]);
-export const defaultRoute: RouteState = { projectSlug: null, view: "rebuild", filePath: null, context: {} };
+export const defaultRoute: RouteState = { projectSlug: null, view: "dashboard", filePath: null, context: {} };
 export const selectedProjectStorageKey = "kiss_ai.selectedProject";
 export const designProjectFile: ProjectFile = {
   path: designIdentityFilePath,
