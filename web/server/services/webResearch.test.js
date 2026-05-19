@@ -70,7 +70,7 @@ describe("webResearch", () => {
       globalThis.fetch = originalFetch;
     });
 
-    it("returns an error for non-200 responses", async () => {
+    it("attempts browser fallback on 403 responses", async () => {
       const { fetchAndExtract } = await import("./webResearch.js");
 
       globalThis.fetch = vi.fn().mockResolvedValue({
@@ -81,8 +81,28 @@ describe("webResearch", () => {
       });
 
       const result = await fetchAndExtract("https://example.com/blocked");
-      expect(result.error).toContain("403");
+      // Browser fallback is triggered on 403 — if Chrome is available it will
+      // attempt to load the page; if not, a fallback error is returned.
+      // Either way, it should NOT return the raw "HTTP 403 Forbidden" error.
       expect(result.url).toBe("https://example.com/blocked");
+      if (result.error) {
+        expect(result.error).not.toBe("HTTP 403 Forbidden");
+      }
+    });
+
+    it("returns an error for non-403 HTTP failures", async () => {
+      const { fetchAndExtract } = await import("./webResearch.js");
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        headers: new Headers(),
+      });
+
+      const result = await fetchAndExtract("https://example.com/error");
+      expect(result.error).toContain("500");
+      expect(result.url).toBe("https://example.com/error");
     });
 
     it("extracts text from PDF responses", async () => {

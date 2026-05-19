@@ -97,6 +97,108 @@ async function extractPdf(url, response) {
   }
 }
 
+// ── Browser fallback for WAF-blocked pages ──────────────────────────
+const CHROME_PATHS = [
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/usr/bin/google-chrome",
+  "/usr/bin/google-chrome-stable",
+  "/usr/bin/chromium-browser",
+  "/usr/bin/chromium",
+];
+
+let _puppeteer;
+
+async function loadBrowserDeps() {
+  if (_puppeteer) return;
+  const mod = await import("puppeteer-core");
+  _puppeteer = mod.default ?? mod;
+}
+
+async function findChrome() {
+  const { existsSync } = await import("node:fs");
+  for (const p of CHROME_PATHS) {
+    if (existsSync(p)) return p;
+  }
+  return null;
+}
+
+async function fetchWithBrowser(url, timeoutMs = 30_000) {
+  await loadBrowserDeps();
+  await loadDeps(); // Need Readability + Turndown
+
+  const chromePath = await findChrome();
+  if (!chromePath) {
+    return { error: "Browser fallback unavailable: Chrome not found at known paths", url };
+  }
+
+  let browser;
+  try {
+    browser = await _puppeteer.launch({
+      executablePath: chromePath,
+      headless: "shell",
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+    });
+
+    const page = await browser.newPage();
+    await page.setUserAgent(
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    );
+
+    await page.goto(url, { waitUntil: "networkidle2", timeout: timeoutMs });
+
+    // Check if we still got blocked after JS execution
+    const title = await page.title();
+    if (title.toLowerCase().includes("access denied") || title.toLowerCase().includes("blocked")) {
+      return { error: "Browser fallback: page still blocked after JS execution", url };
+    }
+
+    const html = await page.content();
+
+    // Use the same Readability + Turndown pipeline as the normal path
+    const { document } = _parseHTML(html);
+    const reader = new _Readability(document);
+    const article = reader.parse();
+
+    if (!article || !article.content) {
+      // Fall back to full page body text if Readability can't isolate an article
+      const bodyText = await page.evaluate(() => document.body?.innerText || "");
+      const wordCount = bodyText.split(/\s+/).filter(Boolean).length;
+
+      if (wordCount < 50) {
+        return { error: "Browser fallback: page loaded but no extractable content", url };
+      }
+
+      return {
+        url,
+        title: title || "",
+        byline: "",
+        excerpt: "",
+        content: bodyText,
+        wordCount,
+      };
+    }
+
+    const turndown = new _TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
+    const markdown = turndown.turndown(article.content);
+    const wordCount = markdown.split(/\s+/).filter(Boolean).length;
+
+    return {
+      url,
+      title: article.title || title || "",
+      byline: article.byline || "",
+      excerpt: article.excerpt || "",
+      content: markdown,
+      wordCount,
+    };
+  } catch (err) {
+    return { error: `Browser fallback error: ${err.message || "unknown"}`, url };
+  } finally {
+    if (browser) {
+      await browser.close().catch(() => {});
+    }
+  }
+}
+
 // ── Core: fetch a single URL and extract article content ────────────
 const DEFAULT_TIMEOUT_MS = 15_000;
 const USER_AGENT = "kiss-ai-research/1.0 (Node.js; research build pipeline)";
@@ -121,6 +223,10 @@ export async function fetchAndExtract(url, timeoutMs = DEFAULT_TIMEOUT_MS) {
     clearTimeout(timer);
 
     if (!response.ok) {
+      // On 403 (WAF block), retry with headless browser
+      if (response.status === 403) {
+        return fetchWithBrowser(url, timeoutMs * 2);
+      }
       return { error: `HTTP ${response.status} ${response.statusText}`, url };
     }
 
