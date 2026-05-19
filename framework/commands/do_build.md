@@ -37,7 +37,7 @@ Two categories of files exist in every project:
 **AI-managed (the build creates and updates these):**
 - `sources/**`
 - `outputs_ai/**`
-- `questions.md`
+- `.build/questions.json`
 - `.build/manifest.json`
 - `change_logs/**`
 
@@ -61,7 +61,7 @@ Two marker types exist in AI-managed markdown files:
 1. Read `project.md` in full. This is the single source of truth for project goals, topics, context, constraints, directed output requirements, and output guidance.
 2. Read `human_design_identity.md` for project identity and design tokens.
 3. Read `.build/manifest.json` if it exists. If it does not exist, this is a first build.
-4. Read `questions.md` if it exists. Scan each item under `## Open Questions` for a user-provided answer — the user answers inline by appending text such as `Answer:` to the question line. Collect all answered questions for processing in Phase 10. Treat unanswered open questions as context for the current build.
+4. Read `.build/questions.json` if it exists. Check for questions with `status: "answered"` that have not yet been applied. Collect these for processing in Phase 10. Treat open questions as context for the current build. If this file does not exist, there are no prior questions.
 5. Read `outputs_ai/wiki/_index.md` if it exists. This is a lightweight table of contents for the wiki — it lists every wiki page with its BLUF summary, source references, and last-updated date. Use it to understand the current state of the wiki without reading every page. If this file does not exist, this is a first build.
 6. Read `.build/scratchpad.md` if it exists. This is your working memory from the previous build — it contains key data points, cross-references, contradictions found, and open threads. Use it as context for the current build.
 7. Read `.build/topic_graph.json` if it exists. This maps which topics depend on or reference other topics, and which sources support each topic. Use it to understand the project's knowledge structure and to determine which downstream outputs need updating when a source or topic changes.
@@ -217,11 +217,11 @@ Each suggestion should be:
 - Actionable — clear what happens if the user accepts.
 - Self-contained — understandable without reading other files.
 
-36. Process answered questions collected in Step 4:
-    - For each answered question, determine where the answer should be applied: update `project.md` (e.g., add to `## Output Guidance` or `## Constraints`), adjust output content, or both.
+36. Process answered questions collected in Step 4 (from `.build/questions.json`):
+    - For each question with `status: "answered"`, determine where the answer should be applied: update `project.md` (e.g., add to `## Output Guidance` or `## Constraints`), adjust output content, or both.
     - Apply the answer: make the concrete changes to the relevant files so the answer is reflected in the project going forward.
-    - Move the question from `## Open Questions` to `## Resolved Questions`, preserving both the original question text and the user's answer.
-37. Add any new items to `## Open Questions` in `questions.md` that require user judgment or information the AI cannot infer. Do not duplicate items already present.
+    - Update the question's status to `"applied"` in `.build/questions.json`.
+37. If the build prompt includes raw `BUILD_QUESTION` markers for consolidation, consolidate and write them to `.build/questions.json` (merging duplicates, preserving highest priority, preserving existing answered/applied questions).
 
 ### Phase 11: Record and Snapshot
 
@@ -286,7 +286,7 @@ This graph maps which topics depend on other topics, which sources support each 
       - `project.md`
       - `human_design_identity.md`
       - `inputs_human/**`
-      - `questions.md` (if exists)
+      - `.build/questions.json` (if exists)
       - `README.md`
       - Placeholder files (`.gitkeep`) under `sources/`, `outputs_ai/`
     - Commit: `kiss_ai initial baseline: <project_name> (YYYY-MM-DD)`
@@ -302,6 +302,6 @@ Report:
 - Directed outputs created or updated.
 - FEEDBACK markers applied.
 - AI_SUGGESTION markers added (count and brief list).
-- Questions added to `questions.md`.
+- Questions consolidated and written to `.build/questions.json`.
 - Git snapshot commit hash (or why it was skipped).
 - Any caveats, issues, or items needing user attention.

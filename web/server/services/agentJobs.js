@@ -3,6 +3,7 @@ import path from "node:path";
 import { parseResearchPlan, executeResearchPlan, generateSourceDigests } from "./webResearch.js";
 import { computeBuildScope } from "./buildScope.js";
 import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
+import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
 
 export function createAgentJobService({
   FRAMEWORK_ROOT,
@@ -209,8 +210,8 @@ export function createAgentJobService({
 
     // Add questions if available
     try {
-      await fs.access(path.join(project.path, "questions.md"));
-      lines.push("  - questions.md (for relevant open questions)");
+      await fs.access(path.join(project.path, ".build/questions.json"));
+      lines.push("  - .build/questions.json (for relevant open questions)");
     } catch {
       // No questions file
     }
@@ -222,8 +223,8 @@ export function createAgentJobService({
     return lines.join("\n");
   }
 
-  function createValidationPrompt(project, modelId) {
-    return [
+  function createValidationPrompt(project, modelId, rawBuildQuestions = []) {
+    const lines = [
       "Run the kiss_ai validation pass for this project.",
       "",
       `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build.md")} Phases 9-11 only (Validate, Leave AI Suggestions, Record and Snapshot).`,
@@ -235,7 +236,33 @@ export function createAgentJobService({
       "Your job is to validate, add AI suggestions, update manifest.json, and git snapshot.",
       "",
       `Model used for this build: ${modelId}. Include this in the change_logs/builds.md entry.`,
-    ].join("\n");
+    ];
+
+    // Question consolidation instructions
+    if (rawBuildQuestions.length > 0) {
+      lines.push(
+        "",
+        "QUESTION CONSOLIDATION:",
+        `The build produced ${rawBuildQuestions.length} raw question(s) from output files.`,
+        "Consolidate these into the fewest meaningful questions:",
+        "- Merge duplicates and near-duplicates into single questions",
+        "- When merging, combine all relatedFiles from merged questions",
+        "- Preserve the highest priority level when merging (blocking > important > informational)",
+        "- Do not add questions that are already answered in existing .build/questions.json",
+        "- Write the final consolidated list to .build/questions.json",
+        "",
+        "Raw questions:",
+        "```json",
+        JSON.stringify(rawBuildQuestions, null, 2),
+        "```",
+        "",
+        "Write .build/questions.json with this schema:",
+        '{ "questions": [{ "id": "q-...", "text": "...", "context": "...", "priority": "blocking|important|informational", "status": "open", "askedAt": "...", "askedDuring": { "phase": "3b", "buildId": "...", "modelId": "..." }, "relatedFiles": [...], "relatedTopics": [...], "answer": null, "answeredAt": null }] }',
+        "Preserve any existing answered questions from the current .build/questions.json.",
+      );
+    }
+
+    return lines.join("\n");
   }
 
   const MAX_FILE_CONCURRENCY = 3;
@@ -881,6 +908,31 @@ export function createAgentJobService({
         });
       }
 
+      // ── Phase 3b.5: Extract BUILD_QUESTION markers from output files ──
+      let rawBuildQuestions = [];
+      try {
+        const outputFiles = Object.keys(sourceMap);
+        rawBuildQuestions = await extractAllBuildQuestions(project.path, outputFiles, {
+          phase: "3b",
+          buildId: (await getRebuildState(project.slug))?.runId?.slice(0, 8) || null,
+          modelId,
+        });
+
+        if (rawBuildQuestions.length > 0) {
+          await appendRunEvent(project.slug, {
+            type: "system",
+            title: `Extracted ${rawBuildQuestions.length} question(s) from output files`,
+            text: `Raw questions will be consolidated during validation.`,
+            status: "questions_extracted",
+            runtime: "server",
+            metadata: { phase: "3b.5", questionCount: rawBuildQuestions.length },
+          });
+        }
+      } catch (extractError) {
+        // Non-fatal — continue without questions
+        console.error("Question extraction failed:", extractError);
+      }
+
       // ── Phase 3c: Validation Pass ──
       const stateBeforeValidation = await getRebuildState(project.slug);
       await setRebuildState(project.slug, {
@@ -898,7 +950,7 @@ export function createAgentJobService({
         metadata: { phase: "3c" },
       });
 
-      const validationPrompt = createValidationPrompt(project, modelId);
+      const validationPrompt = createValidationPrompt(project, modelId, rawBuildQuestions);
       const synthesisResult = await runSingleAgentPhase({
         project,
         apiKey,

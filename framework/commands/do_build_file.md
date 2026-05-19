@@ -56,7 +56,27 @@ Before finishing, verify:
 ## What NOT to Do
 
 - Do not write wiki pages. They are already built.
-- Do not update `manifest.json`, `questions.md`, or `change_logs/`. The orchestrator handles those.
+- Do not update `manifest.json`, `questions.md`, `.build/questions.json`, or `change_logs/`. The orchestrator handles those.
 - Do not run git commands.
 - Do not generate other output files.
 - Do not read sources that are not provided in your context — the pipeline has already determined what is relevant.
+
+## Surfacing Questions
+
+When you encounter ambiguity, missing context, conflicting sources, or decisions that require human judgment, embed a question marker in your output file near the relevant section:
+
+```html
+<!-- BUILD_QUESTION: {"text": "Your question here?", "priority": "blocking", "context": "Brief explanation of why this matters and what you found."} -->
+```
+
+**Priority levels:**
+- `"blocking"` — You cannot proceed confidently. The output section is materially weakened without an answer.
+- `"important"` — The answer would significantly improve quality, but you can produce reasonable output without it.
+- `"informational"` — Nice-to-have clarity for future builds.
+
+**Rules:**
+- Do NOT answer the question yourself or invent data. Document the gap and continue with the conservative default.
+- Do NOT duplicate questions that are already in `questions.md` or `questions.json`.
+- Prefer fewer, higher-quality questions over many trivial ones.
+- Each question must be self-contained — understandable without reading the surrounding output.
+

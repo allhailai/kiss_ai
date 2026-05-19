@@ -22,6 +22,7 @@ import { SimplifiedNavigator } from "../features/navigation/WorkflowMenus";
 import { ProjectPicker } from "../features/projectPicker/ProjectPicker";
 import { BuildProjectRightPanel } from "../features/rebuild/BuildProjectRightPanel";
 import { RebuildWorkspace } from "../features/rebuild/RebuildWorkspace";
+import { QuestionsWorkspace } from "../features/questions/QuestionsWorkspace";
 
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
@@ -30,7 +31,6 @@ import { RightPanelModeSwitch } from "../shared/rightPanel/RightPanelModeSwitch"
 import { makeEditableTargetForFile, useAgentFileContext } from "./hooks/useAgentFileContext";
 import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
 import type { ChatMessageFileEdit, KissAiUpdateCheckResponse, SystemSettingsResponse } from "../contracts/api";
-import { questionsFilePath } from "../domain/projectPaths";
 
 const aiFileAssistPrompt =
   "Review the saved annotations in this file. Interpret the Git diff as user guidance, then propose edits that integrate those annotations cleanly throughout the document while preserving the document's intent, structure, and voice.";
@@ -358,6 +358,8 @@ export function App() {
         <SimplifiedNavigator
           currentView={route.view}
           humanInputEmptyDirectories={fileWorkspace.humanInputEmptyDirectories}
+          openQuestionsCount={rebuildWorkspace.status?.openQuestionsCount}
+          blockingQuestionsCount={rebuildWorkspace.status?.blockingQuestionsCount}
           loading={fileWorkspace.treeLoading}
           projectFiles={fileWorkspace.projectFiles}
           selectedPath={fileWorkspace.selected?.path ?? null}
@@ -418,6 +420,12 @@ export function App() {
             onSave={() => void fileWorkspace.saveSelected()}
           />
         ) : null}
+        {route.view === "questions" ? (
+          <QuestionsWorkspace
+            projectSlug={project.selectedProjectSlug}
+            onNavigateToFile={openProjectFileWithAgentContext}
+          />
+        ) : null}
         {route.view === "rebuild" ? (
           <RebuildWorkspace
             buildLog={
@@ -431,7 +439,7 @@ export function App() {
             status={rebuildWorkspace.status}
             rebuild={rebuildWorkspace.rebuild}
             onOpenBuildProject={openBuildProjectPanel}
-            onOpenQuestions={() => navigateTo("requirements", questionsFilePath)}
+            onOpenQuestions={() => navigateTo("questions")}
 
           />
         ) : null}

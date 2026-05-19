@@ -25,7 +25,7 @@ export function RebuildWorkspace({
           <div>
             <strong>You have unanswered questions for the next build.</strong>
             <p>
-              Answer {openQuestionsCount} question{openQuestionsCount === 1 ? "" : "s"} in human_open_questions.md when you are ready to refine the project.
+              {openQuestionsCount} question{openQuestionsCount === 1 ? "" : "s"} from the AI need your input to improve the next build.
             </p>
           </div>
           <button onClick={onOpenQuestions} type="button">

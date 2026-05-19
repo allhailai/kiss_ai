@@ -53,6 +53,24 @@ export type ResolveHumanAttentionRequest = {
   manualPrompt?: string;
 };
 
+export type BuildQuestion = {
+  id: string;
+  text: string;
+  context: string;
+  priority: "blocking" | "important" | "informational";
+  status: "open" | "answered";
+  askedAt: string;
+  askedDuring: {
+    phase: string;
+    buildId: string | null;
+    modelId: string | null;
+  };
+  relatedFiles: string[];
+  relatedTopics: string[];
+  answer: string | null;
+  answeredAt: string | null;
+};
+
 export type ProjectStatus = {
   projectSlug: string;
   projectName: string;
@@ -68,8 +86,9 @@ export type ProjectStatus = {
   staleOutputs: unknown[];
   humanAttentionItems: HumanAttentionItem[];
   humanAttentionCount: number;
-  openQuestions: string[];
   openQuestionsCount: number;
+  blockingQuestionsCount: number;
+  totalQuestionsCount: number;
   cursorApiKeyAvailable: boolean;
   cursorApiKeySource: string | null;
   cursorApiKeyWarnings: string[];

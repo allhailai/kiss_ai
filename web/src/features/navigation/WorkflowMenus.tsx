@@ -19,6 +19,8 @@ const defaultExpandedSections = new Set<SimplifiedNavSectionId>(
 export function SimplifiedNavigator({
   currentView,
   humanInputEmptyDirectories,
+  openQuestionsCount,
+  blockingQuestionsCount,
   projectFiles,
   loading,
   selectedPath,
@@ -33,6 +35,8 @@ export function SimplifiedNavigator({
 }: {
   currentView: View;
   humanInputEmptyDirectories?: string[];
+  openQuestionsCount?: number;
+  blockingQuestionsCount?: number;
   projectFiles: ProjectFile[];
   loading: boolean;
   selectedPath: string | null;
@@ -130,12 +134,17 @@ export function SimplifiedNavigator({
             ))}
             <button
               className={
-                selectedPath === openQuestionsNavLeaf.path ? "simple-nav-item simple-nav-child active" : "simple-nav-item simple-nav-child"
+                currentView === "questions" ? "simple-nav-item simple-nav-child active" : "simple-nav-item simple-nav-child"
               }
-              onClick={() => onOpenView(openQuestionsNavLeaf.view, openQuestionsNavLeaf.path)}
+              onClick={() => onOpenView(openQuestionsNavLeaf.view)}
               type="button"
             >
               <DefineNavLabel label={openQuestionsNavLeaf.label} />
+              {(openQuestionsCount ?? 0) > 0 ? (
+                <span className={`nav-badge${(blockingQuestionsCount ?? 0) > 0 ? " nav-badge-blocking" : " nav-badge-open"}`}>
+                  {openQuestionsCount}
+                </span>
+              ) : null}
             </button>
           </div>
         </>

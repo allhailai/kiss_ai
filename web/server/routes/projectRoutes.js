@@ -1,4 +1,5 @@
 import { buildLogQuerySchema, createProjectBodySchema, parseRequestBody, parseRequestQuery, updateProjectUiStateBodySchema } from "./requestSchemas.js";
+import { readQuestions, answerQuestion, getQuestionCounts } from "../services/questionsService.js";
 
 function extractOpenQuestions(content) {
   const lines = content.split("\n");
@@ -124,7 +125,7 @@ export function registerProjectRoutes(app, {
       const harness = manifest ? {} : await readProjectJson(project.path, ".harness-state.json", {});
       const cursorApiKey = await resolveCursorApiKey();
       const humanAttentionItems = getHumanAttentionItems(harness);
-      const openQuestions = await readOpenQuestions(readTextFile, project.path);
+      const questionCounts = await getQuestionCounts(project.path);
 
       response.json({
         projectSlug: manifest?.project_slug ?? harness.project_slug ?? project.slug,
@@ -141,8 +142,9 @@ export function registerProjectRoutes(app, {
         staleOutputs: harness.rebuild_scope?.outputs_marked_stale ?? [],
         humanAttentionItems,
         humanAttentionCount: humanAttentionItems.length,
-        openQuestions,
-        openQuestionsCount: openQuestions.length,
+        openQuestionsCount: questionCounts.openQuestionsCount,
+        blockingQuestionsCount: questionCounts.blockingQuestionsCount,
+        totalQuestionsCount: questionCounts.totalQuestionsCount,
         cursorApiKeyAvailable: cursorApiKey.available,
         cursorApiKeySource: cursorApiKey.source,
         cursorApiKeyWarnings: cursorApiKey.warnings,
@@ -173,4 +175,36 @@ export function registerProjectRoutes(app, {
       next(error);
     }
   });
+
+  // ── Questions API ──
+
+  app.get("/api/projects/:projectSlug/questions", async (request, response, next) => {
+    try {
+      response.json(await readQuestions(request.project.path));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/questions/:questionId/answer", async (request, response, next) => {
+    try {
+      const { questionId } = request.params;
+      const answer = request.body?.answer;
+
+      if (!answer || typeof answer !== "string" || !answer.trim()) {
+        throw httpError("Answer text is required.", 400, "missing_answer");
+      }
+
+      const updated = await answerQuestion(request.project.path, questionId, answer.trim());
+
+      if (!updated) {
+        throw httpError(`Question '${questionId}' not found.`, 404, "question_not_found");
+      }
+
+      response.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
 }
+
