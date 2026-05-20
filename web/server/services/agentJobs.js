@@ -4,6 +4,7 @@ import { parseResearchPlan, executeResearchPlan, generateSourceDigests } from ".
 import { computeBuildScope } from "./buildScope.js";
 import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
 import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
+import { extractAllSuggestions, readSuggestions, writeSuggestions } from "./suggestionsService.js";
 
 export function createAgentJobService({
   FRAMEWORK_ROOT,
@@ -931,6 +932,62 @@ export function createAgentJobService({
       } catch (extractError) {
         // Non-fatal — continue without questions
         console.error("Question extraction failed:", extractError);
+      }
+
+      // ── Phase 3b.6: Extract AI_SUGGESTION markers from all output files ──
+      try {
+        // Scan all markdown files in outputs_ai/ (directed outputs + wiki pages)
+        const allOutputMdFiles = [];
+        async function walkOutputs(dir, relativeBase) {
+          let entries;
+          try { entries = await fs.readdir(dir, { withFileTypes: true }); } catch { return; }
+          for (const entry of entries) {
+            if (entry.name.startsWith(".")) continue;
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+              await walkOutputs(fullPath, path.join(relativeBase, entry.name));
+            } else if (entry.name.endsWith(".md")) {
+              allOutputMdFiles.push(path.join(relativeBase, entry.name));
+            }
+          }
+        }
+        await walkOutputs(path.join(project.path, "outputs_ai"), "outputs_ai");
+
+        const buildMeta = {
+          phase: "validation",
+          buildId: (await getRebuildState(project.slug))?.runId?.slice(0, 8) || null,
+          modelId,
+        };
+
+        const newSuggestions = await extractAllSuggestions(project.path, allOutputMdFiles, buildMeta);
+        const existing = await readSuggestions(project.path);
+
+        // Deduplicate by text — keep existing entries, add new ones
+        const existingTexts = new Set(existing.suggestions.map((s) => s.text));
+        const merged = [...existing.suggestions];
+        for (const suggestion of newSuggestions) {
+          if (!existingTexts.has(suggestion.text)) {
+            merged.push(suggestion);
+            existingTexts.add(suggestion.text);
+          }
+        }
+
+        await writeSuggestions(project.path, merged);
+
+        const newCount = merged.length - existing.suggestions.length;
+        if (newCount > 0 || merged.length > 0) {
+          await appendRunEvent(project.slug, {
+            type: "system",
+            title: `Extracted ${newCount} new suggestion(s) (${merged.length} total)`,
+            text: `AI suggestions written to .build/suggestions.json.`,
+            status: "suggestions_extracted",
+            runtime: "server",
+            metadata: { phase: "3b.6", newCount, totalCount: merged.length },
+          });
+        }
+      } catch (suggestError) {
+        // Non-fatal — continue without suggestions
+        console.error("Suggestion extraction failed:", suggestError);
       }
 
       // ── Phase 3c: Validation Pass ──
