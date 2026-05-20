@@ -9,6 +9,7 @@ import { panelForKind, useRightPanelSurface, type RightPanelKind } from "./hooks
 import { useRightPanelWidth } from "./hooks/useRightPanelWidth";
 import { useLeftNavWidth } from "./hooks/useLeftNavWidth";
 import { useAgentChatPanel } from "./hooks/useAgentChatPanel";
+import { useKeybindings } from "./hooks/useKeybindings";
 import { useProjectChat } from "./hooks/useProjectChat";
 import { api } from "../data/apiClient";
 import { errorMessage } from "../domain/errors";
@@ -104,6 +105,10 @@ export function App() {
     projectSlug: project.selectedProjectSlug,
     rightPanelSurface,
     view: route.view,
+  });
+  useKeybindings({
+    toggleLeftPanel: () => setSidebarCollapsed((prev) => !prev),
+    toggleRightPanel: toggleAgentPanel,
   });
   const agentFileContext = useAgentFileContext({
     aiEditableFiles: projectChat.aiEditableFiles,

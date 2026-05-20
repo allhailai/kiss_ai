@@ -1,6 +1,7 @@
 import express from "express";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
+import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createRebuildStore } from "./agentRuns.js";
@@ -300,6 +301,25 @@ function execFileText(command, args, options = {}) {
   });
 }
 
+
+
+const defaultKeybindings = {
+  toggleLeftPanel: "Ctrl+Shift+Meta+ArrowLeft",
+  toggleRightPanel: "Ctrl+Shift+Meta+ArrowRight",
+};
+
+async function readKeybindings() {
+  const settingsPath = path.join(PROJECTS_ROOT, ".kiss_ai_settings.json");
+  try {
+    const raw = await fs.readFile(settingsPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    const userBindings = parsed?.keybindings ?? {};
+    return { ...defaultKeybindings, ...userBindings };
+  } catch {
+    return { ...defaultKeybindings };
+  }
+}
+
 registerApiRoutes(app, {
   assistQuestion,
   PROJECTS_ROOT,
@@ -330,6 +350,7 @@ registerApiRoutes(app, {
   pickRebuildModelId,
   readConversation,
   readProjectJson,
+  readKeybindings,
   readProjectUiState,
   readTextFile,
   resolveCursorApiKey,

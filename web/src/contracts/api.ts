@@ -169,6 +169,11 @@ export type SaveCursorApiKeyResponse = {
   message: string;
 };
 
+export type Keybindings = {
+  toggleLeftPanel: string;
+  toggleRightPanel: string;
+};
+
 export type CreateProjectRequest = {
   name: string;
   slug?: string;

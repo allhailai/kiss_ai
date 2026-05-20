@@ -1,4 +1,5 @@
 import type {
+  Keybindings,
   KissAiUpdateCheckResponse,
   KissAiUpdateResponse,
   SaveCursorApiKeyRequest,
@@ -8,6 +9,7 @@ import type {
 import { request } from "./request";
 
 export const systemApi = {
+  keybindings: () => request<Keybindings>("/api/system/keybindings"),
   systemSettings: () => request<SystemSettingsResponse>("/api/system/settings"),
   saveCursorApiKey: (body: SaveCursorApiKeyRequest) =>
     request<SaveCursorApiKeyResponse>("/api/system/settings/cursor-api-key", {
