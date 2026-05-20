@@ -20,6 +20,7 @@ export function FileWorkspace({
   onOpenFile,
   onRevert,
   onSave,
+  projectSlug,
 }: {
   title?: string;
   explainer?: string;
@@ -36,6 +37,7 @@ export function FileWorkspace({
   onOpenFile: (path: string) => void;
   onRevert: () => void;
   onSave: () => void;
+  projectSlug: string;
 }) {
   return (
     <div className="document-workspace">
@@ -163,6 +165,7 @@ function EditorPane({
         onNotice={onNotice}
         onOpenFile={onOpenFile}
         onSave={onSave}
+        projectSlug={projectSlug}
         savedDiff={selectedDiff}
         selectedPath={selected.path}
         value={draft}

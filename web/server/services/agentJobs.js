@@ -4,7 +4,7 @@ import { parseResearchPlan, executeResearchPlan, generateSourceDigests } from ".
 import { computeBuildScope } from "./buildScope.js";
 import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
 import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
-import { extractAllSuggestions, readSuggestions, writeSuggestions } from "./suggestionsService.js";
+import { extractAllSuggestions, readSuggestions, writeSuggestions, backfillSuggestionIds } from "./suggestionsService.js";
 
 export function createAgentJobService({
   FRAMEWORK_ROOT,
@@ -953,6 +953,18 @@ export function createAgentJobService({
         }
         await walkOutputs(path.join(project.path, "outputs_ai"), "outputs_ai");
 
+        // Backfill ID= into markers that don't have one yet
+        for (const relFile of allOutputMdFiles) {
+          const fullPath = path.join(project.path, relFile);
+          try {
+            const original = await fs.readFile(fullPath, "utf-8");
+            const updated = backfillSuggestionIds(original, relFile);
+            if (updated !== original) {
+              await fs.writeFile(fullPath, updated, "utf-8");
+            }
+          } catch { /* skip */ }
+        }
+
         const buildMeta = {
           phase: "validation",
           buildId: (await getRebuildState(project.slug))?.runId?.slice(0, 8) || null,
@@ -962,13 +974,13 @@ export function createAgentJobService({
         const newSuggestions = await extractAllSuggestions(project.path, allOutputMdFiles, buildMeta);
         const existing = await readSuggestions(project.path);
 
-        // Deduplicate by text — keep existing entries, add new ones
-        const existingTexts = new Set(existing.suggestions.map((s) => s.text));
+        // Deduplicate by ID — keep existing entries, add new ones
+        const existingIds = new Set(existing.suggestions.map((s) => s.id));
         const merged = [...existing.suggestions];
         for (const suggestion of newSuggestions) {
-          if (!existingTexts.has(suggestion.text)) {
+          if (!existingIds.has(suggestion.id)) {
             merged.push(suggestion);
-            existingTexts.add(suggestion.text);
+            existingIds.add(suggestion.id);
           }
         }
 

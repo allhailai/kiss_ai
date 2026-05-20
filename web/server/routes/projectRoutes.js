@@ -238,8 +238,8 @@ export function registerProjectRoutes(app, {
       const { suggestionId } = request.params;
       const status = request.body?.status;
 
-      if (!status || (status !== "accepted" && status !== "dismissed")) {
-        throw httpError("Status must be 'accepted' or 'dismissed'.", 400, "invalid_status");
+      if (!status || (status !== "accepted" && status !== "dismissed" && status !== "pending")) {
+        throw httpError("Status must be 'accepted', 'dismissed', or 'pending'.", 400, "invalid_status");
       }
 
       const updated = await resolveSuggestion(request.project.path, suggestionId, status);

@@ -410,6 +410,7 @@ export function App() {
             onOpenFile={openProjectFileWithAgentContext}
             onRevert={() => void fileWorkspace.revertSelected()}
             onSave={() => void fileWorkspace.saveSelected()}
+            projectSlug={project.selectedProjectSlug}
           />
         ) : null}
         {route.view === "design" ? (

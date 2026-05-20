@@ -1,7 +1,18 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
 const SUGGESTIONS_PATH = ".build/suggestions.json";
+
+/**
+ * Generate a deterministic suggestion ID from source file + text.
+ * Same marker always produces the same ID.
+ */
+export function generateSuggestionId(sourceFile, text) {
+  const normalized = `${sourceFile}|${text.trim().toLowerCase()}`;
+  const hash = createHash("sha256").update(normalized).digest("hex").slice(0, 12);
+  return `s-${hash}`;
+}
 
 /**
  * Read suggestions.json, returning { suggestions: [] } if missing or invalid.
@@ -26,11 +37,11 @@ export async function writeSuggestions(projectPath, suggestions) {
 }
 
 /**
- * Resolve a suggestion by ID (accept or dismiss).
+ * Resolve a suggestion by ID (accept, dismiss, or revert to pending).
  * Returns the updated suggestion or null if not found.
  */
 export async function resolveSuggestion(projectPath, suggestionId, status) {
-  if (status !== "accepted" && status !== "dismissed") return null;
+  if (status !== "accepted" && status !== "dismissed" && status !== "pending") return null;
 
   const data = await readSuggestions(projectPath);
   const suggestion = data.suggestions.find((s) => s.id === suggestionId);
@@ -38,29 +49,40 @@ export async function resolveSuggestion(projectPath, suggestionId, status) {
   if (!suggestion) return null;
 
   suggestion.status = status;
-  suggestion.resolvedAt = new Date().toISOString();
+  suggestion.resolvedAt = status === "pending" ? null : new Date().toISOString();
 
   await writeSuggestions(projectPath, data.suggestions);
   return suggestion;
 }
 
 /**
- * Scan a file for <!-- AI_SUGGESTION: text --> markers.
- * Skips markers that already have [ACCEPTED] or [DISMISSED] status prefixes.
- * Returns an array of suggestion objects.
+ * Scan a file for <!-- AI_SUGGESTION: ID=xxx text --> markers.
+ * Returns an array of suggestion objects with deterministic IDs.
  */
 export function extractAiSuggestions(fileContent, filePath, buildMeta) {
   const suggestions = [];
+  // Match AI_SUGGESTION markers — with or without ID= prefix, with optional status prefix
   const markerRegex = /<!-- AI_SUGGESTION: ([\s\S]*?) -->/g;
 
   let match;
   while ((match = markerRegex.exec(fileContent)) !== null) {
-    const rawText = match[1].trim();
+    let rawText = match[1].trim();
 
-    // Skip already-resolved markers (e.g. [ACCEPTED] or [DISMISSED] prefix)
+    // Skip already-resolved markers
     if (/^\[(ACCEPTED|DISMISSED)\]/i.test(rawText)) continue;
 
-    const id = `s-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    // Parse ID= prefix if present
+    let id = null;
+    const idMatch = rawText.match(/^ID=(\S+)\s+/);
+    if (idMatch) {
+      id = idMatch[1];
+      rawText = rawText.slice(idMatch[0].length).trim();
+    }
+
+    // Generate deterministic ID if none was embedded
+    if (!id) {
+      id = generateSuggestionId(filePath, rawText);
+    }
 
     suggestions.push({
       id,
@@ -99,6 +121,20 @@ export async function extractAllSuggestions(projectPath, outputFiles, buildMeta)
   }
 
   return allSuggestions;
+}
+
+/**
+ * Backfill ID= into AI_SUGGESTION markers in a file that don't have one yet.
+ * Returns the updated content (or original if no changes needed).
+ */
+export function backfillSuggestionIds(fileContent, filePath) {
+  return fileContent.replace(
+    /<!-- AI_SUGGESTION: (?!ID=)(?!\[(ACCEPTED|DISMISSED)\])([\s\S]*?) -->/g,
+    (_match, _statusGroup, text) => {
+      const id = generateSuggestionId(filePath, text.trim());
+      return `<!-- AI_SUGGESTION: ID=${id} ${text.trim()} -->`;
+    },
+  );
 }
 
 /**
