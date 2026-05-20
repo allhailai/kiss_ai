@@ -1,7 +1,7 @@
 import type { ProjectFile } from "../contracts/api";
 import { designIdentityFilePath, isDesignIdentityPath, projectPathPrefixes } from "../domain/projectPaths";
 
-export type View = "chat" | "dashboard" | "requirements" | "inputs" | "outputs" | "design" | "questions";
+export type View = "chat" | "dashboard" | "requirements" | "inputs" | "outputs" | "design" | "questions" | "suggestions";
 
 export type RouteState = {
   projectSlug: string | null;
@@ -10,7 +10,7 @@ export type RouteState = {
   context: Record<string, string>;
 };
 
-const views: View[] = ["chat", "requirements", "inputs", "outputs", "design", "dashboard", "questions"];
+const views: View[] = ["chat", "requirements", "inputs", "outputs", "design", "dashboard", "questions", "suggestions"];
 
 export const viewIds = new Set<View>(views);
 export const fileBackedViews = new Set<View>(["requirements", "inputs", "outputs", "design"]);

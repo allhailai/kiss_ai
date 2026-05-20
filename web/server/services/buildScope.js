@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { getAcceptedSuggestionPaths } from "./suggestionsService.js";
 
 function hashText(value) {
   return createHash("sha256").update(String(value)).digest("hex");
@@ -193,7 +194,11 @@ export async function computeBuildScope(projectPath) {
   const outputsMarkers = await scanMarkersInDirectory(path.join(projectPath, "outputs_ai"), projectPath);
 
   const feedbackMarkers = [...sourcesMarkers.feedbackPaths, ...outputsMarkers.feedbackPaths].sort();
-  const acceptedSuggestions = [...sourcesMarkers.acceptedSuggestionPaths, ...outputsMarkers.acceptedSuggestionPaths].sort();
+  const markerAcceptedSuggestions = [...sourcesMarkers.acceptedSuggestionPaths, ...outputsMarkers.acceptedSuggestionPaths];
+
+  // Also include suggestions accepted via the UI (stored in suggestions.json)
+  const uiAcceptedSuggestions = await getAcceptedSuggestionPaths(projectPath);
+  const acceptedSuggestions = [...new Set([...markerAcceptedSuggestions, ...uiAcceptedSuggestions])].sort();
 
   // Compare inputs_human
   const currentHumanInputs = await listHumanInputFiles(projectPath);

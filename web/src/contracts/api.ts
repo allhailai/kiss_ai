@@ -109,6 +109,8 @@ export type ProjectStatus = {
   openQuestionsCount: number;
   blockingQuestionsCount: number;
   totalQuestionsCount: number;
+  pendingSuggestionsCount: number;
+  totalSuggestionsCount: number;
   cursorApiKeyAvailable: boolean;
   cursorApiKeySource: string | null;
   cursorApiKeyWarnings: string[];
@@ -172,6 +174,20 @@ export type SaveCursorApiKeyResponse = {
 export type Keybindings = {
   toggleLeftPanel: string;
   toggleRightPanel: string;
+};
+
+export type AiSuggestion = {
+  id: string;
+  text: string;
+  status: "pending" | "accepted" | "dismissed";
+  sourceFile: string;
+  createdAt: string;
+  resolvedAt: string | null;
+  createdDuring: {
+    phase: string;
+    buildId: string | null;
+    modelId: string | null;
+  };
 };
 
 export type CreateProjectRequest = {

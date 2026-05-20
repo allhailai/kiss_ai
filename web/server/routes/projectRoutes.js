@@ -1,5 +1,6 @@
 import { buildLogQuerySchema, createProjectBodySchema, parseRequestBody, parseRequestQuery, updateProjectUiStateBodySchema } from "./requestSchemas.js";
 import { readQuestions, answerQuestion, getQuestionCounts } from "../services/questionsService.js";
+import { readSuggestions, resolveSuggestion, getSuggestionCounts } from "../services/suggestionsService.js";
 
 function extractOpenQuestions(content) {
   const lines = content.split("\n");
@@ -127,6 +128,7 @@ export function registerProjectRoutes(app, {
       const cursorApiKey = await resolveCursorApiKey();
       const humanAttentionItems = getHumanAttentionItems(harness);
       const questionCounts = await getQuestionCounts(project.path);
+      const suggestionCounts = await getSuggestionCounts(project.path);
 
       response.json({
         projectSlug: manifest?.project_slug ?? harness.project_slug ?? project.slug,
@@ -146,6 +148,8 @@ export function registerProjectRoutes(app, {
         openQuestionsCount: questionCounts.openQuestionsCount,
         blockingQuestionsCount: questionCounts.blockingQuestionsCount,
         totalQuestionsCount: questionCounts.totalQuestionsCount,
+        pendingSuggestionsCount: suggestionCounts.pendingSuggestionsCount,
+        totalSuggestionsCount: suggestionCounts.totalSuggestionsCount,
         cursorApiKeyAvailable: cursorApiKey.available,
         cursorApiKeySource: cursorApiKey.source,
         cursorApiKeyWarnings: cursorApiKey.warnings,
@@ -214,6 +218,37 @@ export function registerProjectRoutes(app, {
     try {
       const result = await assistQuestion(request.project, request.body);
       response.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ── Suggestions API ──
+
+  app.get("/api/projects/:projectSlug/suggestions", async (request, response, next) => {
+    try {
+      response.json(await readSuggestions(request.project.path));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/suggestions/:suggestionId/resolve", async (request, response, next) => {
+    try {
+      const { suggestionId } = request.params;
+      const status = request.body?.status;
+
+      if (!status || (status !== "accepted" && status !== "dismissed")) {
+        throw httpError("Status must be 'accepted' or 'dismissed'.", 400, "invalid_status");
+      }
+
+      const updated = await resolveSuggestion(request.project.path, suggestionId, status);
+
+      if (!updated) {
+        throw httpError(`Suggestion '${suggestionId}' not found.`, 404, "suggestion_not_found");
+      }
+
+      response.json(updated);
     } catch (error) {
       next(error);
     }

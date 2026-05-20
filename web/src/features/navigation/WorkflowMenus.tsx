@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  aiSuggestionsNavLeaf,
   chatNavLeaf,
   openQuestionsNavLeaf,
   requirementNavLeaves,
@@ -21,6 +22,7 @@ export function SimplifiedNavigator({
   humanInputEmptyDirectories,
   openQuestionsCount,
   blockingQuestionsCount,
+  pendingSuggestionsCount,
   projectFiles,
   loading,
   selectedPath,
@@ -37,6 +39,7 @@ export function SimplifiedNavigator({
   humanInputEmptyDirectories?: string[];
   openQuestionsCount?: number;
   blockingQuestionsCount?: number;
+  pendingSuggestionsCount?: number;
   projectFiles: ProjectFile[];
   loading: boolean;
   selectedPath: string | null;
@@ -137,6 +140,18 @@ export function SimplifiedNavigator({
               {(openQuestionsCount ?? 0) > 0 ? (
                 <b className={(blockingQuestionsCount ?? 0) > 0 ? "nav-badge nav-badge-blocking" : "nav-badge nav-badge-open"}>
                   {openQuestionsCount}
+                </b>
+              ) : null}
+            </button>
+            <button
+              className={currentView === "suggestions" ? "simple-nav-item simple-nav-child nav-questions-btn active" : "simple-nav-item simple-nav-child nav-questions-btn"}
+              onClick={() => onOpenView(aiSuggestionsNavLeaf.view)}
+              type="button"
+            >
+              <DefineNavLabel label={aiSuggestionsNavLeaf.label} />
+              {(pendingSuggestionsCount ?? 0) > 0 ? (
+                <b className="nav-badge nav-badge-open">
+                  {pendingSuggestionsCount}
                 </b>
               ) : null}
             </button>

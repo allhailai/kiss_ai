@@ -22,6 +22,7 @@ import { SimplifiedNavigator } from "../features/navigation/WorkflowMenus";
 import { ProjectPicker } from "../features/projectPicker/ProjectPicker";
 import { BuildProjectRightPanel } from "../features/rebuild/BuildProjectRightPanel";
 import { QuestionsWorkspace } from "../features/questions/QuestionsWorkspace";
+import { SuggestionsWorkspace } from "../features/suggestions/SuggestionsWorkspace";
 
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
@@ -34,16 +35,14 @@ import type { ChatMessageFileEdit, KissAiUpdateCheckResponse, SystemSettingsResp
 const aiFileAssistPrompt =
   "Review the saved annotations in this file. Interpret the Git diff as user guidance, then propose edits that integrate those annotations cleanly throughout the document while preserving the document's intent, structure, and voice.";
 
-const fileWorkspaceByView: Partial<Record<View, { title: string; explainer?: string }>> = {
+const fileWorkspaceByView: Partial<Record<View, { title?: string; explainer?: string }>> = {
   requirements: {
     title: "Project Definition",
   },
   inputs: {
-    title: "Source Data",
     explainer: "Sources are AI-managed. Use annotations to guide the AI.",
   },
   outputs: {
-    title: "Outputs",
     explainer: "Outputs are AI-managed. Use annotations to guide the AI.",
   },
 };
@@ -363,6 +362,7 @@ export function App() {
           humanInputEmptyDirectories={fileWorkspace.humanInputEmptyDirectories}
           openQuestionsCount={rebuildWorkspace.status?.openQuestionsCount}
           blockingQuestionsCount={rebuildWorkspace.status?.blockingQuestionsCount}
+          pendingSuggestionsCount={rebuildWorkspace.status?.pendingSuggestionsCount}
           loading={fileWorkspace.treeLoading}
           projectFiles={fileWorkspace.projectFiles}
           selectedPath={fileWorkspace.selected?.path ?? null}
@@ -408,7 +408,6 @@ export function App() {
             onNotice={toastWorkspace.setNotice}
 
             onOpenFile={openProjectFileWithAgentContext}
-            onUploadFiles={route.view === "inputs" ? fileWorkspace.uploadHumanInputFiles : undefined}
             onRevert={() => void fileWorkspace.revertSelected()}
             onSave={() => void fileWorkspace.saveSelected()}
           />
@@ -433,6 +432,12 @@ export function App() {
             onNavigateToFile={openProjectFileWithAgentContext}
             projectSlug={project.selectedProjectSlug}
             selectedModelId={rebuildWorkspace.selectedModelId}
+          />
+        ) : null}
+        {route.view === "suggestions" ? (
+          <SuggestionsWorkspace
+            onNavigateToFile={openProjectFileWithAgentContext}
+            projectSlug={project.selectedProjectSlug}
           />
         ) : null}
       </section>
