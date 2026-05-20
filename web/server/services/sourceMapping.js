@@ -52,7 +52,7 @@ async function listMdFilesRecursive(dirPath, projectPath) {
  * topic and the wiki/digest content.
  *
  * @param {string} projectPath - absolute path to project root
- * @returns {Object} mapping from output path to { wikiPages, digestFiles }
+ * @returns {Promise<Object>} mapping from output path to { wikiPages, digestFiles }
  */
 export async function buildSourceMapping(projectPath) {
   const manifest = await readJsonSafe(path.join(projectPath, ".build", "manifest.json"));

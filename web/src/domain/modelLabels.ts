@@ -6,7 +6,7 @@ export const modelTierLabels: Record<RebuildModel["tier"], string> = {
   small: "Low ($)",
 };
 
-export const modelTierOrder: RebuildModel["tier"][] = ["high", "medium", "small"];
+const modelTierOrder: RebuildModel["tier"][] = ["high", "medium", "small"];
 
 export function modelDisplayName(model: RebuildModel) {
   return model.displayName || model.id;

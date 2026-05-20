@@ -117,6 +117,7 @@ const serverRules = [
     test: (specifier, filePath) =>
       (specifier === "node:fs" || specifier === "node:fs/promises") &&
       !new Set([
+        "agentJobs.js",
         "buildLogs.js",
         "buildScope.js",
         "capabilities.js",
@@ -126,6 +127,8 @@ const serverRules = [
         "projectFiles.js",
         "projectUiState.js",
         "projects.js",
+        "questionsService.js",
+        "sourceMapping.js",
         "webResearch.js",
       ]).has(path.basename(filePath)),
     message: "server services must keep filesystem access in approved service modules",

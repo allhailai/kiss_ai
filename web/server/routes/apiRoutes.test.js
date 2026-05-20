@@ -64,6 +64,7 @@ function createUiStateProjectApp(projectRoot) {
   });
   registerProjectRoutes(app, {
     PROJECTS_ROOT: "/tmp/projects",
+    assistQuestion: async () => ({}),
     buildLogTabState: async () => ({}),
     createProjectFromTemplate: async () => ({}),
     discoverProjects: async () => [],
@@ -228,6 +229,7 @@ describe("API routes", () => {
       createHumanInputFolder: async () => ({ folder: "" }),
       createHumanInputTextFile: async () => ({ file: {} }),
       deleteHumanInputFile: service.deleteHumanInputFile,
+      deleteHumanInputFolder: async () => ({ folder: "" }),
       gitFileDiff: service.gitFileDiff,
       humanFiles: new Map([["human_goal_requirements.md", { kind: "human", editable: true, annotation: false }]]),
       httpError,
@@ -298,6 +300,7 @@ describe("API routes", () => {
     app.use(express.json());
     registerProjectRoutes(app, {
       PROJECTS_ROOT: "/tmp/projects",
+      assistQuestion: async () => ({}),
       buildLogTabState: async () => ({}),
       createProjectFromTemplate: async () => ({ slug: "demo", name: "Demo", path: "/tmp/projects/demo", setupStatus: "initialized" }),
       discoverProjects: async () => [],
@@ -405,6 +408,7 @@ describe("API routes", () => {
       createHumanInputFolder: async () => ({ folder: "" }),
       createHumanInputTextFile: async () => ({ file: {} }),
       deleteHumanInputFile: service.deleteHumanInputFile,
+      deleteHumanInputFolder: async () => ({ folder: "" }),
       gitFileDiff: service.gitFileDiff,
       humanFiles: new Map([["human_goal_requirements.md", { kind: "human", editable: true, annotation: false }]]),
       httpError,

@@ -1,5 +1,5 @@
 import type { BuildLogState, DesignState, ProjectStatus, RebuildState } from "../../contracts/api";
-import { BuildLogWorkspace } from "../buildLog/BuildLogWorkspace";
+import { BuildLogWorkspace } from "../../shared/buildLog/BuildLogWorkspace";
 import { formatLocalDateTime } from "../../domain/formatters";
 import { rebuildStatusLabel } from "../../domain/rebuild";
 

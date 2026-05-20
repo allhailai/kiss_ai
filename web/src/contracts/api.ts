@@ -21,14 +21,6 @@ export type ResolutionOption = {
   createdAt?: string | null;
 };
 
-export type ResolutionAttempt = {
-  attemptedAt?: string | null;
-  outcome?: "resolved" | "failed" | "incomplete" | string;
-  selectedResolutionOptionId?: string;
-  manualPrompt?: string;
-  summary?: string;
-  failureDetails?: string;
-};
 
 export type HumanAttentionItem = {
   id: string;
@@ -42,8 +34,22 @@ export type HumanAttentionItem = {
   next_human_action?: string;
   nextAction?: string;
   resolution_options: ResolutionOption[];
-  resolution_attempts?: ResolutionAttempt[];
-  last_resolution_attempt?: ResolutionAttempt;
+  resolution_attempts?: Array<{
+    attemptedAt?: string | null;
+    outcome?: "resolved" | "failed" | "incomplete" | string;
+    selectedResolutionOptionId?: string;
+    manualPrompt?: string;
+    summary?: string;
+    failureDetails?: string;
+  }>;
+  last_resolution_attempt?: {
+    attemptedAt?: string | null;
+    outcome?: "resolved" | "failed" | "incomplete" | string;
+    selectedResolutionOptionId?: string;
+    manualPrompt?: string;
+    summary?: string;
+    failureDetails?: string;
+  };
 };
 
 export type ResolveHumanAttentionRequest = {
@@ -204,20 +210,11 @@ export type FileContent = {
   annotation: boolean;
 };
 
-export type FileDiffRange = {
-  from: number;
-  to: number;
-};
-
-export type FileDiffDeletion = {
-  afterLine: number;
-  count: number;
-};
 
 export type FileDiff = {
   path: string;
-  ranges: FileDiffRange[];
-  deletions: FileDiffDeletion[];
+  ranges: Array<{ from: number; to: number }>;
+  deletions: Array<{ afterLine: number; count: number }>;
 };
 
 export type TreeResponse = {
@@ -295,7 +292,7 @@ export type RebuildState = {
   attentionContext: Record<string, unknown> | null;
   events: AgentRunEvent[];
   log: string[];
-  buildPhase?: "research" | "fetching" | "digests" | "wiki" | "directed_outputs" | "validation" | null;
+  buildPhase?: "research" | "fetching" | "digests" | "wiki" | "directed_outputs" | "validation" | "complete" | null;
   buildPhaseDetail?: string | null;
 };
 
@@ -365,63 +362,46 @@ export type ChatMessageMetadata = Record<string, unknown> & {
   fileEdits?: ChatMessageFileEdit[];
 };
 
-export type ConceptualDiffStatus = "accepted" | "rejected";
-
-export type ConceptualDiffScope = "local" | "section" | "multi_section" | "document";
-
-export type ConceptualDiffRiskLevel = "low" | "medium" | "high";
-
-export type ConceptualDiffTarget = {
-  scope: ConceptualDiffScope;
-  sections?: string[];
-  anchors?: string[];
-};
-
-export type ConceptualDiffIntent = {
-  objective: string;
-  rationale?: string;
-  mustPreserve?: string[];
-  avoid?: string[];
-};
-
-export type ConceptualDiffEvidence = {
-  userGuidance?: string[];
-  gitDiffSignals?: string[];
-  contextSignals?: string[];
-};
-
-export type ConceptualDiffApplyNotes = {
-  expectedChangeShape?: string;
-  nonGoals?: string[];
-  riskLevel?: ConceptualDiffRiskLevel;
-};
-
-export type ConceptualDiffMemory = {
-  fingerprint?: string;
-  reconsidersRejectedId?: string;
-  reconsiderReason?: string;
-  suppressionState?: "new" | "reconsidered" | "near_rejected";
-};
-
 export type ConceptualDiff = {
   id: string;
   filePath: string;
   title: string;
   summary: string;
-  status: ConceptualDiffStatus;
-  target?: ConceptualDiffTarget;
-  intent?: ConceptualDiffIntent;
-  evidence?: ConceptualDiffEvidence;
-  applyNotes?: ConceptualDiffApplyNotes;
-  memory?: ConceptualDiffMemory;
+  status: "accepted" | "rejected";
+  target?: {
+    scope: "local" | "section" | "multi_section" | "document";
+    sections?: string[];
+    anchors?: string[];
+  };
+  intent?: {
+    objective: string;
+    rationale?: string;
+    mustPreserve?: string[];
+    avoid?: string[];
+  };
+  evidence?: {
+    userGuidance?: string[];
+    gitDiffSignals?: string[];
+    contextSignals?: string[];
+  };
+  applyNotes?: {
+    expectedChangeShape?: string;
+    nonGoals?: string[];
+    riskLevel?: "low" | "medium" | "high";
+  };
+  memory?: {
+    fingerprint?: string;
+    reconsidersRejectedId?: string;
+    reconsiderReason?: string;
+    suppressionState?: "new" | "reconsidered" | "near_rejected";
+  };
 };
 
-export type EditProposalStatus = "proposed" | "applying" | "applied" | "partial" | "failed";
 
 export type EditProposal = {
   id: string;
   sourceMessageId?: string;
-  status: EditProposalStatus;
+  status: "proposed" | "applying" | "applied" | "partial" | "failed";
   createdAt: string;
   updatedAt: string;
   appliedAt?: string;
@@ -464,10 +444,6 @@ export type Conversation = {
   messages: ChatMessage[];
 };
 
-export type CreateConversationRequest = {
-  modelId?: string;
-  title?: string;
-};
 
 export type UpdateConversationRequest = {
   title?: string;
@@ -500,7 +476,7 @@ export type GenerateEditProposalRequest = {
 export type UpdateEditProposalRequest = {
   conceptualDiffs: Array<{
     id: string;
-    status: ConceptualDiffStatus;
+    status: "accepted" | "rejected";
   }>;
 };
 

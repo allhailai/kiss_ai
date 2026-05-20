@@ -240,7 +240,7 @@ export function useProjectWorkspace() {
   );
 
   const clearSelectedProject = useCallback(() => {
-    if (!canLeaveCurrentRoute({ projectSlug: null, view: "rebuild", filePath: null, context: {} })) return;
+    if (!canLeaveCurrentRoute({ projectSlug: null, view: "dashboard", filePath: null, context: {} })) return;
 
     selectProjectRequestRef.current += 1;
     setSelectedProjectSlug(null);
