@@ -56,6 +56,7 @@ export function FileWorkspace({
         aiFileAssistDisabled={aiFileAssistDisabled}
         hasUnsavedChanges={hasUnsavedChanges}
         projectFiles={projectFiles}
+        projectSlug={projectSlug}
         onDraft={onDraft}
         onAiFileAssist={onAiFileAssist}
         onNotice={onNotice}
@@ -74,6 +75,7 @@ function EditorPane({
   aiFileAssistDisabled,
   hasUnsavedChanges,
   projectFiles,
+  projectSlug,
   onDraft,
   onAiFileAssist,
   onNotice,
@@ -87,6 +89,7 @@ function EditorPane({
   aiFileAssistDisabled: boolean;
   hasUnsavedChanges: boolean;
   projectFiles: ProjectFile[];
+  projectSlug: string;
   onDraft: (value: string) => void;
   onAiFileAssist?: () => void;
   onNotice: (message: string) => void;
