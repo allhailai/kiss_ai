@@ -172,8 +172,7 @@ export function SimplifiedNavigator({
             onClick={() => onOpenView("inputs")}
             type="button"
           >
-            <span>Human acquired</span>
-            <small>{projectPathPrefixes.humanInput}</small>
+            <span>Human sources</span>
           </button>
 
           {onCreateFolder ? (
@@ -203,8 +202,7 @@ export function SimplifiedNavigator({
             onClick={() => onOpenView("inputs")}
             type="button"
           >
-            <span>Sources</span>
-            <small>{projectPathPrefixes.sources}</small>
+            <span>AI Sources</span>
           </button>
           <FileTreeBlock
             emptyLabel="No source files yet. Run a build to gather sources."
