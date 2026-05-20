@@ -241,6 +241,16 @@ export type Topic = {
   disposition: TopicDisposition;
   disposition_at: string | null;
   disposition_note: string | null;
+  queued_for_deepen: boolean;
+  deepen_log: Array<{
+    deepened_at: string;
+    sources_added: number;
+    word_count_before: number;
+    word_count_after: number;
+    state_before: TopicState;
+    state_after: TopicState;
+    enriched_files: string[];
+  }>;
 };
 
 export type TopicCluster = {

@@ -57,6 +57,41 @@
   outline: none;
 }
 
+.topics-run-deepen-button {
+  padding: 0.3rem 0.75rem;
+  border: none;
+  border-radius: 4px;
+  background: var(--color-annotation);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  margin-left: auto;
+  transition: background 0.15s ease;
+}
+
+.topics-run-deepen-button:hover {
+  background: color-mix(in srgb, var(--color-annotation) 85%, black);
+}
+
+/* ── Queued card highlight ── */
+
+.topic-card-queued {
+  border-color: var(--color-annotation);
+  box-shadow: inset 3px 0 0 var(--color-annotation);
+}
+
+.topic-deepen-queued {
+  background: var(--color-annotation) !important;
+  color: white !important;
+  border-color: var(--color-annotation) !important;
+}
+
+.topic-deepen-queued:hover {
+  background: color-mix(in srgb, var(--color-annotation) 75%, black) !important;
+}
+
 .topics-loading,
 .topics-error {
   margin: 0;

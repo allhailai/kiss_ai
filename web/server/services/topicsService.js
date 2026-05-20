@@ -169,7 +169,99 @@ export async function getTopicCounts(projectPath) {
     deprecatedTopicsCount: topics.filter((t) => t.state === "deprecated").length,
     parkedTopicsCount: topics.filter((t) => t.disposition === "parked").length,
     settledTopicsCount: topics.filter((t) => t.disposition === "settled").length,
+    queuedForDeepenCount: topics.filter((t) => t.queued_for_deepen).length,
   };
+}
+
+/**
+ * Toggle queued_for_deepen on a topic.
+ * Returns the updated topic or null if not found.
+ */
+export async function toggleDeepenQueue(projectPath, topicId) {
+  const data = await readTopics(projectPath);
+  const topic = data.topics.find((t) => t.id === topicId);
+
+  if (!topic) return null;
+
+  // Only active topics can be queued (not seed, deprecated, parked, settled)
+  if (topic.state === "seed" || topic.state === "deprecated") return null;
+  if (topic.disposition === "parked" || topic.disposition === "settled") return null;
+
+  topic.queued_for_deepen = !topic.queued_for_deepen;
+  await writeTopics(projectPath, data.topics, data.clusters);
+  return topic;
+}
+
+/**
+ * Get all topics queued for deepening.
+ */
+export async function getDeepenQueue(projectPath) {
+  const data = await readTopics(projectPath);
+  return data.topics.filter((t) => t.queued_for_deepen);
+}
+
+/**
+ * Clear the deepen queue (set queued_for_deepen = false on all topics).
+ */
+export async function clearDeepenQueue(projectPath) {
+  const data = await readTopics(projectPath);
+  let cleared = 0;
+  for (const topic of data.topics) {
+    if (topic.queued_for_deepen) {
+      topic.queued_for_deepen = false;
+      cleared++;
+    }
+  }
+  if (cleared > 0) {
+    await writeTopics(projectPath, data.topics, data.clusters);
+  }
+  return cleared;
+}
+
+/**
+ * Append a deepen log entry to a topic.
+ * Returns the updated topic or null if not found.
+ */
+export async function appendDeepenLog(projectPath, topicId, logEntry) {
+  const data = await readTopics(projectPath);
+  const topic = data.topics.find((t) => t.id === topicId);
+
+  if (!topic) return null;
+
+  if (!Array.isArray(topic.deepen_log)) {
+    topic.deepen_log = [];
+  }
+  // Prepend (newest first)
+  topic.deepen_log.unshift(logEntry);
+
+  await writeTopics(projectPath, data.topics, data.clusters);
+  return topic;
+}
+
+/**
+ * Get the merged deepen log across all topics, sorted by date descending.
+ */
+export async function getDeepenLog(projectPath) {
+  const data = await readTopics(projectPath);
+  const entries = [];
+  for (const topic of data.topics) {
+    if (Array.isArray(topic.deepen_log)) {
+      for (const entry of topic.deepen_log) {
+        entries.push({
+          topic_id: topic.id,
+          topic_label: topic.label,
+          wiki_page: topic.wiki_page,
+          ...entry,
+        });
+      }
+    }
+  }
+  entries.sort((a, b) => {
+    const ta = a.deepened_at ? new Date(a.deepened_at).getTime() : 0;
+    const tb = b.deepened_at ? new Date(b.deepened_at).getTime() : 0;
+    return tb - ta;
+  });
+  return entries;
 }
 
 /**
@@ -212,6 +304,8 @@ function migrateFromLegacyTopicGraph(legacy) {
     disposition: null,
     disposition_at: null,
     disposition_note: null,
+    queued_for_deepen: false,
+    deepen_log: [],
   }));
 
   return {

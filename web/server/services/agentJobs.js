@@ -5,7 +5,7 @@ import { computeBuildScope } from "./buildScope.js";
 import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
 import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
 import { extractAllSuggestions, readSuggestions, writeSuggestions, backfillSuggestionIds } from "./suggestionsService.js";
-import { readTopics } from "./topicsService.js";
+import { readTopics, getDeepenQueue, clearDeepenQueue } from "./topicsService.js";
 
 export function createAgentJobService({
   FRAMEWORK_ROOT,
@@ -596,9 +596,21 @@ export function createAgentJobService({
     });
   }
 
-  function createDeepenResearchPrompt(project, topic) {
+  function createBatchDeepenResearchPrompt(project, topics) {
+    const topicBlocks = topics.map((t) => [
+      `- TOPIC_ID: ${t.id}`,
+      `  LABEL: ${t.label}`,
+      `  WIKI_PAGE: ${t.wiki_page || "null"}`,
+      `  SOURCES: ${JSON.stringify(t.sources || [])}`,
+      `  COVERAGE_GAPS: ${JSON.stringify(t.coverage_gaps || [])}`,
+      `  DEPENDS_ON: ${JSON.stringify(t.depends_on || [])}`,
+      `  DEEPENING_COUNT: ${t.discovery?.deepening_count ?? 0}`,
+    ].join("\n")).join("\n\n");
+
     return [
-      `Run a focused deepening research pass on the topic: ${topic.label}`,
+      `Run a focused deepening research pass on ${topics.length} topic(s):`,
+      "",
+      topicBlocks,
       "",
       `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_deepen.md")} Phases 1-2 only (Read Context and Search for Deeper Evidence).`,
       "This is a non-interactive web-triggered deepen run. Never ask the user for confirmation or wait for input mid-run.",
@@ -607,23 +619,27 @@ export function createAgentJobService({
       "Do not operate outside this project root.",
       `Project root: ${project.path}`,
       "",
-      `TOPIC_ID: ${topic.id}`,
-      `TOPIC_LABEL: ${topic.label}`,
-      `TOPIC_WIKI_PAGE: ${topic.wiki_page || "null"}`,
-      `TOPIC_SOURCES: ${JSON.stringify(topic.sources || [])}`,
-      `TOPIC_COVERAGE_GAPS: ${JSON.stringify(topic.coverage_gaps || [])}`,
-      `TOPIC_DEPENDS_ON: ${JSON.stringify(topic.depends_on || [])}`,
-      `TOPIC_DEEPENING_COUNT: ${topic.discovery?.deepening_count ?? 0}`,
-      "",
-      "Search the web for deeper evidence on this topic, then write sources/research_plan.json with the new URLs.",
-      "Do NOT fetch URLs. Only list them. The build pipeline will fetch them.",
+      "Search the web for deeper evidence on ALL listed topics, then write sources/research_plan.json with the new URLs.",
+      "Cover every topic listed above. Do NOT fetch URLs. Only list them. The build pipeline will fetch them.",
       "Do NOT write wiki pages, directed outputs, or source notes in this phase.",
     ].join("\n");
   }
 
-  function createDeepenSynthesisPrompt(project, topic) {
+  function createBatchDeepenSynthesisPrompt(project, topics) {
+    const topicBlocks = topics.map((t) => [
+      `- TOPIC_ID: ${t.id}`,
+      `  LABEL: ${t.label}`,
+      `  WIKI_PAGE: ${t.wiki_page || "null"}`,
+      `  SOURCES: ${JSON.stringify(t.sources || [])}`,
+      `  COVERAGE_GAPS: ${JSON.stringify(t.coverage_gaps || [])}`,
+      `  DEPENDS_ON: ${JSON.stringify(t.depends_on || [])}`,
+      `  DEEPENING_COUNT: ${t.discovery?.deepening_count ?? 0}`,
+    ].join("\n")).join("\n\n");
+
     return [
-      `Synthesize deeper evidence for the topic: ${topic.label}`,
+      `Synthesize deeper evidence for ${topics.length} topic(s):`,
+      "",
+      topicBlocks,
       "",
       `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_deepen.md")} Phases 3-4 only (Synthesize and Snapshot).`,
       "This is a non-interactive web-triggered deepen run. Never ask the user for confirmation or wait for input mid-run.",
@@ -632,50 +648,47 @@ export function createAgentJobService({
       "Do not operate outside this project root.",
       `Project root: ${project.path}`,
       "",
-      `TOPIC_ID: ${topic.id}`,
-      `TOPIC_LABEL: ${topic.label}`,
-      `TOPIC_WIKI_PAGE: ${topic.wiki_page || "null"}`,
-      `TOPIC_SOURCES: ${JSON.stringify(topic.sources || [])}`,
-      `TOPIC_COVERAGE_GAPS: ${JSON.stringify(topic.coverage_gaps || [])}`,
-      `TOPIC_DEPENDS_ON: ${JSON.stringify(topic.depends_on || [])}`,
-      `TOPIC_DEEPENING_COUNT: ${topic.discovery?.deepening_count ?? 0}`,
-      "",
       "IMPORTANT: Source files have already been fetched and written to sources/web_research/ by the build pipeline.",
       "Source digests have been generated in sources/digests/.",
       "Do NOT search the web. Use only the pre-fetched sources.",
-      "Read newly fetched sources, update the topic's wiki page, update affected directed outputs,",
-      "and update .build/topics.json for this topic.",
+      "Read newly fetched sources, update each topic's wiki page, update affected directed outputs,",
+      "and update .build/topics.json for ALL topics listed above.",
     ].join("\n");
   }
 
-  async function startDeepen(project, topicId, requestedModelId) {
-    const topicsData = await readTopics(project.path);
-    const topic = topicsData.topics.find((t) => t.id === topicId);
+  async function startBatchDeepen(project, requestedModelId) {
+    const queue = await getDeepenQueue(project.path);
 
-    if (!topic) {
-      throw httpError(`Topic '${topicId}' not found.`, 404, "topic_not_found");
+    if (queue.length === 0) {
+      throw httpError("No topics queued for deepening. Queue topics first.", 400, "empty_deepen_queue");
     }
-    if (topic.state === "deprecated") {
-      throw httpError(`Topic '${topicId}' is deprecated and cannot be deepened.`, 400, "topic_deprecated");
+
+    // Validate all queued topics
+    for (const topic of queue) {
+      if (topic.state === "deprecated") {
+        throw httpError(`Topic '${topic.id}' is deprecated and cannot be deepened.`, 400, "topic_deprecated");
+      }
+      if (topic.disposition === "parked" || topic.disposition === "settled") {
+        throw httpError(`Topic '${topic.id}' is ${topic.disposition}. Resume it first.`, 400, "topic_disposition_blocks");
+      }
+      if (topic.state === "seed") {
+        throw httpError(`Topic '${topic.id}' is a seed. Accept it first.`, 400, "topic_is_seed");
+      }
     }
-    if (topic.disposition === "parked" || topic.disposition === "settled") {
-      throw httpError(`Topic '${topicId}' is ${topic.disposition}. Resume it first before deepening.`, 400, "topic_disposition_blocks");
-    }
-    if (topic.state === "seed") {
-      throw httpError(`Topic '${topicId}' is a seed. Accept it first before deepening.`, 400, "topic_is_seed");
-    }
+
+    const topicLabels = queue.map((t) => t.label).join(", ");
 
     return await startAgentJob({
       project,
       requestedModelId,
-      runKind: "deepen",
-      deepenContext: topic,
-      startMessage: `Deepening research on topic: ${topic.label}`,
+      runKind: "batch_deepen",
+      deepenContext: queue,
+      startMessage: `Deepening ${queue.length} topic(s): ${topicLabels}`,
       noApiKeyMessage:
         "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Topic deepening is unavailable from the UI.",
       noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
-      jobName: `Deepen: ${topic.label}`,
-      prompt: createDeepenResearchPrompt(project, topic),
+      jobName: `Deepen (${queue.length} topics)`,
+      prompt: createBatchDeepenResearchPrompt(project, queue),
     });
   }
 
@@ -706,9 +719,9 @@ export function createAgentJobService({
   }
 
   async function runAgentJob({ project, apiKey, modelId, prompt, jobName, runKind, deepenContext, releaseProjectAgent }) {
-    // Deepen jobs get their own pipeline
-    if (runKind === "deepen" && deepenContext) {
-      return await runDeepenJob({ project, apiKey, modelId, prompt, jobName, deepenContext, releaseProjectAgent });
+    // Batch deepen jobs get their own pipeline
+    if (runKind === "batch_deepen" && Array.isArray(deepenContext)) {
+      return await runBatchDeepenJob({ project, apiKey, modelId, prompt, jobName, topics: deepenContext, releaseProjectAgent });
     }
 
     activeRebuilds.add(project.slug);
@@ -1120,6 +1133,82 @@ export function createAgentJobService({
         phaseName: "Validation",
       });
 
+      // ── Phase 4: Drain Deepen Queue (if any topics are queued) ──
+      const deepenQueue = await getDeepenQueue(project.path);
+      if (deepenQueue.length > 0) {
+        const dqLabels = deepenQueue.map((t) => t.label);
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Phase 4: Deepening ${deepenQueue.length} queued topic(s)`,
+          text: `Full build will now deepen: ${dqLabels.join(", ")}`,
+          status: "deepen_research",
+          runtime: "server",
+          metadata: { topicIds: deepenQueue.map((t) => t.id), topicLabels: dqLabels },
+        });
+
+        // Phase 4a: Deepen Research
+        const stateBeforeDeepenResearch = await getRebuildState(project.slug);
+        await setRebuildState(project.slug, {
+          ...stateBeforeDeepenResearch,
+          buildPhase: "deepen_research",
+          buildPhaseDetail: `Researching deeper evidence for ${deepenQueue.length} topic(s)`,
+        });
+
+        const deepenResearchPrompt = createBatchDeepenResearchPrompt(project, deepenQueue);
+        const deepenResearchResult = await runSingleAgentPhase({
+          project, apiKey, modelId,
+          prompt: deepenResearchPrompt,
+          phaseName: `Build Deepen Research (${deepenQueue.length} topics)`,
+        });
+
+        if (deepenResearchResult.status === "finished") {
+          // Phase 4b: Fetch
+          const stateBeforeDeepenFetch = await getRebuildState(project.slug);
+          await setRebuildState(project.slug, {
+            ...stateBeforeDeepenFetch,
+            buildPhase: "deepen_fetching",
+            buildPhaseDetail: `Fetching deepen sources for ${deepenQueue.length} topic(s)`,
+          });
+
+          try {
+            const deepenPlan = await parseResearchPlan(project.path);
+            await executeResearchPlan(project.path, deepenPlan, async () => {});
+          } catch { /* non-fatal */ }
+
+          // Phase 4c: Digests
+          try {
+            await generateSourceDigests(project.path, async () => {});
+          } catch { /* non-fatal */ }
+
+          // Phase 4d: Synthesis
+          const stateBeforeDeepenSynthesis = await getRebuildState(project.slug);
+          await setRebuildState(project.slug, {
+            ...stateBeforeDeepenSynthesis,
+            buildPhase: "deepen_synthesis",
+            buildPhaseDetail: `Synthesizing deeper evidence for ${deepenQueue.length} topic(s)`,
+          });
+
+          const deepenSynthesisPrompt = createBatchDeepenSynthesisPrompt(project, deepenQueue);
+          await runSingleAgentPhase({
+            project, apiKey, modelId,
+            prompt: deepenSynthesisPrompt,
+            phaseName: `Build Deepen Synthesis (${deepenQueue.length} topics)`,
+          });
+        }
+
+        // Clear the queue regardless of success
+        await clearDeepenQueue(project.path);
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Deepen queue cleared (${deepenQueue.length} topic(s) processed)`,
+          text: dqLabels.join(", "),
+          status: "deepen_complete",
+          runtime: "server",
+        });
+      }
+
       // ── Completion ──
       const completedState = await getRebuildState(project.slug);
       const buildDurationSeconds = Math.round((Date.now() - buildStartTime) / 1000);
@@ -1173,23 +1262,34 @@ export function createAgentJobService({
     }
   }
 
-  async function runDeepenJob({ project, apiKey, modelId, prompt, jobName, deepenContext, releaseProjectAgent }) {
+  async function runBatchDeepenJob({ project, apiKey, modelId, prompt, jobName, topics, releaseProjectAgent }) {
     activeRebuilds.add(project.slug);
     const buildStartTime = Date.now();
+    const topicLabels = topics.map((t) => t.label);
 
     try {
-      // ── Phase 1: Topic Research (agent searches web for deeper evidence) ──
+      // ── Emit batch start ──
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: `Batch deepening ${topics.length} topic(s)`,
+        text: topicLabels.join(", "),
+        status: "batch_deepen_start",
+        runtime: "server",
+        metadata: { topicIds: topics.map((t) => t.id), topicLabels },
+      });
+
+      // ── Phase 1: Batch Research (agent searches web for ALL topics) ──
       const stateBeforeResearch = await getRebuildState(project.slug);
       await setRebuildState(project.slug, {
         ...stateBeforeResearch,
         buildPhase: "deepen_research",
-        buildPhaseDetail: `Researching deeper evidence for: ${deepenContext.label}`,
+        buildPhaseDetail: `Researching deeper evidence for ${topics.length} topic(s)`,
       });
 
       await appendRunEvent(project.slug, {
         type: "system",
-        title: `Deepen Phase 1: Researching ${deepenContext.label}`,
-        text: `Agent is searching the web for deeper evidence on this topic. Coverage gaps: ${(deepenContext.coverage_gaps || []).join(", ") || "none listed"}.`,
+        title: `Deepen Phase 1: Researching ${topics.length} topic(s)`,
+        text: `Agent is searching the web for deeper evidence. Topics: ${topicLabels.join(", ")}`,
         status: "deepen_research",
         runtime: "cursor",
       });
@@ -1199,7 +1299,7 @@ export function createAgentJobService({
         apiKey,
         modelId,
         prompt,
-        phaseName: `Deepen Research: ${deepenContext.label}`,
+        phaseName: `Batch Deepen Research (${topics.length} topics)`,
       });
 
       if (researchResult.status !== "finished") {
@@ -1211,7 +1311,7 @@ export function createAgentJobService({
       await setRebuildState(project.slug, {
         ...stateBeforeFetch,
         buildPhase: "deepen_fetching",
-        buildPhaseDetail: `Fetching new sources for: ${deepenContext.label}`,
+        buildPhaseDetail: `Fetching new sources for ${topics.length} topic(s)`,
       });
 
       await appendRunEvent(project.slug, {
@@ -1253,7 +1353,7 @@ export function createAgentJobService({
         await appendRunEvent(project.slug, {
           type: "system",
           title: `Fetch complete: ${fetchResults.fetched} new, ${fetchResults.skipped} cached, ${fetchResults.failed} failed`,
-          text: `Server-side fetch finished for deepen pass.`,
+          text: `Server-side fetch finished for batch deepen pass.`,
           status: "fetch_complete",
           runtime: "server",
         });
@@ -1274,7 +1374,7 @@ export function createAgentJobService({
       await setRebuildState(project.slug, {
         ...stateBeforeDigests,
         buildPhase: "deepen_digests",
-        buildPhaseDetail: `Generating digests for: ${deepenContext.label}`,
+        buildPhaseDetail: `Generating digests for ${topics.length} topic(s)`,
       });
 
       try {
@@ -1282,7 +1382,7 @@ export function createAgentJobService({
         await appendRunEvent(project.slug, {
           type: "system",
           title: `Digests complete: ${digestResults.generated} generated, ${digestResults.skipped} cached`,
-          text: `Source digests ready for deepen synthesis.`,
+          text: `Source digests ready for batch deepen synthesis.`,
           status: "digests_complete",
           runtime: "server",
         });
@@ -1297,30 +1397,33 @@ export function createAgentJobService({
         });
       }
 
-      // ── Phase 3: Synthesis (agent updates wiki page + outputs) ──
+      // ── Phase 3: Batch Synthesis (agent updates ALL topics' wiki pages + outputs) ──
       const stateBeforeSynthesis = await getRebuildState(project.slug);
       await setRebuildState(project.slug, {
         ...stateBeforeSynthesis,
         buildPhase: "deepen_synthesis",
-        buildPhaseDetail: `Synthesizing deeper evidence for: ${deepenContext.label}`,
+        buildPhaseDetail: `Synthesizing deeper evidence for ${topics.length} topic(s)`,
       });
 
       await appendRunEvent(project.slug, {
         type: "system",
-        title: `Deepen Phase 3: Synthesizing ${deepenContext.label}`,
-        text: "Agent is updating the topic's wiki page and related outputs with new evidence.",
+        title: `Deepen Phase 3: Synthesizing ${topics.length} topic(s)`,
+        text: `Agent is updating wiki pages and related outputs for: ${topicLabels.join(", ")}`,
         status: "deepen_synthesis",
         runtime: "cursor",
       });
 
-      const synthesisPrompt = createDeepenSynthesisPrompt(project, deepenContext);
+      const synthesisPrompt = createBatchDeepenSynthesisPrompt(project, topics);
       const synthesisResult = await runSingleAgentPhase({
         project,
         apiKey,
         modelId,
         prompt: synthesisPrompt,
-        phaseName: `Deepen Synthesis: ${deepenContext.label}`,
+        phaseName: `Batch Deepen Synthesis (${topics.length} topics)`,
       });
+
+      // ── Clear the deepen queue ──
+      await clearDeepenQueue(project.path);
 
       // ── Completion ──
       const completedState = await getRebuildState(project.slug);
@@ -1347,12 +1450,16 @@ export function createAgentJobService({
           fetchResults,
           buildDurationSeconds,
           modelId,
-          topicId: deepenContext.id,
+          topicIds: topics.map((t) => t.id),
+          topicCount: topics.length,
         },
       });
     } catch (error) {
       await finishAssistantMessage(project.slug);
-      const message = error instanceof Error ? error.message : `Unknown deepen failure.`;
+      const message = error instanceof Error ? error.message : `Unknown batch deepen failure.`;
+
+      // Clear queue even on failure so user doesn't get stuck
+      await clearDeepenQueue(project.path).catch(() => {});
 
       const current = await getRebuildState(project.slug);
       await setRebuildState(project.slug, {
@@ -1375,5 +1482,6 @@ export function createAgentJobService({
     }
   }
 
-  return { startDeepen, startHumanAttentionResolution, startRebuild };
+  return { startBatchDeepen, startHumanAttentionResolution, startRebuild };
 }
+

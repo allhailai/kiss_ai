@@ -3,9 +3,9 @@ import type { Topic, TopicCluster, TopicDisposition, TopicState } from "../../co
 import { formatLocalDateTime } from "../../domain/formatters";
 import "./TopicsWorkspace.css";
 
-type TopicsFilter = "all" | "seeds" | "active" | "deepened" | "parked" | "settled" | "deprecated";
+type TopicsFilter = "all" | "seeds" | "active" | "queued" | "deepened" | "parked" | "settled" | "deprecated";
 
-const VALID_FILTERS = new Set<TopicsFilter>(["all", "seeds", "active", "deepened", "parked", "settled", "deprecated"]);
+const VALID_FILTERS = new Set<TopicsFilter>(["all", "seeds", "active", "queued", "deepened", "parked", "settled", "deprecated"]);
 
 function parseFilterFromHash(): TopicsFilter {
   const hash = window.location.hash;
@@ -47,14 +47,14 @@ function isActiveTopic(topic: Topic): boolean {
 function TopicCard({
   topic,
   allTopics,
-  onDeepen,
+  onToggleQueue,
   onResolve,
   onDisposition,
   onNavigateToFile,
 }: {
   topic: Topic;
   allTopics: Topic[];
-  onDeepen: (topicId: string) => void;
+  onToggleQueue: (topicId: string) => void;
   onResolve: (topicId: string, action: "accept" | "dismiss" | "deprecate") => void;
   onDisposition: (topicId: string, disposition: TopicDisposition) => void;
   onNavigateToFile: (path: string) => void;
@@ -104,6 +104,7 @@ function TopicCard({
     "topic-card",
     `topic-card-${topic.state}`,
     hasDisposition ? `topic-card-disposition-${topic.disposition}` : "",
+    topic.queued_for_deepen ? "topic-card-queued" : "",
   ].filter(Boolean).join(" ");
 
   return (
@@ -230,13 +231,13 @@ function TopicCard({
       {isActive ? (
         <div className="topic-card-actions">
           <button
-            className="topic-deepen-button"
+            className={`topic-deepen-button${topic.queued_for_deepen ? " topic-deepen-queued" : ""}`}
             disabled={saving}
-            onClick={() => onDeepen(topic.id)}
-            title="Run a deeper research pass on this topic"
+            onClick={() => onToggleQueue(topic.id)}
+            title={topic.queued_for_deepen ? "Remove from deepen queue" : "Add to deepen queue"}
             type="button"
           >
-            Go Deeper
+            {topic.queued_for_deepen ? "Queued ✓" : "Go Deeper"}
           </button>
           {topic.wiki_page ? (
             <button
@@ -390,11 +391,33 @@ export function TopicsWorkspace({
     [projectSlug, fetchTopics],
   );
 
-  const handleDeepen = useCallback(
+  const handleToggleQueue = useCallback(
     async (topicId: string) => {
       try {
         const response = await fetch(
-          `/api/projects/${encodeURIComponent(projectSlug)}/topics/${encodeURIComponent(topicId)}/deepen`,
+          `/api/projects/${encodeURIComponent(projectSlug)}/topics/${encodeURIComponent(topicId)}/queue-deepen`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          throw new Error(body?.message || "Failed to toggle deepen queue");
+        }
+        await fetchTopics();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to toggle deepen queue");
+      }
+    },
+    [projectSlug, fetchTopics],
+  );
+
+  const handleRunDeepen = useCallback(
+    async () => {
+      try {
+        const response = await fetch(
+          `/api/projects/${encodeURIComponent(projectSlug)}/rebuild/deepen`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -403,12 +426,11 @@ export function TopicsWorkspace({
         );
         if (!response.ok) {
           const body = await response.json().catch(() => null);
-          throw new Error(body?.message || "Failed to start deepen");
+          throw new Error(body?.message || "Failed to start batch deepen");
         }
-        // Navigate to rebuild view so user can watch progress
         window.location.hash = `#/p/${encodeURIComponent(projectSlug)}/rebuild`;
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to start deepen");
+        setError(err instanceof Error ? err.message : "Failed to start batch deepen");
       }
     },
     [projectSlug],
@@ -416,6 +438,7 @@ export function TopicsWorkspace({
 
   const seedCount = topics.filter((t) => t.state === "seed").length;
   const activeCount = topics.filter((t) => isActiveTopic(t)).length;
+  const queuedCount = topics.filter((t) => t.queued_for_deepen).length;
   const deepenedCount = topics.filter((t) => (t.discovery?.deepening_count ?? 0) > 0).length;
   const parkedCount = topics.filter((t) => t.disposition === "parked").length;
   const settledCount = topics.filter((t) => t.disposition === "settled").length;
@@ -424,6 +447,7 @@ export function TopicsWorkspace({
   const filteredTopics = topics.filter((t) => {
     if (filter === "seeds") return t.state === "seed";
     if (filter === "active") return isActiveTopic(t);
+    if (filter === "queued") return t.queued_for_deepen;
     if (filter === "deepened") return (t.discovery?.deepening_count ?? 0) > 0;
     if (filter === "parked") return t.disposition === "parked";
     if (filter === "settled") return t.disposition === "settled";
@@ -474,6 +498,7 @@ export function TopicsWorkspace({
     all: "All",
     seeds: "Seeds",
     active: "Active",
+    queued: "Queued",
     deepened: "Deepened",
     parked: "Parked",
     settled: "Settled",
@@ -485,10 +510,10 @@ export function TopicsWorkspace({
       <header className="topics-header">
         <h2>Topics</h2>
         <p className="topics-summary">
-          {seedCount} seeds · {activeCount} active · {deepenedCount} deepened · {parkedCount} parked · {settledCount} settled · {deprecatedCount} deprecated · {topics.length} total
+          {seedCount} seeds · {activeCount} active · {queuedCount} queued · {deepenedCount} deepened · {parkedCount} parked · {settledCount} settled · {deprecatedCount} deprecated · {topics.length} total
         </p>
         <div className="topics-filter-bar">
-          {(["all", "seeds", "active", "deepened", "parked", "settled", "deprecated"] as const).map((f) => (
+          {(["all", "seeds", "active", "queued", "deepened", "parked", "settled", "deprecated"] as const).map((f) => (
             <button
               className={`topics-filter-button${filter === f ? " active" : ""}`}
               key={f}
@@ -498,6 +523,16 @@ export function TopicsWorkspace({
               {filterLabels[f]}
             </button>
           ))}
+          {queuedCount > 0 ? (
+            <button
+              className="topics-run-deepen-button"
+              onClick={() => void handleRunDeepen()}
+              title={`Run deepening on ${queuedCount} queued topic(s)`}
+              type="button"
+            >
+              Run Deepening ({queuedCount})
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -517,7 +552,7 @@ export function TopicsWorkspace({
             <TopicCard
               allTopics={topics}
               key={t.id}
-              onDeepen={handleDeepen}
+              onToggleQueue={handleToggleQueue}
               onDisposition={handleDisposition}
               onNavigateToFile={onNavigateToFile}
               onResolve={handleResolve}

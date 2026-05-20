@@ -1,7 +1,7 @@
 import { buildLogQuerySchema, createProjectBodySchema, parseRequestBody, parseRequestQuery, updateProjectUiStateBodySchema } from "./requestSchemas.js";
 import { readQuestions, answerQuestion, getQuestionCounts } from "../services/questionsService.js";
 import { readSuggestions, resolveSuggestion, getSuggestionCounts } from "../services/suggestionsService.js";
-import { readTopics, resolveTopic, updateTopic, setDisposition, getTopicCounts } from "../services/topicsService.js";
+import { readTopics, resolveTopic, updateTopic, setDisposition, getTopicCounts, toggleDeepenQueue, getDeepenLog } from "../services/topicsService.js";
 
 function extractOpenQuestions(content) {
   const lines = content.split("\n");
@@ -343,6 +343,30 @@ export function registerProjectRoutes(app, {
       }
 
       response.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/topics/:topicId/queue-deepen", async (request, response, next) => {
+    try {
+      const { topicId } = request.params;
+      const updated = await toggleDeepenQueue(request.project.path, topicId);
+
+      if (!updated) {
+        throw httpError("Topic '" + topicId + "' not found or cannot be queued (must be active, not parked/settled/deprecated/seed).", 400, "cannot_queue_topic");
+      }
+
+      response.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/projects/:projectSlug/topics/deepen-log", async (request, response, next) => {
+    try {
+      const log = await getDeepenLog(request.project.path);
+      response.json({ entries: log });
     } catch (error) {
       next(error);
     }
