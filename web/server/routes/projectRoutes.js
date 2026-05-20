@@ -1,6 +1,7 @@
 import { buildLogQuerySchema, createProjectBodySchema, parseRequestBody, parseRequestQuery, updateProjectUiStateBodySchema } from "./requestSchemas.js";
 import { readQuestions, answerQuestion, getQuestionCounts } from "../services/questionsService.js";
 import { readSuggestions, resolveSuggestion, getSuggestionCounts } from "../services/suggestionsService.js";
+import { readTopics, resolveTopic, updateTopic, setDisposition, getTopicCounts } from "../services/topicsService.js";
 
 function extractOpenQuestions(content) {
   const lines = content.split("\n");
@@ -129,6 +130,7 @@ export function registerProjectRoutes(app, {
       const humanAttentionItems = getHumanAttentionItems(harness);
       const questionCounts = await getQuestionCounts(project.path);
       const suggestionCounts = await getSuggestionCounts(project.path);
+      const topicCounts = await getTopicCounts(project.path);
 
       response.json({
         projectSlug: manifest?.project_slug ?? harness.project_slug ?? project.slug,
@@ -150,6 +152,10 @@ export function registerProjectRoutes(app, {
         totalQuestionsCount: questionCounts.totalQuestionsCount,
         pendingSuggestionsCount: suggestionCounts.pendingSuggestionsCount,
         totalSuggestionsCount: suggestionCounts.totalSuggestionsCount,
+        seedTopicsCount: topicCounts.seedTopicsCount,
+        totalTopicsCount: topicCounts.totalTopicsCount,
+        parkedTopicsCount: topicCounts.parkedTopicsCount,
+        settledTopicsCount: topicCounts.settledTopicsCount,
         cursorApiKeyAvailable: cursorApiKey.available,
         cursorApiKeySource: cursorApiKey.source,
         cursorApiKeyWarnings: cursorApiKey.warnings,
@@ -246,6 +252,94 @@ export function registerProjectRoutes(app, {
 
       if (!updated) {
         throw httpError(`Suggestion '${suggestionId}' not found.`, 404, "suggestion_not_found");
+      }
+
+      response.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ── Topics API ──
+
+  app.get("/api/projects/:projectSlug/topics", async (request, response, next) => {
+    try {
+      response.json(await readTopics(request.project.path));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/topics/:topicId/resolve", async (request, response, next) => {
+    try {
+      const { topicId } = request.params;
+      const action = request.body?.action;
+
+      if (!action || (action !== "accept" && action !== "dismiss" && action !== "deprecate")) {
+        throw httpError("Action must be 'accept', 'dismiss', or 'deprecate'.", 400, "invalid_action");
+      }
+
+      const options = {
+        reason: request.body?.reason,
+        merged_into: request.body?.merged_into,
+        notes: request.body?.notes,
+      };
+
+      const updated = await resolveTopic(request.project.path, topicId, action, options);
+
+      if (!updated) {
+        throw httpError("Topic '" + topicId + "' not found.", 404, "topic_not_found");
+      }
+
+      response.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/projects/:projectSlug/topics/:topicId", async (request, response, next) => {
+    try {
+      const { topicId } = request.params;
+      const updates = {};
+
+      if (request.body?.label !== undefined) updates.label = String(request.body.label).trim();
+      if (request.body?.confidence !== undefined) {
+        if (request.body.confidence !== "high" && request.body.confidence !== "low") {
+          throw httpError("Confidence must be 'high' or 'low'.", 400, "invalid_confidence");
+        }
+        updates.confidence = request.body.confidence;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        throw httpError("No valid fields to update. Provide 'label' and/or 'confidence'.", 400, "no_updates");
+      }
+
+      const updated = await updateTopic(request.project.path, topicId, updates);
+
+      if (!updated) {
+        throw httpError("Topic '" + topicId + "' not found.", 404, "topic_not_found");
+      }
+
+      response.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/topics/:topicId/disposition", async (request, response, next) => {
+    try {
+      const { topicId } = request.params;
+      const disposition = request.body?.disposition === undefined ? undefined : request.body.disposition;
+
+      if (disposition !== "parked" && disposition !== "settled" && disposition !== null) {
+        throw httpError("Disposition must be 'parked', 'settled', or null (to resume).", 400, "invalid_disposition");
+      }
+
+      const options = { note: request.body?.note };
+      const updated = await setDisposition(request.project.path, topicId, disposition, options);
+
+      if (!updated) {
+        throw httpError("Topic '" + topicId + "' not found.", 404, "topic_not_found");
       }
 
       response.json(updated);

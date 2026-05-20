@@ -129,6 +129,8 @@ const serverRules = [
         "projects.js",
         "questionsService.js",
         "sourceMapping.js",
+        "suggestionsService.js",
+        "topicsService.js",
         "webResearch.js",
       ]).has(path.basename(filePath)),
     message: "server services must keep filesystem access in approved service modules",

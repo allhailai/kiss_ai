@@ -111,6 +111,10 @@ export type ProjectStatus = {
   totalQuestionsCount: number;
   pendingSuggestionsCount: number;
   totalSuggestionsCount: number;
+  seedTopicsCount: number;
+  totalTopicsCount: number;
+  parkedTopicsCount: number;
+  settledTopicsCount: number;
   cursorApiKeyAvailable: boolean;
   cursorApiKeySource: string | null;
   cursorApiKeyWarnings: string[];
@@ -188,6 +192,73 @@ export type AiSuggestion = {
     buildId: string | null;
     modelId: string | null;
   };
+};
+
+export type TopicState = "seed" | "shallow" | "deep" | "saturated" | "split_candidate" | "deprecated";
+export type TopicConfidence = "high" | "low";
+export type TopicDisposition = "parked" | "settled" | null;
+
+export type Topic = {
+  id: string;
+  label: string;
+  state: TopicState;
+  confidence: TopicConfidence;
+  depth: number;
+  parent: string | null;
+  children: string[];
+  cluster: string | null;
+  wiki_page: string | null;
+  sources: Array<{ path: string; relevance: number; added_at: string }>;
+  depends_on: string[];
+  outputs: string[];
+  justification: {
+    goal_support: string;
+    graph_support: string;
+    questions_addressed: string[];
+    suggestions_addressed: string[];
+  } | null;
+  discovery: {
+    origin: string;
+    discovered_at: string;
+    discovered_from: string | null;
+    reason: string | null;
+    last_deepened: string | null;
+    deepening_count: number;
+  };
+  deprecation: {
+    reason: string | null;
+    deprecated_at: string | null;
+    merged_into: string | null;
+    notes: string | null;
+  } | null;
+  metrics: {
+    source_count: number;
+    cross_references: number;
+    word_count: number;
+    last_updated: string | null;
+  };
+  coverage_gaps: string[];
+  disposition: TopicDisposition;
+  disposition_at: string | null;
+  disposition_note: string | null;
+};
+
+export type TopicCluster = {
+  id: string;
+  label: string;
+  confidence: TopicConfidence;
+  topic_ids: string[];
+  justification: {
+    goal_support: string;
+    graph_support: string;
+  };
+};
+
+export type TopicsResponse = {
+  version: number;
+  last_updated: string | null;
+  topics: Topic[];
+  clusters: TopicCluster[];
 };
 
 export type CreateProjectRequest = {

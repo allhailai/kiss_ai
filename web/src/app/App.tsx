@@ -23,6 +23,7 @@ import { ProjectPicker } from "../features/projectPicker/ProjectPicker";
 import { BuildProjectRightPanel } from "../features/rebuild/BuildProjectRightPanel";
 import { QuestionsWorkspace } from "../features/questions/QuestionsWorkspace";
 import { SuggestionsWorkspace } from "../features/suggestions/SuggestionsWorkspace";
+import { TopicsWorkspace } from "../features/topics/TopicsWorkspace";
 
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
@@ -363,6 +364,7 @@ export function App() {
           openQuestionsCount={rebuildWorkspace.status?.openQuestionsCount}
           blockingQuestionsCount={rebuildWorkspace.status?.blockingQuestionsCount}
           pendingSuggestionsCount={rebuildWorkspace.status?.pendingSuggestionsCount}
+          seedTopicsCount={rebuildWorkspace.status?.seedTopicsCount}
           loading={fileWorkspace.treeLoading}
           projectFiles={fileWorkspace.projectFiles}
           selectedPath={fileWorkspace.selected?.path ?? null}
@@ -437,6 +439,12 @@ export function App() {
         ) : null}
         {route.view === "suggestions" ? (
           <SuggestionsWorkspace
+            onNavigateToFile={openProjectFileWithAgentContext}
+            projectSlug={project.selectedProjectSlug}
+          />
+        ) : null}
+        {route.view === "topics" ? (
+          <TopicsWorkspace
             onNavigateToFile={openProjectFileWithAgentContext}
             projectSlug={project.selectedProjectSlug}
           />

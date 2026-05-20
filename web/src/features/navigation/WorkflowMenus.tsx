@@ -6,6 +6,7 @@ import {
   requirementNavLeaves,
   sectionForView,
   simplifiedNavSections,
+  topicsNavLeaf,
   type SimplifiedNavSectionId,
 } from "../../navigation/navigationModel";
 import { projectPathPrefixes } from "../../domain/projectPaths";
@@ -23,6 +24,7 @@ export function SimplifiedNavigator({
   openQuestionsCount,
   blockingQuestionsCount,
   pendingSuggestionsCount,
+  seedTopicsCount,
   projectFiles,
   loading,
   selectedPath,
@@ -40,6 +42,7 @@ export function SimplifiedNavigator({
   openQuestionsCount?: number;
   blockingQuestionsCount?: number;
   pendingSuggestionsCount?: number;
+  seedTopicsCount?: number;
   projectFiles: ProjectFile[];
   loading: boolean;
   selectedPath: string | null;
@@ -152,6 +155,18 @@ export function SimplifiedNavigator({
               {(pendingSuggestionsCount ?? 0) > 0 ? (
                 <b className="nav-badge nav-badge-open">
                   {pendingSuggestionsCount}
+                </b>
+              ) : null}
+            </button>
+            <button
+              className={currentView === "topics" ? "simple-nav-item simple-nav-child nav-questions-btn active" : "simple-nav-item simple-nav-child nav-questions-btn"}
+              onClick={() => onOpenView(topicsNavLeaf.view)}
+              type="button"
+            >
+              <DefineNavLabel label={topicsNavLeaf.label} />
+              {(seedTopicsCount ?? 0) > 0 ? (
+                <b className="nav-badge nav-badge-open">
+                  {seedTopicsCount}
                 </b>
               ) : null}
             </button>

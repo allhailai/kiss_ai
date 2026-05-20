@@ -38,6 +38,12 @@ export const aiSuggestionsNavLeaf: SimplifiedNavLeaf = {
   view: "suggestions",
 };
 
+export const topicsNavLeaf: SimplifiedNavLeaf = {
+  id: "topics",
+  label: "Review: Topics",
+  view: "topics",
+};
+
 export const chatNavLeaf: SimplifiedNavLeaf = {
   id: "chat",
   label: "Chat",
@@ -46,7 +52,7 @@ export const chatNavLeaf: SimplifiedNavLeaf = {
 
 export function sectionForView(view: View): SimplifiedNavSectionId {
   if (view === "chat") return "chat";
-  if (view === "requirements" || view === "design" || view === "questions" || view === "suggestions" || view === "dashboard") return "define";
+  if (view === "requirements" || view === "design" || view === "questions" || view === "suggestions" || view === "topics" || view === "dashboard") return "define";
   if (view === "inputs") return "source-data";
   if (view === "outputs") return "results";
   return "define";
