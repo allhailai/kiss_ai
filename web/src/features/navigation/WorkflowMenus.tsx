@@ -129,17 +129,15 @@ export function SimplifiedNavigator({
               </button>
             ))}
             <button
-              className={
-                currentView === "questions" ? "simple-nav-item simple-nav-child active" : "simple-nav-item simple-nav-child"
-              }
+              className={currentView === "questions" ? "simple-nav-item simple-nav-child nav-questions-btn active" : "simple-nav-item simple-nav-child nav-questions-btn"}
               onClick={() => onOpenView(openQuestionsNavLeaf.view)}
               type="button"
             >
               <DefineNavLabel label={openQuestionsNavLeaf.label} />
               {(openQuestionsCount ?? 0) > 0 ? (
-                <span className={`nav-badge${(blockingQuestionsCount ?? 0) > 0 ? " nav-badge-blocking" : " nav-badge-open"}`}>
+                <b className={(blockingQuestionsCount ?? 0) > 0 ? "nav-badge nav-badge-blocking" : "nav-badge nav-badge-open"}>
                   {openQuestionsCount}
-                </span>
+                </b>
               ) : null}
             </button>
           </div>

@@ -533,7 +533,21 @@
 
 /* ── Nav Badge ── */
 
+/* Make the Questions button a flex row so the badge sits right-aligned
+   on the same line. Uses a specific class to avoid touching other nav items.
+   The badge is a <b> element (not span) to dodge the span { display: block } rule. */
+.nav-questions-btn {
+  display: flex !important;
+  align-items: center;
+}
+
+.nav-questions-btn > span {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .nav-badge {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -556,3 +570,4 @@
   background: #f59e0b;
   color: #fff;
 }
+
