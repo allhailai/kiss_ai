@@ -78,6 +78,7 @@ export function registerApiRoutes(app, deps) {
   registerRebuildRoutes(app, {
     getRebuildState: deps.getRebuildState,
     httpError: deps.httpError,
+    startDeepen: deps.startDeepen,
     startHumanAttentionResolution: deps.startHumanAttentionResolution,
     startRebuild: deps.startRebuild,
     subscribeToRebuild: deps.subscribeToRebuild,

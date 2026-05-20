@@ -4,6 +4,7 @@ import { parseRequestBody, resolveHumanAttentionBodySchema, startRebuildBodySche
 export function registerRebuildRoutes(app, {
   getRebuildState,
   httpError,
+  startDeepen,
   startHumanAttentionResolution,
   startRebuild,
   subscribeToRebuild,
@@ -43,6 +44,16 @@ export function registerRebuildRoutes(app, {
   app.post("/api/projects/:projectSlug/human-attention/resolve", async (request, response, next) => {
     try {
       response.json(await startHumanAttentionResolution(request.project, parseRequestBody(resolveHumanAttentionBodySchema, request.body, httpError)));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/topics/:topicId/deepen", async (request, response, next) => {
+    try {
+      const { topicId } = request.params;
+      const modelId = request.body?.modelId ?? null;
+      response.json(await startDeepen(request.project, topicId, modelId));
     } catch (error) {
       next(error);
     }

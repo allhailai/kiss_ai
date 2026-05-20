@@ -5,6 +5,7 @@ import { computeBuildScope } from "./buildScope.js";
 import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
 import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
 import { extractAllSuggestions, readSuggestions, writeSuggestions, backfillSuggestionIds } from "./suggestionsService.js";
+import { readTopics } from "./topicsService.js";
 
 export function createAgentJobService({
   FRAMEWORK_ROOT,
@@ -418,6 +419,7 @@ export function createAgentJobService({
     requestedModelId,
     runKind,
     attentionContext = null,
+    deepenContext = null,
     startMessage,
     noApiKeyMessage,
     noModelsMessage,
@@ -435,6 +437,7 @@ export function createAgentJobService({
       requestedModelId,
       runKind,
       attentionContext,
+      deepenContext,
       startMessage,
       noApiKeyMessage,
       noModelsMessage,
@@ -455,6 +458,7 @@ export function createAgentJobService({
     requestedModelId,
     runKind,
     attentionContext,
+    deepenContext,
     startMessage,
     noApiKeyMessage,
     noModelsMessage,
@@ -540,7 +544,7 @@ export function createAgentJobService({
       await appendRunLog(project.slug, `Using Cursor API key from ${cursorApiKey.source}.`);
       await appendRunLog(project.slug, `Using Cursor model: ${modelId}.`);
 
-      runAgentJob({ project, apiKey: cursorApiKey.apiKey, modelId, prompt, jobName, releaseProjectAgent }).catch((error) => {
+      runAgentJob({ project, apiKey: cursorApiKey.apiKey, modelId, prompt, jobName, runKind, deepenContext, releaseProjectAgent }).catch((error) => {
         void (async () => {
           const current = await getRebuildState(project.slug);
           await setRebuildState(project.slug, {
@@ -592,6 +596,89 @@ export function createAgentJobService({
     });
   }
 
+  function createDeepenResearchPrompt(project, topic) {
+    return [
+      `Run a focused deepening research pass on the topic: ${topic.label}`,
+      "",
+      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_deepen.md")} Phases 1-2 only (Read Context and Search for Deeper Evidence).`,
+      "This is a non-interactive web-triggered deepen run. Never ask the user for confirmation or wait for input mid-run.",
+      `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
+      "Do not create or depend on a project-local framework/ folder.",
+      "Do not operate outside this project root.",
+      `Project root: ${project.path}`,
+      "",
+      `TOPIC_ID: ${topic.id}`,
+      `TOPIC_LABEL: ${topic.label}`,
+      `TOPIC_WIKI_PAGE: ${topic.wiki_page || "null"}`,
+      `TOPIC_SOURCES: ${JSON.stringify(topic.sources || [])}`,
+      `TOPIC_COVERAGE_GAPS: ${JSON.stringify(topic.coverage_gaps || [])}`,
+      `TOPIC_DEPENDS_ON: ${JSON.stringify(topic.depends_on || [])}`,
+      `TOPIC_DEEPENING_COUNT: ${topic.discovery?.deepening_count ?? 0}`,
+      "",
+      "Search the web for deeper evidence on this topic, then write sources/research_plan.json with the new URLs.",
+      "Do NOT fetch URLs. Only list them. The build pipeline will fetch them.",
+      "Do NOT write wiki pages, directed outputs, or source notes in this phase.",
+    ].join("\n");
+  }
+
+  function createDeepenSynthesisPrompt(project, topic) {
+    return [
+      `Synthesize deeper evidence for the topic: ${topic.label}`,
+      "",
+      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_deepen.md")} Phases 3-4 only (Synthesize and Snapshot).`,
+      "This is a non-interactive web-triggered deepen run. Never ask the user for confirmation or wait for input mid-run.",
+      `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
+      "Do not create or depend on a project-local framework/ folder.",
+      "Do not operate outside this project root.",
+      `Project root: ${project.path}`,
+      "",
+      `TOPIC_ID: ${topic.id}`,
+      `TOPIC_LABEL: ${topic.label}`,
+      `TOPIC_WIKI_PAGE: ${topic.wiki_page || "null"}`,
+      `TOPIC_SOURCES: ${JSON.stringify(topic.sources || [])}`,
+      `TOPIC_COVERAGE_GAPS: ${JSON.stringify(topic.coverage_gaps || [])}`,
+      `TOPIC_DEPENDS_ON: ${JSON.stringify(topic.depends_on || [])}`,
+      `TOPIC_DEEPENING_COUNT: ${topic.discovery?.deepening_count ?? 0}`,
+      "",
+      "IMPORTANT: Source files have already been fetched and written to sources/web_research/ by the build pipeline.",
+      "Source digests have been generated in sources/digests/.",
+      "Do NOT search the web. Use only the pre-fetched sources.",
+      "Read newly fetched sources, update the topic's wiki page, update affected directed outputs,",
+      "and update .build/topics.json for this topic.",
+    ].join("\n");
+  }
+
+  async function startDeepen(project, topicId, requestedModelId) {
+    const topicsData = await readTopics(project.path);
+    const topic = topicsData.topics.find((t) => t.id === topicId);
+
+    if (!topic) {
+      throw httpError(`Topic '${topicId}' not found.`, 404, "topic_not_found");
+    }
+    if (topic.state === "deprecated") {
+      throw httpError(`Topic '${topicId}' is deprecated and cannot be deepened.`, 400, "topic_deprecated");
+    }
+    if (topic.disposition === "parked" || topic.disposition === "settled") {
+      throw httpError(`Topic '${topicId}' is ${topic.disposition}. Resume it first before deepening.`, 400, "topic_disposition_blocks");
+    }
+    if (topic.state === "seed") {
+      throw httpError(`Topic '${topicId}' is a seed. Accept it first before deepening.`, 400, "topic_is_seed");
+    }
+
+    return await startAgentJob({
+      project,
+      requestedModelId,
+      runKind: "deepen",
+      deepenContext: topic,
+      startMessage: `Deepening research on topic: ${topic.label}`,
+      noApiKeyMessage:
+        "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Topic deepening is unavailable from the UI.",
+      noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
+      jobName: `Deepen: ${topic.label}`,
+      prompt: createDeepenResearchPrompt(project, topic),
+    });
+  }
+
   async function runSingleAgentPhase({ project, apiKey, modelId, prompt, phaseName }) {
     const result = await runCursorAgent({
       project,
@@ -618,7 +705,12 @@ export function createAgentJobService({
     return result;
   }
 
-  async function runAgentJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent }) {
+  async function runAgentJob({ project, apiKey, modelId, prompt, jobName, runKind, deepenContext, releaseProjectAgent }) {
+    // Deepen jobs get their own pipeline
+    if (runKind === "deepen" && deepenContext) {
+      return await runDeepenJob({ project, apiKey, modelId, prompt, jobName, deepenContext, releaseProjectAgent });
+    }
+
     activeRebuilds.add(project.slug);
     const buildStartTime = Date.now();
 
@@ -1081,5 +1173,207 @@ export function createAgentJobService({
     }
   }
 
-  return { startHumanAttentionResolution, startRebuild };
+  async function runDeepenJob({ project, apiKey, modelId, prompt, jobName, deepenContext, releaseProjectAgent }) {
+    activeRebuilds.add(project.slug);
+    const buildStartTime = Date.now();
+
+    try {
+      // ── Phase 1: Topic Research (agent searches web for deeper evidence) ──
+      const stateBeforeResearch = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...stateBeforeResearch,
+        buildPhase: "deepen_research",
+        buildPhaseDetail: `Researching deeper evidence for: ${deepenContext.label}`,
+      });
+
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: `Deepen Phase 1: Researching ${deepenContext.label}`,
+        text: `Agent is searching the web for deeper evidence on this topic. Coverage gaps: ${(deepenContext.coverage_gaps || []).join(", ") || "none listed"}.`,
+        status: "deepen_research",
+        runtime: "cursor",
+      });
+
+      const researchResult = await runSingleAgentPhase({
+        project,
+        apiKey,
+        modelId,
+        prompt,
+        phaseName: `Deepen Research: ${deepenContext.label}`,
+      });
+
+      if (researchResult.status !== "finished") {
+        throw new Error(`Deepen research phase failed: ${researchResult.result || "unknown error"}`);
+      }
+
+      // ── Phase 2: Server-Side Fetch ──
+      const stateBeforeFetch = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...stateBeforeFetch,
+        buildPhase: "deepen_fetching",
+        buildPhaseDetail: `Fetching new sources for: ${deepenContext.label}`,
+      });
+
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: "Deepen Phase 2: Fetching sources",
+        text: "Server is fetching and extracting content from URLs in the research plan.",
+        status: "fetching_sources",
+        runtime: "server",
+      });
+
+      let fetchResults;
+      try {
+        const plan = await parseResearchPlan(project.path);
+        const totalUrls = plan.queries.reduce((sum, q) => sum + q.urls.length, 0);
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Fetching ${totalUrls} URLs`,
+          text: `Research plan contains ${plan.queries.length} topic(s) with ${totalUrls} URLs to fetch.`,
+          status: "fetching_sources",
+          runtime: "server",
+        });
+
+        let lastReportedPercent = -1;
+        fetchResults = await executeResearchPlan(project.path, plan, async (progress) => {
+          const percent = Math.floor((progress.completed / progress.total) * 10) * 10;
+          if (percent <= lastReportedPercent) return;
+          lastReportedPercent = percent;
+
+          await appendRunEvent(project.slug, {
+            type: "system",
+            title: `Fetching sources... ${progress.completed}/${progress.total} (${percent}%)`,
+            text: "Processing research plan URLs.",
+            status: "fetching_sources",
+            runtime: "server",
+          });
+        });
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Fetch complete: ${fetchResults.fetched} new, ${fetchResults.skipped} cached, ${fetchResults.failed} failed`,
+          text: `Server-side fetch finished for deepen pass.`,
+          status: "fetch_complete",
+          runtime: "server",
+        });
+      } catch (fetchError) {
+        const errorMsg = fetchError instanceof Error ? fetchError.message : "Unknown fetch error";
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Deepen Phase 2: Fetch skipped or failed",
+          text: `Server-side fetch could not run: ${errorMsg}. The synthesis agent will proceed with any existing sources.`,
+          status: "fetch_skipped",
+          runtime: "server",
+        });
+        fetchResults = { fetched: 0, failed: 0, skipped: 0, total: 0 };
+      }
+
+      // ── Phase 2.5: Generate Source Digests ──
+      const stateBeforeDigests = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...stateBeforeDigests,
+        buildPhase: "deepen_digests",
+        buildPhaseDetail: `Generating digests for: ${deepenContext.label}`,
+      });
+
+      try {
+        const digestResults = await generateSourceDigests(project.path, async () => {});
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Digests complete: ${digestResults.generated} generated, ${digestResults.skipped} cached`,
+          text: `Source digests ready for deepen synthesis.`,
+          status: "digests_complete",
+          runtime: "server",
+        });
+      } catch (digestError) {
+        const errorMsg = digestError instanceof Error ? digestError.message : "Unknown digest error";
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Digest generation skipped",
+          text: `Could not generate source digests: ${errorMsg}.`,
+          status: "digests_skipped",
+          runtime: "server",
+        });
+      }
+
+      // ── Phase 3: Synthesis (agent updates wiki page + outputs) ──
+      const stateBeforeSynthesis = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...stateBeforeSynthesis,
+        buildPhase: "deepen_synthesis",
+        buildPhaseDetail: `Synthesizing deeper evidence for: ${deepenContext.label}`,
+      });
+
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: `Deepen Phase 3: Synthesizing ${deepenContext.label}`,
+        text: "Agent is updating the topic's wiki page and related outputs with new evidence.",
+        status: "deepen_synthesis",
+        runtime: "cursor",
+      });
+
+      const synthesisPrompt = createDeepenSynthesisPrompt(project, deepenContext);
+      const synthesisResult = await runSingleAgentPhase({
+        project,
+        apiKey,
+        modelId,
+        prompt: synthesisPrompt,
+        phaseName: `Deepen Synthesis: ${deepenContext.label}`,
+      });
+
+      // ── Completion ──
+      const completedState = await getRebuildState(project.slug);
+      const buildDurationSeconds = Math.round((Date.now() - buildStartTime) / 1000);
+      const { attentionCount, finishedWithAttention, message, status } = await createAgentJobCompletionMessage(jobName)({ project, result: synthesisResult });
+      await setRebuildState(project.slug, {
+        ...completedState,
+        running: false,
+        status,
+        finishedAt: new Date().toISOString(),
+        message,
+        buildPhase: "complete",
+        buildPhaseDetail: null,
+      });
+      await appendRunEvent(project.slug, {
+        type: synthesisResult.status === "finished" ? "run_status" : "error",
+        title: synthesisResult.status === "finished" ? `${jobName} finished (${buildDurationSeconds}s)` : `${jobName} stopped before finishing`,
+        text: message,
+        status,
+        runtime: "cursor",
+        metadata: {
+          resultStatus: synthesisResult.status,
+          attentionCount,
+          fetchResults,
+          buildDurationSeconds,
+          modelId,
+          topicId: deepenContext.id,
+        },
+      });
+    } catch (error) {
+      await finishAssistantMessage(project.slug);
+      const message = error instanceof Error ? error.message : `Unknown deepen failure.`;
+
+      const current = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...current,
+        running: false,
+        status: "error",
+        finishedAt: new Date().toISOString(),
+        message,
+      });
+      await appendRunEvent(project.slug, {
+        type: "error",
+        title: `${jobName} failed`,
+        text: message,
+        status: "error",
+        runtime: "cursor",
+      });
+    } finally {
+      activeRebuilds.delete(project.slug);
+      releaseProjectAgent();
+    }
+  }
+
+  return { startDeepen, startHumanAttentionResolution, startRebuild };
 }

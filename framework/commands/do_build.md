@@ -64,7 +64,11 @@ Two marker types exist in AI-managed markdown files:
 4. Read `.build/questions.json` if it exists. Check for questions with `status: "answered"` that have not yet been applied. Collect these for processing in Phase 10. Treat open questions as context for the current build. If this file does not exist, there are no prior questions.
 5. Read `outputs_ai/wiki/_index.md` if it exists. This is a lightweight table of contents for the wiki — it lists every wiki page with its BLUF summary, source references, and last-updated date. Use it to understand the current state of the wiki without reading every page. If this file does not exist, this is a first build.
 6. Read `.build/scratchpad.md` if it exists. This is your working memory from the previous build — it contains key data points, cross-references, contradictions found, and open threads. Use it as context for the current build.
-7. Read `.build/topic_graph.json` if it exists. This maps which topics depend on or reference other topics, and which sources support each topic. Use it to understand the project's knowledge structure and to determine which downstream outputs need updating when a source or topic changes.
+7. Read `.build/topics.json` if it exists. This is the living topic taxonomy. Each topic has a `state` (seed/shallow/deep/saturated/split_candidate/deprecated), a `disposition` (null/parked/settled), sources, dependencies, and justification. Use it to understand the project's knowledge structure and determine which downstream outputs need updating.
+   - **Do not modify topics the user has `parked` or `settled`** — these are user-owned disposition decisions. Still update their `metrics` and `sources` if new evidence was found, but do not expand scope or change state.
+   - **Do not re-add topics the user has `deprecated`** — these are intentional removals.
+   - **If you discover new topics** from sources or evidence that don't exist in `topics.json`, add them with `state: "seed"`, `confidence: "low"`, and `origin: "agent_discovered"` so the user can review them.
+   - If `.build/topics.json` does not exist but `.build/topic_graph.json` does, ignore the legacy file — the build pipeline handles migration automatically.
 
 ### Phase 2: Scan Annotations
 
@@ -232,24 +236,63 @@ Each suggestion should be:
     - Open threads or areas needing deeper research.
     - This file is not user-facing. It is the agent's persistent working memory between builds. Keep it concise (~500 words max). Overwrite the previous scratchpad — do not append.
 
-39. Create or update `.build/topic_graph.json` with the project's knowledge structure:
+39. Create or update `.build/topics.json` with the project's knowledge structure using the v2 schema:
 
 ```json
 {
+  "version": 2,
+  "last_updated": "ISO timestamp",
   "topics": [
     {
       "id": "topic_slug",
       "label": "Human-readable topic name",
+      "state": "seed|shallow|deep|saturated|split_candidate|deprecated",
+      "confidence": "high|low",
+      "depth": 0,
+      "parent": null,
+      "children": [],
+      "cluster": null,
       "wiki_page": "outputs_ai/wiki/topic_slug.md",
-      "sources": ["sources/web_research/source1.md", "sources/digests/source1.md"],
+      "sources": [{"path": "sources/web_research/source1.md", "relevance": 0.9, "added_at": "ISO"}],
       "depends_on": ["other_topic_slug"],
-      "outputs": ["outputs_ai/reports/report_name.md"]
+      "outputs": ["outputs_ai/reports/report_name.md"],
+      "justification": {
+        "goal_support": "Why this topic supports the project goals",
+        "graph_support": "How this connects to other topics",
+        "questions_addressed": [],
+        "suggestions_addressed": []
+      },
+      "discovery": {
+        "origin": "agent_discovered|user_suggestion|legacy_migration",
+        "discovered_at": "ISO",
+        "discovered_from": "research_plan|evidence|user",
+        "reason": "Why this topic was added",
+        "last_deepened": null,
+        "deepening_count": 0
+      },
+      "deprecation": null,
+      "metrics": {
+        "source_count": 3,
+        "cross_references": 2,
+        "word_count": 4500,
+        "last_updated": "ISO"
+      },
+      "coverage_gaps": ["missing primary data on X"],
+      "disposition": null,
+      "disposition_at": null,
+      "disposition_note": null
     }
-  ]
+  ],
+  "clusters": []
 }
 ```
 
-This graph maps which topics depend on other topics, which sources support each topic, and which directed outputs consume each topic. On subsequent builds, update incrementally — add new topics, remove deleted ones, update source references. The build pipeline will use this graph in the future to propagate scope changes.
+Behavioral rules for updating topics:
+- **Existing non-deprecated, non-seed topics:** Update `sources`, `outputs`, `metrics`, `coverage_gaps`. Auto-advance `state` from `shallow` → `deep` if evidence is now substantial (3+ sources with specific data points, wiki page has 1000+ words of sourced content). Advance `deep` → `saturated` if all coverage gaps are addressed and the topic has 5+ sources.
+- **Newly discovered topics:** Add as `state: "seed"`, `confidence: "low"`, `origin: "agent_discovered"`, with `justification.goal_support` explaining why this topic is relevant to the project.
+- **Deprecated topics:** Preserve as-is. Do not re-add, reactivate, or modify.
+- **Parked/settled topics:** Preserve `disposition`, `disposition_at`, `disposition_note`. Update `metrics` and `sources` if new evidence was found, but do not change `state` or expand scope.
+- **Do not delete `.build/topic_graph.json`** — the build pipeline handles legacy cleanup automatically.
 
 40. Create or update `.build/manifest.json` with:
     ```json

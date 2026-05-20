@@ -268,7 +268,7 @@ const { assistQuestion } = createQuestionAiAssistService({
   runCursorAgentText,
 });
 
-const { startHumanAttentionResolution, startRebuild } = createAgentJobService({
+const { startDeepen, startHumanAttentionResolution, startRebuild } = createAgentJobService({
   FRAMEWORK_ROOT,
   activeRebuilds,
   appendAssistantDelta,
@@ -361,6 +361,7 @@ registerApiRoutes(app, {
   editChatMessage,
   generateEditProposal,
   sendChatMessage,
+  startDeepen,
   startHumanAttentionResolution,
   startRebuild,
   subscribeToConversation,
