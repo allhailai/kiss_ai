@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { projectPathPrefixes } from "../domain/projectPaths";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { resolveChatFileEditApplication } from "./chatFileEdits";
 import { buildThemeStyle } from "./theme";
 import { useProjectWorkspace } from "./useProjectWorkspace";
-import { RightPanelSurface } from "./RightPanelSurface";
 import { RightPanelToggle } from "./RightPanelToggle";
 import { panelForKind, useRightPanelSurface, type RightPanelKind } from "./hooks/useRightPanelSurface";
 import { useRightPanelWidth } from "./hooks/useRightPanelWidth";
@@ -11,62 +9,30 @@ import { useLeftNavWidth } from "./hooks/useLeftNavWidth";
 import { useAgentChatPanel } from "./hooks/useAgentChatPanel";
 import { useKeybindings } from "./hooks/useKeybindings";
 import { useProjectChat } from "./hooks/useProjectChat";
-import { api } from "../data/apiClient";
-import { errorMessage } from "../domain/errors";
 import { type View } from "../navigation/views";
-import { ProjectChatConversationHistory } from "../features/chat/ProjectChatConversationHistory";
-import { Dashboard } from "../features/dashboard/Dashboard";
-import { DesignWorkspace } from "../features/design/DesignWorkspace";
-import { FileWorkspace } from "../features/files/FileWorkspace";
-import { SimplifiedNavigator } from "../features/navigation/WorkflowMenus";
 import { ProjectPicker } from "../features/projectPicker/ProjectPicker";
-import { BuildProjectRightPanel } from "../features/rebuild/BuildProjectRightPanel";
-import { QuestionsWorkspace } from "../features/questions/QuestionsWorkspace";
-import { SuggestionsWorkspace } from "../features/suggestions/SuggestionsWorkspace";
-import { TopicsWorkspace } from "../features/topics/TopicsWorkspace";
-
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
-import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
-import { RightPanelModeSwitch } from "../shared/rightPanel/RightPanelModeSwitch";
 import { makeEditableTargetForFile, useAgentFileContext } from "./hooks/useAgentFileContext";
 import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
-import type { ChatMessageFileEdit, KissAiUpdateCheckResponse, SystemSettingsResponse } from "../contracts/api";
+import type { ChatMessageFileEdit } from "../contracts/api";
+import { BuildProvider, type BuildContextValue } from "./contexts/BuildContext";
+import { UpdateCheckerModal } from "./UpdateCheckerModal";
+import { SettingsModal } from "./SettingsModal";
+import { MainContentArea } from "./MainContentArea";
+import { RightPanelOrchestrator } from "./RightPanelOrchestrator";
+import { AppSidebar } from "./AppSidebar";
 
 const aiFileAssistPrompt =
   "Review the saved annotations in this file. Interpret the Git diff as user guidance, then propose edits that integrate those annotations cleanly throughout the document while preserving the document's intent, structure, and voice.";
-
-const fileWorkspaceByView: Partial<Record<View, { title?: string; explainer?: string }>> = {
-  requirements: {
-    title: "Project Definition",
-  },
-  inputs: {
-    explainer: "Sources are AI-managed. Use annotations to guide the AI.",
-  },
-  outputs: {
-    explainer: "Outputs are AI-managed. Use annotations to guide the AI.",
-  },
-};
 
 export function App() {
   const workspace = useProjectWorkspace();
   const { designWorkspace, fileWorkspace, project, rebuildWorkspace, route, toastWorkspace } = workspace;
   const rightPanelSurface = useRightPanelSurface();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const sidebarResizingRef = useRef(false);
   const leftNavWidth = useLeftNavWidth({ projectSlug: project.selectedProjectSlug ?? "", collapsed: sidebarCollapsed });
   const [agentDraftSeed, setAgentDraftSeed] = useState<{ id: string; draft: string } | null>(null);
-  const [updateModalOpen, setUpdateModalOpen] = useState(false);
-  const [updateCheck, setUpdateCheck] = useState<KissAiUpdateCheckResponse | null>(null);
-  const [updateCheckLoading, setUpdateCheckLoading] = useState(false);
-  const [updateDownloadLoading, setUpdateDownloadLoading] = useState(false);
-  const [updateError, setUpdateError] = useState("");
-  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
-  const [settings, setSettings] = useState<SystemSettingsResponse | null>(null);
-  const [settingsLoading, setSettingsLoading] = useState(false);
-  const [settingsSaving, setSettingsSaving] = useState(false);
-  const [settingsError, setSettingsError] = useState("");
-  const [settingsMessage, setSettingsMessage] = useState("");
   const themeStyle = useMemo(() => buildThemeStyle(designWorkspace.design), [designWorkspace.design]);
   const rightPanelWidth = useRightPanelWidth({
     panelKind: rightPanelSurface.rightPanel?.kind ?? null,
@@ -134,7 +100,6 @@ export function App() {
       openAgentChatPanel();
       return;
     }
-
     openBuildProjectPanel();
   };
   const closeRightPanel = () => {
@@ -142,68 +107,7 @@ export function App() {
       closeAgentPanel();
       return;
     }
-
     rightPanelSurface.closePanel();
-  };
-  const checkLatestKissAi = async () => {
-    if (updateCheckLoading || updateDownloadLoading) return;
-
-    setUpdateModalOpen(true);
-    setUpdateCheck(null);
-    setUpdateError("");
-    setUpdateCheckLoading(true);
-    try {
-      setUpdateCheck(await api.checkKissAiUpdate());
-    } catch (error) {
-      setUpdateError(errorMessage(error, "Could not check for the latest KISS AI version."));
-    } finally {
-      setUpdateCheckLoading(false);
-    }
-  };
-  const downloadLatestKissAi = async () => {
-    if (updateDownloadLoading) return;
-
-    setUpdateError("");
-    setUpdateDownloadLoading(true);
-    try {
-      await api.updateKissAi();
-      window.location.reload();
-    } catch (error) {
-      setUpdateError(errorMessage(error, "Could not download the latest KISS AI version."));
-      setUpdateDownloadLoading(false);
-    }
-  };
-  const openSettingsModal = async () => {
-    if (settingsLoading || settingsSaving) return;
-
-    setSettingsModalOpen(true);
-    setSettings(null);
-    setSettingsError("");
-    setSettingsMessage("");
-    setSettingsLoading(true);
-    try {
-      setSettings(await api.systemSettings());
-    } catch (error) {
-      setSettingsError(errorMessage(error, "Could not load settings."));
-    } finally {
-      setSettingsLoading(false);
-    }
-  };
-  const saveCursorApiKey = async (cursorApiKey: string) => {
-    if (settingsSaving) return;
-
-    setSettingsError("");
-    setSettingsMessage("");
-    setSettingsSaving(true);
-    try {
-      const result = await api.saveCursorApiKey({ cursorApiKey });
-      setSettingsMessage(result.message);
-      setSettings(await api.systemSettings());
-    } catch {
-      setSettingsError("Failed! Please try again. If this issue persists, contact AllHail.AI");
-    } finally {
-      setSettingsSaving(false);
-    }
   };
 
   useEffect(() => {
@@ -211,6 +115,16 @@ export function App() {
       void rebuildWorkspace.refreshRebuild();
     }
   }, [rebuildWorkspace.refreshRebuild, rightPanelSurface.rightPanel?.kind]);
+
+  // Auto-open build panel when navigating from a legacy /rebuild URL
+  useEffect(() => {
+    if (route.context.panel === "build-project" && !rightPanelSurface.rightPanel) {
+      openBuildProjectPanel();
+      // Clear the context so it doesn't re-trigger on re-render
+      navigateTo(route.view, undefined, {});
+    }
+  }, [route.context.panel]);
+
   const applyChatFileEdit = async (edit: ChatMessageFileEdit) => {
     const decision = await resolveChatFileEditApplication({ draft: fileWorkspace.draft, edit, selected: fileWorkspace.selected });
 
@@ -244,6 +158,22 @@ export function App() {
     setAgentDraftSeed({ id: `${savedFile.path}:${Date.now()}`, draft: aiFileAssistPrompt });
     toastWorkspace.setNotice(`Prepared AI File Assist for ${savedFile.path}.`);
   };
+  const buildContextValue: BuildContextValue = useMemo(
+    () => ({
+      isBuilding: rebuildWorkspace.rebuild?.running ?? false,
+      rebuild: rebuildWorkspace.rebuild,
+      buildPhase: null,
+      startRebuild: startRebuildWithRequirementsCheck,
+      openBuildPanel: openBuildProjectPanel,
+      refreshRebuild: rebuildWorkspace.refreshRebuild,
+      refreshStatus: rebuildWorkspace.refreshStatus,
+      models: rebuildWorkspace.models,
+      selectedModelId: rebuildWorkspace.selectedModelId,
+      setSelectedModelId: rebuildWorkspace.setSelectedModelId,
+      status: rebuildWorkspace.status,
+    }),
+    [rebuildWorkspace, openBuildProjectPanel, startRebuildWithRequirementsCheck],
+  );
 
   if (!project.selectedProjectSlug || !project.selectedProject) {
     return (
@@ -253,257 +183,88 @@ export function App() {
           creatingProject={project.creatingProject}
           error={project.projectsError}
           onCreateProject={project.createProject}
-          onCheckLatest={() => void checkLatestKissAi()}
-          onCloseUpdateModal={() => setUpdateModalOpen(false)}
-          onDownloadLatest={() => void downloadLatestKissAi()}
-          onOpenSettings={() => void openSettingsModal()}
-          onCloseSettings={() => setSettingsModalOpen(false)}
-          onSaveCursorApiKey={saveCursorApiKey}
           onSelect={project.selectProject}
           projects={project.projects}
           projectsRoot={project.projectsRoot}
-          settings={settings}
-          settingsError={settingsError}
-          settingsLoading={settingsLoading}
-          settingsMessage={settingsMessage}
-          settingsModalOpen={settingsModalOpen}
-          settingsSaving={settingsSaving}
-          updateCheck={updateCheck}
-          updateCheckLoading={updateCheckLoading}
-          updateDownloadLoading={updateDownloadLoading}
-          updateError={updateError}
-          updateModalOpen={updateModalOpen}
+          settingsSlot={<SettingsModal />}
+          updateCheckerSlot={<UpdateCheckerModal />}
         />
       </main>
     );
   }
 
-  const fileWorkspaceConfig = fileWorkspaceByView[route.view];
   const appShellClassName = `${sidebarCollapsed ? "app-shell sidebar-collapsed" : "app-shell"}${
     rightPanelSurface.rightPanel ? ` right-panel-open right-panel-${rightPanelSurface.rightPanel.kind}` : ""
   }`;
+
   return (
-    <main className={appShellClassName} style={appStyle}>
-      <GlobalFileSearch
-        projectName={rebuildWorkspace.status?.projectName ?? project.selectedProject.name}
-        projectSlug={project.selectedProjectSlug}
-        onOpenFile={openProjectFileWithAgentContext}
-        onOpenDashboard={() => navigateTo("dashboard")}
-        onOpenProjectHome={() => navigateTo("dashboard")}
-        onSwitchProject={project.clearSelectedProject}
-      />
-      <RightPanelToggle active={isAgentPanelOpen} label="AI" onToggle={toggleAgentPanel} />
-      <ToastViewport toasts={toastWorkspace.toasts} onDismiss={toastWorkspace.dismissToast} />
-
-      <button
-        aria-label="Open navigation"
-        className="sidebar-open-button"
-        onClick={() => setSidebarCollapsed(false)}
-        type="button"
-      >
-        Nav
-      </button>
-
-      <aside className="sidebar" aria-label="Project navigation">
-        {leftNavWidth.isResizable ? (
-          <div
-            aria-label="Resize navigation"
-            aria-orientation="vertical"
-            aria-valuemax={Math.round(leftNavWidth.maxWidthPx)}
-            aria-valuemin={Math.round(leftNavWidth.minWidthPx)}
-            aria-valuenow={Math.round(leftNavWidth.widthPx)}
-            className="sidebar-resize-handle"
-            onKeyDown={(event: ReactKeyboardEvent<HTMLDivElement>) => {
-              if (event.key === "ArrowRight") {
-                event.preventDefault();
-                leftNavWidth.resizeByKeyboard("wider");
-              } else if (event.key === "ArrowLeft") {
-                event.preventDefault();
-                leftNavWidth.resizeByKeyboard("narrower");
-              }
-            }}
-            onPointerCancel={(event: ReactPointerEvent<HTMLDivElement>) => {
-              if (!sidebarResizingRef.current) return;
-              sidebarResizingRef.current = false;
-              event.currentTarget.releasePointerCapture(event.pointerId);
-              leftNavWidth.commitWidth();
-            }}
-            onPointerDown={(event: ReactPointerEvent<HTMLDivElement>) => {
-              event.preventDefault();
-              sidebarResizingRef.current = true;
-              event.currentTarget.setPointerCapture(event.pointerId);
-              leftNavWidth.resizeFromClientX(event.clientX);
-            }}
-            onPointerMove={(event: ReactPointerEvent<HTMLDivElement>) => {
-              if (!sidebarResizingRef.current) return;
-              leftNavWidth.resizeFromClientX(event.clientX);
-            }}
-            onPointerUp={(event: ReactPointerEvent<HTMLDivElement>) => {
-              if (!sidebarResizingRef.current) return;
-              sidebarResizingRef.current = false;
-              event.currentTarget.releasePointerCapture(event.pointerId);
-              leftNavWidth.commitWidth();
-            }}
-            role="separator"
-            tabIndex={0}
-            title="Drag to resize navigation"
-          />
-        ) : null}
-        <button
-          aria-label="Close navigation"
-          className="sidebar-close-button"
-          onClick={() => setSidebarCollapsed(true)}
-          title="Close navigation"
-          type="button"
-        >
-          x
-        </button>
-        <SimplifiedNavigator
-          currentView={route.view}
-          humanInputEmptyDirectories={fileWorkspace.humanInputEmptyDirectories}
-          openQuestionsCount={rebuildWorkspace.status?.openQuestionsCount}
-          blockingQuestionsCount={rebuildWorkspace.status?.blockingQuestionsCount}
-          pendingSuggestionsCount={rebuildWorkspace.status?.pendingSuggestionsCount}
-          seedTopicsCount={rebuildWorkspace.status?.seedTopicsCount}
-          loading={fileWorkspace.treeLoading}
-          projectFiles={fileWorkspace.projectFiles}
-          selectedPath={fileWorkspace.selected?.path ?? null}
-          onCreateFolder={(name) => void fileWorkspace.createHumanInputFolder(name)}
-          onCreateTextFile={(name, folder) => void fileWorkspace.createHumanInputTextFile(name, folder)}
-          onDeleteFolder={(folder) => void fileWorkspace.deleteHumanInputFolder(folder)}
-          onDeleteHumanInputFile={(path) => void fileWorkspace.deleteHumanInputFile(path)}
-          onMoveFile={(sourcePath, targetFolder) => void fileWorkspace.moveHumanInputFile(sourcePath, targetFolder)}
-          onUploadFiles={fileWorkspace.uploadHumanInputFiles}
-          onOpenFile={openProjectFileWithAgentContext}
-          onOpenView={(nextView, filePath) => navigateTo(nextView, filePath)}
-        />
-      </aside>
-
-      <section className="workspace">
-        {route.view === "dashboard" ? (
-          <Dashboard
-            status={rebuildWorkspace.status}
-            design={designWorkspace.design}
-            rebuild={rebuildWorkspace.rebuild}
-            buildLog={rebuildWorkspace.buildLog}
-            onOpenDesign={() => navigateTo("design")}
-            onSelectLog={(tabId, path, sectionId) => void rebuildWorkspace.refreshBuildLog(tabId, path, sectionId)}
-          />
-        ) : null}
-        {route.view === "chat" ? (
-          <div className="chat-history-workspace">
-            <ProjectChatConversationHistory chat={projectChat} onSelectConversation={selectProjectChatConversation} />
-          </div>
-        ) : null}
-        {fileWorkspaceConfig ? (
-          <FileWorkspace
-            title={fileWorkspaceConfig.title}
-            explainer={fileWorkspaceConfig.explainer}
-            selected={fileWorkspace.selected}
-            selectedDiff={fileWorkspace.selectedDiff}
-            draft={fileWorkspace.draft}
-            hasUnsavedChanges={fileWorkspace.hasUnsavedChanges}
-            aiFileAssistDisabled={fileWorkspace.loading || projectChat.loading || projectChat.sending || projectChat.proposalUpdating}
-            projectFiles={fileWorkspace.projectFiles}
-            onDraft={fileWorkspace.setDraft}
-            onAiFileAssist={() => void assistCurrentFile()}
-            onNotice={toastWorkspace.setNotice}
-
+    <BuildProvider value={buildContextValue}>
+        <main className={appShellClassName} style={appStyle}>
+          <GlobalFileSearch
+            projectName={rebuildWorkspace.status?.projectName ?? project.selectedProject.name}
+            projectSlug={project.selectedProjectSlug}
             onOpenFile={openProjectFileWithAgentContext}
-            onRevert={() => void fileWorkspace.revertSelected()}
-            onSave={() => void fileWorkspace.saveSelected()}
+            onOpenDashboard={() => navigateTo("dashboard")}
+            onOpenProjectHome={() => navigateTo("dashboard")}
+            onSwitchProject={project.clearSelectedProject}
+          />
+          <RightPanelToggle active={isAgentPanelOpen} label="AI" onToggle={toggleAgentPanel} />
+          <ToastViewport toasts={toastWorkspace.toasts} onDismiss={toastWorkspace.dismissToast} />
+
+          <AppSidebar
+            collapsed={sidebarCollapsed}
+            fileWorkspace={fileWorkspace}
+            leftNavWidth={leftNavWidth}
+            onCollapse={() => setSidebarCollapsed(true)}
+            onExpand={() => setSidebarCollapsed(false)}
+            onOpenFile={openProjectFileWithAgentContext}
+            onOpenView={(nextView, filePath) => navigateTo(nextView, filePath)}
+            rebuildWorkspace={rebuildWorkspace}
+            route={route}
+          />
+
+          <MainContentArea
+            designWorkspace={designWorkspace}
+            fileWorkspace={fileWorkspace}
+            navigateTo={navigateTo}
+            onAiFileAssist={() => void assistCurrentFile()}
+            onOpenFile={openProjectFileWithAgentContext}
+            projectChat={projectChat}
             projectSlug={project.selectedProjectSlug}
+            rebuildWorkspace={rebuildWorkspace}
+            route={route}
+            selectProjectChatConversation={selectProjectChatConversation}
+            toastWorkspace={toastWorkspace}
           />
-        ) : null}
-        {route.view === "design" ? (
-          <DesignWorkspace
-            design={designWorkspace.design}
-            selected={fileWorkspace.selected}
-            selectedDiff={fileWorkspace.selectedDiff}
-            draft={fileWorkspace.draft}
-            hasUnsavedChanges={fileWorkspace.hasUnsavedChanges}
-            loading={fileWorkspace.loading}
-            onDraft={fileWorkspace.setDraft}
-            onRevert={() => void fileWorkspace.revertSelected()}
-            onSave={() => void fileWorkspace.saveSelected()}
-          />
-        ) : null}
-        {route.view === "questions" ? (
-          <QuestionsWorkspace
-            models={rebuildWorkspace.models}
-            onModelChange={rebuildWorkspace.setSelectedModelId}
-            onNavigateToFile={openProjectFileWithAgentContext}
-            projectSlug={project.selectedProjectSlug}
-            selectedModelId={rebuildWorkspace.selectedModelId}
-          />
-        ) : null}
-        {route.view === "suggestions" ? (
-          <SuggestionsWorkspace
-            onNavigateToFile={openProjectFileWithAgentContext}
-            projectSlug={project.selectedProjectSlug}
-          />
-        ) : null}
-        {route.view === "topics" ? (
-          <TopicsWorkspace
-            isBuilding={rebuildWorkspace.rebuild?.running ?? false}
-            onNavigateToFile={openProjectFileWithAgentContext}
-            onOpenBuildPanel={openBuildProjectPanel}
-            projectSlug={project.selectedProjectSlug}
-          />
-        ) : null}
-      </section>
-      {rightPanelSurface.rightPanel ? (
-        <RightPanelSurface
-          onClose={closeRightPanel}
-          panel={rightPanelSurface.rightPanel}
-          resize={
-            rightPanelWidth.isResizable
-              ? {
-                  maxWidthPx: rightPanelWidth.maxWidthPx,
-                  minWidthPx: rightPanelWidth.minWidthPx,
-                  onCommit: () => rightPanelWidth.commitWidth(),
-                  onKeyboardResize: rightPanelWidth.resizeByKeyboard,
-                  onResize: rightPanelWidth.resizeFromClientX,
-                  widthPx: rightPanelWidth.widthPx,
-                }
-              : undefined
-          }
-        >
-          {rightPanelSurface.rightPanel.kind === "build-project" ? (
-            <BuildProjectRightPanel
-              models={rebuildWorkspace.models}
-              onModelChange={rebuildWorkspace.setSelectedModelId}
-              onOpenQuestions={() => navigateTo("questions")}
-              onSelectPanel={selectRightPanelKind}
-              onStart={startRebuildWithRequirementsCheck}
-              rebuild={rebuildWorkspace.rebuild}
-              selectedModelId={rebuildWorkspace.selectedModelId}
-              status={rebuildWorkspace.status}
+
+          {rightPanelSurface.rightPanel ? (
+            <RightPanelOrchestrator
+              agentFileContext={agentFileContext}
+              applyChatFileEdit={applyChatFileEdit}
+              closeRightPanel={closeRightPanel}
+              draftSeed={agentDraftSeed}
+              fileWorkspaceProjectFiles={fileWorkspace.projectFiles}
+              navigateTo={navigateTo}
+              projectChat={projectChat}
+              rebuildWorkspace={rebuildWorkspace}
+              resize={
+                rightPanelWidth.isResizable
+                  ? {
+                      maxWidthPx: rightPanelWidth.maxWidthPx,
+                      minWidthPx: rightPanelWidth.minWidthPx,
+                      onCommit: () => rightPanelWidth.commitWidth(),
+                      onKeyboardResize: rightPanelWidth.resizeByKeyboard,
+                      onResize: rightPanelWidth.resizeFromClientX,
+                      widthPx: rightPanelWidth.widthPx,
+                    }
+                  : undefined
+              }
+              rightPanel={rightPanelSurface.rightPanel}
+              selectRightPanelKind={selectRightPanelKind}
+              startRebuild={startRebuildWithRequirementsCheck}
             />
-          ) : (
-            <div className="right-panel-mode-layout">
-              <RightPanelModeSwitch activeKind="agent-chat" onSelect={selectRightPanelKind} />
-              <RightPanelAgentChat
-                aiEditableFiles={agentFileContext.aiEditableFiles}
-                chat={projectChat}
-                contextFiles={agentFileContext.contextFiles}
-                currentFile={agentFileContext.currentFile}
-                draftSeed={agentDraftSeed}
-                highlightedContext={agentFileContext.highlightedContext}
-                models={rebuildWorkspace.models}
-                onAddContextFile={agentFileContext.addContextFile}
-                onApplyFileEdit={applyChatFileEdit}
-                onContextFilesChange={projectChat.setContextFiles}
-                onModelChange={rebuildWorkspace.setSelectedModelId}
-                onModifyCurrentFile={() => agentFileContext.currentFile && agentFileContext.addEditableFile(agentFileContext.currentFile.path)}
-                onRemoveAiEditableFile={agentFileContext.removeAiEditableFile}
-                projectFiles={fileWorkspace.projectFiles}
-                selectedModelId={rebuildWorkspace.selectedModelId}
-              />
-            </div>
-          )}
-        </RightPanelSurface>
-      ) : null}
-    </main>
+          ) : null}
+        </main>
+    </BuildProvider>
   );
 }

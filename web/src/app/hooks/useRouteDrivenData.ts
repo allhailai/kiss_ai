@@ -8,7 +8,6 @@ export function useRouteDrivenData({
   loadTree,
   refreshBuildLog,
   refreshDesign,
-  refreshRebuild,
   selectFile,
   selectedProjectSlug,
   setNotice,
@@ -19,7 +18,6 @@ export function useRouteDrivenData({
   loadTree: (section: string) => Promise<void>;
   refreshBuildLog: () => Promise<void>;
   refreshDesign: () => Promise<void>;
-  refreshRebuild: () => Promise<unknown>;
   selectFile: (path: string) => Promise<void>;
   selectedProjectSlug: string | null;
   setNotice: (message: string) => void;
@@ -75,7 +73,6 @@ export function useRouteDrivenData({
       loadTree,
       refreshBuildLog,
       refreshDesign,
-      refreshRebuild,
       selectFile,
       selectedProjectSlug,
       setNotice,

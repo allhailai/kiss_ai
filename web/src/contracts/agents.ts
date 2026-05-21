@@ -23,12 +23,3 @@ export type AgentContextFileSelection = {
 
 export type AgentEditableTargetFile = AgentContextFile;
 export type AgentContextSourceFile = AgentContextFileSelection;
-
-export type AgentMessageContext = {
-  /** Read-only context for the file currently open in the editor. */
-  currentFile?: AgentContextFile;
-  /** Files explicitly permitted as editable targets for proposal/apply-to-draft flows. */
-  ai_editable_files?: AgentEditableTargetFile[];
-  /** Files explicitly selected as read-only source context. */
-  context_files?: AgentContextSourceFile[];
-};

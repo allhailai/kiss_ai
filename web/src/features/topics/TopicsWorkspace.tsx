@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Topic, TopicCluster, TopicDisposition, TopicState } from "../../contracts/api";
+import type { Topic, TopicDisposition, TopicState } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
+import { useBuildContext } from "../../app/contexts/BuildContext";
 import "./TopicsWorkspace.css";
 
 type TopicsFilter = "all" | "seeds" | "active" | "queued" | "deepened" | "parked" | "settled" | "deprecated";
@@ -308,18 +309,14 @@ function TopicCard({
 }
 
 export function TopicsWorkspace({
-  isBuilding,
   onNavigateToFile,
-  onOpenBuildPanel,
   projectSlug,
 }: {
-  isBuilding: boolean;
   onNavigateToFile: (path: string) => void;
-  onOpenBuildPanel: () => void;
   projectSlug: string;
 }) {
+  const { isBuilding, openBuildPanel } = useBuildContext();
   const [topics, setTopics] = useState<Topic[]>([]);
-  const [clusters, setClusters] = useState<TopicCluster[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilterState] = useState<TopicsFilter>(parseFilterFromHash);
   const [error, setError] = useState<string | null>(null);
@@ -345,7 +342,6 @@ export function TopicsWorkspace({
       if (!response.ok) throw new Error("Failed to load topics");
       const data = await response.json();
       setTopics(data.topics ?? []);
-      setClusters(data.clusters ?? []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load topics");
@@ -444,12 +440,12 @@ export function TopicsWorkspace({
           const body = await response.json().catch(() => null);
           throw new Error(body?.message || "Failed to start batch deepen");
         }
-        onOpenBuildPanel();
+        openBuildPanel();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to start batch deepen");
       }
     },
-    [projectSlug, onOpenBuildPanel],
+    [projectSlug, openBuildPanel],
   );
 
   const seedCount = topics.filter((t) => t.state === "seed").length;

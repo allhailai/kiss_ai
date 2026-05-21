@@ -1,5 +1,4 @@
-import type { ProjectFile } from "../contracts/api";
-import { designIdentityFilePath, isDesignIdentityPath, projectPathPrefixes } from "../domain/projectPaths";
+import { isDesignIdentityPath, projectPathPrefixes } from "../domain/projectPaths";
 
 export type View = "chat" | "dashboard" | "requirements" | "inputs" | "outputs" | "design" | "questions" | "suggestions" | "topics";
 
@@ -15,15 +14,6 @@ const views: View[] = ["chat", "requirements", "inputs", "outputs", "design", "d
 export const viewIds = new Set<View>(views);
 export const fileBackedViews = new Set<View>(["requirements", "inputs", "outputs", "design"]);
 export const defaultRoute: RouteState = { projectSlug: null, view: "dashboard", filePath: null, context: {} };
-export const selectedProjectStorageKey = "kiss_ai.selectedProject";
-export const designProjectFile: ProjectFile = {
-  path: designIdentityFilePath,
-  name: designIdentityFilePath,
-  kind: "design",
-  editable: true,
-  annotation: false,
-  chatContextReadable: false,
-};
 
 export function viewForProjectPath(path: string): View | null {
   if (isDesignIdentityPath(path)) return "design";

@@ -18,6 +18,10 @@ export function parseRouteHash(hash: string): RouteState {
   const filePathParts = isProjectRoute ? remainingParts : [secondSegment, thirdSegment, ...remainingParts].filter(Boolean);
 
   if (!viewCandidate || !viewIds.has(viewCandidate as View)) {
+    // Legacy /rebuild route: redirect to dashboard with build panel context
+    if (viewCandidate === "rebuild") {
+      return { ...defaultRoute, projectSlug, context: { ...context, panel: "build-project" } };
+    }
     return { ...defaultRoute, projectSlug, context };
   }
 

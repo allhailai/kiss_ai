@@ -1,3 +1,5 @@
+import type { ProjectFile } from "../contracts/api";
+
 export const designIdentityFilePath = "human_design_identity.md";
 export const projectFilePath = "project.md";
 export const questionsFilePath = "questions.md";
@@ -25,3 +27,14 @@ export function isAiManagedPath(path: string) {
     path.startsWith(projectPathPrefixes.changeLogs)
   );
 }
+
+export const selectedProjectStorageKey = "kiss_ai.selectedProject";
+
+export const designProjectFile: ProjectFile = {
+  path: designIdentityFilePath,
+  name: designIdentityFilePath,
+  kind: "design",
+  editable: true,
+  annotation: false,
+  chatContextReadable: false,
+};

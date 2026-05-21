@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { type BuildLogState, type DesignState, type ProjectFile, type ProjectStatus, type RebuildState } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { uniqueFiles } from "../../domain/files";
-import { designProjectFile } from "../../navigation/views";
+import { designProjectFile } from "../../domain/projectPaths";
 
 export function useProjectDataLoaders({
   selectedProjectSlug,

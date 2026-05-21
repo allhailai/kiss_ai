@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import type { BuildLogState, DesignState, ProjectFile, ProjectStatus, ProjectSummary, RebuildState } from "../../contracts/api";
 import { errorMessage } from "../../domain/errors";
-import { designProjectFile, selectedProjectStorageKey } from "../../navigation/views";
+import { designProjectFile, selectedProjectStorageKey } from "../../domain/projectPaths";
 
 type UseSelectedProjectLifecycleOptions = {
   clearSelectedFile: () => void;

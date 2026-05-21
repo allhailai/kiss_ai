@@ -9,9 +9,9 @@ import {
   type RebuildState,
 } from "../contracts/api";
 import { buildRouteHash, parseRouteHash } from "../navigation/routes";
-import { designProjectFile, selectedProjectStorageKey, viewForProjectPath, type RouteState, type View } from "../navigation/views";
+import { designProjectFile, projectFilePath, selectedProjectStorageKey } from "../domain/projectPaths";
+import { viewForProjectPath, type RouteState, type View } from "../navigation/views";
 import { errorMessage } from "../domain/errors";
-import { projectFilePath } from "../domain/projectPaths";
 import { useProjectDataLoaders } from "./hooks/useProjectDataLoaders";
 import { useHumanInputs } from "./hooks/useHumanInputs";
 import { useRebuildSync } from "./hooks/useRebuildSync";
@@ -148,7 +148,6 @@ export function useProjectWorkspace() {
     loadTree,
     refreshBuildLog,
     refreshDesign,
-    refreshRebuild,
     selectFile,
     selectedProjectSlug,
     setNotice,
@@ -321,6 +320,7 @@ export function useProjectWorkspace() {
     selectedProjectSlug,
   } satisfies ProjectController;
   const route = {
+    context: routeContext,
     navigateTo,
     openProjectFile,
     view,

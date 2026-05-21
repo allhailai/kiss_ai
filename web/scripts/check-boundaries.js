@@ -53,8 +53,15 @@ const srcRules = [
   },
   {
     from: "features",
-    test: (specifier, filePath) => importsLayer(specifier, filePath, "app") || importsOtherFeature(specifier, filePath),
-    message: "feature modules must not import app-owned modules or other feature implementations",
+    test: (specifier, filePath) => {
+      if (importsOtherFeature(specifier, filePath)) return true;
+      if (!importsLayer(specifier, filePath, "app")) return false;
+      // Allow features to import from app/contexts (React Context consumers)
+      const resolved = resolvesUnderRoot(filePath, specifier, SRC_ROOT);
+      if (resolved && resolved[0] === "app" && resolved[1] === "contexts") return false;
+      return true;
+    },
+    message: "feature modules must not import app-owned modules (except app/contexts) or other feature implementations",
   },
   {
     from: "data",
