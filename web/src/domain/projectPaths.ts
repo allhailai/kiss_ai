@@ -2,7 +2,7 @@ import type { ProjectFile } from "../contracts/api";
 
 export const designIdentityFilePath = "human_design_identity.md";
 export const projectFilePath = "project.md";
-export const questionsFilePath = "questions.md";
+const questionsFilePath = "questions.md";
 
 export const projectPathPrefixes = {
   humanInput: "inputs_human/",

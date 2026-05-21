@@ -9,7 +9,7 @@ import { useLeftNavWidth } from "./hooks/useLeftNavWidth";
 import { useAgentChatPanel } from "./hooks/useAgentChatPanel";
 import { useKeybindings } from "./hooks/useKeybindings";
 import { useProjectChat } from "./hooks/useProjectChat";
-import { type View } from "../navigation/views";
+
 import { ProjectPicker } from "../features/projectPicker/ProjectPicker";
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
@@ -65,7 +65,7 @@ export function App() {
     onProposalApplied: refreshAfterAiFileAssistApply,
   });
 
-  const navigateTo = (view: View, filePath?: string | null, context?: Record<string, string>) => route.navigateTo(view, filePath, context);
+
   const { closeAgentPanel, isAgentPanelOpen, openAgentChatPanel, selectProjectChatConversation, toggleAgentPanel } = useAgentChatPanel({
     projectChat,
     projectSlug: project.selectedProjectSlug,
@@ -121,7 +121,7 @@ export function App() {
     if (route.context.panel === "build-project" && !rightPanelSurface.rightPanel) {
       openBuildProjectPanel();
       // Clear the context so it doesn't re-trigger on re-render
-      navigateTo(route.view, undefined, {});
+      route.navigateTo(route.view, undefined, {});
     }
   }, [route.context.panel]);
 
@@ -204,8 +204,8 @@ export function App() {
             projectName={rebuildWorkspace.status?.projectName ?? project.selectedProject.name}
             projectSlug={project.selectedProjectSlug}
             onOpenFile={openProjectFileWithAgentContext}
-            onOpenDashboard={() => navigateTo("dashboard")}
-            onOpenProjectHome={() => navigateTo("dashboard")}
+            onOpenDashboard={() => route.navigateTo("dashboard")}
+            onOpenProjectHome={() => route.navigateTo("dashboard")}
             onSwitchProject={project.clearSelectedProject}
           />
           <RightPanelToggle active={isAgentPanelOpen} label="AI" onToggle={toggleAgentPanel} />
@@ -218,7 +218,7 @@ export function App() {
             onCollapse={() => setSidebarCollapsed(true)}
             onExpand={() => setSidebarCollapsed(false)}
             onOpenFile={openProjectFileWithAgentContext}
-            onOpenView={(nextView, filePath) => navigateTo(nextView, filePath)}
+            onOpenView={(nextView, filePath) => route.navigateTo(nextView, filePath)}
             rebuildWorkspace={rebuildWorkspace}
             route={route}
           />
@@ -226,7 +226,7 @@ export function App() {
           <MainContentArea
             designWorkspace={designWorkspace}
             fileWorkspace={fileWorkspace}
-            navigateTo={navigateTo}
+            navigateTo={route.navigateTo}
             onAiFileAssist={() => void assistCurrentFile()}
             onOpenFile={openProjectFileWithAgentContext}
             projectChat={projectChat}
@@ -244,7 +244,7 @@ export function App() {
               closeRightPanel={closeRightPanel}
               draftSeed={agentDraftSeed}
               fileWorkspaceProjectFiles={fileWorkspace.projectFiles}
-              navigateTo={navigateTo}
+              navigateTo={route.navigateTo}
               projectChat={projectChat}
               rebuildWorkspace={rebuildWorkspace}
               resize={

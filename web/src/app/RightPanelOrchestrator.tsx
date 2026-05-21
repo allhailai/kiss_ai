@@ -2,20 +2,13 @@ import type { AgentContextFile, ChatContextFile, ChatMessageFileEdit, ProjectFil
 import type { ProjectChatController } from "./hooks/useProjectChat";
 import type { RightPanelKind, RightPanelState } from "./hooks/useRightPanelSurface";
 import type { View } from "../navigation/views";
-import { RightPanelSurface } from "./RightPanelSurface";
+import { RightPanelSurface, type RightPanelResizeControls } from "./RightPanelSurface";
 import { BuildProjectRightPanel } from "../features/rebuild/BuildProjectRightPanel";
 import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
 import { RightPanelModeSwitch } from "../shared/rightPanel/RightPanelModeSwitch";
 import type { ProjectStatus } from "../contracts/api";
 
-export type RightPanelResizeConfig = {
-  maxWidthPx: number;
-  minWidthPx: number;
-  onCommit: () => void;
-  onKeyboardResize: (direction: "wider" | "narrower") => void;
-  onResize: (clientX: number) => void;
-  widthPx: number;
-} | undefined;
+
 
 export function RightPanelOrchestrator({
   agentFileContext,
@@ -53,7 +46,7 @@ export function RightPanelOrchestrator({
     setSelectedModelId: (modelId: string) => void;
     status: ProjectStatus | null;
   };
-  resize: RightPanelResizeConfig;
+  resize?: RightPanelResizeControls;
   rightPanel: NonNullable<RightPanelState>;
   selectRightPanelKind: (kind: RightPanelKind) => void;
   startRebuild: () => void;
@@ -62,14 +55,7 @@ export function RightPanelOrchestrator({
     <RightPanelSurface
       onClose={closeRightPanel}
       panel={rightPanel}
-      resize={resize ? {
-        maxWidthPx: resize.maxWidthPx,
-        minWidthPx: resize.minWidthPx,
-        onCommit: resize.onCommit,
-        onKeyboardResize: resize.onKeyboardResize,
-        onResize: resize.onResize,
-        widthPx: resize.widthPx,
-      } : undefined}
+      resize={resize}
     >
       {rightPanel.kind === "build-project" ? (
         <BuildProjectRightPanel

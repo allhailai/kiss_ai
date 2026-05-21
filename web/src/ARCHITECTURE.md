@@ -105,17 +105,18 @@ workspace orchestration.
 Current features:
 
 - `agents/`
-- `buildLog/`
 - `chat/`
 - `dashboard/`
 - `design/`
 - `files/`
 - `navigation/`
 - `projectPicker/`
+- `questions/`
 - `rebuild/`
-
 - `search/`
+- `suggestions/`
 - `toast/`
+- `topics/`
 
 ## Data And Live Updates
 
