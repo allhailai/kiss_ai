@@ -337,8 +337,6 @@ function formatFailedNote({ url, type, relevance, error, fetchDate }) {
     "",
     relevance || "General project coverage.",
     "",
-    "<!-- AI_SUGGESTION: This source could not be fetched. Try refreshing on the next build, or find an alternative source for this topic. -->",
-    "",
   ].join("\n");
 }
 

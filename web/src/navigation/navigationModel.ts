@@ -40,7 +40,7 @@ export const chatNavLeaf: SimplifiedNavLeaf = {
 
 export function sectionForView(view: View): SimplifiedNavSectionId {
   if (view === "chat") return "chat";
-  if (view === "requirements" || view === "design" || view === "review" || view === "questions" || view === "suggestions" || view === "topics" || view === "dashboard") return "define";
+  if (view === "requirements" || view === "design" || view === "review" || view === "questions" || view === "topics" || view === "dashboard") return "define";
   if (view === "inputs") return "source-data";
   if (view === "outputs") return "results";
   return "define";

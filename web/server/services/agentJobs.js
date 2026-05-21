@@ -4,7 +4,7 @@ import { parseResearchPlan, executeResearchPlan, generateSourceDigests } from ".
 import { computeBuildScope } from "./buildScope.js";
 import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
 import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
-import { extractAllSuggestions, readSuggestions, writeSuggestions, backfillSuggestionIds } from "./suggestionsService.js";
+
 import { readTopics, getDeepenQueue, clearDeepenQueue } from "./topicsService.js";
 
 export function createAgentJobService({
@@ -54,7 +54,7 @@ export function createAgentJobService({
       "",
       `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build.md")} exactly.`,
       "This is a non-interactive web-triggered build. Never ask the user for confirmation or wait for input mid-run.",
-      "When a decision is needed, choose the conservative default, leave an AI_SUGGESTION marker in the relevant output file, and continue.",
+      "When a decision is needed, choose the conservative default, log the decision in the build entry, and continue.",
       `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
       "Do not create or depend on a project-local framework/ folder.",
       "Do not operate outside this project root.",
@@ -99,7 +99,7 @@ export function createAgentJobService({
       } else if (!scope.projectMdChanged) {
         lines.push(
           "BUILD SCOPE: project.md has NOT changed since last build.",
-          "Only process FEEDBACK markers, accepted AI_SUGGESTION markers, and refresh dated reports.",
+          "Only process FEEDBACK markers and refresh dated reports.",
           "Do not regenerate wiki pages or directed outputs that have no pending markers.",
         );
       }
@@ -108,9 +108,7 @@ export function createAgentJobService({
         lines.push("", `FEEDBACK markers found in: ${scope.feedbackMarkers.join(", ")}`, "Apply feedback to these files and their downstream dependents only.");
       }
 
-      if (scope.acceptedSuggestions.length > 0) {
-        lines.push("", `Accepted AI_SUGGESTION markers in: ${scope.acceptedSuggestions.join(", ")}`, "Execute these accepted suggestions.");
-      }
+
     }
 
     return lines.join("\n");
@@ -122,7 +120,7 @@ export function createAgentJobService({
       "",
       `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build.md")} exactly.`,
       "This is a non-interactive web-triggered build. Never ask the user for confirmation or wait for input mid-run.",
-      "When a decision is needed, choose the conservative default, leave an AI_SUGGESTION marker in the relevant output file, and continue.",
+      "When a decision is needed, choose the conservative default, log the decision in the build entry, and continue.",
       `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
       "Do not create or depend on a project-local framework/ folder.",
       "Do not operate outside this project root.",
@@ -159,9 +157,7 @@ export function createAgentJobService({
       if (scope.feedbackMarkers.length > 0) {
         lines.push("", `FEEDBACK markers found in: ${scope.feedbackMarkers.join(", ")}`);
       }
-      if (scope.acceptedSuggestions.length > 0) {
-        lines.push("", `Accepted AI_SUGGESTION markers in: ${scope.acceptedSuggestions.join(", ")}`);
-      }
+
     }
 
     return lines.join("\n");
@@ -229,13 +225,13 @@ export function createAgentJobService({
     const lines = [
       "Run the kiss_ai validation pass for this project.",
       "",
-      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build.md")} Phases 9-11 only (Validate, Leave AI Suggestions, Record and Snapshot).`,
+      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build.md")} Phases 9-11 only (Validate, Act on Gaps, Record and Snapshot).`,
       "This is a non-interactive web-triggered build. Never ask the user for confirmation or wait for input mid-run.",
       `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
       `Project root: ${project.path}`,
       "",
       "Wiki pages and directed outputs have already been built.",
-      "Your job is to validate, add AI suggestions, update manifest.json, and git snapshot.",
+      "Your job is to validate, act on gaps (coverage_gaps in topics.json or questions), update manifest.json, and git snapshot.",
       "",
       `Model used for this build: ${modelId}. Include this in the change_logs/builds.md entry.`,
     ];
@@ -1039,86 +1035,20 @@ export function createAgentJobService({
         console.error("Question extraction failed:", extractError);
       }
 
-      // ── Phase 3b.6: Extract AI_SUGGESTION markers from all output files ──
-      try {
-        // Scan all markdown files in outputs_ai/ (directed outputs + wiki pages)
-        const allOutputMdFiles = [];
-        async function walkOutputs(dir, relativeBase) {
-          let entries;
-          try { entries = await fs.readdir(dir, { withFileTypes: true }); } catch { return; }
-          for (const entry of entries) {
-            if (entry.name.startsWith(".")) continue;
-            const fullPath = path.join(dir, entry.name);
-            if (entry.isDirectory()) {
-              await walkOutputs(fullPath, path.join(relativeBase, entry.name));
-            } else if (entry.name.endsWith(".md")) {
-              allOutputMdFiles.push(path.join(relativeBase, entry.name));
-            }
-          }
-        }
-        await walkOutputs(path.join(project.path, "outputs_ai"), "outputs_ai");
 
-        // Backfill ID= into markers that don't have one yet
-        for (const relFile of allOutputMdFiles) {
-          const fullPath = path.join(project.path, relFile);
-          try {
-            const original = await fs.readFile(fullPath, "utf-8");
-            const updated = backfillSuggestionIds(original, relFile);
-            if (updated !== original) {
-              await fs.writeFile(fullPath, updated, "utf-8");
-            }
-          } catch { /* skip */ }
-        }
-
-        const buildMeta = {
-          phase: "validation",
-          buildId: (await getRebuildState(project.slug))?.runId?.slice(0, 8) || null,
-          modelId,
-        };
-
-        const newSuggestions = await extractAllSuggestions(project.path, allOutputMdFiles, buildMeta);
-        const existing = await readSuggestions(project.path);
-
-        // Deduplicate by ID — keep existing entries, add new ones
-        const existingIds = new Set(existing.suggestions.map((s) => s.id));
-        const merged = [...existing.suggestions];
-        for (const suggestion of newSuggestions) {
-          if (!existingIds.has(suggestion.id)) {
-            merged.push(suggestion);
-            existingIds.add(suggestion.id);
-          }
-        }
-
-        await writeSuggestions(project.path, merged);
-
-        const newCount = merged.length - existing.suggestions.length;
-        if (newCount > 0 || merged.length > 0) {
-          await appendRunEvent(project.slug, {
-            type: "system",
-            title: `Extracted ${newCount} new suggestion(s) (${merged.length} total)`,
-            text: `AI suggestions written to .build/suggestions.json.`,
-            status: "suggestions_extracted",
-            runtime: "server",
-            metadata: { phase: "3b.6", newCount, totalCount: merged.length },
-          });
-        }
-      } catch (suggestError) {
-        // Non-fatal — continue without suggestions
-        console.error("Suggestion extraction failed:", suggestError);
-      }
 
       // ── Phase 3c: Validation Pass ──
       const stateBeforeValidation = await getRebuildState(project.slug);
       await setRebuildState(project.slug, {
         ...stateBeforeValidation,
         buildPhase: "validation",
-        buildPhaseDetail: "Validating outputs, adding suggestions, recording snapshot",
+        buildPhaseDetail: "Validating outputs, acting on gaps, recording snapshot",
       });
 
       await appendRunEvent(project.slug, {
         type: "system",
         title: "Phase 3c: Validating and recording",
-        text: "Agent is validating outputs, adding AI suggestions, updating manifest, and creating git snapshot.",
+        text: "Agent is validating outputs, acting on gaps, updating manifest, and creating git snapshot.",
         status: "validation",
         runtime: "cursor",
         metadata: { phase: "3c" },

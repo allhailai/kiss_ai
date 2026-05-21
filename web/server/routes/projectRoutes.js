@@ -1,6 +1,6 @@
 import { buildLogQuerySchema, createProjectBodySchema, parseRequestBody, parseRequestQuery, updateProjectUiStateBodySchema } from "./requestSchemas.js";
 import { readQuestions, answerQuestion, getQuestionCounts } from "../services/questionsService.js";
-import { readSuggestions, resolveSuggestion, getSuggestionCounts } from "../services/suggestionsService.js";
+
 import { readTopics, resolveTopic, updateTopic, setDisposition, getTopicCounts, toggleDeepenQueue, getDeepenLog } from "../services/topicsService.js";
 
 function extractOpenQuestions(content) {
@@ -129,7 +129,7 @@ export function registerProjectRoutes(app, {
       const cursorApiKey = await resolveCursorApiKey();
       const humanAttentionItems = getHumanAttentionItems(harness);
       const questionCounts = await getQuestionCounts(project.path);
-      const suggestionCounts = await getSuggestionCounts(project.path);
+
       const topicCounts = await getTopicCounts(project.path);
 
       response.json({
@@ -150,8 +150,7 @@ export function registerProjectRoutes(app, {
         openQuestionsCount: questionCounts.openQuestionsCount,
         blockingQuestionsCount: questionCounts.blockingQuestionsCount,
         totalQuestionsCount: questionCounts.totalQuestionsCount,
-        pendingSuggestionsCount: suggestionCounts.pendingSuggestionsCount,
-        totalSuggestionsCount: suggestionCounts.totalSuggestionsCount,
+
         seedTopicsCount: topicCounts.seedTopicsCount,
         totalTopicsCount: topicCounts.totalTopicsCount,
         parkedTopicsCount: topicCounts.parkedTopicsCount,
@@ -163,9 +162,8 @@ export function registerProjectRoutes(app, {
         // v2 annotation counts from manifest
         annotationCounts: manifest ? {
           feedbackApplied: manifest.feedback_applied ?? 0,
-          suggestionsAdded: manifest.suggestions_added ?? 0,
-          suggestionsAccepted: manifest.suggestions_accepted ?? 0,
-          suggestionsDismissed: manifest.suggestions_dismissed ?? 0,
+          coverageGapsWritten: manifest.coverage_gaps_written ?? 0,
+          autonomousActions: manifest.autonomous_actions ?? 0,
         } : null,
         buildNotes: manifest?.build_notes ?? null,
       });
@@ -229,36 +227,7 @@ export function registerProjectRoutes(app, {
     }
   });
 
-  // ── Suggestions API ──
 
-  app.get("/api/projects/:projectSlug/suggestions", async (request, response, next) => {
-    try {
-      response.json(await readSuggestions(request.project.path));
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.post("/api/projects/:projectSlug/suggestions/:suggestionId/resolve", async (request, response, next) => {
-    try {
-      const { suggestionId } = request.params;
-      const status = request.body?.status;
-
-      if (!status || (status !== "accepted" && status !== "dismissed" && status !== "pending")) {
-        throw httpError("Status must be 'accepted', 'dismissed', or 'pending'.", 400, "invalid_status");
-      }
-
-      const updated = await resolveSuggestion(request.project.path, suggestionId, status);
-
-      if (!updated) {
-        throw httpError(`Suggestion '${suggestionId}' not found.`, 404, "suggestion_not_found");
-      }
-
-      response.json(updated);
-    } catch (error) {
-      next(error);
-    }
-  });
 
   // ── Topics API ──
 

@@ -21,7 +21,7 @@ const fileWorkspaceByView: Partial<Record<View, { title?: string; explainer?: st
   },
 };
 
-const reviewViews = new Set<View>(["review", "questions", "suggestions", "topics"]);
+const reviewViews = new Set<View>(["review", "questions", "topics"]);
 
 export function MainContentArea({
   designWorkspace,

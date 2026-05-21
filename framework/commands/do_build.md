@@ -2,7 +2,7 @@
 
 Run the full kiss_ai research project build.
 
-This is the single build command. It reads the project brief, gathers or refreshes sources, processes annotations, generates or updates outputs, leaves AI suggestions, and snapshots the project in Git.
+This is the single build command. It reads the project brief, gathers or refreshes sources, processes annotations, generates or updates outputs, acts on gaps autonomously, and snapshots the project in Git.
 
 ## Preconditions
 
@@ -23,7 +23,7 @@ This is the single build command. It reads the project brief, gathers or refresh
 
 ## Non-Interactive Runtime Contract
 
-Web-triggered builds must not ask for mid-run human confirmation. When a decision would normally require user input, choose the conservative default, continue when technically possible, and leave an `<!-- AI_SUGGESTION: ... -->` marker in the relevant output file explaining what happened and what the user should review.
+Web-triggered builds must not ask for mid-run human confirmation. When a decision would normally require user input, choose the conservative default, continue when technically possible, and log the decision in the build entry (`change_logs/builds.md`).
 
 ## File Ownership Model
 
@@ -45,14 +45,9 @@ Users interact with AI-managed files through `<!-- FEEDBACK: ... -->` annotation
 
 ## Annotation Markers
 
-Two marker types exist in AI-managed markdown files:
+One marker type exists in AI-managed markdown files:
 
 **`<!-- FEEDBACK: ... -->`** — User-to-AI feedback. Added by the user via the web UI [+] affordance. The build must process every FEEDBACK marker: apply the requested change, then remove the marker. If the feedback implies a lasting rule (e.g., "always sort this table by X"), also add the rule to the `## Output Guidance` section of `project.md`.
-
-**`<!-- AI_SUGGESTION: ... -->`** — AI-to-user suggestion. Added by the build at the end of a run. These are informational. On the next build:
-- Markers the user accepted (flagged via the web UI) are executed and removed.
-- Markers the user dismissed are removed.
-- Markers with no user action are left in place (carried forward).
 
 ## Instructions
 
@@ -73,15 +68,13 @@ Two marker types exist in AI-managed markdown files:
 ### Phase 2: Scan Annotations
 
 8. Scan all markdown files under `sources/**` and `outputs_ai/**` for `<!-- FEEDBACK: ... -->` markers. Collect them with their file path and position.
-9. Scan all markdown files under `sources/**` and `outputs_ai/**` for `<!-- AI_SUGGESTION: ... -->` markers. The user flags suggestions via the UI: accepted markers contain `[ACCEPTED]` (e.g., `<!-- AI_SUGGESTION: [ACCEPTED] add a row ... -->`), dismissed markers contain `[DISMISSED]`. Unflagged markers are carried forward. Collect accepted suggestions for execution.
-10. Remove `[DISMISSED]` AI_SUGGESTION markers from files (delete the entire HTML comment line).
 
 ### Phase 3: Follow Build Scope Directive
 
 11. The build pipeline provides a `BUILD SCOPE` directive in the prompt. Follow it exactly:
    - If the prompt says **"BUILD SCOPE: project.md changed"** with a diff and affected outputs list, update only the listed affected outputs. Do not regenerate unchanged wiki pages or outputs.
    - If the prompt says **"FEEDBACK markers found in: ..."**, apply feedback to those files and their downstream dependents only.
-   - If the prompt says **"BUILD SCOPE: project.md has NOT changed"**, only process FEEDBACK markers, accepted AI_SUGGESTION markers, and refresh dated reports. Do not regenerate wiki pages or directed outputs that have no pending markers.
+   - If the prompt says **"BUILD SCOPE: project.md has NOT changed"**, only process FEEDBACK markers and refresh dated reports. Do not regenerate wiki pages or directed outputs that have no pending markers.
    - If **no BUILD SCOPE directive is present**, this is a first build — generate everything.
    - **Do not override the provided scope.** Do not choose a broader scope than instructed. The pipeline has already determined what changed.
 
@@ -95,7 +88,7 @@ Two marker types exist in AI-managed markdown files:
       - The original filename and path.
       - All substantive content from the file — data, arguments, claims, tables, figures described.
       - A brief summary of what the file contributes to the project.
-    - If a file format cannot be read, leave an `AI_SUGGESTION` marker in the most relevant output file noting the gap and what format support is needed.
+    - If a file format cannot be read, add a coverage_gap entry to the most relevant topic in `.build/topics.json` noting the gap and what format support is needed.
 14. Do not ask the user to populate `inputs_human/` if it is empty. An empty `inputs_human/` is normal — the build proceeds with web research alone.
 
 ### Phase 5: Review Pre-Fetched Sources
@@ -111,7 +104,7 @@ Source files have been fetched and written to `sources/web_research/` by the bui
 
 17. **Do not read full source files in `sources/web_research/` at this stage.** You will read specific full sources later in Phase 7 and 8, only when you are actively writing or updating a page that needs detailed evidence from that source. **Exception:** plan to read all low-coverage sources during synthesis — the digest alone is insufficient.
 
-18. If `sources/source_log.md` shows gaps (Unfetched sources or missing topic coverage), leave an `AI_SUGGESTION` marker in the most relevant output file noting the gap and what sources to try on the next build.
+18. If `sources/source_log.md` shows gaps (Unfetched sources or missing topic coverage), add structured `coverage_gaps` entries to the relevant topics in `.build/topics.json` with `search_hints` and `target_urls` so the pipeline can fetch them on the next build.
 
 #### Source Confidence Tiers
 
@@ -127,16 +120,13 @@ When evaluating sources and resolving conflicting data, use this confidence rank
 
 When two sources conflict, favor the higher-ranked source and note the disagreement explicitly.
 
-### Phase 6: Apply Annotations
+### Phase 6: Apply Feedback
 
 19. Process each collected FEEDBACK marker:
     - Read the feedback text and the surrounding content context.
     - Apply the requested change to the file.
     - Remove the `<!-- FEEDBACK: ... -->` marker.
     - If the feedback implies a lasting structural or formatting rule, add it to `project.md` under `## Output Guidance`. If that section does not exist, create it.
-20. Execute each accepted AI_SUGGESTION:
-    - Perform the suggested action (add a wiki page, split a file, refresh data, etc.).
-    - Remove the `<!-- AI_SUGGESTION: ... -->` marker.
 
 ### Phase 7: Build Wiki
 
@@ -195,37 +185,37 @@ This index is read by future builds (Phase 1, Step 5) to understand the wiki sta
     - Wiki `_index.md` exists and matches the wiki pages.
     - Source log is current.
     - No unprocessed FEEDBACK markers remain (all must be applied or flagged).
-31. **Source depth check**: verify that source digests in `sources/digests/` contain substantive key claims (not just metadata). Flag any thin digests with an `AI_SUGGESTION` marker recommending re-fetch on the next build.
-32. **Evidence coverage check**: for each directed output, verify that key claims cite gathered sources. Flag unsourced claims with `AI_SUGGESTION` markers.
+31. **Source depth check**: verify that source digests in `sources/digests/` contain substantive key claims (not just metadata). For any thin digests, add a structured `coverage_gap` entry to the relevant topic in `.build/topics.json` with a re-fetch target URL so the pipeline can retry on the next build.
+32. **Evidence coverage check**: for each directed output, verify that key claims cite gathered sources. For unsourced claims, add `coverage_gap` entries to the relevant topics with `search_hints` describing what evidence is needed.
 33. **Contradiction detection**: scan wiki pages and directed outputs for claims where two or more sources disagree on a data point, date, figure, or conclusion. For each contradiction found:
     - Note both claims and their sources in the relevant wiki page or output.
     - Indicate which source has higher confidence (per the Source Confidence Tiers).
-    - If the contradiction is material to the project thesis, leave an `AI_SUGGESTION` marker recommending the user investigate.
-34. If issues are found, leave `AI_SUGGESTION` markers in the relevant files rather than blocking the build.
+    - If the contradiction is material to the project thesis, create a **question** in `.build/questions.json` asking the user which interpretation should guide the project.
+34. If issues are found, act on them directly (coverage_gaps, questions, or inline notes) rather than blocking the build.
 
-### Phase 10: Leave AI Suggestions
+### Phase 10: Act on Gaps and Process Questions
 
-35. After generating/updating outputs, scan the project for improvement opportunities. Leave `<!-- AI_SUGGESTION: ... -->` markers inline in relevant files. Limit to approximately 3-5 suggestions per build to avoid fatigue.
+35. After generating/updating outputs, identify improvement opportunities and **act on them directly**:
+    - Missing wiki page for an evidenced topic → create it now.
+    - Output file too long → split it now.
+    - Thin source digest → add a structured `coverage_gap` to the relevant topic with a re-fetch target.
+    - Missing source for a key claim → add a structured `coverage_gap` with `search_hints`.
+    - Source contradiction (immaterial) → favor higher-ranked source, note inline.
+    - Source contradiction (material to project thesis) → create a **question**.
+    - A new topic or directed output would serve the project goal → add it as a seed topic or create the output.
 
-Suggest when:
-- A wiki topic referenced in sources has no wiki page.
-- An output file is very long and could be split for readability.
-- A source is stale or thin (single secondary source for a key claim).
-- User context in `project.md` is missing information that would improve outputs.
-- A topic connection between outputs is missing.
-- A new topic or directed output would serve the project goal.
-- Two sources contradict each other on a material claim (from Step 33).
+    **Do not leave `<!-- AI_SUGGESTION: ... -->` markers.** Act directly or delegate to the pipeline via `coverage_gaps` in `.build/topics.json`.
 
-Each suggestion should be:
-- Specific — points to a concrete file, section, or claim.
-- Actionable — clear what happens if the user accepts.
-- Self-contained — understandable without reading other files.
+36. **Question gate:** Before creating any question in `.build/questions.json`, apply the public/private test:
+    - If the answer could come from a publicly available source (statutes, regulations, published documents, government databases), do NOT create a question. Add a structured `coverage_gap` to the relevant topic and let the pipeline fetch it on the next build.
+    - If the answer requires private information only the human has (business relationships, contract terms, strategic judgment, proprietary data), create a question.
+    - If a `coverage_gap` has persisted for 2+ builds without resolution (check the `attempts` field), THEN escalate to a question explaining what the AI already tried.
 
-36. Process answered questions collected in Step 4 (from `.build/questions.json`):
+37. Process answered questions collected in Step 4 (from `.build/questions.json`):
     - For each question with `status: "answered"`, determine where the answer should be applied: update `project.md` (e.g., add to `## Output Guidance` or `## Constraints`), adjust output content, or both.
     - Apply the answer: make the concrete changes to the relevant files so the answer is reflected in the project going forward.
     - Update the question's status to `"applied"` in `.build/questions.json`.
-37. If the build prompt includes raw `BUILD_QUESTION` markers for consolidation, consolidate and write them to `.build/questions.json` (merging duplicates, preserving highest priority, preserving existing answered/applied questions).
+38. If the build prompt includes raw `BUILD_QUESTION` markers for consolidation, consolidate them into `.build/questions.json` (merging duplicates, preserving highest priority, preserving existing answered/applied questions). Before writing each question, apply the question gate (Step 36) — convert publicly-researchable questions to coverage_gaps instead.
 
 ### Phase 11: Record and Snapshot
 
@@ -259,8 +249,7 @@ Each suggestion should be:
       "justification": {
         "goal_support": "Why this topic supports the project goals",
         "graph_support": "How this connects to other topics",
-        "questions_addressed": [],
-        "suggestions_addressed": []
+        "questions_addressed": []
       },
       "discovery": {
         "origin": "agent_discovered|user_suggestion|legacy_migration",
@@ -277,7 +266,16 @@ Each suggestion should be:
         "word_count": 4500,
         "last_updated": "ISO"
       },
-      "coverage_gaps": ["missing primary data on X"],
+      "coverage_gaps": [
+        {
+          "description": "Human-readable description of what is missing",
+          "search_hints": ["search query 1", "search query 2"],
+          "target_urls": ["https://specific-url-to-fetch"],
+          "reason": "Why this gap matters for the project",
+          "attempts": 0,
+          "first_noted": "ISO timestamp"
+        }
+      ],
       "disposition": null,
       "disposition_at": null,
       "disposition_note": null
@@ -307,9 +305,8 @@ Behavioral rules for updating topics:
       "sources_gathered": 0,
       "sources_refreshed": 0,
       "feedback_applied": 0,
-      "suggestions_added": 0,
-      "suggestions_accepted": 0,
-      "suggestions_dismissed": 0,
+      "coverage_gaps_written": 0,
+      "autonomous_actions": 0,
       "inputs_human_inventory": ["list of files in inputs_human/"],
       "build_notes": "brief summary of what was done"
     }
@@ -344,7 +341,8 @@ Report:
 - Wiki pages created or updated.
 - Directed outputs created or updated.
 - FEEDBACK markers applied.
-- AI_SUGGESTION markers added (count and brief list).
+- Coverage gaps written to `.build/topics.json` (count and brief list).
+- Autonomous actions taken (file splits, wiki pages added, etc.).
 - Questions consolidated and written to `.build/questions.json`.
 - Git snapshot commit hash (or why it was skipped).
 - Any caveats, issues, or items needing user attention.

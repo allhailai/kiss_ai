@@ -237,11 +237,7 @@
   background: linear-gradient(135deg, hsl(0 60% 97%) 0%, var(--color-surface, #ffffff) 100%);
 }
 
-/* Suggestions card — warm amber/accent */
-.review-summary-suggestions {
-  border-left-color: var(--color-accent, #a45c40);
-  background: linear-gradient(135deg, hsl(28 50% 97%) 0%, var(--color-surface, #ffffff) 100%);
-}
+
 
 .review-summary-card-header {
   display: flex;

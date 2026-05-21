@@ -109,8 +109,7 @@ export type ProjectStatus = {
   openQuestionsCount: number;
   blockingQuestionsCount: number;
   totalQuestionsCount: number;
-  pendingSuggestionsCount: number;
-  totalSuggestionsCount: number;
+
   seedTopicsCount: number;
   totalTopicsCount: number;
   parkedTopicsCount: number;
@@ -121,9 +120,8 @@ export type ProjectStatus = {
   gitStatus: string[];
   annotationCounts: {
     feedbackApplied: number;
-    suggestionsAdded: number;
-    suggestionsAccepted: number;
-    suggestionsDismissed: number;
+    coverageGapsWritten: number;
+    autonomousActions: number;
   } | null;
   buildNotes: string | null;
 };
@@ -180,19 +178,7 @@ export type Keybindings = {
   toggleRightPanel: string;
 };
 
-export type AiSuggestion = {
-  id: string;
-  text: string;
-  status: "pending" | "accepted" | "dismissed";
-  sourceFile: string;
-  createdAt: string;
-  resolvedAt: string | null;
-  createdDuring: {
-    phase: string;
-    buildId: string | null;
-    modelId: string | null;
-  };
-};
+
 
 export type TopicState = "seed" | "shallow" | "deep" | "saturated" | "split_candidate" | "deprecated";
 export type TopicConfidence = "high" | "low";
@@ -215,7 +201,6 @@ export type Topic = {
     goal_support: string;
     graph_support: string;
     questions_addressed: string[];
-    suggestions_addressed: string[];
   } | null;
   discovery: {
     origin: string;
@@ -237,7 +222,14 @@ export type Topic = {
     word_count: number;
     last_updated: string | null;
   };
-  coverage_gaps: string[];
+  coverage_gaps: Array<string | {
+    description: string;
+    search_hints?: string[];
+    target_urls?: string[];
+    reason?: string;
+    attempts?: number;
+    first_noted?: string;
+  }>;
   disposition: TopicDisposition;
   disposition_at: string | null;
   disposition_note: string | null;

@@ -75,78 +75,6 @@ export function MarkdownEditor({
   const unsavedDiffRef = useRef(unsavedDiff);
   useEffect(() => { unsavedDiffRef.current = unsavedDiff; }, [unsavedDiff]);
 
-  // Stable callback wrappers that read from refs — these never change identity.
-  const stableHandleAcceptSuggestion = useCallback((id: string | null, lineFrom: number, lineTo: number) => {
-    const lines = valueRef.current.split("\n");
-    // Rewrite the marker with [ACCEPTED] so the build scope scanner can detect it
-    // and the synthesis agent will execute the suggestion on the next build.
-    const updatedLines = lines.map((line, i) => {
-      const lineNum = i + 1;
-      if (lineNum === lineFrom) {
-        return line.replace(/AI_SUGGESTION:\s*(ID=\S+\s+)?/, "AI_SUGGESTION: $1[ACCEPTED] ");
-      }
-      return line;
-    });
-    onChangeRef.current(updatedLines.join("\n"));
-    onNoticeRef.current("Suggestion accepted — will be executed on next build.");
-    // Auto-save so the [ACCEPTED] flag persists to disk
-    window.setTimeout(() => onSaveRef.current?.(), 500);
-    // Sync to suggestions.json
-    if (id) {
-      void fetch(`/api/projects/${encodeURIComponent(projectSlug)}/suggestions/${encodeURIComponent(id)}/resolve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "accepted" }),
-      });
-    }
-  }, [projectSlug]);
-
-  const stableHandleDismissSuggestion = useCallback((id: string | null, lineFrom: number, lineTo: number) => {
-    const lines = valueRef.current.split("\n");
-    // Rewrite the marker with [DISMISSED] instead of deleting — keeps it reversible.
-    const updatedLines = lines.map((line, i) => {
-      const lineNum = i + 1;
-      if (lineNum === lineFrom) {
-        return line.replace(/AI_SUGGESTION:\s*(ID=\S+\s+)?/, "AI_SUGGESTION: $1[DISMISSED] ");
-      }
-      return line;
-    });
-    onChangeRef.current(updatedLines.join("\n"));
-    onNoticeRef.current("Suggestion dismissed — undo available until next build.");
-    // Auto-save so the [DISMISSED] flag persists to disk
-    window.setTimeout(() => onSaveRef.current?.(), 500);
-    // Sync to suggestions.json
-    if (id) {
-      void fetch(`/api/projects/${encodeURIComponent(projectSlug)}/suggestions/${encodeURIComponent(id)}/resolve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "dismissed" }),
-      });
-    }
-  }, [projectSlug]);
-
-  const stableHandleUndoSuggestion = useCallback((id: string | null, lineFrom: number, lineTo: number) => {
-    const lines = valueRef.current.split("\n");
-    // Strip [ACCEPTED] or [DISMISSED] flag to revert to the original suggestion.
-    const updatedLines = lines.map((line, i) => {
-      const lineNum = i + 1;
-      if (lineNum === lineFrom) {
-        return line.replace(/AI_SUGGESTION:\s*(ID=\S+\s+)?\[(ACCEPTED|DISMISSED)\]\s*/, "AI_SUGGESTION: $1");
-      }
-      return line;
-    });
-    onChangeRef.current(updatedLines.join("\n"));
-    onNoticeRef.current("Suggestion restored.");
-    window.setTimeout(() => onSaveRef.current?.(), 500);
-    // Sync to suggestions.json — revert to pending
-    if (id) {
-      void fetch(`/api/projects/${encodeURIComponent(projectSlug)}/suggestions/${encodeURIComponent(id)}/resolve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "pending" }),
-      });
-    }
-  }, [projectSlug]);
 
   const stableHandleEditComment = useCallback((lineFrom: number, lineTo: number, newText: string) => {
     const lines = valueRef.current.split("\n");
@@ -212,12 +140,9 @@ export function MarkdownEditor({
         isAiManaged,
         onEditComment: stableHandleEditComment,
         onDeleteComment: stableHandleDeleteComment,
-        onAcceptSuggestion: stableHandleAcceptSuggestion,
-        onDismissSuggestion: stableHandleDismissSuggestion,
-        onUndoSuggestion: stableHandleUndoSuggestion,
       }),
     ],
-    [allowAnnotationEdits, editable, getFiles, getOnOpenFile, getSavedDiff, getUnsavedDiff, isAiManaged, selectedPath, stableHandleAcceptSuggestion, stableHandleDeleteComment, stableHandleDismissSuggestion, stableHandleEditComment, stableHandleUndoSuggestion, stableOnNotice],
+    [allowAnnotationEdits, editable, getFiles, getOnOpenFile, getSavedDiff, getUnsavedDiff, isAiManaged, selectedPath, stableHandleDeleteComment, stableHandleEditComment, stableOnNotice],
   );
 
   return (

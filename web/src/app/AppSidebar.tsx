@@ -114,7 +114,6 @@ export function AppSidebar({
           humanInputEmptyDirectories={fileWorkspace.humanInputEmptyDirectories}
           reviewBadgeCount={
             (rebuildWorkspace.status?.openQuestionsCount ?? 0) +
-            (rebuildWorkspace.status?.pendingSuggestionsCount ?? 0) +
             (rebuildWorkspace.status?.seedTopicsCount ?? 0)
           }
           hasBlockingQuestions={(rebuildWorkspace.status?.blockingQuestionsCount ?? 0) > 0}

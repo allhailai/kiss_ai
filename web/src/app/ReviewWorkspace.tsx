@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { AiSuggestion, BuildQuestion, RebuildModel, Topic } from "../contracts/api";
+import type { BuildQuestion, RebuildModel, Topic } from "../contracts/api";
 import type { ReviewTab } from "../navigation/views";
 import { QuestionsWorkspace } from "../features/questions/QuestionsWorkspace";
-import { SuggestionsWorkspace } from "../features/suggestions/SuggestionsWorkspace";
 import { TopicsWorkspace } from "../features/topics/TopicsWorkspace";
 
-const VALID_TABS = new Set<ReviewTab>(["attention", "questions", "suggestions", "topics"]);
-const LEGACY_VIEW_TO_TAB: Record<string, ReviewTab> = { questions: "questions", suggestions: "suggestions", topics: "topics" };
+const VALID_TABS = new Set<ReviewTab>(["attention", "questions", "topics"]);
+const LEGACY_VIEW_TO_TAB: Record<string, ReviewTab> = { questions: "questions", topics: "topics" };
 
 function parseTabFromHash(): ReviewTab {
   const hash = window.location.hash;
@@ -46,12 +45,10 @@ function truncate(text: string, max: number): string {
 
 function SummaryDashboard({
   questions,
-  suggestions,
   topics,
   onSwitchTab,
 }: {
   questions: BuildQuestion[];
-  suggestions: AiSuggestion[];
   topics: Topic[];
   onSwitchTab: (tab: ReviewTab) => void;
 }) {
@@ -87,16 +84,7 @@ function SummaryDashboard({
     ? openQuestions.sort((a, b) => new Date(b.askedAt).getTime() - new Date(a.askedAt).getTime())[0]
     : null;
 
-  // ── Suggestion stats ─────────────────────────────
-  const pendingSuggestions = suggestions.filter((s) => s.status === "pending");
-  const acceptedSuggestions = suggestions.filter((s) => s.status === "accepted");
-  const dismissedSuggestions = suggestions.filter((s) => s.status === "dismissed");
-  const crossLinkedCount = pendingSuggestions.filter((s) =>
-    s.sourceFile && openQuestions.some((q) => q.relatedFiles.some((f) => f === s.sourceFile)),
-  ).length;
-  const latestSuggestion = pendingSuggestions.length > 0
-    ? pendingSuggestions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
-    : null;
+
 
   return (
     <div className="review-summary-dashboard">
@@ -202,45 +190,6 @@ function SummaryDashboard({
           </div>
         ) : null}
       </section>
-
-      {/* ── Suggestions Section ────────────────── */}
-      <section className="review-summary-card review-summary-suggestions" onClick={() => onSwitchTab("suggestions")}>
-        <div className="review-summary-card-header">
-          <h3 className="review-summary-card-title">Suggestions</h3>
-          <button
-            className="review-summary-cta"
-            onClick={() => onSwitchTab("suggestions")}
-            type="button"
-          >
-            View Suggestions →
-          </button>
-        </div>
-
-        {pendingSuggestions.length > 0 ? (
-          <div className="review-summary-hero review-summary-hero-pending">
-            <span className="review-summary-hero-number">{pendingSuggestions.length}</span>
-            <span className="review-summary-hero-label">pending</span>
-          </div>
-        ) : null}
-
-        <div className="review-summary-stats">
-          <span className="review-summary-stat">
-            {pendingSuggestions.length} pending · {acceptedSuggestions.length} accepted · {dismissedSuggestions.length} dismissed
-          </span>
-          {crossLinkedCount > 0 ? (
-            <span className="review-summary-stat review-summary-stat-crosslink">
-              {crossLinkedCount} address{crossLinkedCount !== 1 ? "" : "es"} open questions
-            </span>
-          ) : null}
-        </div>
-
-        {latestSuggestion ? (
-          <div className="review-summary-preview">
-            <span className="review-summary-preview-label">Latest</span>
-            <p className="review-summary-preview-text">{truncate(latestSuggestion.text, 120)}</p>
-          </div>
-        ) : null}
-      </section>
     </div>
   );
 }
@@ -283,7 +232,6 @@ export function ReviewWorkspace({
 
   // Fetch summary counts for the header and summary dashboard
   const [questions, setQuestions] = useState<BuildQuestion[]>([]);
-  const [suggestions, setSuggestions] = useState<AiSuggestion[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [summaryLoading, setSummaryLoading] = useState(true);
 
@@ -293,12 +241,10 @@ export function ReviewWorkspace({
 
     Promise.all([
       fetch(`/api/projects/${encodeURIComponent(projectSlug)}/questions`).then((r) => r.ok ? r.json() : { questions: [] }),
-      fetch(`/api/projects/${encodeURIComponent(projectSlug)}/suggestions`).then((r) => r.ok ? r.json() : { suggestions: [] }),
       fetch(`/api/projects/${encodeURIComponent(projectSlug)}/topics`).then((r) => r.ok ? r.json() : { topics: [] }),
-    ]).then(([qData, sData, tData]) => {
+    ]).then(([qData, tData]) => {
       if (cancelled) return;
       setQuestions(qData.questions ?? []);
-      setSuggestions(sData.suggestions ?? []);
       setTopics(tData.topics ?? []);
       setSummaryLoading(false);
     }).catch(() => {
@@ -310,17 +256,15 @@ export function ReviewWorkspace({
 
   const openQuestions = questions.filter((q) => q.status === "open").length;
   const blockingQuestions = questions.filter((q) => q.status === "open" && q.priority === "blocking").length;
-  const pendingSuggestions = suggestions.filter((s) => s.status === "pending").length;
   const deepTopics = topics.filter((t) => t.state === "deep" || t.state === "saturated").length;
   const shallowTopics = topics.filter((t) => t.state === "shallow").length;
   const seedTopics = topics.filter((t) => t.state === "seed").length;
 
-  // Tab order: Needs Attention, Topics, Questions, Suggestions
+  // Tab order: Needs Attention, Topics, Questions
   const tabs: Array<{ id: ReviewTab; label: string; badge?: number; badgeClass?: string }> = [
     { id: "attention", label: "Needs Attention" },
     { id: "topics", label: "Topics", badge: seedTopics > 0 ? seedTopics : undefined, badgeClass: "review-tab-badge-open" },
     { id: "questions", label: "Questions", badge: openQuestions > 0 ? openQuestions : undefined, badgeClass: blockingQuestions > 0 ? "review-tab-badge-blocking" : "review-tab-badge-open" },
-    { id: "suggestions", label: "Suggestions", badge: pendingSuggestions > 0 ? pendingSuggestions : undefined, badgeClass: "review-tab-badge-open" },
   ];
 
   return (
@@ -335,8 +279,6 @@ export function ReviewWorkspace({
             {topics.length > 0 ? ` (${deepTopics} deep, ${shallowTopics} shallow${seedTopics > 0 ? `, ${seedTopics} seed` : ""})` : ""}
             {" · "}
             {openQuestions} open question{openQuestions !== 1 ? "s" : ""}{blockingQuestions > 0 ? ` (${blockingQuestions} blocking)` : ""}
-            {" · "}
-            {pendingSuggestions} pending suggestion{pendingSuggestions !== 1 ? "s" : ""}
           </p>
         )}
       </header>
@@ -367,7 +309,6 @@ export function ReviewWorkspace({
             <SummaryDashboard
               onSwitchTab={setActiveTab}
               questions={questions}
-              suggestions={suggestions}
               topics={topics}
             />
           )
@@ -387,12 +328,7 @@ export function ReviewWorkspace({
             selectedModelId={selectedModelId}
           />
         ) : null}
-        {activeTab === "suggestions" ? (
-          <SuggestionsWorkspace
-            onNavigateToFile={onNavigateToFile}
-            projectSlug={projectSlug}
-          />
-        ) : null}
+
       </div>
     </div>
   );

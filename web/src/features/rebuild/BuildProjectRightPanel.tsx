@@ -322,26 +322,13 @@ export function BuildProjectRightPanel({
                   <span className="build-project-annotation-stat-value">{status.annotationCounts.feedbackApplied}</span>
                   <span className="build-project-annotation-stat-label">Comments applied</span>
                 </div>
-                <div className="build-project-annotation-stat" title="[AI_SUGGESTION] markers the AI placed in output files for your review.">
-                  <span className="build-project-annotation-stat-value">{status.annotationCounts.suggestionsAdded}</span>
-                  <span className="build-project-annotation-stat-label">Suggestions added</span>
+                <div className="build-project-annotation-stat" title="Coverage gaps written to topics.json for the pipeline to auto-fetch on the next build.">
+                  <span className="build-project-annotation-stat-value">{status.annotationCounts.coverageGapsWritten}</span>
+                  <span className="build-project-annotation-stat-label">Coverage gaps</span>
                 </div>
-                {(() => {
-                  const pending = status.annotationCounts.suggestionsAdded - status.annotationCounts.suggestionsAccepted - status.annotationCounts.suggestionsDismissed;
-                  return pending > 0 ? (
-                    <div className="build-project-annotation-stat build-project-annotation-stat-pending" title="AI suggestions you haven't accepted or dismissed yet. Review these in the output files.">
-                      <span className="build-project-annotation-stat-value">{pending}</span>
-                      <span className="build-project-annotation-stat-label">Pending review</span>
-                    </div>
-                  ) : null;
-                })()}
-                <div className="build-project-annotation-stat" title="AI suggestions you approved. These will be kept in future builds.">
-                  <span className="build-project-annotation-stat-value">{status.annotationCounts.suggestionsAccepted}</span>
-                  <span className="build-project-annotation-stat-label">Accepted</span>
-                </div>
-                <div className="build-project-annotation-stat" title="AI suggestions you rejected. These will not appear in future builds.">
-                  <span className="build-project-annotation-stat-value">{status.annotationCounts.suggestionsDismissed}</span>
-                  <span className="build-project-annotation-stat-label">Dismissed</span>
+                <div className="build-project-annotation-stat" title="Actions the AI took autonomously (file splits, wiki pages created, etc.).">
+                  <span className="build-project-annotation-stat-value">{status.annotationCounts.autonomousActions}</span>
+                  <span className="build-project-annotation-stat-label">Autonomous actions</span>
                 </div>
               </div>
             </div>

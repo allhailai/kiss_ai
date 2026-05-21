@@ -115,7 +115,7 @@ export function SimplifiedNavigator({
 
   function renderSectionBody(sectionId: SimplifiedNavSectionId) {
     if (sectionId === "define") {
-      const isReviewActive = currentView === "review" || currentView === "questions" || currentView === "suggestions" || currentView === "topics";
+      const isReviewActive = currentView === "review" || currentView === "questions" || currentView === "topics";
       return (
         <>
           <div className="simple-nav-children">

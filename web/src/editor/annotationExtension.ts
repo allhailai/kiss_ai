@@ -12,7 +12,7 @@ import {
 // Types
 // ─────────────────────────────────────────────────────────
 
-export type AnnotationKind = "feedback" | "ai_suggestion" | "ai_suggestion_accepted" | "ai_suggestion_dismissed";
+export type AnnotationKind = "feedback";
 
 export type Annotation = {
   kind: AnnotationKind;
@@ -28,21 +28,9 @@ export type Annotation = {
 // ─────────────────────────────────────────────────────────
 
 // Single-line: <!-- COMMENT: text --> or <!-- FEEDBACK: text -->
-const COMMENT_SINGLE_RE = /^(\s*)<!--\s*(?:COMMENT|FEEDBACK):\s*(.*?)\s*-->\s*$/;
+const COMMENT_SINGLE_RE = /^(\s*)<!-- (?:COMMENT|FEEDBACK):\s*(.*?)\s*-->\s*$/;
 // Multi-line start: <!-- COMMENT: or <!-- FEEDBACK:
-const COMMENT_START_RE = /^(\s*)<!--\s*(?:COMMENT|FEEDBACK):\s*(.*)/;
-// Single-line accepted: <!-- AI_SUGGESTION: [ACCEPTED] ID=xxx text --> or <!-- AI_SUGGESTION: ID=xxx [ACCEPTED] text -->
-const AI_SUGGESTION_ACCEPTED_SINGLE_RE = /^(\s*)<!-- AI_SUGGESTION:\s*(?:ID=(\S+)\s*)?\[ACCEPTED\]\s*(.*?)\s*-->\s*$/;
-// Multi-line accepted start
-const AI_SUGGESTION_ACCEPTED_START_RE = /^(\s*)<!-- AI_SUGGESTION:\s*(?:ID=(\S+)\s*)?\[ACCEPTED\]\s*(.*)/;
-// Single-line dismissed: <!-- AI_SUGGESTION: [DISMISSED] ID=xxx text --> or <!-- AI_SUGGESTION: ID=xxx [DISMISSED] text -->
-const AI_SUGGESTION_DISMISSED_SINGLE_RE = /^(\s*)<!-- AI_SUGGESTION:\s*(?:ID=(\S+)\s*)?\[DISMISSED\]\s*(.*?)\s*-->\s*$/;
-// Multi-line dismissed start
-const AI_SUGGESTION_DISMISSED_START_RE = /^(\s*)<!-- AI_SUGGESTION:\s*(?:ID=(\S+)\s*)?\[DISMISSED\]\s*(.*)/;
-// Single-line: <!-- AI_SUGGESTION: ID=xxx text --> or <!-- AI_SUGGESTION: text -->
-const AI_SUGGESTION_SINGLE_RE = /^(\s*)<!-- AI_SUGGESTION:\s*(?:ID=(\S+)\s+)?(.*?)\s*-->\s*$/;
-// Multi-line start
-const AI_SUGGESTION_START_RE = /^(\s*)<!-- AI_SUGGESTION:\s*(?:ID=(\S+)\s+)?(.*)/;
+const COMMENT_START_RE = /^(\s*)<!-- (?:COMMENT|FEEDBACK):\s*(.*)/;
 // Multi-line end
 const MULTILINE_END_RE = /^(.*?)-->\s*$/;
 
@@ -65,67 +53,10 @@ function parseAnnotations(doc: { lines: number; line(n: number): { text: string 
       continue;
     }
 
-    // Try single-line accepted suggestion (must check before normal suggestion)
-    const acceptedSingle = AI_SUGGESTION_ACCEPTED_SINGLE_RE.exec(lineText);
-    if (acceptedSingle) {
-      annotations.push({ kind: "ai_suggestion_accepted", text: acceptedSingle[3], id: acceptedSingle[2] || null, lineFrom: lineNumber, lineTo: lineNumber });
-      lineNumber += 1;
-      continue;
-    }
-
-    // Try single-line dismissed suggestion (must check before normal suggestion)
-    const dismissedSingle = AI_SUGGESTION_DISMISSED_SINGLE_RE.exec(lineText);
-    if (dismissedSingle) {
-      annotations.push({ kind: "ai_suggestion_dismissed", text: dismissedSingle[3], id: dismissedSingle[2] || null, lineFrom: lineNumber, lineTo: lineNumber });
-      lineNumber += 1;
-      continue;
-    }
-
-    // Try single-line suggestion
-    const suggestionSingle = AI_SUGGESTION_SINGLE_RE.exec(lineText);
-    if (suggestionSingle) {
-      annotations.push({ kind: "ai_suggestion", text: suggestionSingle[3], id: suggestionSingle[2] || null, lineFrom: lineNumber, lineTo: lineNumber });
-      lineNumber += 1;
-      continue;
-    }
-
     // Try multi-line comment
     const commentStart = COMMENT_START_RE.exec(lineText);
     if (commentStart) {
       const result = consumeMultiLine(doc, lineNumber, commentStart[2], "feedback", null);
-      if (result) {
-        annotations.push(result);
-        lineNumber = result.lineTo + 1;
-        continue;
-      }
-    }
-
-    // Try multi-line accepted suggestion (must check before normal suggestion)
-    const acceptedStart = AI_SUGGESTION_ACCEPTED_START_RE.exec(lineText);
-    if (acceptedStart) {
-      const result = consumeMultiLine(doc, lineNumber, acceptedStart[3], "ai_suggestion_accepted", acceptedStart[2] || null);
-      if (result) {
-        annotations.push(result);
-        lineNumber = result.lineTo + 1;
-        continue;
-      }
-    }
-
-    // Try multi-line dismissed suggestion (must check before normal suggestion)
-    const dismissedStart = AI_SUGGESTION_DISMISSED_START_RE.exec(lineText);
-    if (dismissedStart) {
-      const result = consumeMultiLine(doc, lineNumber, dismissedStart[3], "ai_suggestion_dismissed", dismissedStart[2] || null);
-      if (result) {
-        annotations.push(result);
-        lineNumber = result.lineTo + 1;
-        continue;
-      }
-    }
-
-    // Try multi-line suggestion
-    const suggestionStart = AI_SUGGESTION_START_RE.exec(lineText);
-    if (suggestionStart) {
-      const result = consumeMultiLine(doc, lineNumber, suggestionStart[3], "ai_suggestion", suggestionStart[2] || null);
       if (result) {
         annotations.push(result);
         lineNumber = result.lineTo + 1;
@@ -334,184 +265,7 @@ class CommentWidget extends WidgetType {
   }
 }
 
-class AiSuggestionWidget extends WidgetType {
-  constructor(
-    private readonly text: string,
-    private readonly suggestionId: string | null,
-    private readonly lineFrom: number,
-    private readonly onAccept?: (id: string | null, lineFrom: number, lineTo: number) => void,
-    private readonly onDismiss?: (id: string | null, lineFrom: number, lineTo: number) => void,
-    private readonly lineTo?: number,
-  ) {
-    super();
-  }
 
-  eq(other: AiSuggestionWidget) {
-    return this.text === other.text && this.lineFrom === other.lineFrom;
-  }
-
-  toDOM() {
-    const wrapper = document.createElement("div");
-    wrapper.className = "cm-annotation cm-annotation-suggestion";
-    wrapper.setAttribute("aria-label", "AI suggestion");
-
-    const label = document.createElement("span");
-    label.className = "cm-annotation-label";
-    label.textContent = "Suggestion";
-
-    const content = document.createElement("span");
-    content.className = "cm-annotation-text";
-    content.textContent = this.text;
-
-    const actions = document.createElement("span");
-    actions.className = "cm-annotation-actions";
-
-    const acceptButton = document.createElement("button");
-    acceptButton.className = "cm-annotation-action cm-annotation-accept";
-    acceptButton.textContent = "Accept";
-    acceptButton.type = "button";
-    acceptButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      this.onAccept?.(this.suggestionId, this.lineFrom, this.lineTo ?? this.lineFrom);
-    });
-
-    const dismissButton = document.createElement("button");
-    dismissButton.className = "cm-annotation-action cm-annotation-dismiss";
-    dismissButton.textContent = "Dismiss";
-    dismissButton.type = "button";
-    dismissButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      this.onDismiss?.(this.suggestionId, this.lineFrom, this.lineTo ?? this.lineFrom);
-    });
-
-    actions.appendChild(acceptButton);
-    actions.appendChild(dismissButton);
-    wrapper.appendChild(label);
-    wrapper.appendChild(content);
-    wrapper.appendChild(actions);
-    return wrapper;
-  }
-
-  ignoreEvent(event: Event) {
-    return event.type === "mousedown";
-  }
-}
-
-class AcceptedSuggestionWidget extends WidgetType {
-  constructor(
-    private readonly text: string,
-    private readonly suggestionId: string | null,
-    private readonly lineFrom: number,
-    private readonly lineTo: number,
-    private readonly onUndo?: (id: string | null, lineFrom: number, lineTo: number) => void,
-  ) {
-    super();
-  }
-
-  eq(other: AcceptedSuggestionWidget) {
-    return this.text === other.text && this.lineFrom === other.lineFrom;
-  }
-
-  toDOM() {
-    const wrapper = document.createElement("div");
-    wrapper.className = "cm-annotation cm-annotation-suggestion cm-annotation-accepted";
-    wrapper.setAttribute("aria-label", "Accepted suggestion — will be executed on next build");
-
-    const label = document.createElement("span");
-    label.className = "cm-annotation-label";
-    label.textContent = "Accepted";
-
-    const content = document.createElement("span");
-    content.className = "cm-annotation-text";
-    content.textContent = this.text;
-
-    const actions = document.createElement("span");
-    actions.className = "cm-annotation-actions";
-
-    const undoButton = document.createElement("button");
-    undoButton.className = "cm-annotation-action cm-annotation-undo";
-    undoButton.textContent = "Undo";
-    undoButton.type = "button";
-    undoButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      this.onUndo?.(this.suggestionId, this.lineFrom, this.lineTo);
-    });
-
-    actions.appendChild(undoButton);
-
-    const status = document.createElement("span");
-    status.className = "cm-annotation-status";
-    status.textContent = "Will execute on next build";
-
-    wrapper.appendChild(label);
-    wrapper.appendChild(content);
-    wrapper.appendChild(actions);
-    wrapper.appendChild(status);
-    return wrapper;
-  }
-
-  ignoreEvent(event: Event) {
-    return event.type === "mousedown";
-  }
-}
-
-class DismissedSuggestionWidget extends WidgetType {
-  constructor(
-    private readonly text: string,
-    private readonly suggestionId: string | null,
-    private readonly lineFrom: number,
-    private readonly lineTo: number,
-    private readonly onUndo?: (id: string | null, lineFrom: number, lineTo: number) => void,
-  ) {
-    super();
-  }
-
-  eq(other: DismissedSuggestionWidget) {
-    return this.text === other.text && this.lineFrom === other.lineFrom;
-  }
-
-  toDOM() {
-    const wrapper = document.createElement("div");
-    wrapper.className = "cm-annotation cm-annotation-suggestion cm-annotation-dismissed";
-    wrapper.setAttribute("aria-label", "Dismissed suggestion — will be removed on next build");
-
-    const label = document.createElement("span");
-    label.className = "cm-annotation-label";
-    label.textContent = "Dismissed";
-
-    const content = document.createElement("span");
-    content.className = "cm-annotation-text";
-    content.textContent = this.text;
-
-    const actions = document.createElement("span");
-    actions.className = "cm-annotation-actions";
-
-    const undoButton = document.createElement("button");
-    undoButton.className = "cm-annotation-action cm-annotation-undo";
-    undoButton.type = "button";
-    undoButton.textContent = "Undo";
-    undoButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      this.onUndo?.(this.suggestionId, this.lineFrom, this.lineTo);
-    });
-
-    actions.appendChild(undoButton);
-
-    const status = document.createElement("span");
-    status.className = "cm-annotation-status";
-    status.textContent = "Will be removed on next build";
-
-    wrapper.appendChild(label);
-    wrapper.appendChild(content);
-    wrapper.appendChild(actions);
-    wrapper.appendChild(status);
-    return wrapper;
-  }
-
-  ignoreEvent(event: Event) {
-    return event.type === "mousedown";
-  }
-}
 
 // ─────────────────────────────────────────────────────────
 // Gutter marker — the [+] button for adding comments
@@ -558,17 +312,11 @@ export function buildAnnotationExtension({
   isAiManaged,
   onEditComment,
   onDeleteComment,
-  onAcceptSuggestion,
-  onDismissSuggestion,
-  onUndoSuggestion,
 }: {
   editable: boolean;
   isAiManaged: boolean;
   onEditComment?: (lineFrom: number, lineTo: number, newText: string) => void;
   onDeleteComment?: (lineFrom: number, lineTo: number) => void;
-  onAcceptSuggestion?: (id: string | null, lineFrom: number, lineTo: number) => void;
-  onDismissSuggestion?: (id: string | null, lineFrom: number, lineTo: number) => void;
-  onUndoSuggestion?: (id: string | null, lineFrom: number, lineTo: number) => void;
 }): Extension[] {
   const extensions: Extension[] = [];
 
@@ -593,49 +341,6 @@ export function buildAnnotationExtension({
               annotation.lineTo,
               onEditComment,
               onDeleteComment,
-            ),
-          }),
-        });
-      } else if (annotation.kind === "ai_suggestion") {
-        entries.push({
-          from,
-          to,
-          decoration: Decoration.replace({
-            widget: new AiSuggestionWidget(
-              annotation.text,
-              annotation.id,
-              annotation.lineFrom,
-              onAcceptSuggestion,
-              onDismissSuggestion,
-              annotation.lineTo,
-            ),
-          }),
-        });
-      } else if (annotation.kind === "ai_suggestion_accepted") {
-        entries.push({
-          from,
-          to,
-          decoration: Decoration.replace({
-            widget: new AcceptedSuggestionWidget(
-              annotation.text,
-              annotation.id,
-              annotation.lineFrom,
-              annotation.lineTo,
-              onUndoSuggestion,
-            ),
-          }),
-        });
-      } else if (annotation.kind === "ai_suggestion_dismissed") {
-        entries.push({
-          from,
-          to,
-          decoration: Decoration.replace({
-            widget: new DismissedSuggestionWidget(
-              annotation.text,
-              annotation.id,
-              annotation.lineFrom,
-              annotation.lineTo,
-              onUndoSuggestion,
             ),
           }),
         });

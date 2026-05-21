@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { getAcceptedSuggestionPaths } from "./suggestionsService.js";
+
 
 function hashText(value) {
   return createHash("sha256").update(String(value)).digest("hex");
@@ -33,11 +33,10 @@ function gitDiffText(projectPath, relativePath) {
 
 // ── Scan for annotation markers ─────────────────────────────────────
 const FEEDBACK_PATTERN = /<!--\s*FEEDBACK:/;
-const SUGGESTION_ACCEPTED_PATTERN = /<!--\s*AI_SUGGESTION:\s*\[ACCEPTED\]/;
+
 
 async function scanMarkersInDirectory(directoryPath, projectPath) {
   const feedbackPaths = [];
-  const acceptedSuggestionPaths = [];
 
   async function walk(currentPath) {
     let entries;
@@ -65,9 +64,6 @@ async function scanMarkersInDirectory(directoryPath, projectPath) {
         if (FEEDBACK_PATTERN.test(content)) {
           feedbackPaths.push(relativePath);
         }
-        if (SUGGESTION_ACCEPTED_PATTERN.test(content)) {
-          acceptedSuggestionPaths.push(relativePath);
-        }
       } catch {
         // Skip unreadable files
       }
@@ -75,7 +71,7 @@ async function scanMarkersInDirectory(directoryPath, projectPath) {
   }
 
   await walk(directoryPath);
-  return { feedbackPaths, acceptedSuggestionPaths };
+  return { feedbackPaths };
 }
 
 // ── Detect affected outputs from diff text ──────────────────────────
@@ -194,11 +190,6 @@ export async function computeBuildScope(projectPath) {
   const outputsMarkers = await scanMarkersInDirectory(path.join(projectPath, "outputs_ai"), projectPath);
 
   const feedbackMarkers = [...sourcesMarkers.feedbackPaths, ...outputsMarkers.feedbackPaths].sort();
-  const markerAcceptedSuggestions = [...sourcesMarkers.acceptedSuggestionPaths, ...outputsMarkers.acceptedSuggestionPaths];
-
-  // Also include suggestions accepted via the UI (stored in suggestions.json)
-  const uiAcceptedSuggestions = await getAcceptedSuggestionPaths(projectPath);
-  const acceptedSuggestions = [...new Set([...markerAcceptedSuggestions, ...uiAcceptedSuggestions])].sort();
 
   // Compare inputs_human
   const currentHumanInputs = await listHumanInputFiles(projectPath);
@@ -229,7 +220,6 @@ export async function computeBuildScope(projectPath) {
     projectMdHash,
     projectMdDiff,
     feedbackMarkers,
-    acceptedSuggestions,
     humanInputsChanged,
     sourcesChanged,
     sourceInventoryHash: sourceInventory.hash,
