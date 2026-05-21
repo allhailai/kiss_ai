@@ -164,7 +164,7 @@ function TopicCard({
         </div>
       ) : null}
 
-      {topic.coverage_gaps.length > 0 ? (
+      {(topic.coverage_gaps?.length ?? 0) > 0 ? (
         <div className="topic-card-gaps">
           <span className="topic-card-gaps-label">Gaps:</span>
           {topic.coverage_gaps.map((gap, i) => {
@@ -185,7 +185,7 @@ function TopicCard({
             ) : null}
           </div>
 
-          {topic.deepen_log.length > 0 ? (
+          {(topic.deepen_log?.length ?? 0) > 0 ? (
             <>
               {topic.deepen_log.slice().reverse().map((entry, idx) => {
                 const wordDelta = entry.word_count_after - entry.word_count_before;
@@ -241,7 +241,7 @@ function TopicCard({
                             ))}
                           </ul>
                         </div>
-                      ) : entry.enriched_files.length > 0 ? (
+                      ) : (entry.enriched_files?.length ?? 0) > 0 ? (
                         <div className="topic-deepen-entry-row topic-deepen-entry-row-block">
                           <span className="topic-deepen-entry-label">Outputs updated</span>
                           <ul className="topic-deepen-enriched-list">

@@ -104,6 +104,10 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
       "WIKI_ONLY: Build wiki pages ONLY (Phase 7). Do NOT write directed outputs (Phase 8).",
       "Directed outputs will be built in a separate per-file pass with focused context.",
       "Complete Phases 1-7 and Phase 9-11 (validation, manifest, git snapshot).",
+      "",
+      "IMPORTANT: When writing topics.json, populate each topic's `outputs` array with the expected directed output file paths",
+      "(e.g., `outputs_ai/reports/reagent_brittleness_index_dashboard.md`). The build pipeline uses these paths to schedule",
+      "per-file synthesis in Phase 3b. Without them, directed outputs will not be built.",
     ];
 
     if (scope && !scope.isFirstBuild) {

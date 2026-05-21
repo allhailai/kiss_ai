@@ -691,9 +691,21 @@ export function createAgentJobService({
         metadata: { phase: "3b" },
       });
 
-      const sourceMap = await buildSourceMapping(project.path);
+      const { mapping: sourceMap, discoverySource } = await buildSourceMapping(project.path);
       await writeSourceMapping(project.path, sourceMap);
       const outputFileCount = Object.keys(sourceMap).length;
+
+      const discoveryLabel = discoverySource === "manifest" ? "manifest" : discoverySource === "topics" ? "topics.json" : "disk scan";
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: `Phase 3b: Discovered ${outputFileCount} directed output(s) via ${discoveryLabel}`,
+        text: outputFileCount > 0
+          ? `Outputs: ${Object.keys(sourceMap).join(", ")}`
+          : "No directed outputs found. Skipping per-file synthesis.",
+        status: outputFileCount > 0 ? "source_mapping_complete" : "source_mapping_empty",
+        runtime: "server",
+        metadata: { phase: "3b", outputFileCount, discoverySource },
+      });
 
       if (outputFileCount > 0) {
         const stateBeforeFiles = await getRebuildState(project.slug);
