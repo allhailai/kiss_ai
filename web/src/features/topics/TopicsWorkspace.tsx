@@ -3,9 +3,9 @@ import type { Topic, TopicDisposition, TopicState } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
 import { useBuildContext } from "../../app/contexts/BuildContext";
 
-type TopicsFilter = "all" | "seeds" | "active" | "queued" | "deepened" | "parked" | "settled" | "deprecated";
+type TopicsFilter = "all" | "seeds" | "active" | "shallow" | "deep" | "queued" | "deepened" | "parked" | "settled" | "deprecated";
 
-const VALID_FILTERS = new Set<TopicsFilter>(["all", "seeds", "active", "queued", "deepened", "parked", "settled", "deprecated"]);
+const VALID_FILTERS = new Set<TopicsFilter>(["all", "seeds", "active", "shallow", "deep", "queued", "deepened", "parked", "settled", "deprecated"]);
 
 function parseFilterFromHash(): TopicsFilter {
   const hash = window.location.hash;
@@ -535,8 +535,32 @@ export function TopicsWorkspace({
     [projectSlug, openBuildPanel],
   );
 
+  const handleDeepenAllShallow = useCallback(
+    async () => {
+      try {
+        const response = await fetch(
+          `/api/projects/${encodeURIComponent(projectSlug)}/topics/queue-all-shallow`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          throw new Error(body?.message || "Failed to queue shallow topics");
+        }
+        await fetchTopics();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to queue shallow topics");
+      }
+    },
+    [projectSlug, fetchTopics],
+  );
+
   const seedCount = topics.filter((t) => t.state === "seed").length;
   const activeCount = topics.filter((t) => isActiveTopic(t)).length;
+  const shallowCount = topics.filter((t) => t.state === "shallow" && !t.disposition).length;
+  const deepCount = topics.filter((t) => t.state === "deep" && !t.disposition).length;
   const queuedCount = topics.filter((t) => t.queued_for_deepen).length;
   const deepenedCount = topics.filter((t) => (t.discovery?.deepening_count ?? 0) > 0).length;
   const parkedCount = topics.filter((t) => t.disposition === "parked").length;
@@ -546,6 +570,8 @@ export function TopicsWorkspace({
   const filteredTopics = topics.filter((t) => {
     if (filter === "seeds") return t.state === "seed";
     if (filter === "active") return isActiveTopic(t);
+    if (filter === "shallow") return t.state === "shallow" && !t.disposition;
+    if (filter === "deep") return t.state === "deep" && !t.disposition;
     if (filter === "queued") return t.queued_for_deepen;
     if (filter === "deepened") return (t.discovery?.deepening_count ?? 0) > 0;
     if (filter === "parked") return t.disposition === "parked";
@@ -597,6 +623,8 @@ export function TopicsWorkspace({
     all: "All",
     seeds: "Seeds",
     active: "Active",
+    shallow: "Shallow",
+    deep: "Deep",
     queued: "Queued",
     deepened: "Deepened",
     parked: "Parked",
@@ -609,10 +637,10 @@ export function TopicsWorkspace({
       <header className="topics-header">
         <h2>Topics</h2>
         <p className="topics-summary">
-          {seedCount} seeds · {activeCount} active · {queuedCount} queued · {deepenedCount} deepened · {parkedCount} parked · {settledCount} settled · {deprecatedCount} deprecated · {topics.length} total
+          {seedCount} seeds · {activeCount} active · {shallowCount} shallow · {deepCount} deep · {queuedCount} queued · {deepenedCount} deepened · {parkedCount} parked · {settledCount} settled · {deprecatedCount} deprecated · {topics.length} total
         </p>
         <div className="topics-filter-bar">
-          {(["all", "seeds", "active", "queued", "deepened", "parked", "settled", "deprecated"] as const).map((f) => (
+          {(["all", "seeds", "active", "shallow", "deep", "queued", "deepened", "parked", "settled", "deprecated"] as const).map((f) => (
             <button
               className={`topics-filter-button${filter === f ? " active" : ""}`}
               key={f}
@@ -622,16 +650,29 @@ export function TopicsWorkspace({
               {filterLabels[f]}
             </button>
           ))}
-          {queuedCount > 0 ? (
-            <button
-              className="topics-run-deepen-button"
-              onClick={() => void handleRunDeepen()}
-              title={`Run deepening on ${queuedCount} queued topic(s)`}
-              type="button"
-            >
-              Run Deepening ({queuedCount})
-            </button>
-          ) : null}
+          <div className="topics-action-buttons">
+            {shallowCount > 0 ? (
+              <button
+                className="topics-deepen-all-shallow-button"
+                disabled={isBuilding}
+                onClick={() => void handleDeepenAllShallow()}
+                title={`Queue all ${shallowCount} shallow topic(s) for deepening`}
+                type="button"
+              >
+                Queue All Shallow ({shallowCount})
+              </button>
+            ) : null}
+            {queuedCount > 0 ? (
+              <button
+                className="topics-run-deepen-button"
+                onClick={() => void handleRunDeepen()}
+                title={`Run deepening on ${queuedCount} queued topic(s)`}
+                type="button"
+              >
+                Run Deepening ({queuedCount})
+              </button>
+            ) : null}
+          </div>
         </div>
       </header>
 

@@ -1,7 +1,7 @@
 import { buildLogQuerySchema, createProjectBodySchema, parseRequestBody, parseRequestQuery, updateProjectUiStateBodySchema } from "./requestSchemas.js";
 import { readQuestions, answerQuestion, getQuestionCounts } from "../services/questionsService.js";
 
-import { readTopics, resolveTopic, updateTopic, setDisposition, getTopicCounts, toggleDeepenQueue, getDeepenLog } from "../services/topicsService.js";
+import { readTopics, resolveTopic, updateTopic, setDisposition, getTopicCounts, toggleDeepenQueue, queueAllShallowForDeepen, getDeepenLog } from "../services/topicsService.js";
 
 function extractOpenQuestions(content) {
   const lines = content.split("\n");
@@ -327,6 +327,15 @@ export function registerProjectRoutes(app, {
       }
 
       response.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/topics/queue-all-shallow", async (request, response, next) => {
+    try {
+      const result = await queueAllShallowForDeepen(request.project.path);
+      response.json(result);
     } catch (error) {
       next(error);
     }

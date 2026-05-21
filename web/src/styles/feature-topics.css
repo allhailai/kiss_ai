@@ -67,12 +67,43 @@
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
-  margin-left: auto;
   transition: background 0.15s ease;
 }
 
 .topics-run-deepen-button:hover {
   background: color-mix(in srgb, var(--color-annotation) 85%, black);
+}
+
+/* ── Action buttons group ── */
+
+.topics-action-buttons {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  align-items: center;
+}
+
+.topics-deepen-all-shallow-button {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 50%, var(--color-border));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+  color: var(--color-accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.topics-deepen-all-shallow-button:hover {
+  background: color-mix(in srgb, var(--color-accent) 22%, var(--color-surface));
+  border-color: var(--color-accent);
+}
+
+.topics-deepen-all-shallow-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 /* ── Queued card highlight ── */

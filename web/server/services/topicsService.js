@@ -193,6 +193,29 @@ export async function toggleDeepenQueue(projectPath, topicId) {
 }
 
 /**
+ * Queue all shallow, active topics for deepening in one operation.
+ * Returns the count of topics newly queued.
+ */
+export async function queueAllShallowForDeepen(projectPath) {
+  const data = await readTopics(projectPath);
+  let queued = 0;
+  for (const topic of data.topics) {
+    if (
+      topic.state === "shallow" &&
+      !topic.disposition &&
+      !topic.queued_for_deepen
+    ) {
+      topic.queued_for_deepen = true;
+      queued++;
+    }
+  }
+  if (queued > 0) {
+    await writeTopics(projectPath, data.topics, data.clusters);
+  }
+  return { queued, total: data.topics.filter((t) => t.state === "shallow" && !t.disposition).length };
+}
+
+/**
  * Get all topics queued for deepening.
  */
 export async function getDeepenQueue(projectPath) {

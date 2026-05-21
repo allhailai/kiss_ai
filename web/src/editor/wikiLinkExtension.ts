@@ -99,7 +99,9 @@ export function buildWikiLinkExtension({
     const files = getFiles();
     const onOpenFile = getOnOpenFile();
     const linkIndex = createLinkResolutionIndex(files, selectedPath);
-    const builder = new RangeSetBuilder<Decoration>();
+
+    // Collect all link decorations across all visible ranges first
+    const allLinks: Array<{ from: number; to: number; label: string; resolution: WikiLinkResolution }> = [];
 
     for (const { from, to } of view.visibleRanges) {
       let position = from;
@@ -113,14 +115,14 @@ export function buildWikiLinkExtension({
           continue;
         }
 
-        const linkDecorations: Array<{ from: number; to: number; label: string; resolution: WikiLinkResolution }> = [];
+        const lineLinks: Array<{ from: number; to: number; label: string; resolution: WikiLinkResolution }> = [];
         wikiLinkPattern.lastIndex = 0;
         markdownLinkPattern.lastIndex = 0;
 
         for (const match of line.text.matchAll(wikiLinkPattern)) {
           const matchIndex = match.index ?? 0;
           const rawTarget = match[1] ?? "";
-          linkDecorations.push({
+          lineLinks.push({
             from: line.from + matchIndex,
             to: line.from + matchIndex + match[0].length,
             label: wikiLinkLabel(rawTarget),
@@ -135,9 +137,9 @@ export function buildWikiLinkExtension({
           const linkFrom = line.from + matchIndex;
           const linkTo = linkFrom + match[0].length;
 
-          if (linkDecorations.some((decoration) => linkFrom < decoration.to && linkTo > decoration.from)) continue;
+          if (lineLinks.some((decoration) => linkFrom < decoration.to && linkTo > decoration.from)) continue;
 
-          linkDecorations.push({
+          lineLinks.push({
             from: linkFrom,
             to: linkTo,
             label,
@@ -145,27 +147,28 @@ export function buildWikiLinkExtension({
           });
         }
 
-        let lastLinkEnd = -1;
-        linkDecorations
-          .sort((left, right) => left.from - right.from || left.to - right.to)
-          .filter((link) => {
-            if (link.from < lastLinkEnd) return false;
-            lastLinkEnd = link.to;
-            return true;
-          })
-          .forEach((link) => {
-            builder.add(
-              link.from,
-              link.to,
-              Decoration.replace({
-                widget: new MarkdownLinkWidget(link.label, link.resolution, onOpenFile),
-              }),
-            );
-          });
+        allLinks.push(...lineLinks);
 
         if (line.to >= to) break;
         position = line.to + 1;
       }
+    }
+
+    // Sort globally by position, then deduplicate overlaps
+    allLinks.sort((left, right) => left.from - right.from || left.to - right.to);
+
+    const builder = new RangeSetBuilder<Decoration>();
+    let lastEnd = -1;
+    for (const link of allLinks) {
+      if (link.from < lastEnd) continue; // skip overlapping
+      lastEnd = link.to;
+      builder.add(
+        link.from,
+        link.to,
+        Decoration.replace({
+          widget: new MarkdownLinkWidget(link.label, link.resolution, onOpenFile),
+        }),
+      );
     }
 
     return builder.finish();
