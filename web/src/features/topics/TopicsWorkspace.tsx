@@ -240,7 +240,7 @@ function TopicCard({
             title={isRunningDeepen ? "Deepening in progress…" : topic.queued_for_deepen ? "Remove from deepen queue" : "Add to deepen queue"}
             type="button"
           >
-            {isRunningDeepen ? (<><span className="topic-deepen-spinner" /> Running</>) : topic.queued_for_deepen ? "Queued ✓" : "Go Deeper"}
+            {isRunningDeepen ? (<><span className="topic-deepen-spinner" /> Running</>) : topic.queued_for_deepen ? "Queued ✓" : hasBeenDeepened ? "Deepened" : "Go Deeper"}
           </button>
           {topic.wiki_page ? (
             <button
