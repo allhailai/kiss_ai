@@ -5,7 +5,6 @@ import { type RouteState, type View } from "../../navigation/views";
 
 export function useRouteDrivenData({
   clearSelectedFile,
-  loadTree,
   refreshBuildLog,
   refreshDesign,
   selectFile,
@@ -15,7 +14,6 @@ export function useRouteDrivenData({
   setView,
 }: {
   clearSelectedFile: () => void;
-  loadTree: (section: string) => Promise<void>;
   refreshBuildLog: () => Promise<void>;
   refreshDesign: () => Promise<void>;
   selectFile: (path: string) => Promise<void>;
@@ -40,14 +38,7 @@ export function useRouteDrivenData({
         setNotice("");
         clearSelectedFile();
 
-        if (nextView === "requirements") {
-          await loadTree("requirements");
-        } else if (nextView === "inputs") {
-          await loadTree("human");
-        } else if (nextView === "outputs") {
-          await loadTree("outputs");
-        }
-        if (!isCurrentRouteRequest()) return;
+
 
         if (nextView === "dashboard") {
           await Promise.all([refreshDesign(), refreshBuildLog()]);
@@ -70,7 +61,6 @@ export function useRouteDrivenData({
     },
     [
       clearSelectedFile,
-      loadTree,
       refreshBuildLog,
       refreshDesign,
       selectFile,

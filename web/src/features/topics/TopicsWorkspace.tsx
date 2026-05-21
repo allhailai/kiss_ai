@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Topic, TopicDisposition, TopicState } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
 import { useBuildContext } from "../../app/contexts/BuildContext";
-import "./TopicsWorkspace.css";
 
 type TopicsFilter = "all" | "seeds" | "active" | "queued" | "deepened" | "parked" | "settled" | "deprecated";
 

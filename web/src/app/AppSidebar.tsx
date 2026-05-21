@@ -17,9 +17,9 @@ export function AppSidebar({
   collapsed: boolean;
   fileWorkspace: {
     humanInputEmptyDirectories: string[];
+    loading: boolean;
     projectFiles: ProjectFile[];
     selected: { path: string } | null;
-    treeLoading: boolean;
     createHumanInputFolder: (name: string) => Promise<void>;
     createHumanInputTextFile: (name: string, folder?: string) => Promise<void>;
     deleteHumanInputFile: (path: string) => Promise<void>;
@@ -119,7 +119,7 @@ export function AppSidebar({
           blockingQuestionsCount={rebuildWorkspace.status?.blockingQuestionsCount}
           pendingSuggestionsCount={rebuildWorkspace.status?.pendingSuggestionsCount}
           seedTopicsCount={rebuildWorkspace.status?.seedTopicsCount}
-          loading={fileWorkspace.treeLoading}
+          loading={fileWorkspace.loading}
           projectFiles={fileWorkspace.projectFiles}
           selectedPath={fileWorkspace.selected?.path ?? null}
           onCreateFolder={(name) => void fileWorkspace.createHumanInputFolder(name)}

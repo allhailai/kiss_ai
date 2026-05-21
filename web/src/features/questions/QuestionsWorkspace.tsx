@@ -4,7 +4,6 @@ import { api } from "../../data/apiClient";
 import { formatLocalDateTime } from "../../domain/formatters";
 import { renderMarkdownMessageContent } from "../../shared/chat/chatRendering";
 import { CompactModelPicker } from "../../shared/CompactModelPicker";
-import "./QuestionsWorkspace.css";
 
 type QuestionsFilter = "all" | "open" | "answered";
 

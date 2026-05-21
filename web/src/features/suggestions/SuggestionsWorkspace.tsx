@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AiSuggestion } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
-import "./SuggestionsWorkspace.css";
 
 type SuggestionsFilter = "all" | "pending" | "accepted" | "dismissed";
 

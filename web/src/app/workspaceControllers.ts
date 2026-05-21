@@ -44,7 +44,6 @@ export type FileWorkspaceController = {
   selected: FileContent | null;
   selectedDiff: FileDiff | null;
   setDraft: (draft: string) => void;
-  treeLoading: boolean;
   uploadHumanInputFiles: (files: File[]) => Promise<void>;
 };
 

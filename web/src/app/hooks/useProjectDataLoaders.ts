@@ -12,7 +12,6 @@ export function useProjectDataLoaders({
   setProjectFiles,
   setRebuild,
   setStatus,
-  setTreeLoading,
 }: {
   selectedProjectSlug: string | null;
   setBuildLog: (buildLog: BuildLogState | null) => void;
@@ -21,10 +20,8 @@ export function useProjectDataLoaders({
   setProjectFiles: (files: ProjectFile[]) => void;
   setRebuild: (rebuild: RebuildState | null) => void;
   setStatus: (status: ProjectStatus | null) => void;
-  setTreeLoading: (loading: boolean) => void;
 }) {
   const selectedProjectSlugRef = useRef(selectedProjectSlug);
-  const treeRequestIdRef = useRef(0);
 
   const requireSelectedProjectSlug = useCallback(() => {
     if (!selectedProjectSlug) {
@@ -90,24 +87,7 @@ export function useProjectDataLoaders({
     }
   }, [requireSelectedProjectSlug, setHumanInputEmptyDirectories, setProjectFiles]);
 
-  const loadTree = useCallback(
-    async (section: string) => {
-      const projectSlug = requireSelectedProjectSlug();
-      const requestId = (treeRequestIdRef.current += 1);
-      setTreeLoading(true);
-      try {
-        await api.tree(projectSlug, section);
-      } finally {
-        if (treeRequestIdRef.current === requestId) {
-          setTreeLoading(false);
-        }
-      }
-    },
-    [requireSelectedProjectSlug, setTreeLoading],
-  );
-
   return {
-    loadTree,
     refreshBuildLog,
     refreshDesign,
     refreshProjectFiles,

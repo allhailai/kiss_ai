@@ -172,7 +172,17 @@ export function App() {
       setSelectedModelId: rebuildWorkspace.setSelectedModelId,
       status: rebuildWorkspace.status,
     }),
-    [rebuildWorkspace, openBuildProjectPanel, startRebuildWithRequirementsCheck],
+    [
+      openBuildProjectPanel,
+      rebuildWorkspace.models,
+      rebuildWorkspace.rebuild,
+      rebuildWorkspace.refreshRebuild,
+      rebuildWorkspace.refreshStatus,
+      rebuildWorkspace.selectedModelId,
+      rebuildWorkspace.setSelectedModelId,
+      rebuildWorkspace.status,
+      startRebuildWithRequirementsCheck,
+    ],
   );
 
   if (!project.selectedProjectSlug || !project.selectedProject) {

@@ -47,7 +47,6 @@ export function useProjectWorkspace() {
   const [design, setDesign] = useState<DesignState | null>(null);
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([designProjectFile]);
   const [humanInputEmptyDirectories, setHumanInputEmptyDirectories] = useState<string[]>([]);
-  const [treeLoading, setTreeLoading] = useState(false);
   const [fileLoading, setFileLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reverting, setReverting] = useState(false);
@@ -80,7 +79,6 @@ export function useProjectWorkspace() {
   }, []);
 
   const {
-    loadTree,
     refreshBuildLog,
     refreshDesign,
     refreshProjectFiles,
@@ -95,7 +93,6 @@ export function useProjectWorkspace() {
     setProjectFiles,
     setRebuild,
     setStatus,
-    setTreeLoading,
   });
 
   const {
@@ -145,7 +142,6 @@ export function useProjectWorkspace() {
 
   const applyRoute = useRouteDrivenData({
     clearSelectedFile,
-    loadTree,
     refreshBuildLog,
     refreshDesign,
     selectFile,
@@ -197,13 +193,11 @@ export function useProjectWorkspace() {
 
   const { createHumanInputFolder, createHumanInputTextFile, deleteHumanInputFile, deleteHumanInputFolder, moveHumanInputFile, uploadHumanInputFiles } = useHumanInputs({
     clearSelectedFile,
-    loadTree,
     refreshProjectFiles,
     requireSelectedProjectSlug,
     selected,
     setInputMutationLoading,
     setNotice,
-    view,
     onOpenFile: openProjectFile,
   });
 
@@ -336,7 +330,7 @@ export function useProjectWorkspace() {
     hasUnsavedChanges,
     humanInputEmptyDirectories,
     inputMutationLoading,
-    loading: treeLoading || fileLoading || saving || reverting || inputMutationLoading,
+    loading: fileLoading || saving || reverting || inputMutationLoading,
     projectFiles,
     refreshProjectFiles,
     refreshSelectedFile,
@@ -347,7 +341,6 @@ export function useProjectWorkspace() {
     selected,
     selectedDiff,
     setDraft,
-    treeLoading,
     uploadHumanInputFiles,
   } satisfies FileWorkspaceController;
   const rebuildWorkspace = {
