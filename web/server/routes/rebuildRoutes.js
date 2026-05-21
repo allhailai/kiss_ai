@@ -58,8 +58,3 @@ export function registerRebuildRoutes(app, {
     }
   });
 }
-
-  getRebuildState,
-  httpError,
-  startDeepen,
-  startHumanAttentionResolution,
