@@ -277,6 +277,56 @@ export function createAgentJobService({
     return lines.join("\n");
   }
 
+  function createAutoAnswerPrompt(project, openQuestions) {
+    const questionsJson = JSON.stringify(openQuestions.map((q) => ({
+      id: q.id,
+      text: q.text,
+      context: q.context,
+      priority: q.priority,
+      relatedFiles: q.relatedFiles,
+      relatedTopics: q.relatedTopics,
+    })), null, 2);
+
+    return [
+      "You are reviewing open questions for a kiss_ai research project.",
+      "Your SOLE job is to check if any of these questions can be answered from the evidence already gathered in this project.",
+      "",
+      `Project root: ${project.path}`,
+      "",
+      "## Instructions",
+      "",
+      "1. Read sources/digests/ to understand what evidence has been gathered.",
+      "2. Read outputs_ai/wiki/_index.md to understand the wiki coverage.",
+      "3. For each open question below, determine if the gathered sources contain a clear answer.",
+      "4. If a question CAN be clearly answered from the evidence:",
+      "   - Read the relevant source file(s) from sources/web_research/ or wiki page(s) to confirm.",
+      "   - Note the answer and which source(s) support it.",
+      "5. If a question CANNOT be answered (requires private/business info, or evidence is insufficient), skip it.",
+      "",
+      "## Output",
+      "",
+      "Read .build/questions.json, then rewrite it with updates.",
+      "For each question you can answer from evidence:",
+      '  - Set status: "answered"',
+      "  - Set answer: a concise answer citing the source file(s) that support it.",
+      '  - Set answeredBy: "ai_auto"',
+      "  - Set answeredAt: current ISO timestamp",
+      "For questions you cannot answer, leave them unchanged (status: \"open\").",
+      "",
+      "IMPORTANT:",
+      "- Do NOT guess. Only answer if the evidence clearly supports the answer.",
+      "- Do NOT answer questions about specific business relationships, contract partners, or proprietary details unless the sources explicitly name them.",
+      "- DO answer questions about public regulations, statutes, government rules, and published policies if the sources contain this information.",
+      "- Write the updated .build/questions.json with ALL questions (both answered and still-open).",
+      "",
+      "## Open Questions",
+      "",
+      "```json",
+      questionsJson,
+      "```",
+    ].join("\n");
+  }
+
   const MAX_FILE_CONCURRENCY = 3;
 
   async function runFileSynthesisPhase({ project, apiKey, modelId, sourceMap }) {
@@ -1076,6 +1126,76 @@ export function createAgentJobService({
         prompt: validationPrompt,
         phaseName: "Validation",
       });
+
+      // ── Phase 3d: Auto-answer open questions from evidence ──
+      try {
+        const questionsData = await readQuestions(project.path);
+        const openQuestions = questionsData.questions.filter((q) => q.status === "open");
+
+        if (openQuestions.length > 0) {
+          await appendRunEvent(project.slug, {
+            type: "system",
+            title: `Phase 3d: Auto-answering ${openQuestions.length} open question(s)`,
+            text: "Agent is reviewing open questions against gathered sources and digests.",
+            status: "auto_answer",
+            runtime: "cursor",
+            metadata: { phase: "3d", openQuestionCount: openQuestions.length },
+          });
+
+          const stateBeforeAutoAnswer = await getRebuildState(project.slug);
+          await setRebuildState(project.slug, {
+            ...stateBeforeAutoAnswer,
+            buildPhase: "auto_answer",
+            buildPhaseDetail: `Reviewing ${openQuestions.length} open question(s) against evidence`,
+          });
+
+          const autoAnswerPrompt = createAutoAnswerPrompt(project, openQuestions);
+          await runSingleAgentPhase({
+            project,
+            apiKey,
+            modelId,
+            prompt: autoAnswerPrompt,
+            phaseName: "Auto-Answer Questions",
+          });
+
+          // Check results
+          const updatedQuestions = await readQuestions(project.path);
+          const answeredCount = updatedQuestions.questions.filter(
+            (q) => q.status === "answered" && q.answeredBy === "ai_auto"
+          ).length;
+
+          if (answeredCount > 0) {
+            await appendRunEvent(project.slug, {
+              type: "system",
+              title: `Auto-answered ${answeredCount} question(s)`,
+              text: `${answeredCount} of ${openQuestions.length} open questions were answered from gathered evidence.`,
+              status: "auto_answer_complete",
+              runtime: "server",
+              metadata: { phase: "3d", answeredCount, totalOpen: openQuestions.length },
+            });
+          } else {
+            await appendRunEvent(project.slug, {
+              type: "system",
+              title: "No questions auto-answered",
+              text: "None of the open questions could be conclusively answered from current evidence.",
+              status: "auto_answer_complete",
+              runtime: "server",
+              metadata: { phase: "3d", answeredCount: 0, totalOpen: openQuestions.length },
+            });
+          }
+        }
+      } catch (autoAnswerError) {
+        // Non-fatal — continue build even if auto-answer fails
+        console.error("Auto-answer phase failed:", autoAnswerError);
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Auto-answer phase skipped",
+          text: `Error: ${autoAnswerError.message}`,
+          status: "auto_answer_error",
+          runtime: "server",
+          metadata: { phase: "3d", error: autoAnswerError.message },
+        });
+      }
 
       // ── Phase 4: Drain Deepen Queue (if any topics are queued) ──
       const deepenQueue = await getDeepenQueue(project.path);
