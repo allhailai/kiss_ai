@@ -112,10 +112,12 @@ export function AppSidebar({
         <SimplifiedNavigator
           currentView={route.view}
           humanInputEmptyDirectories={fileWorkspace.humanInputEmptyDirectories}
-          openQuestionsCount={rebuildWorkspace.status?.openQuestionsCount}
-          blockingQuestionsCount={rebuildWorkspace.status?.blockingQuestionsCount}
-          pendingSuggestionsCount={rebuildWorkspace.status?.pendingSuggestionsCount}
-          seedTopicsCount={rebuildWorkspace.status?.seedTopicsCount}
+          reviewBadgeCount={
+            (rebuildWorkspace.status?.openQuestionsCount ?? 0) +
+            (rebuildWorkspace.status?.pendingSuggestionsCount ?? 0) +
+            (rebuildWorkspace.status?.seedTopicsCount ?? 0)
+          }
+          hasBlockingQuestions={(rebuildWorkspace.status?.blockingQuestionsCount ?? 0) > 0}
           loading={fileWorkspace.loading}
           projectFiles={fileWorkspace.projectFiles}
           selectedPath={fileWorkspace.selected?.path ?? null}

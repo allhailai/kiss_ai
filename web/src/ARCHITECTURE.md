@@ -55,6 +55,8 @@ Global hub actions that are not scoped to a research project should use `/api/sy
 
 App-owned orchestration belongs in `app/`. If state drives more than one workflow surface, keep the controller in `app/` or a focused `app/hooks/` module and pass behavior into features as props.
 
+`app/ReviewWorkspace.tsx` composes `features/questions/`, `features/suggestions/`, and `features/topics/` into a unified tabbed view called "AI Review". It lives in `app/` rather than `features/` because it crosses feature boundaries to compose the three review surfaces. It also owns the "Needs Attention" merged feed and cross-link detection logic.
+
 Right-panel behavior is app shell state. Panel persistence, panel width, panel kind, selected agent conversation mirroring, mode switching, and file context selection belong in `app/`. `features/agents/` owns the AI File Assist / agent chat panel body.
 
 `app/useProjectWorkspace.ts` owns the shared `projectFiles` index used by navigation, editor link resolution, and agent file context selection. View-specific file content stays in the selected file state; features should not maintain a parallel project tree unless the data is truly local to that workflow.
@@ -111,12 +113,12 @@ Current features:
 - `files/`
 - `navigation/`
 - `projectPicker/`
-- `questions/`
+- `questions/` (composed via `app/ReviewWorkspace.tsx`)
 - `rebuild/`
 - `search/`
-- `suggestions/`
+- `suggestions/` (composed via `app/ReviewWorkspace.tsx`)
 - `toast/`
-- `topics/`
+- `topics/` (composed via `app/ReviewWorkspace.tsx`)
 
 ## Data And Live Updates
 

@@ -7,9 +7,7 @@ import { Dashboard } from "../features/dashboard/Dashboard";
 import { DesignWorkspace } from "../features/design/DesignWorkspace";
 import { FileWorkspace } from "../features/files/FileWorkspace";
 import { ProjectChatConversationHistory } from "../features/chat/ProjectChatConversationHistory";
-import { QuestionsWorkspace } from "../features/questions/QuestionsWorkspace";
-import { SuggestionsWorkspace } from "../features/suggestions/SuggestionsWorkspace";
-import { TopicsWorkspace } from "../features/topics/TopicsWorkspace";
+import { ReviewWorkspace } from "./ReviewWorkspace";
 
 const fileWorkspaceByView: Partial<Record<View, { title?: string; explainer?: string }>> = {
   requirements: {
@@ -22,6 +20,8 @@ const fileWorkspaceByView: Partial<Record<View, { title?: string; explainer?: st
     explainer: "Outputs are AI-managed. Use annotations to guide the AI.",
   },
 };
+
+const reviewViews = new Set<View>(["review", "questions", "suggestions", "topics"]);
 
 export function MainContentArea({
   designWorkspace,
@@ -95,8 +95,8 @@ export function MainContentArea({
           onSave={() => void fileWorkspace.saveSelected()}
         />
       ) : null}
-      {route.view === "questions" ? (
-        <QuestionsWorkspace
+      {reviewViews.has(route.view) ? (
+        <ReviewWorkspace
           models={rebuildWorkspace.models}
           onModelChange={rebuildWorkspace.setSelectedModelId}
           onNavigateToFile={onOpenFile}
@@ -104,18 +104,7 @@ export function MainContentArea({
           selectedModelId={rebuildWorkspace.selectedModelId}
         />
       ) : null}
-      {route.view === "suggestions" ? (
-        <SuggestionsWorkspace
-          onNavigateToFile={onOpenFile}
-          projectSlug={projectSlug}
-        />
-      ) : null}
-      {route.view === "topics" ? (
-        <TopicsWorkspace
-          onNavigateToFile={onOpenFile}
-          projectSlug={projectSlug}
-        />
-      ) : null}
     </section>
   );
 }
+

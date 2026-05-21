@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  aiSuggestionsNavLeaf,
+  reviewNavLeaf,
   chatNavLeaf,
-  openQuestionsNavLeaf,
   requirementNavLeaves,
   sectionForView,
   simplifiedNavSections,
-  topicsNavLeaf,
   type SimplifiedNavSectionId,
 } from "../../navigation/navigationModel";
 import { projectPathPrefixes } from "../../domain/projectPaths";
@@ -21,10 +19,8 @@ const defaultExpandedSections = new Set<SimplifiedNavSectionId>(
 export function SimplifiedNavigator({
   currentView,
   humanInputEmptyDirectories,
-  openQuestionsCount,
-  blockingQuestionsCount,
-  pendingSuggestionsCount,
-  seedTopicsCount,
+  reviewBadgeCount,
+  hasBlockingQuestions,
   projectFiles,
   loading,
   selectedPath,
@@ -39,10 +35,8 @@ export function SimplifiedNavigator({
 }: {
   currentView: View;
   humanInputEmptyDirectories?: string[];
-  openQuestionsCount?: number;
-  blockingQuestionsCount?: number;
-  pendingSuggestionsCount?: number;
-  seedTopicsCount?: number;
+  reviewBadgeCount?: number;
+  hasBlockingQuestions?: boolean;
   projectFiles: ProjectFile[];
   loading: boolean;
   selectedPath: string | null;
@@ -121,6 +115,7 @@ export function SimplifiedNavigator({
 
   function renderSectionBody(sectionId: SimplifiedNavSectionId) {
     if (sectionId === "define") {
+      const isReviewActive = currentView === "review" || currentView === "questions" || currentView === "suggestions" || currentView === "topics";
       return (
         <>
           <div className="simple-nav-children">
@@ -135,38 +130,14 @@ export function SimplifiedNavigator({
               </button>
             ))}
             <button
-              className={currentView === "questions" ? "simple-nav-item simple-nav-child nav-questions-btn active" : "simple-nav-item simple-nav-child nav-questions-btn"}
-              onClick={() => onOpenView(openQuestionsNavLeaf.view)}
+              className={isReviewActive ? "simple-nav-item simple-nav-child nav-questions-btn active" : "simple-nav-item simple-nav-child nav-questions-btn"}
+              onClick={() => onOpenView(reviewNavLeaf.view)}
               type="button"
             >
-              <DefineNavLabel label={openQuestionsNavLeaf.label} />
-              {(openQuestionsCount ?? 0) > 0 ? (
-                <b className={(blockingQuestionsCount ?? 0) > 0 ? "nav-badge nav-badge-blocking" : "nav-badge nav-badge-open"}>
-                  {openQuestionsCount}
-                </b>
-              ) : null}
-            </button>
-            <button
-              className={currentView === "suggestions" ? "simple-nav-item simple-nav-child nav-questions-btn active" : "simple-nav-item simple-nav-child nav-questions-btn"}
-              onClick={() => onOpenView(aiSuggestionsNavLeaf.view)}
-              type="button"
-            >
-              <DefineNavLabel label={aiSuggestionsNavLeaf.label} />
-              {(pendingSuggestionsCount ?? 0) > 0 ? (
-                <b className="nav-badge nav-badge-open">
-                  {pendingSuggestionsCount}
-                </b>
-              ) : null}
-            </button>
-            <button
-              className={currentView === "topics" ? "simple-nav-item simple-nav-child nav-questions-btn active" : "simple-nav-item simple-nav-child nav-questions-btn"}
-              onClick={() => onOpenView(topicsNavLeaf.view)}
-              type="button"
-            >
-              <DefineNavLabel label={topicsNavLeaf.label} />
-              {(seedTopicsCount ?? 0) > 0 ? (
-                <b className="nav-badge nav-badge-open">
-                  {seedTopicsCount}
+              <DefineNavLabel label={reviewNavLeaf.label} />
+              {(reviewBadgeCount ?? 0) > 0 ? (
+                <b className={hasBlockingQuestions ? "nav-badge nav-badge-blocking" : "nav-badge nav-badge-open"}>
+                  {reviewBadgeCount}
                 </b>
               ) : null}
             </button>
