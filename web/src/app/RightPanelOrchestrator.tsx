@@ -1,7 +1,7 @@
 import type { AgentContextFile, ChatContextFile, ChatMessageFileEdit, ProjectFile, RebuildModel, RebuildState } from "../contracts/api";
 import type { ProjectChatController } from "./hooks/useProjectChat";
 import type { RightPanelKind, RightPanelState } from "./hooks/useRightPanelSurface";
-import type { View } from "../navigation/views";
+import { useRouteContext } from "./contexts/RouteContext";
 import { RightPanelSurface, type RightPanelResizeControls } from "./RightPanelSurface";
 import { BuildProjectRightPanel } from "../features/rebuild/BuildProjectRightPanel";
 import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
@@ -16,7 +16,6 @@ export function RightPanelOrchestrator({
   closeRightPanel,
   draftSeed,
   fileWorkspaceProjectFiles,
-  navigateTo,
   projectChat,
   rebuildWorkspace,
   resize,
@@ -37,7 +36,6 @@ export function RightPanelOrchestrator({
   closeRightPanel: () => void;
   draftSeed: { id: string; draft: string } | null;
   fileWorkspaceProjectFiles: ProjectFile[];
-  navigateTo: (view: View) => void;
   projectChat: ProjectChatController;
   rebuildWorkspace: {
     models: RebuildModel[];
@@ -51,6 +49,7 @@ export function RightPanelOrchestrator({
   selectRightPanelKind: (kind: RightPanelKind) => void;
   startRebuild: () => void;
 }) {
+  const route = useRouteContext();
   return (
     <RightPanelSurface
       onClose={closeRightPanel}
@@ -61,7 +60,7 @@ export function RightPanelOrchestrator({
         <BuildProjectRightPanel
           models={rebuildWorkspace.models}
           onModelChange={rebuildWorkspace.setSelectedModelId}
-          onOpenQuestions={() => navigateTo("questions")}
+          onOpenQuestions={() => route.navigateTo("questions")}
           onSelectPanel={selectRightPanelKind}
           onStart={startRebuild}
           rebuild={rebuildWorkspace.rebuild}

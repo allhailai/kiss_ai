@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import type { ProjectFile, ProjectStatus } from "../contracts/api";
-import type { View } from "../navigation/views";
+import { useRouteContext } from "./contexts/RouteContext";
 import { SimplifiedNavigator } from "../features/navigation/WorkflowMenus";
 
 export function AppSidebar({
@@ -10,9 +10,7 @@ export function AppSidebar({
   onCollapse,
   onExpand,
   onOpenFile,
-  onOpenView,
   rebuildWorkspace,
-  route,
 }: {
   collapsed: boolean;
   fileWorkspace: {
@@ -39,12 +37,11 @@ export function AppSidebar({
   onCollapse: () => void;
   onExpand: () => void;
   onOpenFile: (path: string) => void;
-  onOpenView: (nextView: View, filePath?: string | null) => void;
   rebuildWorkspace: {
     status: ProjectStatus | null;
   };
-  route: { view: View };
 }) {
+  const route = useRouteContext();
   const resizingRef = useRef(false);
 
   return (
@@ -129,7 +126,7 @@ export function AppSidebar({
           onMoveFile={(sourcePath, targetFolder) => void fileWorkspace.moveHumanInputFile(sourcePath, targetFolder)}
           onUploadFiles={fileWorkspace.uploadHumanInputFiles}
           onOpenFile={onOpenFile}
-          onOpenView={(nextView, filePath) => onOpenView(nextView, filePath)}
+          onOpenView={(nextView, filePath) => route.navigateTo(nextView, filePath)}
         />
       </aside>
     </>

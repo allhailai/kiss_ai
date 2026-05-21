@@ -17,6 +17,8 @@ import { makeEditableTargetForFile, useAgentFileContext } from "./hooks/useAgent
 import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
 import type { ChatMessageFileEdit } from "../contracts/api";
 import { BuildProvider, type BuildContextValue } from "./contexts/BuildContext";
+import { RouteProvider } from "./contexts/RouteContext";
+import { ToastProvider } from "./contexts/ToastContext";
 import { UpdateCheckerModal } from "./UpdateCheckerModal";
 import { SettingsModal } from "./SettingsModal";
 import { MainContentArea } from "./MainContentArea";
@@ -187,19 +189,21 @@ export function App() {
 
   if (!project.selectedProjectSlug || !project.selectedProject) {
     return (
-      <main className="app-shell project-picker-shell" style={appStyle}>
-        <ToastViewport toasts={toastWorkspace.toasts} onDismiss={toastWorkspace.dismissToast} />
-        <ProjectPicker
-          creatingProject={project.creatingProject}
-          error={project.projectsError}
-          onCreateProject={project.createProject}
-          onSelect={project.selectProject}
-          projects={project.projects}
-          projectsRoot={project.projectsRoot}
-          settingsSlot={<SettingsModal />}
-          updateCheckerSlot={<UpdateCheckerModal />}
-        />
-      </main>
+      <ToastProvider value={toastWorkspace}>
+        <main className="app-shell project-picker-shell" style={appStyle}>
+          <ToastViewport toasts={toastWorkspace.toasts} onDismiss={toastWorkspace.dismissToast} />
+          <ProjectPicker
+            creatingProject={project.creatingProject}
+            error={project.projectsError}
+            onCreateProject={project.createProject}
+            onSelect={project.selectProject}
+            projects={project.projects}
+            projectsRoot={project.projectsRoot}
+            settingsSlot={<SettingsModal />}
+            updateCheckerSlot={<UpdateCheckerModal />}
+          />
+        </main>
+      </ToastProvider>
     );
   }
 
@@ -208,6 +212,8 @@ export function App() {
   }`;
 
   return (
+    <ToastProvider value={toastWorkspace}>
+    <RouteProvider value={route}>
     <BuildProvider value={buildContextValue}>
         <main className={appShellClassName} style={appStyle}>
           <GlobalFileSearch
@@ -228,23 +234,18 @@ export function App() {
             onCollapse={() => setSidebarCollapsed(true)}
             onExpand={() => setSidebarCollapsed(false)}
             onOpenFile={openProjectFileWithAgentContext}
-            onOpenView={(nextView, filePath) => route.navigateTo(nextView, filePath)}
             rebuildWorkspace={rebuildWorkspace}
-            route={route}
           />
 
           <MainContentArea
             designWorkspace={designWorkspace}
             fileWorkspace={fileWorkspace}
-            navigateTo={route.navigateTo}
             onAiFileAssist={() => void assistCurrentFile()}
             onOpenFile={openProjectFileWithAgentContext}
             projectChat={projectChat}
             projectSlug={project.selectedProjectSlug}
             rebuildWorkspace={rebuildWorkspace}
-            route={route}
             selectProjectChatConversation={selectProjectChatConversation}
-            toastWorkspace={toastWorkspace}
           />
 
           {rightPanelSurface.rightPanel ? (
@@ -254,7 +255,6 @@ export function App() {
               closeRightPanel={closeRightPanel}
               draftSeed={agentDraftSeed}
               fileWorkspaceProjectFiles={fileWorkspace.projectFiles}
-              navigateTo={route.navigateTo}
               projectChat={projectChat}
               rebuildWorkspace={rebuildWorkspace}
               resize={
@@ -276,5 +276,7 @@ export function App() {
           ) : null}
         </main>
     </BuildProvider>
+    </RouteProvider>
+    </ToastProvider>
   );
 }

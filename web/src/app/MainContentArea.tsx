@@ -1,6 +1,8 @@
-import type { View } from "../navigation/views";
 import type { ProjectChatController } from "./hooks/useProjectChat";
-import type { DesignWorkspaceController, FileWorkspaceController, RebuildWorkspaceController, ToastWorkspaceController } from "./workspaceControllers";
+import type { DesignWorkspaceController, FileWorkspaceController, RebuildWorkspaceController } from "./workspaceControllers";
+import type { View } from "../navigation/views";
+import { useRouteContext } from "./contexts/RouteContext";
+import { useToastContext } from "./contexts/ToastContext";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { DesignWorkspace } from "../features/design/DesignWorkspace";
 import { FileWorkspace } from "../features/files/FileWorkspace";
@@ -24,28 +26,24 @@ const fileWorkspaceByView: Partial<Record<View, { title?: string; explainer?: st
 export function MainContentArea({
   designWorkspace,
   fileWorkspace,
-  navigateTo,
   onAiFileAssist,
   onOpenFile,
   projectChat,
   projectSlug,
   rebuildWorkspace,
-  route,
   selectProjectChatConversation,
-  toastWorkspace,
 }: {
   designWorkspace: DesignWorkspaceController;
   fileWorkspace: FileWorkspaceController;
-  navigateTo: (view: View) => void;
   onAiFileAssist: () => void;
   onOpenFile: (path: string) => void;
   projectChat: ProjectChatController;
   projectSlug: string;
   rebuildWorkspace: RebuildWorkspaceController;
-  route: { view: View };
   selectProjectChatConversation: (conversationId: string) => void;
-  toastWorkspace: ToastWorkspaceController;
 }) {
+  const route = useRouteContext();
+  const toastWorkspace = useToastContext();
   const fileWorkspaceConfig = fileWorkspaceByView[route.view];
 
   return (
@@ -56,7 +54,7 @@ export function MainContentArea({
           design={designWorkspace.design}
           rebuild={rebuildWorkspace.rebuild}
           buildLog={rebuildWorkspace.buildLog}
-          onOpenDesign={() => navigateTo("design")}
+          onOpenDesign={() => route.navigateTo("design")}
           onSelectLog={(tabId, path, sectionId) => void rebuildWorkspace.refreshBuildLog(tabId, path, sectionId)}
         />
       ) : null}
