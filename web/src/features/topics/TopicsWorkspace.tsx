@@ -167,9 +167,12 @@ function TopicCard({
       {topic.coverage_gaps.length > 0 ? (
         <div className="topic-card-gaps">
           <span className="topic-card-gaps-label">Gaps:</span>
-          {topic.coverage_gaps.map((gap) => (
-            <span className="topic-card-gap-tag" key={gap}>{gap}</span>
-          ))}
+          {topic.coverage_gaps.map((gap, i) => {
+            const label = typeof gap === "string" ? gap : gap.description || "Untitled gap";
+            return (
+              <span className="topic-card-gap-tag" key={typeof gap === "string" ? gap : gap.description || i}>{label}</span>
+            );
+          })}
         </div>
       ) : null}
 
