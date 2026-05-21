@@ -204,18 +204,27 @@ This index is read by future builds (Phase 1, Step 5) to understand the wiki sta
     - Source contradiction (material to project thesis) → create a **question**.
     - A new topic or directed output would serve the project goal → add it as a seed topic or create the output.
 
-    **Do not leave `<!-- AI_SUGGESTION: ... -->` markers.** Act directly or delegate to the pipeline via `coverage_gaps` in `.build/topics.json`.
+    Act directly or delegate to the pipeline via `coverage_gaps` in `.build/topics.json`.
 
 36. **Question gate:** Before creating any question in `.build/questions.json`, apply the public/private test:
     - If the answer could come from a publicly available source (statutes, regulations, published documents, government databases), do NOT create a question. Add a structured `coverage_gap` to the relevant topic and let the pipeline fetch it on the next build.
     - If the answer requires private information only the human has (business relationships, contract terms, strategic judgment, proprietary data), create a question.
     - If a `coverage_gap` has persisted for 2+ builds without resolution (check the `attempts` field), THEN escalate to a question explaining what the AI already tried.
 
-37. Process answered questions collected in Step 4 (from `.build/questions.json`):
+37. **Auto-answer open questions from evidence:** Before processing human-answered questions, review every question in `.build/questions.json` with `status: "open"`. For each one:
+    - Check whether the sources gathered in this build (or resolved `coverage_gaps`) now contain the answer.
+    - If the answer is clearly supported by gathered evidence, auto-answer it:
+      - Set `status: "answered"`.
+      - Set `answer` to a concise answer citing the source(s).
+      - Set `answeredBy: "ai_auto"` and `answeredAt` to the current ISO timestamp.
+    - If the answer is partially available but not conclusive, leave the question open — do not guess.
+    - This step ensures questions don't linger when the pipeline has already fetched the information needed to resolve them.
+
+38. Process answered questions collected in Step 4 **and any auto-answered in Step 37** (from `.build/questions.json`):
     - For each question with `status: "answered"`, determine where the answer should be applied: update `project.md` (e.g., add to `## Output Guidance` or `## Constraints`), adjust output content, or both.
     - Apply the answer: make the concrete changes to the relevant files so the answer is reflected in the project going forward.
     - Update the question's status to `"applied"` in `.build/questions.json`.
-38. If the build prompt includes raw `BUILD_QUESTION` markers for consolidation, consolidate them into `.build/questions.json` (merging duplicates, preserving highest priority, preserving existing answered/applied questions). Before writing each question, apply the question gate (Step 36) — convert publicly-researchable questions to coverage_gaps instead.
+39. If the build prompt includes raw `BUILD_QUESTION` markers for consolidation, consolidate them into `.build/questions.json` (merging duplicates, preserving highest priority, preserving existing answered/applied questions). Before writing each question, apply the question gate (Step 36) — convert publicly-researchable questions to coverage_gaps instead.
 
 ### Phase 11: Record and Snapshot
 

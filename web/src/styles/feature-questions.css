@@ -101,7 +101,8 @@
   background: color-mix(in srgb, #f59e0b 4%, var(--color-surface));
 }
 
-.question-card-answered {
+.question-card-answered,
+.question-card-applied {
   opacity: 0.75;
 }
 
@@ -161,6 +162,11 @@
 .question-status-answered {
   background: color-mix(in srgb, #22c55e 14%, var(--color-surface));
   color: #16a34a;
+}
+
+.question-status-applied {
+  background: color-mix(in srgb, var(--color-secondary) 14%, var(--color-surface));
+  color: var(--color-secondary);
 }
 
 /* ── Card Content ── */

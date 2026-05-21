@@ -64,7 +64,7 @@ export type BuildQuestion = {
   text: string;
   context: string;
   priority: "blocking" | "important" | "informational";
-  status: "open" | "answered";
+  status: "open" | "answered" | "applied";
   askedAt: string;
   askedDuring: {
     phase: string;
@@ -75,6 +75,7 @@ export type BuildQuestion = {
   relatedTopics: string[];
   answer: string | null;
   answeredAt: string | null;
+  answeredBy: "human" | "ai_auto" | null;
 };
 
 export type QuestionAiAssistRequest = {

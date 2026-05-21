@@ -37,6 +37,7 @@ export async function answerQuestion(projectPath, questionId, answerText) {
 
   question.answer = answerText;
   question.answeredAt = new Date().toISOString();
+  question.answeredBy = "human";
   question.status = "answered";
 
   await writeQuestions(projectPath, data.questions);
@@ -76,6 +77,7 @@ export function extractBuildQuestions(fileContent, outputFilePath, buildMeta) {
         relatedTopics: [],
         answer: null,
         answeredAt: null,
+        answeredBy: null,
       });
     } catch {
       // Malformed JSON in marker — skip silently

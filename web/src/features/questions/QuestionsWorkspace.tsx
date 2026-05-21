@@ -115,7 +115,7 @@ function QuestionCard({
           {priorityLabel(question.priority)}
         </span>
         <span className={`question-status-pill question-status-${question.status}`}>
-          {isOpen ? "Open" : "Answered"}
+          {isOpen ? "Open" : question.status === "applied" ? "Applied" : question.answeredBy === "ai_auto" ? "AI Answered" : "Answered"}
         </span>
       </header>
 
@@ -369,7 +369,8 @@ function QuestionCard({
           )}
           {question.answeredAt ? (
             <span className="question-card-answered-at">
-              Answered {formatLocalDateTime(question.answeredAt, "")}
+              {question.answeredBy === "ai_auto" ? "Auto-answered by AI" : "Answered"}{" "}
+              {formatLocalDateTime(question.answeredAt, "")}
             </span>
           ) : null}
         </div>
@@ -437,11 +438,11 @@ export function QuestionsWorkspace({
   );
 
   const openCount = questions.filter((q) => q.status === "open").length;
-  const answeredCount = questions.filter((q) => q.status === "answered").length;
+  const answeredCount = questions.filter((q) => q.status === "answered" || q.status === "applied").length;
 
   const filteredQuestions = questions.filter((q) => {
     if (filter === "open") return q.status === "open";
-    if (filter === "answered") return q.status === "answered";
+    if (filter === "answered") return q.status === "answered" || q.status === "applied";
     return true;
   });
 
