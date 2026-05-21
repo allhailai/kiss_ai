@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Topic, TopicCluster, TopicDisposition, TopicState } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
 import "./TopicsWorkspace.css";
@@ -240,7 +240,7 @@ function TopicCard({
             title={isRunningDeepen ? "Deepening in progress…" : topic.queued_for_deepen ? "Remove from deepen queue" : "Add to deepen queue"}
             type="button"
           >
-            {isRunningDeepen ? (<><span className="topic-deepen-spinner" /> Running</>) : topic.queued_for_deepen ? "Queued ✓" : hasBeenDeepened ? "Deepened" : "Go Deeper"}
+            {isRunningDeepen ? (<><span className="topic-deepen-spinner" /> Running</>) : topic.queued_for_deepen ? "Queued ✓" : "Go Deeper"}
           </button>
           {topic.wiki_page ? (
             <button
@@ -357,6 +357,15 @@ export function TopicsWorkspace({
   useEffect(() => {
     void fetchTopics();
   }, [fetchTopics]);
+
+  // Auto-refresh when a build finishes (isBuilding transitions true → false)
+  const prevIsBuilding = useRef(isBuilding);
+  useEffect(() => {
+    if (prevIsBuilding.current && !isBuilding) {
+      void fetchTopics();
+    }
+    prevIsBuilding.current = isBuilding;
+  }, [isBuilding, fetchTopics]);
 
   const handleResolve = useCallback(
     async (topicId: string, action: "accept" | "dismiss" | "deprecate") => {
