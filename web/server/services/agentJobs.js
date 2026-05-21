@@ -255,10 +255,24 @@ export function createAgentJobService({
         "```",
         "",
         "Write .build/questions.json with this schema:",
-        '{ "questions": [{ "id": "q-...", "text": "...", "context": "...", "priority": "blocking|important|informational", "status": "open", "askedAt": "...", "askedDuring": { "phase": "3b", "buildId": "...", "modelId": "..." }, "relatedFiles": [...], "relatedTopics": [...], "answer": null, "answeredAt": null }] }',
+        '{ "questions": [{ "id": "q-...", "text": "...", "context": "...", "priority": "blocking|important|informational", "status": "open|answered|applied", "askedAt": "...", "askedDuring": { "phase": "3b", "buildId": "...", "modelId": "..." }, "relatedFiles": [...], "relatedTopics": [...], "answer": null, "answeredAt": null, "answeredBy": null }] }',
         "Preserve any existing answered questions from the current .build/questions.json.",
       );
     }
+
+    // Auto-answer open questions from evidence
+    lines.push(
+      "",
+      "AUTO-ANSWER OPEN QUESTIONS:",
+      "Read .build/questions.json. For each question with status: \"open\":",
+      "- Check whether gathered sources (sources/web_research/, sources/digests/) or wiki pages already contain the answer.",
+      "- If the answer is clearly supported by evidence, auto-answer it:",
+      '  - Set status: "answered"',
+      "  - Set answer to a concise answer citing the source file(s).",
+      '  - Set answeredBy: "ai_auto" and answeredAt to the current ISO timestamp.',
+      "- If the answer is only partially available or inconclusive, leave the question open — do not guess.",
+      "- This is critical: questions should not linger when the evidence to answer them already exists in the project sources.",
+    );
 
     return lines.join("\n");
   }
