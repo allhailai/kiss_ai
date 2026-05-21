@@ -238,11 +238,16 @@ export type Topic = {
   deepen_log: Array<{
     deepened_at: string;
     sources_added: number;
+    sources_total?: number;
+    unfetched?: string[];
     word_count_before: number;
     word_count_after: number;
     state_before: TopicState;
     state_after: TopicState;
     enriched_files: string[];
+    enriched_file_details?: string[];
+    seed_topics_added?: number;
+    coverage_gaps_remaining?: string[];
   }>;
 };
 

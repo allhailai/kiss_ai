@@ -92,6 +92,24 @@ The build pipeline provides these values:
       - `shallow` → `deep`: 3+ sources with specific data points, wiki page 1000+ words of sourced content
       - `deep` → `saturated`: all coverage gaps addressed, 5+ sources, wiki page 2000+ words
     - If the new evidence reveals sub-topics worthy of their own pages, add them to `topics.json` as `state: "seed"`, `origin: "agent_discovered"`, `discovered_from: "deepen_pass"`, with this topic as `parent`
+    - **Append a `deepen_log` entry** to the topic's `deepen_log` array with this schema:
+      ```json
+      {
+        "deepened_at": "<current ISO timestamp>",
+        "sources_added": <number of new sources synthesized>,
+        "sources_total": <total sources in topic corpus after deepening>,
+        "unfetched": ["<source description>"],
+        "word_count_before": <wiki page word count before this deepen>,
+        "word_count_after": <wiki page word count after this deepen>,
+        "state_before": "<topic state before deepening>",
+        "state_after": "<topic state after deepening>",
+        "enriched_files": ["<path to each directed output updated>"],
+        "enriched_file_details": ["<filename — brief description of what changed>"],
+        "seed_topics_added": <number of new seed topics discovered>,
+        "coverage_gaps_remaining": ["<description of each remaining gap>"]
+      }
+      ```
+      Record `word_count_before` and `state_before` at the start of Phase 3 before making changes.
 14. Update `outputs_ai/wiki/_index.md` with the updated BLUF for this topic's wiki page.
 15. Update `sources/source_log.md` with the new sources.
 

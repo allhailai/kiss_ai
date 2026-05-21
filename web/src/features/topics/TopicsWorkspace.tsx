@@ -184,11 +184,96 @@ function TopicCard({
               <span className="topic-deepened-date">{formatLocalDateTime(topic.discovery.last_deepened, "")}</span>
             ) : null}
           </div>
-          <div className="topic-card-deepened-stats">
-            <span>{topic.metrics?.source_count ?? 0} sources</span>
-            <span>{topic.metrics?.word_count ? `${Math.round(topic.metrics.word_count / 1000 * 10) / 10}k words` : "—"}</span>
-            <span>State: {stateLabel(topic.state)}</span>
-          </div>
+
+          {topic.deepen_log.length > 0 ? (
+            <>
+              {topic.deepen_log.slice().reverse().map((entry, idx) => {
+                const wordDelta = entry.word_count_after - entry.word_count_before;
+                const wordPct = entry.word_count_before > 0
+                  ? Math.round((wordDelta / entry.word_count_before) * 100)
+                  : 0;
+                const stateChanged = entry.state_before !== entry.state_after;
+                const isLatest = idx === 0;
+
+                return (
+                  <details
+                    className="topic-deepen-entry"
+                    key={entry.deepened_at}
+                    open={isLatest}
+                  >
+                    <summary className="topic-deepen-entry-summary">
+                      <span className="topic-deepen-entry-date">{formatLocalDateTime(entry.deepened_at, "")}</span>
+                      <span className="topic-deepen-entry-stats">
+                        +{entry.sources_added} sources · {entry.word_count_after.toLocaleString()} words
+                        {stateChanged ? ` · ${stateLabel(entry.state_before)} → ${stateLabel(entry.state_after)}` : ""}
+                      </span>
+                    </summary>
+                    <div className="topic-deepen-entry-body">
+                      <div className="topic-deepen-entry-row">
+                        <span className="topic-deepen-entry-label">Sources</span>
+                        <span>
+                          {entry.sources_added} new
+                          {entry.sources_total != null ? ` (${entry.sources_total} total)` : ""}
+                          {entry.unfetched && entry.unfetched.length > 0 ? ` · ${entry.unfetched.length} unfetched` : ""}
+                        </span>
+                      </div>
+                      <div className="topic-deepen-entry-row">
+                        <span className="topic-deepen-entry-label">Wiki</span>
+                        <span>
+                          {entry.word_count_after.toLocaleString()} words (was {entry.word_count_before.toLocaleString()})
+                          {wordPct !== 0 ? ` — ${wordPct > 0 ? "+" : ""}${wordPct}%` : ""}
+                        </span>
+                      </div>
+                      {stateChanged ? (
+                        <div className="topic-deepen-entry-row">
+                          <span className="topic-deepen-entry-label">State</span>
+                          <span className="topic-deepen-state-change">
+                            {stateLabel(entry.state_before)} → {stateLabel(entry.state_after)}
+                          </span>
+                        </div>
+                      ) : null}
+                      {entry.enriched_file_details && entry.enriched_file_details.length > 0 ? (
+                        <div className="topic-deepen-entry-row topic-deepen-entry-row-block">
+                          <span className="topic-deepen-entry-label">Outputs updated</span>
+                          <ul className="topic-deepen-enriched-list">
+                            {entry.enriched_file_details.map((detail) => (
+                              <li key={detail}>{detail}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : entry.enriched_files.length > 0 ? (
+                        <div className="topic-deepen-entry-row topic-deepen-entry-row-block">
+                          <span className="topic-deepen-entry-label">Outputs updated</span>
+                          <ul className="topic-deepen-enriched-list">
+                            {entry.enriched_files.map((f) => (
+                              <li key={f}>{f.split("/").pop()?.replace(/\.md$/, "").replace(/_/g, " ") ?? f}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {entry.coverage_gaps_remaining && entry.coverage_gaps_remaining.length > 0 ? (
+                        <div className="topic-deepen-entry-row topic-deepen-entry-row-block">
+                          <span className="topic-deepen-entry-label">Gaps remaining</span>
+                          <div className="topic-deepen-gaps">
+                            {entry.coverage_gaps_remaining.map((g) => (
+                              <span className="topic-card-gap-tag" key={g}>{g}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </details>
+                );
+              })}
+            </>
+          ) : (
+            <div className="topic-card-deepened-stats">
+              <span>{topic.metrics?.source_count ?? 0} sources</span>
+              <span>{topic.metrics?.word_count ? `${Math.round(topic.metrics.word_count / 1000 * 10) / 10}k words` : "—"}</span>
+              <span>State: {stateLabel(topic.state)}</span>
+            </div>
+          )}
+
           {(topic.sources?.length ?? 0) > 0 ? (
             <details className="topic-card-deepened-sources">
               <summary>{topic.sources.length} source{topic.sources.length === 1 ? "" : "s"} acquired</summary>

@@ -565,6 +565,101 @@
   font-size: 0.72rem;
 }
 
+/* ── Deepen Log Entries ── */
+
+.topic-deepen-entry {
+  margin-top: 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--color-annotation) 18%, var(--color-border));
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.topic-deepen-entry + .topic-deepen-entry {
+  margin-top: 0.25rem;
+}
+
+.topic-deepen-entry-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-annotation);
+  background: color-mix(in srgb, var(--color-annotation) 4%, transparent);
+  transition: background 0.12s ease;
+}
+
+.topic-deepen-entry-summary:hover {
+  background: color-mix(in srgb, var(--color-annotation) 8%, transparent);
+}
+
+.topic-deepen-entry-date {
+  color: var(--color-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.topic-deepen-entry-stats {
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+.topic-deepen-entry-body {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.72rem;
+}
+
+.topic-deepen-entry-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  color: var(--color-primary);
+}
+
+.topic-deepen-entry-row-block {
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.topic-deepen-entry-label {
+  color: var(--color-secondary);
+  font-weight: 800;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  min-width: 5rem;
+}
+
+.topic-deepen-state-change {
+  font-weight: 800;
+  color: var(--color-success);
+}
+
+.topic-deepen-enriched-list {
+  margin: 0 0 0 1rem;
+  padding: 0;
+  list-style: disc;
+  color: var(--color-secondary);
+  font-size: 0.7rem;
+}
+
+.topic-deepen-enriched-list li {
+  margin-bottom: 0.1rem;
+  line-height: 1.4;
+}
+
+.topic-deepen-gaps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 .topic-accept-button:disabled,
 .topic-dismiss-button:disabled,
 .topic-view-wiki-button:disabled,
