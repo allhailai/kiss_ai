@@ -47,6 +47,7 @@ function isActiveTopic(topic: Topic): boolean {
 function TopicCard({
   topic,
   allTopics,
+  isBuilding,
   onToggleQueue,
   onResolve,
   onDisposition,
@@ -54,6 +55,7 @@ function TopicCard({
 }: {
   topic: Topic;
   allTopics: Topic[];
+  isBuilding: boolean;
   onToggleQueue: (topicId: string) => void;
   onResolve: (topicId: string, action: "accept" | "dismiss" | "deprecate") => void;
   onDisposition: (topicId: string, disposition: TopicDisposition) => void;
@@ -67,6 +69,7 @@ function TopicCard({
   const isSettled = topic.disposition === "settled";
   const hasDisposition = isParked || isSettled;
   const hasBeenDeepened = (topic.discovery?.deepening_count ?? 0) > 0;
+  const isRunningDeepen = isBuilding && !!topic.queued_for_deepen;
 
   const handleResolve = useCallback(
     async (action: "accept" | "dismiss" | "deprecate") => {
@@ -231,13 +234,13 @@ function TopicCard({
       {isActive ? (
         <div className="topic-card-actions">
           <button
-            className={`topic-deepen-button${topic.queued_for_deepen ? " topic-deepen-queued" : ""}`}
-            disabled={saving}
+            className={`topic-deepen-button${isRunningDeepen ? " topic-deepen-running" : topic.queued_for_deepen ? " topic-deepen-queued" : ""}`}
+            disabled={saving || isRunningDeepen}
             onClick={() => onToggleQueue(topic.id)}
-            title={topic.queued_for_deepen ? "Remove from deepen queue" : "Add to deepen queue"}
+            title={isRunningDeepen ? "Deepening in progress…" : topic.queued_for_deepen ? "Remove from deepen queue" : "Add to deepen queue"}
             type="button"
           >
-            {topic.queued_for_deepen ? "Queued ✓" : "Go Deeper"}
+            {isRunningDeepen ? (<><span className="topic-deepen-spinner" /> Running</>) : topic.queued_for_deepen ? "Queued ✓" : "Go Deeper"}
           </button>
           {topic.wiki_page ? (
             <button
@@ -305,10 +308,14 @@ function TopicCard({
 }
 
 export function TopicsWorkspace({
+  isBuilding,
   onNavigateToFile,
+  onOpenBuildPanel,
   projectSlug,
 }: {
+  isBuilding: boolean;
   onNavigateToFile: (path: string) => void;
+  onOpenBuildPanel: () => void;
   projectSlug: string;
 }) {
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -428,12 +435,12 @@ export function TopicsWorkspace({
           const body = await response.json().catch(() => null);
           throw new Error(body?.message || "Failed to start batch deepen");
         }
-        window.location.hash = `#/p/${encodeURIComponent(projectSlug)}/rebuild`;
+        onOpenBuildPanel();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to start batch deepen");
       }
     },
-    [projectSlug],
+    [projectSlug, onOpenBuildPanel],
   );
 
   const seedCount = topics.filter((t) => t.state === "seed").length;
@@ -551,6 +558,7 @@ export function TopicsWorkspace({
           {sortedTopics.map((t) => (
             <TopicCard
               allTopics={topics}
+              isBuilding={isBuilding}
               key={t.id}
               onToggleQueue={handleToggleQueue}
               onDisposition={handleDisposition}

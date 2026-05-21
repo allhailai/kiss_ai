@@ -445,7 +445,9 @@ export function App() {
         ) : null}
         {route.view === "topics" ? (
           <TopicsWorkspace
+            isBuilding={rebuildWorkspace.rebuild?.running ?? false}
             onNavigateToFile={openProjectFileWithAgentContext}
+            onOpenBuildPanel={openBuildProjectPanel}
             projectSlug={project.selectedProjectSlug}
           />
         ) : null}

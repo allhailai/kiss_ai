@@ -92,6 +92,48 @@
   background: color-mix(in srgb, var(--color-annotation) 75%, black) !important;
 }
 
+/* ── Running state (building + queued) ── */
+
+.topic-deepen-running {
+  background: var(--color-secondary) !important;
+  color: white !important;
+  border-color: var(--color-secondary) !important;
+  cursor: wait !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.topic-deepen-spinner {
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: topic-spin 0.75s linear infinite;
+}
+
+@keyframes topic-spin {
+  to { transform: rotate(360deg); }
+}
+
+.topic-card-queued {
+  animation: none;
+}
+
+/* When running, pulse the card border */
+.topic-card-queued:has(.topic-deepen-running) {
+  border-color: var(--color-secondary);
+  box-shadow: inset 3px 0 0 var(--color-secondary);
+  animation: topic-pulse-border 1.5s ease-in-out infinite;
+}
+
+@keyframes topic-pulse-border {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 .topics-loading,
 .topics-error {
   margin: 0;
