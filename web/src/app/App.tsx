@@ -113,10 +113,10 @@ export function App() {
   };
 
   useEffect(() => {
-    if (rightPanelSurface.rightPanel?.kind === "build-project") {
+    if (rightPanelSurface.rightPanel?.kind === "build-project" && project.selectedProjectSlug) {
       void rebuildWorkspace.refreshRebuild();
     }
-  }, [rebuildWorkspace.refreshRebuild, rightPanelSurface.rightPanel?.kind]);
+  }, [project.selectedProjectSlug, rebuildWorkspace.refreshRebuild, rightPanelSurface.rightPanel?.kind]);
 
   // Auto-open build panel when navigating from a legacy /rebuild URL
   useEffect(() => {

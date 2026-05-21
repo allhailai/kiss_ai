@@ -1,8 +1,9 @@
 import { isDesignIdentityPath, projectPathPrefixes } from "../domain/projectPaths";
 
-export type View = "chat" | "dashboard" | "requirements" | "inputs" | "outputs" | "design" | "review" | "questions" | "suggestions" | "topics";
+export type View = "chat" | "dashboard" | "requirements" | "inputs" | "outputs" | "design" | "review" | "questions" | "topics";
 
-/** Legacy review sub-views that now redirect to the unified "review" view with a tab param. */
+/** Legacy review sub-views that now redirect to the unified "review" view with a tab param.
+ *  "suggestions" is kept here only for bookmark redirect compatibility — the feature directory was removed. */
 export type LegacyReviewView = "questions" | "suggestions" | "topics";
 export const legacyReviewViews = new Set<LegacyReviewView>(["questions", "suggestions", "topics"]);
 

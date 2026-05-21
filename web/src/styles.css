@@ -6,6 +6,8 @@
 @import "./styles/feature-chat.css";
 @import "./styles/feature-navigation.css";
 @import "./styles/feature-right-panel.css";
+@import "./styles/feature-build-panel.css";
+@import "./styles/feature-proposal-review.css";
 @import "./styles/feature-toast.css";
 @import "./styles/feature-dashboard.css";
 @import "./styles/feature-agents.css";

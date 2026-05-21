@@ -55,7 +55,7 @@ Global hub actions that are not scoped to a research project should use `/api/sy
 
 App-owned orchestration belongs in `app/`. If state drives more than one workflow surface, keep the controller in `app/` or a focused `app/hooks/` module and pass behavior into features as props.
 
-`app/ReviewWorkspace.tsx` composes `features/questions/`, `features/suggestions/`, and `features/topics/` into a unified tabbed view called "AI Review". It lives in `app/` rather than `features/` because it crosses feature boundaries to compose the three review surfaces. It also owns the "Needs Attention" merged feed and cross-link detection logic.
+`app/ReviewWorkspace.tsx` composes `features/questions/` and `features/topics/` into a unified tabbed view called "AI Review". It lives in `app/` rather than `features/` because it crosses feature boundaries to compose the two review surfaces plus a "Needs Attention" summary dashboard with topic progress and question counts.
 
 Right-panel behavior is app shell state. Panel persistence, panel width, panel kind, selected agent conversation mirroring, mode switching, and file context selection belong in `app/`. `features/agents/` owns the AI File Assist / agent chat panel body.
 
@@ -88,6 +88,8 @@ Use `editor/` for CodeMirror-specific behavior:
 - `MarkdownEditor.css`: CodeMirror wrapper, diff, wiki link, and base table editor styles.
 - `diffExtension.ts`: saved and unsaved diff decorations.
 - `wikiLinkExtension.ts`: clickable wiki and markdown links.
+- `annotationExtension.ts`: annotation markers and inline annotation rendering.
+- `annotationExtension.css`: annotation styling.
 - `markdownTableExtension.ts`: table editing extension public API.
 - `markdownTableExtension.css`: table interaction styling, including handles, selection, active cells, and context menus.
 
@@ -116,7 +118,6 @@ Current features:
 - `questions/` (composed via `app/ReviewWorkspace.tsx`)
 - `rebuild/`
 - `search/`
-- `suggestions/` (composed via `app/ReviewWorkspace.tsx`)
 - `toast/`
 - `topics/` (composed via `app/ReviewWorkspace.tsx`)
 
@@ -200,9 +201,15 @@ blast radius is higher than a local edit:
   recovery.
 - `features/agents/RightPanelAgentChat.tsx`: agent chat panel composition and
   conceptual diff review wiring.
-- `features/rebuild/RebuildWorkspace.tsx`: rebuild status, human attention, and
-  requirements-sync launch UI.
+- `features/rebuild/BuildProjectRightPanel.tsx`: rebuild right panel composition,
+  human attention, and build controls.
 - `features/design/DesignWorkspace.tsx`: large design identity form surface.
+- `features/topics/TopicsWorkspace.tsx`: topic management, seed review, deepen
+  queue, and disposition controls.
+- `features/navigation/FileTreeNav.tsx`: navigation tree with inline edit,
+  drag-drop, and folder management.
+- `features/questions/QuestionsWorkspace.tsx`: question management with AI
+  assist, answer flow, and priority sorting.
 - `contracts/api.ts`: shared API contract hub.
 
 When one of these files needs significant change, first identify the stable

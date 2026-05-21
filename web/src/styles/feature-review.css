@@ -97,7 +97,6 @@
 
 /* Let child workspaces fill the tab content area without double-scrollbar */
 .review-tab-content > .questions-workspace,
-.review-tab-content > .suggestions-workspace,
 .review-tab-content > .topics-workspace {
   overflow-y: visible;
   height: auto;

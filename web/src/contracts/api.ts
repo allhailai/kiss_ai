@@ -251,24 +251,6 @@ export type Topic = {
   }>;
 };
 
-export type TopicCluster = {
-  id: string;
-  label: string;
-  confidence: TopicConfidence;
-  topic_ids: string[];
-  justification: {
-    goal_support: string;
-    graph_support: string;
-  };
-};
-
-export type TopicsResponse = {
-  version: number;
-  last_updated: string | null;
-  topics: Topic[];
-  clusters: TopicCluster[];
-};
-
 export type CreateProjectRequest = {
   name: string;
   slug?: string;
