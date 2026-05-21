@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import type { AgentContextFile, ChatContextFile, ChatMessage, Conversation, ConversationSummary, ProjectFile } from "../../contracts/api";
 import { api } from "../../data/apiClient";
 import { hasSettledAssistantReply } from "../../domain/conversation";
 import { errorMessage } from "../../domain/errors";
-import { uniqueByPathPreserveFirst } from "../../domain/files";
 import { useConversationStream } from "./useConversationStream";
+import { useProjectChatScroll } from "./useProjectChatScroll";
+import { useProjectChatFileContext, conversationFileContextFromConversation, type ConversationFileContextState } from "./useProjectChatFileContext";
 
 type ChatSendContext = {
   currentFile?: AgentContextFile;
@@ -17,33 +18,8 @@ type ChatSendOptions = {
   context?: ChatSendContext;
 };
 
-type ConversationFileContextState = {
-  ai_editable_files: AgentContextFile[];
-  context_files: ChatContextFile[];
-};
-
 function emptyConversationFileContext(): ConversationFileContextState {
   return { ai_editable_files: [], context_files: [] };
-}
-
-function conversationFileContextFromConversation(conversation: Conversation | null): ConversationFileContextState {
-  if (!conversation?.fileContext) return emptyConversationFileContext();
-  return {
-    ai_editable_files: uniqueByPathPreserveFirst(conversation.fileContext.ai_editable_files ?? []),
-    context_files: uniqueByPathPreserveFirst(conversation.fileContext.context_files ?? []),
-  };
-}
-
-function hasSelectedFileContext(fileContext: ConversationFileContextState) {
-  return Boolean(fileContext.ai_editable_files.length || fileContext.context_files.length);
-}
-
-function isChatContextFile(file: ProjectFile) {
-  return Boolean(file.chatContextReadable);
-}
-
-function isNearScrollBottom(element: HTMLElement) {
-  return element.scrollHeight - element.scrollTop - element.clientHeight < 120;
 }
 
 export function useProjectChat({
@@ -69,18 +45,8 @@ export function useProjectChat({
   const [sending, setSending] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
-  const [aiEditableFiles, setAiEditableFilesState] = useState<AgentContextFile[]>([]);
-  const [contextFiles, setContextFilesState] = useState<ChatContextFile[]>([]);
   const [proposalUpdating, setProposalUpdating] = useState(false);
-  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
-  const threadRef = useRef<HTMLDivElement | null>(null);
-  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const shouldStickToLatestRef = useRef(true);
-  const forceScrollToLatestRef = useRef(false);
-  const fileContextRef = useRef<ConversationFileContextState>(emptyConversationFileContext());
-  const contextPersistTimeoutRef = useRef<number | null>(null);
-  const pendingContextPersistRef = useRef<{ conversationId: string; fileContext: ConversationFileContextState } | null>(null);
-  const availableContextFiles = useMemo(() => projectFiles.filter(isChatContextFile), [projectFiles]);
+
   const filteredConversations = useMemo(() => {
     const query = conversationFilter.trim().toLowerCase();
     if (!query) return conversations;
@@ -96,77 +62,26 @@ export function useProjectChat({
     return response.conversations;
   }, [projectSlug]);
 
+  // --- Sub-hooks ---
+
+  const scroll = useProjectChatScroll(activeConversation);
+
+  const fileContext = useProjectChatFileContext({
+    activeConversation,
+    onNotice,
+    projectFiles,
+    projectSlug,
+    refreshConversations,
+    sending,
+    setActiveConversation,
+  });
+
+  // --- Conversation lifecycle ---
+
   const handleConversationTruncated = useCallback(() => {
-    forceScrollToLatestRef.current = true;
-    shouldStickToLatestRef.current = true;
+    scroll.forceScrollToLatestRef.current = true;
+    scroll.shouldStickToLatestRef.current = true;
   }, []);
-
-  const applyConversationFileContext = (fileContext: ConversationFileContextState) => {
-    const next = {
-      ai_editable_files: uniqueByPathPreserveFirst(fileContext.ai_editable_files),
-      context_files: uniqueByPathPreserveFirst(fileContext.context_files),
-    };
-    fileContextRef.current = next;
-    setAiEditableFilesState(next.ai_editable_files);
-    setContextFilesState(next.context_files);
-    return next;
-  };
-
-  const persistConversationFileContext = useCallback(
-    async (conversationId: string, fileContext: ConversationFileContextState) => {
-      if (!projectSlug) throw new Error("Select a project first.");
-      const nextContext = {
-        ai_editable_files: uniqueByPathPreserveFirst(fileContext.ai_editable_files),
-        context_files: uniqueByPathPreserveFirst(fileContext.context_files),
-      };
-      const updated = await api.updateConversation(projectSlug, conversationId, { fileContext: nextContext });
-      setActiveConversation(updated);
-      await refreshConversations();
-      return updated;
-    },
-    [projectSlug, refreshConversations],
-  );
-
-  const clearPendingConversationFileContext = () => {
-    if (contextPersistTimeoutRef.current !== null) {
-      window.clearTimeout(contextPersistTimeoutRef.current);
-      contextPersistTimeoutRef.current = null;
-    }
-    pendingContextPersistRef.current = null;
-  };
-
-  useEffect(() => clearPendingConversationFileContext, []);
-
-  const updateConversationFileContext = (updater: SetStateAction<ConversationFileContextState>) => {
-    const next = applyConversationFileContext(typeof updater === "function" ? updater(fileContextRef.current) : updater);
-    if (!projectSlug || !activeConversation) return;
-    pendingContextPersistRef.current = { conversationId: activeConversation.id, fileContext: next };
-    if (contextPersistTimeoutRef.current !== null) window.clearTimeout(contextPersistTimeoutRef.current);
-    contextPersistTimeoutRef.current = window.setTimeout(() => {
-      const pending = pendingContextPersistRef.current;
-      pendingContextPersistRef.current = null;
-      contextPersistTimeoutRef.current = null;
-      if (!pending) return;
-
-      void persistConversationFileContext(pending.conversationId, pending.fileContext).catch((error) => {
-        onNotice(errorMessage(error, "Could not save the conversation file context."));
-      });
-    }, 400);
-  };
-
-  const setAiEditableFiles = (updater: SetStateAction<AgentContextFile[]>) => {
-    updateConversationFileContext((current) => ({
-      ...current,
-      ai_editable_files: typeof updater === "function" ? updater(current.ai_editable_files) : updater,
-    }));
-  };
-
-  const setContextFiles = (updater: SetStateAction<ChatContextFile[]>) => {
-    updateConversationFileContext((current) => ({
-      ...current,
-      context_files: typeof updater === "function" ? updater(current.context_files) : updater,
-    }));
-  };
 
   const cancelEditingMessage = () => {
     setEditingMessageId(null);
@@ -178,10 +93,10 @@ export function useProjectChat({
     setLoading(true);
     onNotice("");
     try {
-      clearPendingConversationFileContext();
+      fileContext.clearPendingConversationFileContext();
       const conversation = await api.conversation(projectSlug, conversationId);
       setActiveConversation(conversation);
-      applyConversationFileContext(conversationFileContextFromConversation(conversation));
+      fileContext.applyConversationFileContext(conversationFileContextFromConversation(conversation));
       cancelEditingMessage();
       if (hasSettledAssistantReply(conversation)) setSending(false);
     } catch (error) {
@@ -196,10 +111,10 @@ export function useProjectChat({
     setLoading(true);
     onNotice("");
     try {
-      clearPendingConversationFileContext();
+      fileContext.clearPendingConversationFileContext();
       const conversation = await api.createConversation(projectSlug, { modelId: selectedModelId });
       setActiveConversation(conversation);
-      applyConversationFileContext(conversationFileContextFromConversation(conversation));
+      fileContext.applyConversationFileContext(conversationFileContextFromConversation(conversation));
       cancelEditingMessage();
       await refreshConversations();
     } catch (error) {
@@ -219,32 +134,34 @@ export function useProjectChat({
 
   const startDraftConversation = (initialFileContext: ConversationFileContextState = emptyConversationFileContext()) => {
     if (loading || sending || proposalUpdating) return;
-    clearPendingConversationFileContext();
+    fileContext.clearPendingConversationFileContext();
     setActiveConversation(null);
     setMessageDraft("");
-    applyConversationFileContext(initialFileContext);
-    setShowJumpToLatest(false);
-    forceScrollToLatestRef.current = true;
-    shouldStickToLatestRef.current = true;
+    fileContext.applyConversationFileContext(initialFileContext);
+    scroll.setShowJumpToLatest(false);
+    scroll.forceScrollToLatestRef.current = true;
+    scroll.shouldStickToLatestRef.current = true;
     cancelEditingMessage();
     onNotice("");
-    composerTextareaRef.current?.focus();
+    scroll.composerTextareaRef.current?.focus();
   };
+
+  // --- Messaging ---
 
   const sendMessage = async (options: ChatSendOptions = {}) => {
     if (!projectSlug) return false;
     const content = (options.content ?? messageDraft).trim();
     if (!content || sending) return false;
-    const currentFileContext = fileContextRef.current;
+    const currentFileContext = fileContext.fileContextRef.current;
     const context = options.context ?? (currentFileContext.context_files.length ? { context_files: currentFileContext.context_files } : undefined);
 
     setSending(true);
     onNotice("");
     try {
       let conversation = await ensureConversation();
-      if (hasSelectedFileContext(currentFileContext)) {
-        clearPendingConversationFileContext();
-        conversation = await persistConversationFileContext(conversation.id, currentFileContext);
+      if (fileContext.hasSelectedFileContext(currentFileContext)) {
+        fileContext.clearPendingConversationFileContext();
+        conversation = await fileContext.persistConversationFileContext(conversation.id, currentFileContext);
       }
       if (options.content === undefined) setMessageDraft("");
       const next = await api.sendChatMessage(projectSlug, conversation.id, {
@@ -263,15 +180,52 @@ export function useProjectChat({
     }
   };
 
-  const generateEditProposal = async (fileContext: ConversationFileContextState, content = "") => {
+  const startEditingMessage = (message: ChatMessage) => {
+    if (sending || message.role !== "user") return;
+    setEditingMessageId(message.id);
+    setEditDraft(message.content);
+    onNotice("");
+  };
+
+  const saveEditedMessage = async (message: ChatMessage) => {
+    const content = editDraft.trim();
+    if (!projectSlug || !activeConversation || !content || sending || message.role !== "user") return;
+
+    setSending(true);
+    onNotice("");
+    try {
+      const next = await api.editChatMessage(projectSlug, activeConversation.id, message.id, {
+        modelId: selectedModelId || undefined,
+        content,
+      });
+      scroll.forceScrollToLatestRef.current = true;
+      scroll.shouldStickToLatestRef.current = true;
+      setActiveConversation(next);
+      setEditingMessageId(null);
+      setEditDraft("");
+      await refreshConversations();
+    } catch (error) {
+      onNotice(errorMessage(error, "Could not edit the chat message."));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleComposerChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    setMessageDraft(event.currentTarget.value);
+  };
+
+  // --- Edit proposals ---
+
+  const generateEditProposal = async (proposalFileContext: ConversationFileContextState, content = "") => {
     if (!projectSlug || loading || sending || proposalUpdating) return false;
     setSending(true);
     onNotice("");
     try {
       let conversation = await ensureConversation();
-      const nextContext = applyConversationFileContext(fileContext);
-      clearPendingConversationFileContext();
-      conversation = await persistConversationFileContext(conversation.id, nextContext);
+      const nextContext = fileContext.applyConversationFileContext(proposalFileContext);
+      fileContext.clearPendingConversationFileContext();
+      conversation = await fileContext.persistConversationFileContext(conversation.id, nextContext);
       const next = await api.generateEditProposal(projectSlug, conversation.id, {
         modelId: selectedModelId,
         content: content.trim() || undefined,
@@ -329,69 +283,13 @@ export function useProjectChat({
     }
   };
 
-  const startEditingMessage = (message: ChatMessage) => {
-    if (sending || message.role !== "user") return;
-    setEditingMessageId(message.id);
-    setEditDraft(message.content);
-    onNotice("");
-  };
-
-  const saveEditedMessage = async (message: ChatMessage) => {
-    const content = editDraft.trim();
-    if (!projectSlug || !activeConversation || !content || sending || message.role !== "user") return;
-
-    setSending(true);
-    onNotice("");
-    try {
-      const next = await api.editChatMessage(projectSlug, activeConversation.id, message.id, {
-        modelId: selectedModelId || undefined,
-        content,
-      });
-      forceScrollToLatestRef.current = true;
-      shouldStickToLatestRef.current = true;
-      setActiveConversation(next);
-      setEditingMessageId(null);
-      setEditDraft("");
-      await refreshConversations();
-    } catch (error) {
-      onNotice(errorMessage(error, "Could not edit the chat message."));
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const handleComposerChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
-    setMessageDraft(event.currentTarget.value);
-  };
-
-  const addContextFile = (path: string) => {
-    if (sending) return;
-    const file = availableContextFiles.find((candidate) => candidate.path === path);
-    if (!file || contextFiles.some((ref) => ref.path === file.path)) return;
-    setContextFiles((current) => [...current, { path: file.path, label: file.name, kind: file.kind }]);
-  };
-
-  const scrollToLatest = (behavior: ScrollBehavior = "smooth") => {
-    const thread = threadRef.current;
-    if (!thread) return;
-    thread.scrollTo({ top: thread.scrollHeight, behavior });
-    shouldStickToLatestRef.current = true;
-    setShowJumpToLatest(false);
-  };
-
-  const handleThreadScroll = () => {
-    const thread = threadRef.current;
-    if (!thread) return;
-    const nearBottom = isNearScrollBottom(thread);
-    shouldStickToLatestRef.current = nearBottom;
-    setShowJumpToLatest(!nearBottom && Boolean(activeConversation?.messages.length));
-  };
+  // --- Project/conversation initialization ---
 
   useEffect(() => {
     if (!projectSlug) {
       setActiveConversation(null);
       setConversations([]);
-      applyConversationFileContext(emptyConversationFileContext());
+      fileContext.applyConversationFileContext(emptyConversationFileContext());
       cancelEditingMessage();
       setLoading(false);
       setSending(false);
@@ -400,7 +298,7 @@ export function useProjectChat({
 
     setActiveConversation(null);
     setConversations([]);
-    applyConversationFileContext(emptyConversationFileContext());
+    fileContext.applyConversationFileContext(emptyConversationFileContext());
     cancelEditingMessage();
     void (async () => {
       setLoading(true);
@@ -411,13 +309,13 @@ export function useProjectChat({
           try {
             const conversation = await api.conversation(projectSlug, conversationId);
             setActiveConversation(conversation);
-            applyConversationFileContext(conversationFileContextFromConversation(conversation));
+            fileContext.applyConversationFileContext(conversationFileContextFromConversation(conversation));
             if (hasSettledAssistantReply(conversation)) setSending(false);
           } catch {
             if (conversationId !== nextConversations[0]?.id && nextConversations[0]) {
               const conversation = await api.conversation(projectSlug, nextConversations[0].id);
               setActiveConversation(conversation);
-              applyConversationFileContext(conversationFileContextFromConversation(conversation));
+              fileContext.applyConversationFileContext(conversationFileContextFromConversation(conversation));
               if (hasSettledAssistantReply(conversation)) setSending(false);
             }
           }
@@ -441,32 +339,13 @@ export function useProjectChat({
     setSending,
   });
 
-  useEffect(() => {
-    if (!activeConversation) return;
-    applyConversationFileContext(conversationFileContextFromConversation(activeConversation));
-  }, [activeConversation?.id, activeConversation?.fileContext]);
-
-  useEffect(() => {
-    window.requestAnimationFrame(() => scrollToLatest("auto"));
-  }, [activeConversation?.id]);
-
-  useEffect(() => {
-    if (!activeConversation?.messages.length) return;
-    if (forceScrollToLatestRef.current || shouldStickToLatestRef.current) {
-      forceScrollToLatestRef.current = false;
-      window.requestAnimationFrame(() => scrollToLatest("auto"));
-    } else {
-      setShowJumpToLatest(true);
-    }
-  }, [activeConversation?.messages.length, activeConversation?.messages.at(-1)?.content.length]);
-
   return {
     activeConversation,
-    addContextFile,
-    aiEditableFiles,
+    addContextFile: fileContext.addContextFile,
+    aiEditableFiles: fileContext.aiEditableFiles,
     cancelEditingMessage,
-    availableContextFiles,
-    contextFiles,
+    availableContextFiles: fileContext.availableContextFiles,
+    contextFiles: fileContext.contextFiles,
     conversationFilter,
     conversations,
     createConversation,
@@ -474,24 +353,24 @@ export function useProjectChat({
     editingMessageId,
     filteredConversations,
     handleComposerChange,
-    handleThreadScroll,
+    handleThreadScroll: scroll.handleThreadScroll,
     generateEditProposal,
     loading,
     messageDraft,
     openConversation,
     saveEditedMessage,
-    scrollToLatest,
+    scrollToLatest: scroll.scrollToLatest,
     sending,
     proposalUpdating,
-    setAiEditableFiles,
-    setContextFiles,
+    setAiEditableFiles: fileContext.setAiEditableFiles,
+    setContextFiles: fileContext.setContextFiles,
     setConversationFilter,
     setEditDraft,
-    showJumpToLatest,
+    showJumpToLatest: scroll.showJumpToLatest,
     startDraftConversation,
     startEditingMessage,
-    threadRef,
-    composerTextareaRef,
+    threadRef: scroll.threadRef,
+    composerTextareaRef: scroll.composerTextareaRef,
     sendMessage,
     applyEditProposal,
     updateEditProposal,
