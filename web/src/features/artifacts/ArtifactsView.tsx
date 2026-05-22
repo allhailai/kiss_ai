@@ -214,7 +214,21 @@ export function ArtifactsView({ projectSlug }: { projectSlug: string }) {
           <div className="artifacts-spec-meta">
             <dl className="artifacts-meta-grid">
               <dt>Name</dt>
-              <dd>{String(selectedSpec.frontmatter.name ?? selectedSpec.slug)}</dd>
+              <dd>
+                <input
+                  className="artifacts-meta-input"
+                  type="text"
+                  value={String(selectedSpec.frontmatter.name ?? "")}
+                  onChange={(e) => {
+                    const updated = { ...selectedSpec, frontmatter: { ...selectedSpec.frontmatter, name: e.target.value } };
+                    setSelectedSpec(updated);
+                  }}
+                  onBlur={() => {
+                    void artifactsApi.update(projectSlug, selectedSlug, selectedSpec.frontmatter, editBody);
+                  }}
+                  placeholder={selectedSpec.slug}
+                />
+              </dd>
               <dt>Format</dt>
               <dd>{String(selectedSpec.frontmatter.format ?? "html")}</dd>
               <dt>Lifecycle</dt>
@@ -234,9 +248,14 @@ export function ArtifactsView({ projectSlug }: { projectSlug: string }) {
               </dd>
               <dt>Sources</dt>
               <dd>
-                {Array.isArray(selectedSpec.frontmatter.sources)
-                  ? (selectedSpec.frontmatter.sources as string[]).join(", ")
-                  : "none"}
+                <ArtifactSourcesEditor
+                  sources={(Array.isArray(selectedSpec.frontmatter.sources) ? selectedSpec.frontmatter.sources : []) as string[]}
+                  onChange={(newSources) => {
+                    const updated = { ...selectedSpec, frontmatter: { ...selectedSpec.frontmatter, sources: newSources } };
+                    setSelectedSpec(updated);
+                    void artifactsApi.update(projectSlug, selectedSlug, updated.frontmatter, editBody);
+                  }}
+                />
               </dd>
               {selectedArtifact?.lastBuilt ? (
                 <>
@@ -286,6 +305,108 @@ export function ArtifactsView({ projectSlug }: { projectSlug: string }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── Sources Editor ─────────────────────────────────────────── */
+
+const SOURCE_PRESETS = [
+  { label: "All", value: "all" },
+  { label: "Wiki", value: "outputs_ai/wiki/*.md" },
+  { label: "Reports", value: "outputs_ai/reports/*.md" },
+  { label: "Directed", value: "outputs_ai/directed_outputs/**/*.md" },
+] as const;
+
+function ArtifactSourcesEditor({
+  sources,
+  onChange,
+}: {
+  sources: string[];
+  onChange: (sources: string[]) => void;
+}) {
+  const [customGlob, setCustomGlob] = useState("");
+
+  function addSource(value: string) {
+    if (!value || sources.includes(value)) return;
+    // If adding "all", replace everything with just "all"
+    if (value === "all") {
+      onChange(["all"]);
+      return;
+    }
+    // If "all" is already present, remove it when adding specific sources
+    const filtered = sources.filter((s) => s !== "all");
+    onChange([...filtered, value]);
+  }
+
+  function removeSource(value: string) {
+    onChange(sources.filter((s) => s !== value));
+  }
+
+  return (
+    <div className="artifacts-sources-editor">
+      {sources.length > 0 ? (
+        <div className="artifacts-sources-chips">
+          {sources.map((source) => (
+            <span className="artifacts-source-chip" key={source}>
+              <span>{source}</span>
+              <button
+                className="artifacts-source-chip-remove"
+                onClick={() => removeSource(source)}
+                type="button"
+                title={`Remove ${source}`}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <span className="artifacts-sources-empty">none — click to add</span>
+      )}
+      <div className="artifacts-sources-presets">
+        {SOURCE_PRESETS.map((preset) => (
+          <button
+            className={`artifacts-source-preset ${sources.includes(preset.value) ? "active" : ""}`}
+            key={preset.value}
+            onClick={() =>
+              sources.includes(preset.value)
+                ? removeSource(preset.value)
+                : addSource(preset.value)
+            }
+            type="button"
+            title={preset.value}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <form
+        className="artifacts-sources-custom"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const trimmed = customGlob.trim();
+          if (trimmed) {
+            addSource(trimmed);
+            setCustomGlob("");
+          }
+        }}
+      >
+        <input
+          className="artifacts-sources-custom-input"
+          type="text"
+          placeholder="Custom glob…"
+          value={customGlob}
+          onChange={(e) => setCustomGlob(e.target.value)}
+        />
+        <button
+          className="artifacts-sources-custom-add"
+          type="submit"
+          disabled={!customGlob.trim()}
+        >
+          Add
+        </button>
+      </form>
     </div>
   );
 }
