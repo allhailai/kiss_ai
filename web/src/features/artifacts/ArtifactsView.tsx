@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { artifactsApi, type ArtifactSpec, type ArtifactSpecDetail } from "../../data/artifactsApi";
 import { useRouteContext } from "../../app/contexts/RouteContext";
+import { MarkdownEditor } from "../../editor/MarkdownEditor";
 import "./artifacts.css";
 
 type Tab = "spec" | "preview";
@@ -20,6 +21,7 @@ export function ArtifactsView({ projectSlug }: { projectSlug: string }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const noopOpenFile = useCallback(() => {}, []);
 
   const selectedArtifact = artifacts.find((a) => a.slug === selectedSlug) ?? null;
   const isBuilt = selectedArtifact?.status === "built";
@@ -234,11 +236,18 @@ export function ArtifactsView({ projectSlug }: { projectSlug: string }) {
           <label className="artifacts-body-label">
             Spec body (goal, content guidance, visualizations)
           </label>
-          <textarea
-            className="artifacts-body-editor"
+          <MarkdownEditor
+            baselineValue={selectedSpec.body}
+            editable={true}
+            files={[]}
+            projectSlug={projectSlug}
+            savedDiff={null}
+            selectedPath={`artifact:${selectedSlug}`}
             value={editBody}
-            onChange={(e) => setEditBody(e.target.value)}
-            spellCheck={false}
+            onChange={setEditBody}
+            onNotice={(msg) => flash(msg)}
+            onOpenFile={noopOpenFile}
+            onSave={() => void handleSave()}
           />
         </div>
       ) : (

@@ -139,19 +139,14 @@
 .artifacts-body-editor {
   flex: 1;
   min-height: 200px;
-  padding: 12px;
-  border: 1px solid var(--color-border, #333);
-  border-radius: 8px;
-  background: var(--color-surface, #1a1a1a);
-  color: var(--color-text, #ccc);
-  font-family: var(--font-mono, "SF Mono", "Fira Code", monospace);
-  font-size: 13px;
-  line-height: 1.6;
-  resize: none;
 }
 
-.artifacts-body-editor:focus {
-  outline: 1px solid var(--color-accent, #c87040);
+.artifacts-spec-editor .markdown-editor-shell {
+  flex: 1;
+  min-height: 200px;
+  border: 1px solid var(--color-border, #333);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 /* ─── Preview ────────────────────────────────────────────────── */
