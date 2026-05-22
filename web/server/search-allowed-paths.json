@@ -1,4 +1,4 @@
 {
-  "directories": ["sources/", "inputs_human/", "outputs_ai/", "inputs_ai/"],
+  "directories": ["sources/", "inputs_human/", "outputs_ai/", "inputs_ai/", "artifacts/artifact_specs/"],
   "files": ["project.md", "questions.md", "human_*.md"]
 }

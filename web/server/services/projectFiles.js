@@ -52,7 +52,8 @@ export function createProjectFileService({
       relativePath.startsWith("inputs_human/") ||
       relativePath.startsWith("sources/") ||
       relativePath.startsWith("inputs_ai/") ||
-      relativePath.startsWith("outputs_ai/")
+      relativePath.startsWith("outputs_ai/") ||
+      relativePath.startsWith("artifacts/artifact_specs/")
     );
   }
 
@@ -199,6 +200,11 @@ export function createProjectFileService({
 
     if (normalized.startsWith("inputs_human/")) {
       return { path: normalized, kind: "human", editable: true, annotation: false, previewable: isPreviewablePath(normalized) };
+    }
+
+    // Artifact spec files — editable by user and right-panel agent
+    if (normalized.startsWith("artifacts/artifact_specs/")) {
+      return { path: normalized, kind: "human", editable: true, annotation: false };
     }
 
     if (normalized.startsWith("change_logs/")) {

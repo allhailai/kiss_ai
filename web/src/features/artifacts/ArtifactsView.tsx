@@ -57,6 +57,25 @@ export function ArtifactsView({ projectSlug }: { projectSlug: string }) {
     });
   }, [projectSlug, selectedSlug]);
 
+  // Re-read spec from disk on window focus (picks up agent edits)
+  useEffect(() => {
+    function handleFocus() {
+      if (!selectedSlug) return;
+      artifactsApi.read(projectSlug, selectedSlug).then((spec) => {
+        setSelectedSpec((prev) => {
+          if (!prev) return spec;
+          // Only update if the disk content differs from what the editor loaded
+          if (spec.body !== prev.body && editBody === prev.body) {
+            setEditBody(spec.body);
+          }
+          return spec;
+        });
+      }).catch(() => {});
+    }
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [projectSlug, selectedSlug, editBody]);
+
   // Clean up poll on unmount
   useEffect(() => {
     return () => {
