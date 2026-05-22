@@ -140,8 +140,17 @@ export function useAgentFileContext({
 
   const addEditableFile = (path: string) => {
     const file = projectFiles.find((candidate) => candidate.path === path);
-    if (!file?.editable) return;
-    const editableFile = editableSelectionFromProjectFile(file);
+    // Fall back to the currently selected file (handles artifact specs and other
+    // files loaded via selectFile but not in the tree-based projectFiles array).
+    const resolvedFile = file ?? (selected?.path === path ? {
+      path: selected.path,
+      name: fileBasename(selected.path),
+      kind: selected.kind,
+      editable: selected.editable,
+      annotation: selected.annotation,
+    } : null);
+    if (!resolvedFile?.editable) return;
+    const editableFile = editableSelectionFromProjectFile(resolvedFile);
     setAiEditableFiles((current) => {
       if (current.some((candidate) => candidate.path === editableFile.path)) return current;
       return [...current, editableFile];
@@ -151,8 +160,14 @@ export function useAgentFileContext({
 
   const addContextFile = (path: string) => {
     const file = projectFiles.find((candidate) => candidate.path === path);
-    if (!file?.chatContextReadable) return;
-    const contextFile = contextFileFromProjectFile(file);
+    const resolvedFile = file ?? (selected?.path === path ? {
+      path: selected.path,
+      name: fileBasename(selected.path),
+      kind: selected.kind,
+      chatContextReadable: true,
+    } : null);
+    if (!resolvedFile?.chatContextReadable) return;
+    const contextFile = contextFileFromProjectFile(resolvedFile as ProjectFile);
     setContextFiles((current) => {
       if (current.some((candidate) => candidate.path === contextFile.path)) return current;
       return [...current, contextFile];
