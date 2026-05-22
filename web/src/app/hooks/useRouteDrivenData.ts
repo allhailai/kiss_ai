@@ -58,6 +58,12 @@ export function useRouteDrivenData({
         if (route.filePath && nextView !== "design" && nextView !== "artifacts") {
           await selectFile(route.filePath);
         }
+
+        // Select the artifact spec file so the right-panel agent can see/edit it
+        if (nextView === "artifacts" && route.filePath) {
+          const specPath = `artifacts/artifact_specs/${route.filePath}.artifact.md`;
+          await selectFile(specPath);
+        }
       } catch (error) {
         if (isCurrentRouteRequest()) {
           setNotice(errorMessage(error, "Could not load this view."));
