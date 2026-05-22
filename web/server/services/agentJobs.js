@@ -1298,7 +1298,8 @@ export function createAgentJobService({
 
   async function startArtifactBuild(project, artifactSlug, requestedModelId) {
     const spec = await readArtifactSpec(project.path, artifactSlug);
-    const resolvedSources = await resolveArtifactSources(project.path, spec.frontmatter.sources || []);
+    const sourceGlobs = spec.frontmatter.sources?.length ? spec.frontmatter.sources : ["all"];
+    const resolvedSources = await resolveArtifactSources(project.path, sourceGlobs);
     await ensureArtifactDirs(project.path);
 
     // Delete old build output so the agent starts fresh (prevents incremental edits on stale HTML)
