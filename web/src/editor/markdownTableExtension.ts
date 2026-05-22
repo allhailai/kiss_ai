@@ -33,6 +33,7 @@ type SelectionBounds = {
 export type MarkdownTableExtensionOptions = {
   editable?: boolean;
   renderCellText?: (cell: string) => string;
+  renderCellDisplay?: ((cell: string, container: HTMLElement) => void) | null;
   onNotice?: (message: string) => void;
 };
 
@@ -656,7 +657,12 @@ class MarkdownTableWidget extends WidgetType {
 
       const display = document.createElement("div");
       display.className = "cm-markdown-table-cell-display";
-      display.textContent = this.options.renderCellText(value) || "\u00a0";
+      if (this.options.renderCellDisplay) {
+        this.options.renderCellDisplay(value, display);
+        if (!display.childNodes.length) display.textContent = "\u00a0";
+      } else {
+        display.textContent = this.options.renderCellText(value) || "\u00a0";
+      }
       display.role = "gridcell";
       display.tabIndex = 0;
       display.title = this.options.editable ? "Select cell. Press Space or F2 to edit." : "Select cell.";
@@ -682,7 +688,13 @@ class MarkdownTableWidget extends WidgetType {
       };
 
       const showDisplay = () => {
-        display.textContent = this.options.renderCellText(input.value) || "\u00a0";
+        if (this.options.renderCellDisplay) {
+          display.textContent = "";
+          this.options.renderCellDisplay(input.value, display);
+          if (!display.childNodes.length) display.textContent = "\u00a0";
+        } else {
+          display.textContent = this.options.renderCellText(input.value) || "\u00a0";
+        }
         input.hidden = true;
         display.hidden = false;
         display.focus();
@@ -844,6 +856,7 @@ export function buildMarkdownTableExtension(options: MarkdownTableExtensionOptio
   const extensionOptions: Required<MarkdownTableExtensionOptions> = {
     editable: options.editable ?? true,
     renderCellText: options.renderCellText ?? defaultRenderCellText,
+    renderCellDisplay: options.renderCellDisplay ?? null,
     onNotice: options.onNotice ?? (() => undefined),
   };
 

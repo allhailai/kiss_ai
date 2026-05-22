@@ -8,7 +8,7 @@ import { buildLineDiff } from "../domain/diffs";
 import { buildAnnotationExtension } from "./annotationExtension";
 import { buildEditorDiffExtension } from "./diffExtension";
 import { buildMarkdownTableExtension } from "./markdownTableExtension";
-import { buildWikiLinkExtension, renderMarkdownTableCellText } from "./wikiLinkExtension";
+import { buildTableCellDisplayRenderer, buildWikiLinkExtension, renderMarkdownTableCellText } from "./wikiLinkExtension";
 
 export function MarkdownEditor({
   baselineValue,
@@ -132,7 +132,7 @@ export function MarkdownEditor({
           overflow: "auto",
         },
       }),
-      buildMarkdownTableExtension({ editable, renderCellText: renderMarkdownTableCellText, onNotice: stableOnNotice }),
+      buildMarkdownTableExtension({ editable, renderCellText: renderMarkdownTableCellText, renderCellDisplay: buildTableCellDisplayRenderer({ getFiles, selectedPath, getOnOpenFile }), onNotice: stableOnNotice }),
       buildEditorDiffExtension({ getUnsavedDiff, getSavedDiff }),
       buildWikiLinkExtension({ getFiles, selectedPath, getOnOpenFile }),
       ...buildAnnotationExtension({

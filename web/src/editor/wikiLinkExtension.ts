@@ -197,3 +197,94 @@ export function buildWikiLinkExtension({
 export function renderMarkdownTableCellText(cell: string) {
   return cell.replace(/\[([^\]\n]+)\]\(([^)\n]+)\)/g, "$1").replace(/\[\[([^\]\n]+)\]\]/g, (_match, rawTarget: string) => wikiLinkLabel(rawTarget));
 }
+
+/**
+ * Builds a renderCellDisplay callback for the markdown table extension.
+ * Parses cell text for wiki links and markdown links, and creates clickable
+ * DOM elements using the same resolution logic as the inline link extension.
+ */
+export function buildTableCellDisplayRenderer({
+  getFiles,
+  selectedPath,
+  getOnOpenFile,
+}: {
+  getFiles: () => ProjectFile[];
+  selectedPath: string | null;
+  getOnOpenFile: () => (path: string) => void;
+}): (cell: string, container: HTMLElement) => void {
+  return (cell: string, container: HTMLElement) => {
+    const files = getFiles();
+    const onOpenFile = getOnOpenFile();
+    const linkIndex = createLinkResolutionIndex(files, selectedPath);
+
+    // Combined pattern matching wiki links and markdown links
+    const combinedPattern = /\[\[([^\]\n]+)\]\]|\[([^\]\n]+)\]\(([^)\n]+)\)/g;
+    let lastIndex = 0;
+
+    for (const match of cell.matchAll(combinedPattern)) {
+      const matchStart = match.index ?? 0;
+
+      // Append any plain text before this match
+      if (matchStart > lastIndex) {
+        container.appendChild(document.createTextNode(cell.slice(lastIndex, matchStart)));
+      }
+
+      if (match[1] !== undefined) {
+        // Wiki link: [[target]]
+        const rawTarget = match[1];
+        const label = wikiLinkLabel(rawTarget);
+        const resolution = resolveWikiLinkWithIndex(rawTarget, linkIndex);
+        container.appendChild(createLinkElement(label, resolution, onOpenFile));
+      } else if (match[2] !== undefined && match[3] !== undefined) {
+        // Markdown link: [label](target)
+        const label = match[2];
+        const rawTarget = match[3];
+        const resolution = resolveMarkdownLinkWithIndex(rawTarget, linkIndex);
+        const humanized = humanizeSourceLabel(label);
+        const displayLabel = humanized ?? label;
+        container.appendChild(createLinkElement(displayLabel, resolution, onOpenFile, humanized !== null));
+      }
+
+      lastIndex = matchStart + match[0].length;
+    }
+
+    // Append any remaining text after the last match
+    if (lastIndex < cell.length) {
+      container.appendChild(document.createTextNode(cell.slice(lastIndex)));
+    }
+  };
+}
+
+function createLinkElement(
+  label: string,
+  resolution: WikiLinkResolution,
+  onOpenFile: (path: string) => void,
+  isSourceCitation = false,
+): HTMLElement {
+  const link = document.createElement("span");
+  link.className = `cm-wiki-link ${linkResolutionClass(resolution)}${isSourceCitation ? " cm-source-citation" : ""}`;
+  link.textContent = isSourceCitation ? `📄 ${label}` : label;
+  link.role = "link";
+  link.tabIndex = 0;
+  link.title = linkResolutionTitle(resolution);
+
+  const open = (event: Event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (resolution.status === "resolved") {
+      onOpenFile(resolution.file.path);
+    } else if (resolution.status === "external") {
+      window.open(resolution.href, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  link.addEventListener("mousedown", (event) => event.preventDefault());
+  link.addEventListener("click", open);
+  link.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    open(event);
+  });
+
+  return link;
+}
+

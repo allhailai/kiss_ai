@@ -110,7 +110,7 @@ The build pipeline provides these values:
       }
       ```
       Record `word_count_before` and `state_before` at the start of Phase 3 before making changes.
-14. Update `outputs_ai/wiki/_index.md` with the updated BLUF for this topic's wiki page.
+14. Update `outputs_ai/wiki/_index.md` with the updated BLUF for this topic's wiki page. Preserve the `[[wiki link]]` format for page names and source references (see `do_build.md` Step 25 for the canonical schema).
 15. Update `sources/source_log.md` with the new sources.
 
 ### Phase 4: Snapshot

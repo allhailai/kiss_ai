@@ -153,10 +153,10 @@ When two sources conflict, favor the higher-ranked source and note the disagreem
 
 | Page | BLUF | Sources | Last Updated |
 |------|------|---------|-------------|
-| topic_name.md | One-sentence summary of the key finding | source1.md, source2.md | YYYY-MM-DD |
+| [[outputs_ai/wiki/topic_name]] | One-sentence summary of the key finding | [[sources/web_research/source1.md]], [[sources/web_research/source2.md]] | YYYY-MM-DD |
 ```
 
-This index is read by future builds (Phase 1, Step 5) to understand the wiki state without reading every page. Keep the BLUF column to one sentence.
+Use `[[wiki links]]` for page names and source references so they are navigable in the web UI. For source references, use the full relative path (e.g. `[[sources/web_research/mining_com__slug.md]]`) so the link resolution system can match them to actual files. This index is read by future builds (Phase 1, Step 5) to understand the wiki state without reading every page. Keep the BLUF column to one sentence.
 
 ### Phase 8: Build Directed Outputs
 
