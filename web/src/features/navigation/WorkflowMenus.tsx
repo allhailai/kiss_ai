@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   reviewNavLeaf,
   chatNavLeaf,
@@ -11,6 +11,7 @@ import { projectPathPrefixes } from "../../domain/projectPaths";
 import { type View } from "../../navigation/views";
 import type { ProjectFile } from "../../contracts/api";
 import { FileTreeNav } from "./FileTreeNav";
+import { artifactsApi, type ArtifactSpec } from "../../data/artifactsApi";
 
 const defaultExpandedSections = new Set<SimplifiedNavSectionId>(
   simplifiedNavSections.filter((section) => section.id !== "source-data").map((section) => section.id),
@@ -22,8 +23,10 @@ export function SimplifiedNavigator({
   reviewBadgeCount,
   hasBlockingQuestions,
   projectFiles,
+  projectSlug,
   loading,
   selectedPath,
+  selectedArtifactSlug,
   onCreateFolder,
   onCreateTextFile,
   onDeleteFolder,
@@ -38,8 +41,10 @@ export function SimplifiedNavigator({
   reviewBadgeCount?: number;
   hasBlockingQuestions?: boolean;
   projectFiles: ProjectFile[];
+  projectSlug: string;
   loading: boolean;
   selectedPath: string | null;
+  selectedArtifactSlug: string | null;
   onCreateFolder?: (name: string) => void;
   onCreateTextFile?: (name: string, folder?: string) => void;
   onDeleteFolder?: (folder: string) => void;
@@ -201,41 +206,179 @@ export function SimplifiedNavigator({
       );
     }
 
-    return (
-      <>
-        <button
-          className={
-            currentView === "artifacts"
-              ? "simple-nav-item simple-nav-subheader active"
-              : "simple-nav-item simple-nav-subheader"
-          }
-          onClick={() => onOpenView("artifacts")}
-          type="button"
-        >
-          <span>📊 Artifacts</span>
-        </button>
-        <button
-          className={
-            currentView === "outputs" && !selectedPath
-              ? "simple-nav-item simple-nav-subheader active"
-              : "simple-nav-item simple-nav-subheader"
-          }
-          onClick={() => onOpenView("outputs")}
-          type="button"
-        >
-          <span>Outputs</span>
-        </button>
-        <FileTreeBlock
-          emptyLabel="No generated Markdown files yet."
-          files={outputFiles}
-          loading={loading && currentView === "outputs"}
-          onOpenFile={onOpenFile}
-          selectedPath={selectedPath}
+    if (sectionId === "results") {
+      return (
+        <>
+          <button
+            className={
+              currentView === "outputs" && !selectedPath
+                ? "simple-nav-item simple-nav-subheader active"
+                : "simple-nav-item simple-nav-subheader"
+            }
+            onClick={() => onOpenView("outputs")}
+            type="button"
+          >
+            <span>Outputs</span>
+          </button>
+          <FileTreeBlock
+            emptyLabel="No generated Markdown files yet."
+            files={outputFiles}
+            loading={loading && currentView === "outputs"}
+            onOpenFile={onOpenFile}
+            selectedPath={selectedPath}
+          />
+        </>
+      );
+    }
+
+    if (sectionId === "artifacts") {
+      return (
+        <ArtifactNavSection
+          projectSlug={projectSlug}
+          selectedArtifactSlug={selectedArtifactSlug}
+          isActive={currentView === "artifacts"}
+          onOpenView={onOpenView}
         />
-      </>
-    );
+      );
+    }
+
+    return null;
   }
 }
+
+/* ─── Artifact Navigation Section ──────────────────────────────── */
+
+function ArtifactNavSection({
+  projectSlug,
+  selectedArtifactSlug,
+  isActive,
+  onOpenView,
+}: {
+  projectSlug: string;
+  selectedArtifactSlug: string | null;
+  isActive: boolean;
+  onOpenView: (view: View, path?: string | null) => void;
+}) {
+  const [artifacts, setArtifacts] = useState<ArtifactSpec[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+
+  const refreshList = useCallback(async () => {
+    try {
+      const result = await artifactsApi.list(projectSlug);
+      setArtifacts(result.artifacts);
+    } catch {
+      setArtifacts([]);
+    }
+  }, [projectSlug]);
+
+  // Load artifact list on mount and when section becomes active
+  useEffect(() => {
+    void refreshList();
+  }, [refreshList, isActive]);
+
+  useEffect(() => {
+    if (showForm && nameInputRef.current) {
+      nameInputRef.current.focus();
+    }
+  }, [showForm]);
+
+  async function handleCreate() {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    setCreating(true);
+    try {
+      const result = await artifactsApi.create(projectSlug, trimmed, "## Goal\n\nDescribe the goal of this artifact...\n");
+      await refreshList();
+      onOpenView("artifacts", result.slug);
+      setNewName("");
+      setShowForm(false);
+    } catch {
+      // Ignore — inline form, no toast access
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <>
+      {artifacts.length === 0 && !showForm ? (
+        <p className="simple-nav-state">No artifacts yet.</p>
+      ) : (
+        <div className="simple-nav-children">
+          {artifacts.map((artifact) => (
+            <button
+              className={
+                selectedArtifactSlug === artifact.slug
+                  ? "simple-nav-item simple-nav-child active"
+                  : "simple-nav-item simple-nav-child"
+              }
+              key={artifact.slug}
+              onClick={() => onOpenView("artifacts", artifact.slug)}
+              type="button"
+            >
+              <span className="artifact-nav-label">
+                <span className={`artifact-nav-status artifact-nav-status-${artifact.status}`}>
+                  {artifact.status === "built" ? "●" : "○"}
+                </span>
+                <span>{artifact.name}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="human-input-actions">
+        <div className="human-input-action-row">
+          <button
+            className="human-input-action-button"
+            onClick={() => setShowForm((prev) => !prev)}
+            type="button"
+            title="Create a new artifact"
+            aria-expanded={showForm}
+          >
+            <span className="human-input-action-icon" aria-hidden="true">+</span>
+            <span>New artifact</span>
+          </button>
+        </div>
+
+        {showForm ? (
+          <form
+            className="human-input-name-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleCreate();
+            }}
+          >
+            <input
+              ref={nameInputRef}
+              className="human-input-name-input"
+              type="text"
+              placeholder="Artifact name…"
+              value={newName}
+              onChange={(event) => setNewName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setShowForm(false);
+              }}
+              maxLength={120}
+            />
+            <button
+              className="human-input-name-submit"
+              type="submit"
+              disabled={!newName.trim() || creating}
+            >
+              Create
+            </button>
+          </form>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+/* ─── Existing helper components ───────────────────────────────── */
 
 function HumanInputActions({
   onCreateFolder,

@@ -10,6 +10,7 @@ export function AppSidebar({
   onCollapse,
   onExpand,
   onOpenFile,
+  projectSlug,
   rebuildWorkspace,
 }: {
   collapsed: boolean;
@@ -37,6 +38,7 @@ export function AppSidebar({
   onCollapse: () => void;
   onExpand: () => void;
   onOpenFile: (path: string) => void;
+  projectSlug: string;
   rebuildWorkspace: {
     status: ProjectStatus | null;
   };
@@ -120,6 +122,8 @@ export function AppSidebar({
           loading={fileWorkspace.loading}
           projectFiles={fileWorkspace.projectFiles}
           selectedPath={fileWorkspace.selected?.path ?? null}
+          projectSlug={projectSlug}
+          selectedArtifactSlug={route.view === "artifacts" ? (route.filePath ?? null) : null}
           onCreateFolder={(name) => void fileWorkspace.createHumanInputFolder(name)}
           onCreateTextFile={(name, folder) => void fileWorkspace.createHumanInputTextFile(name, folder)}
           onDeleteFolder={(folder) => void fileWorkspace.deleteHumanInputFolder(folder)}

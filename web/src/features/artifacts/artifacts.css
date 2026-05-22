@@ -1,170 +1,24 @@
-/* ─── Artifacts View Layout ──────────────────────────────────────── */
+/* ─── Artifacts View ─────────────────────────────────────────── */
 
 .artifacts-view {
   display: flex;
+  flex-direction: column;
   height: 100%;
   overflow: hidden;
 }
 
-/* ─── Left Panel: Artifact List ──────────────────────────────────── */
-
-.artifacts-list-panel {
-  width: 260px;
-  min-width: 200px;
-  border-right: 1px solid var(--color-border, #333);
-  display: flex;
-  flex-direction: column;
-  background: var(--color-surface-secondary, #1a1a1a);
-}
-
-.artifacts-list-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border, #333);
-}
-
-.artifacts-list-header h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-primary, #e0e0e0);
-}
-
-.artifacts-empty {
-  padding: 16px;
-  font-size: 13px;
-  color: var(--color-text-muted, #888);
-}
-
-.artifacts-list {
-  list-style: none;
-  margin: 0;
-  padding: 4px 0;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.artifact-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 8px 16px;
-  border: none;
-  background: transparent;
-  color: var(--color-text-primary, #e0e0e0);
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.artifact-item:hover {
-  background: var(--color-surface-hover, #2a2a2a);
-}
-
-.artifact-item.active {
-  background: var(--color-surface-active, #333);
-  border-left: 2px solid var(--color-accent, #6c8cff);
-}
-
-.artifact-item-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-}
-
-.artifact-item-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 8px;
-  flex-shrink: 0;
-}
-
-.artifact-status {
-  font-size: 10px;
-}
-
-.artifact-status-built {
-  color: #4caf50;
-}
-
-.artifact-status-not_built {
-  color: #888;
-}
-
-.artifact-status-error {
-  color: #f44336;
-}
-
-.artifact-lifecycle {
-  font-size: 11px;
-  color: var(--color-text-muted, #888);
-}
-
-/* ─── Create Form ────────────────────────────────────────────────── */
-
-.artifacts-create-form {
-  display: flex;
-  gap: 4px;
-  padding: 8px;
-  border-top: 1px solid var(--color-border, #333);
-}
-
-.artifacts-create-input {
-  flex: 1;
-  padding: 6px 8px;
-  border: 1px solid var(--color-border, #444);
-  border-radius: 4px;
-  background: var(--color-surface-primary, #111);
-  color: var(--color-text-primary, #e0e0e0);
-  font-size: 12px;
-}
-
-.artifacts-create-input::placeholder {
-  color: var(--color-text-muted, #666);
-}
-
-.artifacts-create-button {
-  padding: 6px 10px;
-  border: 1px solid var(--color-border, #444);
-  border-radius: 4px;
-  background: var(--color-surface-secondary, #1a1a1a);
-  color: var(--color-text-primary, #e0e0e0);
-  font-size: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.artifacts-create-button:hover:not(:disabled) {
-  background: var(--color-surface-hover, #2a2a2a);
-}
-
-.artifacts-create-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-/* ─── Right Panel: Main Content ──────────────────────────────────── */
-
-.artifacts-main-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
+/* ─── Placeholder (no selection) ─────────────────────────────── */
 
 .artifacts-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  flex: 1;
   color: var(--color-text-muted, #888);
   font-size: 14px;
 }
 
-/* ─── Toolbar ────────────────────────────────────────────────────── */
+/* ─── Toolbar ────────────────────────────────────────────────── */
 
 .artifacts-toolbar {
   display: flex;
@@ -172,33 +26,33 @@
   justify-content: space-between;
   padding: 8px 16px;
   border-bottom: 1px solid var(--color-border, #333);
-  gap: 8px;
+  flex-shrink: 0;
 }
 
 .artifacts-tabs {
   display: flex;
-  gap: 2px;
+  gap: 4px;
 }
 
 .artifacts-tab {
-  padding: 6px 14px;
+  padding: 4px 14px;
   border: 1px solid var(--color-border, #444);
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
-  color: var(--color-text-muted, #888);
-  font-size: 12px;
+  color: var(--color-text-muted, #aaa);
   cursor: pointer;
-  transition: all 0.15s;
-}
-
-.artifacts-tab:hover {
-  color: var(--color-text-primary, #e0e0e0);
+  font-size: 13px;
 }
 
 .artifacts-tab.active {
-  background: var(--color-surface-active, #333);
-  color: var(--color-text-primary, #e0e0e0);
-  border-color: var(--color-accent, #6c8cff);
+  background: var(--color-accent-muted, rgba(180, 120, 80, 0.15));
+  color: var(--color-accent, #c87040);
+  border-color: var(--color-accent, #c87040);
+}
+
+.artifacts-tab:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .artifacts-actions {
@@ -209,125 +63,101 @@
 
 .artifacts-notice {
   font-size: 12px;
-  color: var(--color-accent, #6c8cff);
-  animation: artifacts-flash 0.3s ease;
-}
-
-@keyframes artifacts-flash {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  color: var(--color-text-muted, #888);
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .artifacts-action-btn {
-  padding: 5px 12px;
+  padding: 4px 12px;
+  border-radius: 6px;
   border: 1px solid var(--color-border, #444);
-  border-radius: 4px;
-  background: var(--color-surface-secondary, #1a1a1a);
-  color: var(--color-text-primary, #e0e0e0);
-  font-size: 12px;
+  background: transparent;
   cursor: pointer;
-  transition: all 0.15s;
-}
-
-.artifacts-action-btn:hover:not(:disabled) {
-  background: var(--color-surface-hover, #2a2a2a);
-}
-
-.artifacts-action-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.artifacts-build-btn {
-  border-color: var(--color-accent, #6c8cff);
-  color: var(--color-accent, #6c8cff);
-}
-
-.artifacts-build-btn:hover:not(:disabled) {
-  background: rgba(108, 140, 255, 0.1);
+  font-size: 12px;
+  color: var(--color-text, #ccc);
 }
 
 .artifacts-save-btn {
-  border-color: #4caf50;
-  color: #4caf50;
+  border-color: var(--color-accent, #c87040);
+  color: var(--color-accent, #c87040);
+}
+
+.artifacts-build-btn {
+  background: var(--color-accent, #c87040);
+  color: var(--color-on-accent, #fff);
+  border-color: var(--color-accent, #c87040);
 }
 
 .artifacts-delete-btn {
-  color: var(--color-text-muted, #888);
+  color: var(--color-error, #e06060);
+  border-color: transparent;
 }
 
-.artifacts-delete-btn:hover {
-  color: #f44336;
-  border-color: #f44336;
-}
-
-/* ─── Spec Editor ────────────────────────────────────────────────── */
+/* ─── Spec Editor ────────────────────────────────────────────── */
 
 .artifacts-spec-editor {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 16px;
   overflow-y: auto;
+  padding: 16px;
+  gap: 12px;
 }
 
 .artifacts-spec-meta {
-  margin-bottom: 16px;
-  padding: 12px;
-  background: var(--color-surface-secondary, #1a1a1a);
-  border-radius: 6px;
+  background: var(--color-surface, #1e1e1e);
   border: 1px solid var(--color-border, #333);
+  border-radius: 8px;
+  padding: 12px 16px;
 }
 
 .artifacts-meta-grid {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 4px 12px;
+  gap: 4px 16px;
   margin: 0;
   font-size: 13px;
 }
 
 .artifacts-meta-grid dt {
   color: var(--color-text-muted, #888);
-  font-weight: 500;
 }
 
 .artifacts-meta-grid dd {
   margin: 0;
-  color: var(--color-text-primary, #e0e0e0);
+  color: var(--color-text, #ccc);
 }
 
 .artifacts-body-label {
   font-size: 12px;
   color: var(--color-text-muted, #888);
-  margin-bottom: 6px;
 }
 
 .artifacts-body-editor {
   flex: 1;
-  min-height: 300px;
+  min-height: 200px;
   padding: 12px;
   border: 1px solid var(--color-border, #333);
-  border-radius: 6px;
-  background: var(--color-surface-primary, #111);
-  color: var(--color-text-primary, #e0e0e0);
-  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  border-radius: 8px;
+  background: var(--color-surface, #1a1a1a);
+  color: var(--color-text, #ccc);
+  font-family: var(--font-mono, "SF Mono", "Fira Code", monospace);
   font-size: 13px;
   line-height: 1.6;
-  resize: vertical;
-  tab-size: 2;
+  resize: none;
 }
 
 .artifacts-body-editor:focus {
-  outline: none;
-  border-color: var(--color-accent, #6c8cff);
+  outline: 1px solid var(--color-accent, #c87040);
 }
 
-/* ─── Preview Container ──────────────────────────────────────────── */
+/* ─── Preview ────────────────────────────────────────────────── */
 
 .artifacts-preview-container {
   flex: 1;
-  display: flex;
   overflow: hidden;
 }
 
@@ -338,7 +168,7 @@
   background: white;
 }
 
-/* ─── Building Overlay ───────────────────────────────────────────── */
+/* ─── Building Overlay ───────────────────────────────────────── */
 
 .artifacts-building-overlay {
   display: flex;
@@ -373,10 +203,27 @@
   to { transform: rotate(360deg); }
 }
 
-/* ─── Disabled tab ───────────────────────────────────────────────── */
+/* ─── Sidebar Artifact Nav Items ─────────────────────────────── */
 
-.artifacts-tab:disabled {
-  opacity: 0.4;
-  cursor: default;
+.artifact-nav-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
+.artifact-nav-status {
+  font-size: 8px;
+  line-height: 1;
+}
+
+.artifact-nav-status-built {
+  color: var(--color-success, #4caf50);
+}
+
+.artifact-nav-status-not_built {
+  color: var(--color-text-muted, #666);
+}
+
+.artifact-nav-status-error {
+  color: var(--color-error, #e06060);
+}

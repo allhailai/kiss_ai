@@ -234,6 +234,7 @@ export function App() {
             onCollapse={() => setSidebarCollapsed(true)}
             onExpand={() => setSidebarCollapsed(false)}
             onOpenFile={openProjectFileWithAgentContext}
+            projectSlug={project.selectedProjectSlug}
             rebuildWorkspace={rebuildWorkspace}
           />
 
