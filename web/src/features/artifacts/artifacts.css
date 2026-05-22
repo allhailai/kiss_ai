@@ -108,7 +108,7 @@
 }
 
 .artifacts-spec-meta {
-  background: var(--color-surface-elevated, #2a2a2a);
+  background: #fff;
   border: 1px solid var(--color-border, #333);
   border-radius: 8px;
   padding: 12px 16px;
@@ -123,19 +123,19 @@
 }
 
 .artifacts-meta-grid dt {
-  color: var(--color-text, #ccc);
+  color: #666;
   font-weight: 600;
 }
 
 .artifacts-meta-grid dd {
   margin: 0;
-  color: #fff;
+  color: #1a1a1a;
   font-weight: 700;
 }
 
 .artifacts-meta-select {
   background: transparent;
-  color: #fff;
+  color: #1a1a1a;
   font-weight: 700;
   border: 1px solid transparent;
   border-radius: 4px;
@@ -145,7 +145,7 @@
 }
 
 .artifacts-meta-select:hover {
-  border-color: var(--color-border, #444);
+  border-color: #ccc;
 }
 
 .artifacts-meta-select:focus {
@@ -154,8 +154,8 @@
 }
 
 .artifacts-meta-select option {
-  background: var(--color-surface, #1e1e1e);
-  color: var(--color-text, #ccc);
+  background: #fff;
+  color: #1a1a1a;
 }
 
 .artifacts-body-label {
