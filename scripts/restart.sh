@@ -7,9 +7,9 @@
 # The script:
 #   1. Waits for the old server process to exit
 #   2. Waits for the API port to be free
-#   3. Runs npm install
+#   3. Runs npm install and auto-commits package-lock.json if it changed
 #   4. Starts npm run dev in the background
-#   5. Waits for the server to be listening, then opens the browser
+#   5. Waits for the server to be listening
 
 set -euo pipefail
 
@@ -73,6 +73,18 @@ if npm install 2>&1; then
   echo "[restart] npm install succeeded"
 else
   echo "[restart] WARNING: npm install failed (exit code $?), attempting to start anyway"
+fi
+
+# ── 3b. Auto-commit lockfile changes so the tree stays clean ────────────────
+# npm install may update package-lock.json (different npm version, resolved
+# transitive deps). If we leave it dirty, the next update check will reject
+# with "kiss_ai_working_tree_dirty" and the user can never update again.
+HUB_ROOT="$(cd "$WEB_ROOT/.." && pwd)"
+cd "$HUB_ROOT"
+if [ -n "$(git status --porcelain -- web/package-lock.json 2>/dev/null)" ]; then
+  echo "[restart] package-lock.json changed — auto-committing"
+  git add web/package-lock.json
+  git commit -m "chore: update package-lock.json after npm install" --no-verify 2>&1 || true
 fi
 
 # ── 4. Start npm run dev ────────────────────────────────────────────────────
