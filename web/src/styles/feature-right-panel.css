@@ -185,9 +185,19 @@
   min-height: 0;
   height: 100%;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto auto auto auto;
+  grid-template-rows: auto minmax(0, auto) auto auto minmax(0, 1fr) auto auto auto;
   gap: 8px;
   overflow: hidden;
+}
+
+/* Prevent the thread from hogging all vertical space when few messages */
+.right-panel-agent-chat > .right-panel-agent-thread {
+  max-height: min(50%, 400px);
+}
+
+/* When there are no proposals, let the thread expand to fill the space */
+.right-panel-agent-chat:not(:has(.agent-edit-proposal)) > .right-panel-agent-thread {
+  max-height: none;
 }
 
 .right-panel-mode-switch {
