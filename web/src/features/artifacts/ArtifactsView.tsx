@@ -218,7 +218,20 @@ export function ArtifactsView({ projectSlug }: { projectSlug: string }) {
               <dt>Format</dt>
               <dd>{String(selectedSpec.frontmatter.format ?? "html")}</dd>
               <dt>Lifecycle</dt>
-              <dd>{String(selectedSpec.frontmatter.lifecycle ?? "manual")}</dd>
+              <dd>
+                <select
+                  className="artifacts-meta-select"
+                  value={String(selectedSpec.frontmatter.lifecycle ?? "manual")}
+                  onChange={(e) => {
+                    const updated = { ...selectedSpec, frontmatter: { ...selectedSpec.frontmatter, lifecycle: e.target.value } };
+                    setSelectedSpec(updated);
+                    void artifactsApi.update(projectSlug, selectedSlug, updated.frontmatter, editBody);
+                  }}
+                >
+                  <option value="manual">manual</option>
+                  <option value="on_build">on_build</option>
+                </select>
+              </dd>
               <dt>Sources</dt>
               <dd>
                 {Array.isArray(selectedSpec.frontmatter.sources)

@@ -131,6 +131,30 @@
   color: var(--color-text, #ccc);
 }
 
+.artifacts-meta-select {
+  background: transparent;
+  color: var(--color-text, #ccc);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 13px;
+  padding: 1px 4px;
+  cursor: pointer;
+}
+
+.artifacts-meta-select:hover {
+  border-color: var(--color-border, #444);
+}
+
+.artifacts-meta-select:focus {
+  outline: 1px solid var(--color-accent, #c87040);
+  border-color: var(--color-accent, #c87040);
+}
+
+.artifacts-meta-select option {
+  background: var(--color-surface, #1e1e1e);
+  color: var(--color-text, #ccc);
+}
+
 .artifacts-body-label {
   font-size: 12px;
   color: var(--color-text-muted, #888);
