@@ -78,7 +78,7 @@ function QuestionCard({
         questionText: question.text,
         questionContext: question.context,
         userDraft: draft,
-        relatedFiles: question.relatedFiles,
+        relatedFiles: question.relatedFiles ?? [],
       });
       setAiAnswer(result.answer);
       setAiConfidence(result.confidence);
@@ -88,7 +88,7 @@ function QuestionCard({
     } finally {
       setAiLoading(false);
     }
-  }, [aiLoading, selectedModelId, projectSlug, question.text, question.context, draft, question.relatedFiles]);
+  }, [aiLoading, selectedModelId, projectSlug, question.text, question.context, draft, question.relatedFiles]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleApplyAnswer = useCallback(() => {
     if (!aiAnswer) return;
@@ -125,7 +125,7 @@ function QuestionCard({
         <p className="question-card-context">{question.context}</p>
       ) : null}
 
-      {question.relatedFiles.length > 0 ? (
+      {question.relatedFiles?.length ? (
         <div className="question-card-related">
           <span className="question-card-related-label">Related files:</span>
           {question.relatedFiles.map((file) => (
