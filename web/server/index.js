@@ -185,9 +185,10 @@ const { buildLogTabState } = createBuildLogService({
 
 const { getHumanAttentionItems, readProjectHarness } = createHarnessStateService({ httpError });
 
-const { checkKissAiUpdate, updateKissAi } = createKissAiUpdateService({
+const { checkKissAiUpdate, updateAndRestart, updateKissAi } = createKissAiUpdateService({
   HUB_ROOT,
   WEB_ROOT,
+  PORT,
   execFileText,
   httpError,
 });
@@ -369,6 +370,7 @@ registerApiRoutes(app, {
   subscribeToRebuild,
   systemSettings,
   treeRoots,
+  updateAndRestart,
   updateConversation,
   updateEditProposal,
   updateKissAi,

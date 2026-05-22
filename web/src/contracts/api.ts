@@ -159,6 +159,14 @@ export type KissAiUpdateResponse = {
   };
 };
 
+export type KissAiUpdateAndRestartResponse = {
+  status: "updated" | "up_to_date";
+  restarting: boolean;
+  beforeRevision: string;
+  afterRevision: string;
+  pullOutput: string;
+};
+
 export type SystemSettingsResponse = {
   cursorApiKeyAvailable: boolean;
   cursorApiKeySource: string | null;

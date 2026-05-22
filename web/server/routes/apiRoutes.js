@@ -14,6 +14,7 @@ export function registerApiRoutes(app, deps) {
     readKeybindings: deps.readKeybindings,
     saveCursorApiKey: deps.saveCursorApiKey,
     systemSettings: deps.systemSettings,
+    updateAndRestart: deps.updateAndRestart,
     updateKissAi: deps.updateKissAi,
   });
 

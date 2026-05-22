@@ -97,6 +97,7 @@ describe("API routes", () => {
         remoteRevision: "bbb222",
         upstream: "target/master",
       }),
+      updateAndRestart: async () => ({}),
       updateKissAi: async () => ({
         status: "updated",
         beforeRevision: "aaa111",
@@ -121,6 +122,37 @@ describe("API routes", () => {
     });
   });
 
+  it("runs the kiss_ai update-and-restart route", async () => {
+    const app = express();
+    app.use(express.json());
+    registerSystemRoutes(app, {
+      checkKissAiUpdate: async () => ({}),
+      updateAndRestart: async () => ({
+        status: "updated",
+        restarting: true,
+        beforeRevision: "aaa111",
+        afterRevision: "bbb222",
+        pullOutput: "Updated",
+      }),
+      updateKissAi: async () => ({}),
+      httpError,
+      saveCursorApiKey: async () => ({}),
+      systemSettings: async () => ({ cursorApiKeyAvailable: false, cursorApiKeySource: null, cursorApiKeyWarnings: [] }),
+    });
+    app.use(apiErrorHandler);
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/system/update-and-restart`, { method: "POST" });
+
+      await expect(response.json()).resolves.toMatchObject({
+        status: "updated",
+        restarting: true,
+        afterRevision: "bbb222",
+      });
+      expect(response.status).toBe(200);
+    });
+  });
+
   it("runs the kiss_ai update check route", async () => {
     const app = express();
     app.use(express.json());
@@ -135,6 +167,7 @@ describe("API routes", () => {
       httpError,
       saveCursorApiKey: async () => ({}),
       systemSettings: async () => ({ cursorApiKeyAvailable: false, cursorApiKeySource: null, cursorApiKeyWarnings: [] }),
+      updateAndRestart: async () => ({}),
       updateKissAi: async () => ({}),
     });
     app.use(apiErrorHandler);
@@ -164,6 +197,7 @@ describe("API routes", () => {
         cursorApiKeySource: "macOS Keychain item cursor_api_key",
         cursorApiKeyWarnings: [],
       }),
+      updateAndRestart: async () => ({}),
       updateKissAi: async () => ({}),
     });
     app.use(apiErrorHandler);
@@ -193,6 +227,7 @@ describe("API routes", () => {
         message: `saved ${cursorApiKey.length}`,
       }),
       systemSettings: async () => ({ cursorApiKeyAvailable: false, cursorApiKeySource: null, cursorApiKeyWarnings: [] }),
+      updateAndRestart: async () => ({}),
       updateKissAi: async () => ({}),
     });
     app.use(apiErrorHandler);

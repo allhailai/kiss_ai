@@ -1,6 +1,6 @@
 import { parseRequestBody, saveCursorApiKeyBodySchema } from "./requestSchemas.js";
 
-export function registerSystemRoutes(app, { checkKissAiUpdate, httpError, readKeybindings, saveCursorApiKey, systemSettings, updateKissAi }) {
+export function registerSystemRoutes(app, { checkKissAiUpdate, httpError, readKeybindings, saveCursorApiKey, systemSettings, updateAndRestart, updateKissAi }) {
   app.get("/api/system/keybindings", async (_request, response, next) => {
     try {
       response.json(await readKeybindings());
@@ -41,4 +41,13 @@ export function registerSystemRoutes(app, { checkKissAiUpdate, httpError, readKe
       next(error);
     }
   });
+
+  app.post("/api/system/update-and-restart", async (_request, response, next) => {
+    try {
+      response.json(await updateAndRestart());
+    } catch (error) {
+      next(error);
+    }
+  });
 }
+

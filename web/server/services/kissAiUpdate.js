@@ -1,3 +1,6 @@
+import { spawn } from "node:child_process";
+import path from "node:path";
+
 function normalizeCommandOutput(output) {
   return String(output ?? "").trim();
 }
@@ -7,7 +10,9 @@ function truncateOutput(output) {
   return normalized.length > 4000 ? `${normalized.slice(0, 4000)}\n...` : normalized;
 }
 
-export function createKissAiUpdateService({ HUB_ROOT, WEB_ROOT, execFileText, httpError }) {
+export function createKissAiUpdateService({ HUB_ROOT, WEB_ROOT, PORT, execFileText, httpError }) {
+  const SCRIPTS_ROOT = path.resolve(HUB_ROOT, "scripts");
+
   async function git(args) {
     return execFileText("git", args, { cwd: HUB_ROOT });
   }
@@ -131,8 +136,57 @@ export function createKissAiUpdateService({ HUB_ROOT, WEB_ROOT, execFileText, ht
     };
   }
 
+  async function updateAndRestart() {
+    await ensureGitCheckout();
+    await ensureCleanWorkingTree();
+
+    const beforeRevision = await currentShortRevision("HEAD");
+    let pullOutput = "";
+
+    try {
+      pullOutput = truncateOutput(await git(["pull", "--ff-only"]));
+    } catch {
+      throw httpError("Could not get the latest kiss_ai files. Ask a maintainer to check the Git repository connection.", 500, "kiss_ai_update_failed");
+    }
+
+    const afterRevision = await currentShortRevision("HEAD");
+
+    if (beforeRevision === afterRevision) {
+      return {
+        status: "up_to_date",
+        restarting: false,
+        beforeRevision,
+        afterRevision,
+        pullOutput,
+      };
+    }
+
+    // Spawn the restart script as a fully detached process.
+    // It will wait for this process to exit, run npm install, then start npm run dev.
+    const scriptPath = path.join(SCRIPTS_ROOT, "restart.sh");
+    const apiPort = String(PORT);
+
+    const child = spawn("bash", [scriptPath, WEB_ROOT, apiPort, String(process.pid)], {
+      detached: true,
+      stdio: "ignore",
+    });
+    child.unref();
+
+    // Schedule self-exit shortly after the HTTP response is sent.
+    setTimeout(() => process.exit(0), 500);
+
+    return {
+      status: "updated",
+      restarting: true,
+      beforeRevision,
+      afterRevision,
+      pullOutput,
+    };
+  }
+
   return {
     checkKissAiUpdate,
+    updateAndRestart,
     updateKissAi,
   };
 }

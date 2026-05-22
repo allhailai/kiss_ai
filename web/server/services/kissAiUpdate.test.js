@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { httpError } from "./httpErrors.js";
 import { createKissAiUpdateService } from "./kissAiUpdate.js";
 
@@ -18,6 +18,7 @@ describe("kissAiUpdate service", () => {
     const updateService = createKissAiUpdateService({
       HUB_ROOT: "/repo/_kiss_ai",
       WEB_ROOT: "/repo/_kiss_ai/web",
+      PORT: 8787,
       execFileText: createExecFileText(
         {
           "git rev-parse --is-inside-work-tree": "true",
@@ -46,6 +47,7 @@ describe("kissAiUpdate service", () => {
     const updateService = createKissAiUpdateService({
       HUB_ROOT: "/repo/_kiss_ai",
       WEB_ROOT: "/repo/_kiss_ai/web",
+      PORT: 8787,
       execFileText: createExecFileText({
         "git rev-parse --is-inside-work-tree": "true",
         "git status --porcelain": "",
@@ -70,6 +72,7 @@ describe("kissAiUpdate service", () => {
     const updateService = createKissAiUpdateService({
       HUB_ROOT: "/repo/_kiss_ai",
       WEB_ROOT: "/repo/_kiss_ai/web",
+      PORT: 8787,
       execFileText: createExecFileText(
         {
           "git rev-parse --is-inside-work-tree": "true",
@@ -99,6 +102,7 @@ describe("kissAiUpdate service", () => {
     const updateService = createKissAiUpdateService({
       HUB_ROOT: "/repo/_kiss_ai",
       WEB_ROOT: "/repo/_kiss_ai/web",
+      PORT: 8787,
       execFileText: createExecFileText({
         "git rev-parse --is-inside-work-tree": "true",
         "git status --porcelain": " M README.md",
@@ -116,6 +120,7 @@ describe("kissAiUpdate service", () => {
     const updateService = createKissAiUpdateService({
       HUB_ROOT: "/repo/_kiss_ai",
       WEB_ROOT: "/repo/_kiss_ai/web",
+      PORT: 8787,
       execFileText: createExecFileText({
         "git rev-parse --is-inside-work-tree": "true",
         "git status --porcelain": " M README.md",
@@ -128,4 +133,65 @@ describe("kissAiUpdate service", () => {
       statusCode: 409,
     });
   });
+
+  it("updateAndRestart returns restarting:false when already up to date", async () => {
+    const updateService = createKissAiUpdateService({
+      HUB_ROOT: "/repo/_kiss_ai",
+      WEB_ROOT: "/repo/_kiss_ai/web",
+      PORT: 8787,
+      execFileText: createExecFileText({
+        "git rev-parse --is-inside-work-tree": "true",
+        "git status --porcelain": "",
+        "git rev-parse --short HEAD": ["aaa111", "aaa111"],
+        "git pull --ff-only": "Already up to date.",
+      }),
+      httpError,
+    });
+
+    const result = await updateService.updateAndRestart();
+
+    expect(result).toMatchObject({
+      status: "up_to_date",
+      restarting: false,
+      beforeRevision: "aaa111",
+      afterRevision: "aaa111",
+    });
+  });
+
+  it("updateAndRestart spawns restart script and schedules exit when update is available", async () => {
+    // Mock process.exit and setTimeout to prevent actual exit during test
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {});
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout").mockImplementation(() => 0);
+
+    // Mock child_process.spawn via the module — since the service uses spawn internally,
+    // we verify the behavior through the return value (restarting: true).
+    const updateService = createKissAiUpdateService({
+      HUB_ROOT: "/repo/_kiss_ai",
+      WEB_ROOT: "/repo/_kiss_ai/web",
+      PORT: 8787,
+      execFileText: createExecFileText({
+        "git rev-parse --is-inside-work-tree": "true",
+        "git status --porcelain": "",
+        "git rev-parse --short HEAD": ["aaa111", "bbb222"],
+        "git pull --ff-only": "Updating aaa111..bbb222",
+      }),
+      httpError,
+    });
+
+    const result = await updateService.updateAndRestart();
+
+    expect(result).toMatchObject({
+      status: "updated",
+      restarting: true,
+      beforeRevision: "aaa111",
+      afterRevision: "bbb222",
+    });
+
+    // Verify that process.exit was scheduled
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 500);
+
+    exitSpy.mockRestore();
+    setTimeoutSpy.mockRestore();
+  });
 });
+

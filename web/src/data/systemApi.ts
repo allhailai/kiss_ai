@@ -1,5 +1,6 @@
 import type {
   Keybindings,
+  KissAiUpdateAndRestartResponse,
   KissAiUpdateCheckResponse,
   KissAiUpdateResponse,
   SaveCursorApiKeyRequest,
@@ -22,6 +23,10 @@ export const systemApi = {
     }),
   updateKissAi: () =>
     request<KissAiUpdateResponse>("/api/system/update", {
+      method: "POST",
+    }),
+  updateAndRestartKissAi: () =>
+    request<KissAiUpdateAndRestartResponse>("/api/system/update-and-restart", {
       method: "POST",
     }),
 };
