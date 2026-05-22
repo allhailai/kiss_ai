@@ -39,6 +39,15 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild }) {
       if (!name) return next(httpError("Artifact name is required.", 400, "artifact_name_required"));
 
       const slug = slugifyArtifactName(name);
+
+      // Ensure slug uniqueness
+      try {
+        await readArtifactSpec(request.project.path, slug);
+        return next(httpError(`An artifact with the slug "${slug}" already exists.`, 409, "artifact_slug_exists"));
+      } catch {
+        // ENOENT = doesn't exist = good, proceed
+      }
+
       const mergedFrontmatter = { name, format: "html", lifecycle: "manual", ...frontmatter };
 
       const result = await writeArtifactSpec(request.project.path, slug, mergedFrontmatter, body);
