@@ -53,6 +53,7 @@ export function useProjectWorkspace() {
   const [inputMutationLoading, setInputMutationLoading] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
   const { toasts, setNotice, dismissToast } = useToasts();
+  const [artifactSlug, setArtifactSlug] = useState<string | null>(null);
   const {
     clearRebuildModels,
     rebuildModels,
@@ -121,10 +122,10 @@ export function useProjectWorkspace() {
     () => ({
       projectSlug: selectedProjectSlug,
       view,
-      filePath: selected?.path ?? null,
+      filePath: view === "artifacts" ? artifactSlug : (selected?.path ?? null),
       context: routeContext,
     }),
-    [routeContext, selected?.path, selectedProjectSlug, view],
+    [artifactSlug, routeContext, selected?.path, selectedProjectSlug, view],
   );
   const canLeaveCurrentRoute = useCallback(
     (nextRoute: RouteState) => {
@@ -146,6 +147,7 @@ export function useProjectWorkspace() {
     refreshDesign,
     selectFile,
     selectedProjectSlug,
+    setArtifactSlug,
     setNotice,
     setRouteContext,
     setView,
@@ -315,6 +317,7 @@ export function useProjectWorkspace() {
   } satisfies ProjectController;
   const route = {
     context: routeContext,
+    filePath: currentRoute.filePath,
     navigateTo,
     openProjectFile,
     view,

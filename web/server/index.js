@@ -8,6 +8,7 @@ import { createRebuildStore } from "./agentRuns.js";
 import { runCursorAgent, runCursorAgentText } from "./agentRuntimes/cursorSdk.js";
 import { listen } from "./adapters/listen.js";
 import { registerApiRoutes } from "./routes/apiRoutes.js";
+import { registerArtifactRoutes } from "./routes/artifactRoutes.js";
 import { createAgentJobService } from "./services/agentJobs.js";
 import { createBuildLogService } from "./services/buildLogs.js";
 import { createChatAgentService } from "./services/chatAgent.js";
@@ -268,7 +269,7 @@ const { assistQuestion } = createQuestionAiAssistService({
   runCursorAgentText,
 });
 
-const { startBatchDeepen, startHumanAttentionResolution, startRebuild } = createAgentJobService({
+const { startArtifactBuild, startBatchDeepen, startHumanAttentionResolution, startRebuild } = createAgentJobService({
   FRAMEWORK_ROOT,
   activeRebuilds,
   appendAssistantDelta,
@@ -375,6 +376,8 @@ registerApiRoutes(app, {
   writeTextFile,
   writeProjectUiState,
 });
+
+registerArtifactRoutes(app, { httpError, startArtifactBuild });
 
 app.use(apiErrorHandler);
 

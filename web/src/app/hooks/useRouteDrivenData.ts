@@ -9,6 +9,7 @@ export function useRouteDrivenData({
   refreshDesign,
   selectFile,
   selectedProjectSlug,
+  setArtifactSlug,
   setNotice,
   setRouteContext,
   setView,
@@ -18,6 +19,7 @@ export function useRouteDrivenData({
   refreshDesign: () => Promise<void>;
   selectFile: (path: string) => Promise<void>;
   selectedProjectSlug: string | null;
+  setArtifactSlug: (slug: string | null) => void;
   setNotice: (message: string) => void;
   setRouteContext: (context: Record<string, string>) => void;
   setView: (view: View) => void;
@@ -38,6 +40,9 @@ export function useRouteDrivenData({
         setNotice("");
         clearSelectedFile();
 
+        // Track artifact slug when in artifacts view, clear otherwise
+        setArtifactSlug(nextView === "artifacts" ? (route.filePath ?? null) : null);
+
 
 
         if (nextView === "dashboard") {
@@ -50,7 +55,7 @@ export function useRouteDrivenData({
         }
         if (!isCurrentRouteRequest()) return;
 
-        if (route.filePath && nextView !== "design") {
+        if (route.filePath && nextView !== "design" && nextView !== "artifacts") {
           await selectFile(route.filePath);
         }
       } catch (error) {
@@ -65,6 +70,7 @@ export function useRouteDrivenData({
       refreshDesign,
       selectFile,
       selectedProjectSlug,
+      setArtifactSlug,
       setNotice,
       setRouteContext,
       setView,

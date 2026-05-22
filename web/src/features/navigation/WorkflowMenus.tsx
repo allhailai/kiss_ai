@@ -202,13 +202,37 @@ export function SimplifiedNavigator({
     }
 
     return (
-      <FileTreeBlock
-        emptyLabel="No generated Markdown files yet."
-        files={outputFiles}
-        loading={loading && currentView === "outputs"}
-        onOpenFile={onOpenFile}
-        selectedPath={selectedPath}
-      />
+      <>
+        <button
+          className={
+            currentView === "artifacts"
+              ? "simple-nav-item simple-nav-subheader active"
+              : "simple-nav-item simple-nav-subheader"
+          }
+          onClick={() => onOpenView("artifacts")}
+          type="button"
+        >
+          <span>📊 Artifacts</span>
+        </button>
+        <button
+          className={
+            currentView === "outputs" && !selectedPath
+              ? "simple-nav-item simple-nav-subheader active"
+              : "simple-nav-item simple-nav-subheader"
+          }
+          onClick={() => onOpenView("outputs")}
+          type="button"
+        >
+          <span>Outputs</span>
+        </button>
+        <FileTreeBlock
+          emptyLabel="No generated Markdown files yet."
+          files={outputFiles}
+          loading={loading && currentView === "outputs"}
+          onOpenFile={onOpenFile}
+          selectedPath={selectedPath}
+        />
+      </>
     );
   }
 }

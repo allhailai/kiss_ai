@@ -43,6 +43,7 @@ export function sectionForView(view: View): SimplifiedNavSectionId {
   if (view === "requirements" || view === "design" || view === "review" || view === "questions" || view === "topics" || view === "dashboard") return "define";
   if (view === "inputs") return "source-data";
   if (view === "outputs") return "results";
+  if (view === "artifacts") return "results";
   return "define";
 }
 

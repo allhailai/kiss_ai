@@ -6,6 +6,7 @@ import { useToastContext } from "./contexts/ToastContext";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { DesignWorkspace } from "../features/design/DesignWorkspace";
 import { FileWorkspace } from "../features/files/FileWorkspace";
+import { ArtifactsView } from "../features/artifacts/ArtifactsView";
 import { ProjectChatConversationHistory } from "../features/chat/ProjectChatConversationHistory";
 import { ReviewWorkspace } from "./ReviewWorkspace";
 
@@ -103,6 +104,9 @@ export function MainContentArea({
           projectSlug={projectSlug}
           selectedModelId={rebuildWorkspace.selectedModelId}
         />
+      ) : null}
+      {route.view === "artifacts" ? (
+        <ArtifactsView projectSlug={projectSlug} />
       ) : null}
     </section>
   );

@@ -17,6 +17,7 @@ export type ProjectController = {
 
 export type RouteController = {
   context: Record<string, string>;
+  filePath: string | null;
   navigateTo: (view: View, filePath?: string | null, context?: Record<string, string>) => void;
   openProjectFile: (path: string) => void;
   view: View;

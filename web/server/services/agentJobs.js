@@ -5,6 +5,7 @@ import { computeBuildScope } from "./buildScope.js";
 import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
 import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
 import { createPromptBuilders } from "./promptBuilders.js";
+import { readArtifactSpec, resolveArtifactSources, ensureArtifactDirs, listArtifactSpecs } from "./artifactService.js";
 
 import { readTopics, getDeepenQueue, clearDeepenQueue } from "./topicsService.js";
 
@@ -28,6 +29,7 @@ export function createAgentJobService({
   const startLocks = new Map();
 
   const {
+    createArtifactPrompt,
     createAutoAnswerPrompt,
     createBatchDeepenResearchPrompt,
     createBatchDeepenSynthesisPrompt,
@@ -442,6 +444,11 @@ export function createAgentJobService({
     // Batch deepen jobs get their own pipeline
     if (runKind === "batch_deepen" && Array.isArray(deepenContext)) {
       return await runBatchDeepenJob({ project, apiKey, modelId, prompt, jobName, topics: deepenContext, releaseProjectAgent });
+    }
+
+    // Artifact builds get their own simple pipeline
+    if (runKind === "artifact_build") {
+      return await runArtifactBuildJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent });
     }
 
     activeRebuilds.add(project.slug);
@@ -1218,6 +1225,106 @@ export function createAgentJobService({
     }
   }
 
-  return { startBatchDeepen, startHumanAttentionResolution, startRebuild };
+  async function runArtifactBuildJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent }) {
+    activeRebuilds.add(project.slug);
+
+    try {
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: `Building artifact`,
+        text: "Agent is generating the HTML artifact from research data.",
+        status: "artifact_build",
+        runtime: "cursor",
+      });
+
+      const stateBeforeBuild = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...stateBeforeBuild,
+        buildPhase: "artifact_build",
+        buildPhaseDetail: "Generating HTML artifact",
+      });
+
+      const result = await runSingleAgentPhase({
+        project,
+        apiKey,
+        modelId,
+        prompt,
+        phaseName: "Artifact Build",
+      });
+
+      const buildCompletion = createAgentJobCompletionMessage(jobName);
+      const { message, status } = await buildCompletion({ project, result });
+
+      const current = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...current,
+        running: false,
+        status,
+        finishedAt: new Date().toISOString(),
+        message,
+      });
+
+      await appendRunEvent(project.slug, {
+        type: status === "finished" ? "system" : "error",
+        title: `${jobName} ${status}`,
+        text: message,
+        status,
+        runtime: "cursor",
+      });
+    } catch (error) {
+      await finishAssistantMessage(project.slug);
+      const message = error instanceof Error ? error.message : `Unknown artifact build failure.`;
+
+      const current = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...current,
+        running: false,
+        status: "error",
+        finishedAt: new Date().toISOString(),
+        message,
+      });
+      await appendRunEvent(project.slug, {
+        type: "error",
+        title: `${jobName} failed`,
+        text: message,
+        status: "error",
+        runtime: "cursor",
+      });
+    } finally {
+      activeRebuilds.delete(project.slug);
+      releaseProjectAgent();
+    }
+  }
+
+  async function startArtifactBuild(project, artifactSlug, requestedModelId) {
+    const spec = await readArtifactSpec(project.path, artifactSlug);
+    const resolvedSources = await resolveArtifactSources(project.path, spec.frontmatter.sources || []);
+    await ensureArtifactDirs(project.path);
+
+    // Delete old build output so the agent starts fresh (prevents incremental edits on stale HTML)
+    const buildDir = path.join(project.path, "artifacts/builds", artifactSlug);
+    try {
+      await fs.rm(buildDir, { recursive: true, force: true });
+      await fs.mkdir(buildDir, { recursive: true });
+    } catch {
+      // Ignore — directory may not exist yet
+    }
+
+    const prompt = await createArtifactPrompt(project, spec, resolvedSources);
+
+    return await startAgentJob({
+      project,
+      requestedModelId,
+      runKind: "artifact_build",
+      startMessage: `Building artifact: ${spec.frontmatter.name || artifactSlug}`,
+      noApiKeyMessage:
+        "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Artifact builds are unavailable from the UI.",
+      noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
+      jobName: `Artifact: ${spec.frontmatter.name || artifactSlug}`,
+      prompt,
+    });
+  }
+
+  return { startArtifactBuild, startBatchDeepen, startHumanAttentionResolution, startRebuild };
 }
 

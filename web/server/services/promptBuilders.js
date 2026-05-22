@@ -359,7 +359,79 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
     ].join("\n");
   }
 
+  async function createArtifactPrompt(project, artifactSpec, resolvedSources) {
+    const lines = [
+      `Build the artifact: ${artifactSpec.frontmatter.name || artifactSpec.slug}`,
+      "",
+      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build_artifact.md")} exactly.`,
+      "This is a non-interactive web-triggered artifact build. Never ask the user for confirmation or wait for input mid-run.",
+      `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
+      `Project root: ${project.path}`,
+      "",
+      `Output path: artifacts/builds/${artifactSpec.slug}/index.html`,
+      `Manifest path: artifacts/builds/${artifactSpec.slug}/.artifact-manifest.json`,
+      "",
+      "IMPORTANT: The build output directory has been cleared. Generate index.html entirely from scratch based on the spec below. Do NOT read, reference, or modify any prior build output — the directory is empty.",
+      "",
+      "── ARTIFACT SPEC ──────────────────────────────────────────",
+      "",
+    ];
+
+    // Add frontmatter as readable YAML context
+    lines.push("Frontmatter:");
+    for (const [key, value] of Object.entries(artifactSpec.frontmatter)) {
+      if (Array.isArray(value)) {
+        lines.push(`  ${key}:`);
+        for (const item of value) {
+          lines.push(`    - ${item}`);
+        }
+      } else {
+        lines.push(`  ${key}: ${value}`);
+      }
+    }
+
+    // Add spec body (goal, content guidance, etc.)
+    if (artifactSpec.body) {
+      lines.push("", "Spec body (goal, content guidance, visualization direction):", "");
+      lines.push(artifactSpec.body);
+    }
+
+    // Add design identity
+    lines.push(
+      "",
+      "── DESIGN IDENTITY ──────────────────────────────────────────",
+      "",
+    );
+
+    try {
+      const designIdentity = await fs.readFile(path.join(project.path, "human_design_identity.md"), "utf8");
+      lines.push(designIdentity.slice(0, 5000));
+    } catch {
+      lines.push("No human_design_identity.md found. Use a clean, professional design.");
+    }
+
+    // Add resolved source data
+    lines.push(
+      "",
+      "── SOURCE DATA ──────────────────────────────────────────",
+      `${resolvedSources.length} source file(s) resolved from the spec's sources field.`,
+      "",
+    );
+
+    for (const source of resolvedSources) {
+      // Cap each source file to avoid overwhelming the context
+      const content = source.content.length > 8000
+        ? source.content.slice(0, 8000) + "\n\n[... truncated for context limits ...]"
+        : source.content;
+
+      lines.push(`── ${source.relativePath} ──`, "", content, "");
+    }
+
+    return lines.join("\n");
+  }
+
   return {
+    createArtifactPrompt,
     createAutoAnswerPrompt,
     createBatchDeepenResearchPrompt,
     createBatchDeepenSynthesisPrompt,
