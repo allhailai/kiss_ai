@@ -36,7 +36,8 @@ function setTabInHash(tab: ReviewTab): void {
   }
 }
 
-function truncate(text: string, max: number): string {
+function truncate(text: string | undefined | null, max: number): string {
+  if (!text) return "";
   if (text.length <= max) return text;
   return text.slice(0, max).trimEnd() + "…";
 }
