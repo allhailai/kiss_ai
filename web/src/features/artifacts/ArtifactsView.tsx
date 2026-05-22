@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { artifactsApi, type ArtifactSpec, type ArtifactSpecDetail } from "../../data/artifactsApi";
 import { useRouteContext } from "../../app/contexts/RouteContext";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
+import type { FileContent } from "../../contracts/api";
 import "./artifacts.css";
 
 type Tab = "spec" | "preview";
 
-export function ArtifactsView({ projectSlug }: { projectSlug: string }) {
+export function ArtifactsView({ projectSlug, selectedFileContent }: { projectSlug: string; selectedFileContent: FileContent | null }) {
   const route = useRouteContext();
 
   // The selected artifact slug comes from the URL (deep link)
@@ -57,24 +58,22 @@ export function ArtifactsView({ projectSlug }: { projectSlug: string }) {
     });
   }, [projectSlug, selectedSlug]);
 
-  // Re-read spec from disk on window focus (picks up agent edits)
+  // Re-read spec when the underlying file changes (e.g. agent writes to it)
+  const lastContentHashRef = useRef<string | null>(null);
   useEffect(() => {
-    function handleFocus() {
-      if (!selectedSlug) return;
+    if (!selectedSlug || !selectedFileContent) return;
+    const specPath = `artifacts/artifact_specs/${selectedSlug}.artifact.md`;
+    if (selectedFileContent.path !== specPath) return;
+    // Only reload when contentHash actually changes (not on initial load)
+    if (lastContentHashRef.current !== null && selectedFileContent.contentHash !== lastContentHashRef.current) {
       artifactsApi.read(projectSlug, selectedSlug).then((spec) => {
-        setSelectedSpec((prev) => {
-          if (!prev) return spec;
-          // Only update if the disk content differs from what the editor loaded
-          if (spec.body !== prev.body && editBody === prev.body) {
-            setEditBody(spec.body);
-          }
-          return spec;
-        });
+        setSelectedSpec(spec);
+        setEditBody(spec.body);
+        flash("Spec updated by agent");
       }).catch(() => {});
     }
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [projectSlug, selectedSlug, editBody]);
+    lastContentHashRef.current = selectedFileContent.contentHash;
+  }, [projectSlug, selectedSlug, selectedFileContent?.contentHash, selectedFileContent?.path]);
 
   // Clean up poll on unmount
   useEffect(() => {

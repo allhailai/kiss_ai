@@ -106,7 +106,7 @@ export function MainContentArea({
         />
       ) : null}
       {route.view === "artifacts" ? (
-        <ArtifactsView projectSlug={projectSlug} />
+        <ArtifactsView projectSlug={projectSlug} selectedFileContent={fileWorkspace.selected} />
       ) : null}
     </section>
   );
