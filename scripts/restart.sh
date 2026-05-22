@@ -83,14 +83,13 @@ DEV_PID=$!
 echo "$DEV_PID" > "$PID_FILE"
 echo "[restart] Dev server started with PID $DEV_PID"
 
-# ── 5. Wait for server to start, then open browser ──────────────────────────
+# ── 5. Wait for server to start ─────────────────────────────────────────────
+# The frontend's UpdateCheckerModal polls the API and auto-reloads the page
+# when the server comes back, so no need to open a new browser tab.
 echo "[restart] Waiting for server to start on port $API_PORT..."
 for i in $(seq 1 90); do
   if curl -sf "http://127.0.0.1:$API_PORT/api/system/settings" >/dev/null 2>&1; then
     echo "[restart] Server is up after ~${i}s"
-    # Small delay for Vite dev server to also be ready
-    sleep 2
-    open "http://127.0.0.1:$API_PORT"
     echo "[restart] $(date) — Restart complete"
     exit 0
   fi
@@ -100,3 +99,4 @@ done
 echo "[restart] WARNING: Server did not start within 90 seconds"
 echo "[restart] Check $LOG_FILE for dev server output"
 exit 1
+
