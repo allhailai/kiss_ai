@@ -143,8 +143,8 @@ function QuestionCard({
 
       <div className="question-card-meta">
         <span>Asked {formatLocalDateTime(question.askedAt, "Unknown")}</span>
-        {question.askedDuring.phase ? <span>Phase {question.askedDuring.phase}</span> : null}
-        {question.askedDuring.modelId ? <span>{question.askedDuring.modelId}</span> : null}
+        {question.askedDuring?.phase ? <span>Phase {question.askedDuring.phase}</span> : null}
+        {question.askedDuring?.modelId ? <span>{question.askedDuring.modelId}</span> : null}
       </div>
 
       {isOpen ? (
