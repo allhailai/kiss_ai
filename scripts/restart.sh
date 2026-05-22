@@ -7,7 +7,7 @@
 # The script:
 #   1. Waits for the old server process to exit
 #   2. Waits for the API port to be free
-#   3. Runs npm install and auto-commits package-lock.json if it changed
+#   3. Runs npm install and restores package-lock.json to keep the tree clean
 #   4. Starts npm run dev in the background
 #   5. Waits for the server to be listening
 
@@ -75,16 +75,17 @@ else
   echo "[restart] WARNING: npm install failed (exit code $?), attempting to start anyway"
 fi
 
-# ── 3b. Auto-commit lockfile changes so the tree stays clean ────────────────
-# npm install may update package-lock.json (different npm version, resolved
-# transitive deps). If we leave it dirty, the next update check will reject
-# with "kiss_ai_working_tree_dirty" and the user can never update again.
-HUB_ROOT="$(cd "$WEB_ROOT/.." && pwd)"
-cd "$HUB_ROOT"
+# ── 3b. Restore lockfile to match git so the tree stays clean ───────────────
+# npm install may rewrite package-lock.json (different npm version formatting,
+# resolved metadata). The actual installed packages in node_modules are correct
+# regardless. If we leave the lockfile dirty, git status shows a dirty tree and
+# the next update check rejects with "kiss_ai_working_tree_dirty".
+# We restore instead of committing to avoid diverging from the remote (which
+# would break the next git pull --ff-only).
+cd "$WEB_ROOT/.."
 if [ -n "$(git status --porcelain -- web/package-lock.json 2>/dev/null)" ]; then
-  echo "[restart] package-lock.json changed — auto-committing"
-  git add web/package-lock.json
-  git commit -m "chore: update package-lock.json after npm install" --no-verify 2>&1 || true
+  echo "[restart] Restoring package-lock.json to match git (npm reformatted it)"
+  git checkout -- web/package-lock.json
 fi
 
 # ── 4. Start npm run dev ────────────────────────────────────────────────────
