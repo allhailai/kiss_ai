@@ -97,7 +97,14 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild }) {
   // Trigger artifact build (single)
   app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/build", async (request, response, next) => {
     try {
-      const modelId = request.body?.modelId ?? null;
+      let modelId = request.body?.modelId ?? null;
+      // Fall back to the model saved in the artifact spec's frontmatter
+      if (!modelId) {
+        try {
+          const spec = await readArtifactSpec(request.project.path, request.params.artifactSlug);
+          modelId = spec.frontmatter.modelId ?? null;
+        } catch { /* spec read failures are non-fatal here */ }
+      }
       const result = await startArtifactBuild(request.project, request.params.artifactSlug, modelId);
       response.json(result);
     } catch (error) {

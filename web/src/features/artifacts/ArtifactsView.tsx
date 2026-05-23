@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { artifactsApi, type ArtifactSpec, type ArtifactSpecDetail } from "../../data/artifactsApi";
 import { useRouteContext } from "../../app/contexts/RouteContext";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
-import type { FileContent } from "../../contracts/api";
+import { groupModelsByTier, modelDisplayName, modelTierLabels } from "../../domain/modelLabels";
+import type { FileContent, RebuildModel } from "../../contracts/api";
 import "./artifacts.css";
 
 type Tab = "spec" | "preview";
 
-export function ArtifactsView({ projectSlug, selectedFileContent }: { projectSlug: string; selectedFileContent: FileContent | null }) {
+export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selectedFileContent }: { models: RebuildModel[]; projectSlug: string; selectedBuildModelId: string; selectedFileContent: FileContent | null }) {
   const route = useRouteContext();
 
   // The selected artifact slug comes from the URL (deep link)
@@ -26,6 +27,7 @@ export function ArtifactsView({ projectSlug, selectedFileContent }: { projectSlu
 
   const selectedArtifact = artifacts.find((a) => a.slug === selectedSlug) ?? null;
   const isBuilt = selectedArtifact?.status === "built";
+  const tieredModels = useMemo(() => groupModelsByTier(models), [models]);
 
   const refreshList = useCallback(async () => {
     try {
@@ -50,6 +52,11 @@ export function ArtifactsView({ projectSlug, selectedFileContent }: { projectSlu
       return;
     }
     artifactsApi.read(projectSlug, selectedSlug).then((spec) => {
+      // Default modelId to project's current build model if not set
+      if (!spec.frontmatter.modelId && selectedBuildModelId) {
+        spec = { ...spec, frontmatter: { ...spec.frontmatter, modelId: selectedBuildModelId } };
+        void artifactsApi.update(projectSlug, selectedSlug, spec.frontmatter, spec.body);
+      }
       setSelectedSpec(spec);
       setEditBody(spec.body);
     }).catch(() => {
@@ -111,7 +118,7 @@ export function ArtifactsView({ projectSlug, selectedFileContent }: { projectSlu
         flash("Build started — agent is generating HTML…");
       }
 
-      await artifactsApi.build(projectSlug, selectedSlug);
+      await artifactsApi.build(projectSlug, selectedSlug, String(selectedSpec?.frontmatter.modelId ?? ""));
 
       // Poll for build completion every 5 seconds
       if (pollRef.current) clearInterval(pollRef.current);
@@ -263,6 +270,30 @@ export function ArtifactsView({ projectSlug, selectedFileContent }: { projectSlu
                   <option value="manual">manual</option>
                   <option value="on_build">on_build</option>
                 </select>
+              </dd>
+              <dt>Model</dt>
+              <dd>
+                <select
+                  className="artifacts-meta-select"
+                  disabled={building}
+                  value={String(selectedSpec.frontmatter.modelId ?? "")}
+                  onChange={(e) => {
+                    const updated = { ...selectedSpec, frontmatter: { ...selectedSpec.frontmatter, modelId: e.target.value || null } };
+                    setSelectedSpec(updated);
+                    void artifactsApi.update(projectSlug, selectedSlug, updated.frontmatter, editBody);
+                  }}
+                >
+                  {tieredModels.map(({ tier, models: tierModels }) => (
+                    <optgroup key={tier} label={modelTierLabels[tier]}>
+                      {tierModels.map((model) => (
+                        <option key={model.id} value={model.id}>{modelDisplayName(model)}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                {selectedSpec.frontmatter.modelId && !models.some((m) => m.id === selectedSpec.frontmatter.modelId)
+                  ? <small className="artifacts-model-obsolete">⚠ Model no longer available — select a new one</small>
+                  : null}
               </dd>
               <dt>Sources</dt>
               <dd>

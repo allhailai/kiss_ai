@@ -106,7 +106,12 @@ export function MainContentArea({
         />
       ) : null}
       {route.view === "artifacts" ? (
-        <ArtifactsView projectSlug={projectSlug} selectedFileContent={fileWorkspace.selected} />
+        <ArtifactsView
+          models={rebuildWorkspace.models}
+          projectSlug={projectSlug}
+          selectedBuildModelId={rebuildWorkspace.selectedModelId}
+          selectedFileContent={fileWorkspace.selected}
+        />
       ) : null}
     </section>
   );

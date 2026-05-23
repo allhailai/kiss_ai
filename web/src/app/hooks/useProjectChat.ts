@@ -357,6 +357,7 @@ export function useProjectChat({
     generateEditProposal,
     loading,
     messageDraft,
+    setMessageDraft,
     openConversation,
     saveEditedMessage,
     scrollToLatest: scroll.scrollToLatest,

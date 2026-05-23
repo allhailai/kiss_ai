@@ -6,6 +6,7 @@ export type ArtifactSpec = {
   name: string;
   format: string;
   lifecycle: string;
+  modelId: string | null;
   sources: string[];
   lastBuilt: string | null;
   status: string;

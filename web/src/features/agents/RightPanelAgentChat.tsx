@@ -24,6 +24,7 @@ type RightPanelChatController = {
   generateEditProposal: (fileContext: { ai_editable_files: AgentContextFile[]; context_files: ChatContextFile[] }, content?: string) => Promise<boolean>;
   handleThreadScroll: () => void;
   loading: boolean;
+  messageDraft: string;
   openConversation: (conversationId: string) => Promise<void>;
   proposalUpdating: boolean;
   scrollToLatest: () => void;
@@ -33,6 +34,7 @@ type RightPanelChatController = {
   }) => Promise<boolean>;
   sending: boolean;
   setConversationFilter: (query: string) => void;
+  setMessageDraft: (draft: string) => void;
   showJumpToLatest: boolean;
   startDraftConversation: (initialFileContext?: { ai_editable_files: AgentContextFile[]; context_files: ChatContextFile[] }) => void;
   threadRef: RefObject<HTMLDivElement | null>;
@@ -110,7 +112,8 @@ export function RightPanelAgentChat({
   projectFiles: ProjectFile[];
   selectedModelId: string;
 }) {
-  const [draft, setDraft] = useState("");
+  const draft = chat.messageDraft;
+  const setDraft = chat.setMessageDraft;
   const [filePickerQuery, setFilePickerQuery] = useState("");
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -158,7 +161,7 @@ export function RightPanelAgentChat({
   useEffect(() => {
     if (!draftSeed) return;
 
-    setDraft(draftSeed.draft);
+    chat.setMessageDraft(draftSeed.draft);
     window.requestAnimationFrame(() => {
       textareaRef.current?.focus();
     });
@@ -545,7 +548,7 @@ export function RightPanelAgentChat({
         draft={draft}
         models={models}
         onAddContextFile={addContextFile}
-        onChangeDraft={(event) => setDraft(event.currentTarget.value)}
+        onChangeDraft={(event) => chat.setMessageDraft(event.currentTarget.value)}
         onModelChange={onModelChange}
         onRemoveContextFile={removeContextFile}
         onSubmit={() => void sendMessage()}
