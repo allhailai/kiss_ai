@@ -19,6 +19,12 @@ export type ArtifactSpecDetail = {
   rawContent: string;
 };
 
+export type AvailableSourceFile = {
+  relativePath: string;
+  kind: string;
+  name: string;
+};
+
 export const artifactsApi = {
   list: (projectSlug: string) =>
     request<{ artifacts: ArtifactSpec[] }>(`${projectBase(projectSlug)}/artifacts`),
@@ -54,4 +60,7 @@ export const artifactsApi = {
 
   previewUrl: (projectSlug: string, artifactSlug: string) =>
     `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/preview`,
+
+  availableSources: (projectSlug: string) =>
+    request<{ files: AvailableSourceFile[] }>(`${projectBase(projectSlug)}/artifacts/available-sources`),
 };

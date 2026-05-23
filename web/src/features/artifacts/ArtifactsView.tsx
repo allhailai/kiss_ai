@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { artifactsApi, type ArtifactSpec, type ArtifactSpecDetail } from "../../data/artifactsApi";
+import { artifactsApi, type ArtifactSpec, type ArtifactSpecDetail, type AvailableSourceFile } from "../../data/artifactsApi";
 import { useRouteContext } from "../../app/contexts/RouteContext";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
 import { groupModelsByTier, modelDisplayName, modelTierLabels } from "../../domain/modelLabels";
@@ -295,9 +295,10 @@ export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selec
                   ? <small className="artifacts-model-obsolete">⚠ Model no longer available — select a new one</small>
                   : null}
               </dd>
-              <dt>Sources</dt>
+              <dt>Context Hints</dt>
               <dd>
-                <ArtifactSourcesEditor
+                <ArtifactContextHints
+                  projectSlug={projectSlug}
                   sources={(Array.isArray(selectedSpec.frontmatter.sources) ? selectedSpec.frontmatter.sources : []) as string[]}
                   onChange={(newSources) => {
                     const updated = { ...selectedSpec, frontmatter: { ...selectedSpec.frontmatter, sources: newSources } };
@@ -358,38 +359,69 @@ export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selec
   );
 }
 
-/* ─── Sources Editor ─────────────────────────────────────────── */
+/* ─── Context Hints (Sources) ────────────────────────────────── */
 
-const SOURCE_PRESETS = [
-  { label: "All", value: "all" },
-  { label: "Wiki", value: "outputs_ai/wiki/*.md" },
-  { label: "Reports", value: "outputs_ai/reports/*.md" },
-  { label: "Directed", value: "outputs_ai/directed_outputs/**/*.md" },
-] as const;
-
-function ArtifactSourcesEditor({
+function ArtifactContextHints({
+  projectSlug,
   sources,
   onChange,
 }: {
+  projectSlug: string;
   sources: string[];
   onChange: (sources: string[]) => void;
 }) {
-  const [customGlob, setCustomGlob] = useState("");
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [suggestQuery, setSuggestQuery] = useState("");
+  const [availableFiles, setAvailableFiles] = useState<AvailableSourceFile[]>([]);
+  const [loadingFiles, setLoadingFiles] = useState(false);
 
-  function addSource(value: string) {
-    if (!value || sources.includes(value)) return;
-    // If adding "all", replace everything with just "all"
-    if (value === "all") {
-      onChange(["all"]);
-      return;
-    }
-    // If "all" is already present, remove it when adding specific sources
-    const filtered = sources.filter((s) => s !== "all");
-    onChange([...filtered, value]);
-  }
+  // Load available files when suggest picker opens
+  useEffect(() => {
+    if (!suggestOpen) return;
+    setLoadingFiles(true);
+    artifactsApi.availableSources(projectSlug)
+      .then((result) => setAvailableFiles(result.files))
+      .catch(() => setAvailableFiles([]))
+      .finally(() => setLoadingFiles(false));
+  }, [suggestOpen, projectSlug]);
+
+  const filteredFiles = useMemo(() => {
+    if (!suggestOpen) return [];
+    const selectedPaths = new Set(sources);
+    const query = suggestQuery.trim().toLowerCase();
+    return availableFiles
+      .filter((f) => !selectedPaths.has(f.relativePath))
+      .filter((f) => {
+        if (!query) return true;
+        return `${f.relativePath} ${f.name} ${f.kind}`.toLowerCase().includes(query);
+      });
+  }, [availableFiles, sources, suggestOpen, suggestQuery]);
 
   function removeSource(value: string) {
     onChange(sources.filter((s) => s !== value));
+  }
+
+  function addSource(relativePath: string) {
+    if (sources.includes(relativePath)) return;
+    // Filter out legacy "all" if present
+    const filtered = sources.filter((s) => s !== "all");
+    onChange([...filtered, relativePath]);
+    setSuggestOpen(false);
+    setSuggestQuery("");
+  }
+
+  function sourceDisplayName(sourcePath: string): string {
+    // Show basename without extension, humanized
+    const base = sourcePath.split("/").pop() || sourcePath;
+    return base.replace(/\.(md|html)$/, "").replace(/[_-]/g, " ");
+  }
+
+  function sourceKindBadge(sourcePath: string): string {
+    if (sourcePath.startsWith("outputs_ai/wiki/")) return "wiki";
+    if (sourcePath.startsWith("outputs_ai/reports/")) return "report";
+    if (sourcePath.startsWith("outputs_ai/directed_outputs/")) return "directed";
+    if (sourcePath.startsWith("artifacts/builds/")) return "artifact";
+    return "";
   }
 
   return (
@@ -397,8 +429,11 @@ function ArtifactSourcesEditor({
       {sources.length > 0 ? (
         <div className="artifacts-sources-chips">
           {sources.map((source) => (
-            <span className="artifacts-source-chip" key={source}>
-              <span>{source}</span>
+            <span className="artifacts-source-chip" key={source} title={source}>
+              {sourceKindBadge(source) ? (
+                <span className="artifacts-source-kind-badge">{sourceKindBadge(source)}</span>
+              ) : null}
+              <span>{sourceDisplayName(source)}</span>
               <button
                 className="artifacts-source-chip-remove"
                 onClick={() => removeSource(source)}
@@ -411,51 +446,54 @@ function ArtifactSourcesEditor({
           ))}
         </div>
       ) : (
-        <span className="artifacts-sources-empty">none — click to add</span>
+        <span className="artifacts-sources-auto">✨ auto — agent will discover relevant context at build time</span>
       )}
-      <div className="artifacts-sources-presets">
-        {SOURCE_PRESETS.map((preset) => (
-          <button
-            className={`artifacts-source-preset ${sources.includes(preset.value) ? "active" : ""}`}
-            key={preset.value}
-            onClick={() =>
-              sources.includes(preset.value)
-                ? removeSource(preset.value)
-                : addSource(preset.value)
-            }
-            type="button"
-            title={preset.value}
-          >
-            {preset.label}
-          </button>
-        ))}
-      </div>
-      <form
-        className="artifacts-sources-custom"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const trimmed = customGlob.trim();
-          if (trimmed) {
-            addSource(trimmed);
-            setCustomGlob("");
-          }
-        }}
-      >
-        <input
-          className="artifacts-sources-custom-input"
-          type="text"
-          placeholder="Custom glob…"
-          value={customGlob}
-          onChange={(e) => setCustomGlob(e.target.value)}
-        />
+      <div className="artifacts-sources-suggest-row">
         <button
-          className="artifacts-sources-custom-add"
-          type="submit"
-          disabled={!customGlob.trim()}
+          className="artifacts-sources-suggest-btn"
+          onClick={() => {
+            setSuggestQuery("");
+            setSuggestOpen((open) => !open);
+          }}
+          type="button"
         >
-          Add
+          {suggestOpen ? "Close" : "+ Suggest a file"}
         </button>
-      </form>
+      </div>
+      {suggestOpen ? (
+        <div className="artifacts-sources-suggest-picker">
+          <input
+            className="artifacts-sources-suggest-input"
+            type="search"
+            placeholder="Search available files…"
+            value={suggestQuery}
+            onChange={(e) => setSuggestQuery(e.target.value)}
+            autoFocus
+          />
+          <div className="artifacts-sources-suggest-results">
+            {loadingFiles ? (
+              <p className="artifacts-sources-suggest-empty">Loading…</p>
+            ) : filteredFiles.length > 0 ? (
+              filteredFiles.map((file) => (
+                <button
+                  className="artifacts-sources-suggest-item"
+                  key={file.relativePath}
+                  onClick={() => addSource(file.relativePath)}
+                  title={file.relativePath}
+                  type="button"
+                >
+                  <span className="artifacts-source-kind-badge">{file.kind}</span>
+                  <strong>{file.name}</strong>
+                  <span className="artifacts-sources-suggest-path">{file.relativePath}</span>
+                </button>
+              ))
+            ) : (
+              <p className="artifacts-sources-suggest-empty">No matching files.</p>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
+

@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   listArtifactSpecs,
+  listAvailableSourceFiles,
   readArtifactSpec,
   writeArtifactSpec,
   deleteArtifactSpec,
@@ -16,6 +17,16 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild }) {
     try {
       const specs = await listArtifactSpecs(request.project.path);
       response.json({ artifacts: specs });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // List available source files for the suggest-a-file UI
+  app.get("/api/projects/:projectSlug/artifacts/available-sources", async (request, response, next) => {
+    try {
+      const files = await listAvailableSourceFiles(request.project.path);
+      response.json({ files });
     } catch (error) {
       next(error);
     }

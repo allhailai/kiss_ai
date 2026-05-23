@@ -192,7 +192,8 @@ export async function getArtifactBuildStatus(projectPath, slug) {
 }
 
 /**
- * Resolve source globs from the artifact spec into actual file paths and contents.
+ * Resolve explicit source paths from the artifact spec into actual file paths and contents.
+ * These are the priority/hint sources the user or agent has explicitly listed.
  * Returns an array of { relativePath, content }.
  */
 export async function resolveArtifactSources(projectPath, sourceGlobs) {
@@ -201,12 +202,8 @@ export async function resolveArtifactSources(projectPath, sourceGlobs) {
   const resolvedFiles = new Set();
 
   for (const pattern of sourceGlobs) {
-    // Handle "all" shorthand — read everything in outputs_ai/
-    if (pattern === "all") {
-      const allFiles = await simpleGlob("outputs_ai/**/*.md", projectPath);
-      allFiles.forEach((f) => resolvedFiles.add(f));
-      continue;
-    }
+    // Skip legacy "all" — empty sources now means agent auto-discovers
+    if (pattern === "all") continue;
 
     const matches = await simpleGlob(pattern, projectPath);
     matches.forEach((f) => resolvedFiles.add(f));
@@ -224,6 +221,122 @@ export async function resolveArtifactSources(projectPath, sourceGlobs) {
   }
 
   return results;
+}
+
+/**
+ * Discover all available source files for progressive discovery.
+ * Scans outputs_ai/ and artifacts/builds/ to produce a lightweight inventory
+ * with file path + snippet (first ~200 chars) for each file.
+ * The agent uses this to decide what additional files to read beyond explicit sources.
+ * Returns an array of { relativePath, snippet, kind }.
+ */
+export async function discoverRelevantSources(projectPath, excludePaths = []) {
+  const excludeSet = new Set(excludePaths);
+  const inventory = [];
+
+  // Scan outputs_ai/ for all markdown files (wiki, reports, directed outputs)
+  try {
+    const outputFiles = await readDirRecursive(path.join(projectPath, "outputs_ai"), "outputs_ai");
+    for (const relativePath of outputFiles) {
+      if (excludeSet.has(relativePath)) continue;
+      if (!relativePath.endsWith(".md")) continue;
+
+      try {
+        const content = await fs.readFile(path.join(projectPath, relativePath), "utf8");
+        const snippet = content.slice(0, 200).replace(/\n/g, " ").trim();
+        const kind = relativePath.startsWith("outputs_ai/wiki/")
+          ? "wiki"
+          : relativePath.startsWith("outputs_ai/reports/")
+            ? "report"
+            : relativePath.startsWith("outputs_ai/directed_outputs/")
+              ? "directed"
+              : "output";
+        inventory.push({ relativePath, snippet, kind });
+      } catch {
+        // Skip unreadable files
+      }
+    }
+  } catch {
+    // outputs_ai/ may not exist yet
+  }
+
+  // Scan artifacts/builds/ for other artifact outputs
+  try {
+    const buildDirs = await fs.readdir(path.join(projectPath, ARTIFACT_BUILDS_DIR), { withFileTypes: true });
+    for (const entry of buildDirs) {
+      if (!entry.isDirectory()) continue;
+      const manifestPath = path.join(projectPath, ARTIFACT_BUILDS_DIR, entry.name, ".artifact-manifest.json");
+      const htmlPath = `artifacts/builds/${entry.name}/index.html`;
+      if (excludeSet.has(htmlPath)) continue;
+
+      try {
+        const manifestRaw = await fs.readFile(manifestPath, "utf8");
+        const manifest = JSON.parse(manifestRaw);
+        inventory.push({
+          relativePath: htmlPath,
+          snippet: `Built artifact: ${manifest.name || entry.name} (built ${manifest.builtAt || "unknown"})`,
+          kind: "artifact",
+        });
+      } catch {
+        // No manifest = not built, skip
+      }
+    }
+  } catch {
+    // artifacts/builds/ may not exist yet
+  }
+
+  return inventory;
+}
+
+/**
+ * List all files available as artifact sources for the suggest-a-file UI.
+ * Returns a flat list of { relativePath, kind, name } for the frontend picker.
+ */
+export async function listAvailableSourceFiles(projectPath) {
+  const files = [];
+
+  // outputs_ai/ tree
+  try {
+    const outputFiles = await readDirRecursive(path.join(projectPath, "outputs_ai"), "outputs_ai");
+    for (const relativePath of outputFiles) {
+      if (!relativePath.endsWith(".md")) continue;
+      const kind = relativePath.startsWith("outputs_ai/wiki/")
+        ? "wiki"
+        : relativePath.startsWith("outputs_ai/reports/")
+          ? "report"
+          : relativePath.startsWith("outputs_ai/directed_outputs/")
+            ? "directed"
+            : "output";
+      const name = path.basename(relativePath, ".md").replace(/[_-]/g, " ");
+      files.push({ relativePath, kind, name });
+    }
+  } catch {
+    // outputs_ai/ may not exist
+  }
+
+  // artifacts/builds/ — built artifacts
+  try {
+    const buildDirs = await fs.readdir(path.join(projectPath, ARTIFACT_BUILDS_DIR), { withFileTypes: true });
+    for (const entry of buildDirs) {
+      if (!entry.isDirectory()) continue;
+      const manifestPath = path.join(projectPath, ARTIFACT_BUILDS_DIR, entry.name, ".artifact-manifest.json");
+      try {
+        const manifestRaw = await fs.readFile(manifestPath, "utf8");
+        const manifest = JSON.parse(manifestRaw);
+        files.push({
+          relativePath: `artifacts/builds/${entry.name}/index.html`,
+          kind: "artifact",
+          name: manifest.name || entry.name,
+        });
+      } catch {
+        // Not built yet, skip
+      }
+    }
+  } catch {
+    // artifacts/builds/ may not exist
+  }
+
+  return files;
 }
 
 /**

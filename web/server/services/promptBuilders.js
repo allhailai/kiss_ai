@@ -359,7 +359,7 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
     ].join("\n");
   }
 
-  async function createArtifactPrompt(project, artifactSpec, resolvedSources) {
+  async function createArtifactPrompt(project, artifactSpec, resolvedSources, discoveryInventory = []) {
     const lines = [
       `Build the artifact: ${artifactSpec.frontmatter.name || artifactSpec.slug}`,
       "",
@@ -410,21 +410,67 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
       lines.push("No human_design_identity.md found. Use a clean, professional design.");
     }
 
-    // Add resolved source data
-    lines.push(
-      "",
-      "── SOURCE DATA ──────────────────────────────────────────",
-      `${resolvedSources.length} source file(s) resolved from the spec's sources field.`,
-      "",
-    );
+    // Add resolved source data (explicit/priority context — full content)
+    if (resolvedSources.length > 0) {
+      lines.push(
+        "",
+        "── SOURCE DATA (priority context) ──────────────────────────",
+        `${resolvedSources.length} source file(s) explicitly listed in the spec's sources field.`,
+        "These are your primary data sources. Use them first.",
+        "",
+      );
 
-    for (const source of resolvedSources) {
-      // Cap each source file to avoid overwhelming the context
-      const content = source.content.length > 8000
-        ? source.content.slice(0, 8000) + "\n\n[... truncated for context limits ...]"
-        : source.content;
+      for (const source of resolvedSources) {
+        // Cap each source file to avoid overwhelming the context
+        const content = source.content.length > 8000
+          ? source.content.slice(0, 8000) + "\n\n[... truncated for context limits ...]"
+          : source.content;
 
-      lines.push(`── ${source.relativePath} ──`, "", content, "");
+        lines.push(`── ${source.relativePath} ──`, "", content, "");
+      }
+    } else {
+      lines.push(
+        "",
+        "── SOURCE DATA ──────────────────────────────────────────",
+        "No explicit sources were listed in the spec. Use the discovery inventory below to find relevant data.",
+        "",
+      );
+    }
+
+    // Add discovery inventory for progressive discovery
+    if (discoveryInventory.length > 0) {
+      lines.push(
+        "",
+        "── DISCOVERY INVENTORY ──────────────────────────────────",
+        `${discoveryInventory.length} additional file(s) available in the project.`,
+        "These are NOT pre-loaded — you must read them yourself if they seem relevant to the artifact goal.",
+        "The source data above (if any) is priority context; this inventory is for progressive discovery.",
+        "You may read files from outputs_ai/, artifacts/builds/, and sources/digests/ as needed.",
+        "",
+      );
+
+      // Group by kind for readability
+      const byKind = {};
+      for (const item of discoveryInventory) {
+        if (!byKind[item.kind]) byKind[item.kind] = [];
+        byKind[item.kind].push(item);
+      }
+
+      for (const [kind, items] of Object.entries(byKind)) {
+        const kindLabel = kind === "wiki" ? "Wiki Pages"
+          : kind === "report" ? "Reports"
+            : kind === "directed" ? "Directed Outputs"
+              : kind === "artifact" ? "Other Artifacts"
+                : "Other Outputs";
+        lines.push(`${kindLabel}:`);
+        for (const item of items) {
+          lines.push(`  - ${item.relativePath}`);
+          if (item.snippet) {
+            lines.push(`    ${item.snippet.slice(0, 120)}${item.snippet.length > 120 ? "…" : ""}`);
+          }
+        }
+        lines.push("");
+      }
     }
 
     return lines.join("\n");

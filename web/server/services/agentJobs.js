@@ -5,7 +5,7 @@ import { computeBuildScope } from "./buildScope.js";
 import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
 import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
 import { createPromptBuilders } from "./promptBuilders.js";
-import { readArtifactSpec, resolveArtifactSources, ensureArtifactDirs, listArtifactSpecs } from "./artifactService.js";
+import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs } from "./artifactService.js";
 
 import { readTopics, getDeepenQueue, clearDeepenQueue } from "./topicsService.js";
 
@@ -1298,8 +1298,10 @@ export function createAgentJobService({
 
   async function startArtifactBuild(project, artifactSlug, requestedModelId) {
     const spec = await readArtifactSpec(project.path, artifactSlug);
-    const sourceGlobs = spec.frontmatter.sources?.length ? spec.frontmatter.sources : ["all"];
+    const sourceGlobs = Array.isArray(spec.frontmatter.sources) ? spec.frontmatter.sources : [];
     const resolvedSources = await resolveArtifactSources(project.path, sourceGlobs);
+    const explicitPaths = resolvedSources.map((s) => s.relativePath);
+    const discoveryInventory = await discoverRelevantSources(project.path, explicitPaths);
     await ensureArtifactDirs(project.path);
 
     // Delete old build output so the agent starts fresh (prevents incremental edits on stale HTML)
@@ -1311,7 +1313,7 @@ export function createAgentJobService({
       // Ignore — directory may not exist yet
     }
 
-    const prompt = await createArtifactPrompt(project, spec, resolvedSources);
+    const prompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory);
 
     return await startAgentJob({
       project,
