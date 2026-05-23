@@ -355,3 +355,202 @@ export function slugifyArtifactName(name) {
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_|_$/g, "");
 }
+
+// ── Auto-Artifact Prompt Templates ────────────────────────────────────
+
+const PROJECT_OVERVIEW_PROMPT_BODY = `## Goal
+
+Produce a comprehensive, visually rich overview of this project that communicates the full scope of research findings in alignment with the project's stated goal. The artifact should function as a standalone executive briefing — someone unfamiliar with the project should be able to understand what it is, why it matters, what was found, and what the implications are.
+
+## Information Architecture
+
+Structure the content in a **progressive disclosure hierarchy** — start broad, then drill deeper:
+
+### 1. Executive Summary (above the fold)
+- Project title, one-paragraph thesis, and 3–5 key takeaways as bold callout cards
+- A high-level status/maturity indicator (how complete is the research?)
+- Visual: a **hero diagram** showing the project's conceptual model or framework
+
+### 2. Thematic Overview
+- Group all research findings into 3–7 major themes
+- Each theme gets a summary card with: title, one-sentence finding, confidence level, and a relevance indicator
+- Visual: a **thematic map** or **concept cluster diagram** (inline SVG) showing how themes relate to each other and to the central thesis
+
+### 3. Theme Deep Dives (tabbed or accordion sections)
+- For each theme, provide:
+  - A 2–3 paragraph synthesis of findings
+  - Key evidence points with source attribution
+  - Implications and open questions
+- Visual per theme: at least one of — data table, comparison matrix, process flow, or relationship diagram
+
+### 4. Cross-Cutting Analysis
+- What patterns emerge across themes?
+- Where do findings reinforce or contradict each other?
+- Visual: a **findings matrix** (table with themes on one axis and evaluation criteria on another, using color-coded status indicators)
+
+### 5. Knowledge Gaps & Next Steps
+- What questions remain unanswered?
+- What areas need deeper investigation?
+- Visual: a **research coverage heatmap** or gap analysis table
+
+## Visualizations
+
+Use **inline SVG** for all diagrams. Make them information-dense and visually polished. Specific requirements:
+
+- **Concept/relationship diagrams**: Use nodes and edges with labeled connections. Color-code by theme. Make nodes interactive (hover for detail).
+- **Data tables**: Zebra-striped, sortable if more than 10 rows. Use color-coded badges for status/confidence levels.
+- **Comparison matrices**: Grid layout with color fills (green/amber/red or a branded gradient). Include a legend.
+- **Process/flow diagrams**: Horizontal or vertical flowcharts with clear directional arrows and phase labels.
+- **Metric callouts**: Large-number stat cards for key quantitative findings (if applicable).
+- **Progress/coverage indicators**: Horizontal bar charts or radial progress indicators showing research completeness by area.
+
+## Content Transformations
+
+- Synthesize — don't copy-paste. The artifact should read as a cohesive narrative, not a collection of file excerpts.
+- Attribute key claims to their source files (e.g., "[from: topic_name.md]") using subtle inline citations.
+- If the source data contains lists of items, transform them into visual tables or categorized card layouts rather than bullet lists.
+- Convert any quantitative findings into charts rather than prose.
+
+## Design Direction
+
+- Use the project's design identity tokens for all colors, fonts, and spacing
+- Dark or light theme based on the identity file's guidance
+- Clean, editorial layout — generous whitespace, clear typographic hierarchy
+- Interactive elements: collapsible sections, hover tooltips on diagram nodes, tab navigation between themes
+- Print-friendly: include \`@media print\` styles that linearize the layout and hide interactive controls`;
+
+function buildTopicDeepDivePromptBody(topicLabel) {
+  return `## Goal
+
+Produce a focused, visually rich deep dive on the topic **"${topicLabel}"** that communicates the full depth of research findings for this specific area. The artifact should function as a standalone topic briefing — someone reading only this document should understand what was researched, what was found, the strength of the evidence, and what remains unknown.
+
+## Information Architecture
+
+Structure the content in a **progressive disclosure hierarchy**:
+
+### 1. Topic Overview (above the fold)
+- Topic title, one-paragraph thesis, and 3–5 key findings as callout cards
+- Confidence level indicator and research depth status
+- Visual: a **concept diagram** showing how this topic connects to the broader project thesis
+
+### 2. Evidence Synthesis
+- Comprehensive synthesis of all research findings for this topic
+- Key evidence points with source attribution
+- Supporting and contradicting signals presented in balance
+- Visual: an **evidence matrix** showing claims vs. support/neutral/contradict/gap status
+
+### 3. Data & Source Analysis
+- Detailed breakdown of source quality and coverage
+- Cross-references to related topics and their findings
+- Visual: a **source coverage table** with quality indicators
+
+### 4. Implications & Analysis
+- What do the findings mean for the broader project thesis?
+- How do they interact with related topics?
+- Visual: at least one of — comparison matrix, process flow, or relationship diagram
+
+### 5. Knowledge Gaps & Open Questions
+- What questions remain unanswered for this topic?
+- What additional evidence would change confidence levels?
+- Visual: a **gap analysis table** or coverage heatmap
+
+## Visualizations
+
+Use **inline SVG** for all diagrams. Make them information-dense and visually polished:
+
+- **Concept/relationship diagrams**: Nodes and edges with labeled connections, color-coded by theme
+- **Evidence matrices**: Grid with claims vs. evaluation criteria, color-coded badges
+- **Data tables**: Zebra-striped, sortable, with confidence badges
+- **Process/flow diagrams**: Clear directional arrows and phase labels
+- **Metric callouts**: Large-number stat cards for key findings
+
+## Content Transformations
+
+- Synthesize — don't copy-paste. Read as a cohesive narrative, not wiki excerpts.
+- Attribute key claims to source files using subtle inline citations.
+- Transform lists into visual tables or card layouts.
+- Convert quantitative findings into charts rather than prose.
+
+## Design Direction
+
+- Use the project's design identity tokens for all colors, fonts, and spacing
+- Dark or light theme based on the identity file's guidance
+- Clean, editorial layout — generous whitespace, clear typographic hierarchy
+- Interactive elements: collapsible sections, hover tooltips, tab navigation
+- Print-friendly: include \`@media print\` styles`;
+}
+
+// ── Auto-Artifact Spec Generation ─────────────────────────────────────
+
+/**
+ * Automatically generate artifact specs at the end of a build.
+ * - Project overview: created on first build only (if not already present).
+ * - Per-topic deep dives: created for each active (non-seed, non-deprecated) topic
+ *   that doesn't already have a matching spec.
+ *
+ * Returns { created: string[], skipped: string[] } for logging.
+ */
+export async function createAutoArtifactSpecs(projectPath, { modelId, isFirstBuild, topics }) {
+  await ensureArtifactDirs(projectPath);
+
+  const existingSpecs = await listArtifactSpecs(projectPath);
+  const existingSlugs = new Set(existingSpecs.map((s) => s.slug));
+
+  const created = [];
+  const skipped = [];
+
+  // ── Project overview (first build only) ──
+  const overviewSlug = "project_overview";
+  if (isFirstBuild && !existingSlugs.has(overviewSlug)) {
+    await writeArtifactSpec(
+      projectPath,
+      overviewSlug,
+      { name: "Project Overview", format: "html", lifecycle: "manual", modelId, sources: [], autoGenerated: true },
+      PROJECT_OVERVIEW_PROMPT_BODY,
+    );
+    created.push(overviewSlug);
+  } else {
+    skipped.push(overviewSlug);
+  }
+
+  // ── Per-topic deep dives ──
+  const activeTopics = (topics || []).filter(
+    (t) => t.state !== "deprecated" && t.state !== "seed",
+  );
+
+  for (const topic of activeTopics) {
+    const topicSlug = `topic_${topic.id}`;
+
+    if (existingSlugs.has(topicSlug)) {
+      skipped.push(topicSlug);
+      continue;
+    }
+
+    // Wire up the topic's wiki page and outputs as explicit sources
+    const sources = [];
+    if (topic.wiki_page) sources.push(topic.wiki_page);
+    if (Array.isArray(topic.outputs)) {
+      for (const output of topic.outputs) {
+        if (typeof output === "string") sources.push(output);
+      }
+    }
+
+    await writeArtifactSpec(
+      projectPath,
+      topicSlug,
+      {
+        name: topic.label,
+        format: "html",
+        lifecycle: "manual",
+        modelId,
+        sources,
+        autoGenerated: true,
+        topicId: topic.id,
+      },
+      buildTopicDeepDivePromptBody(topic.label),
+    );
+    created.push(topicSlug);
+  }
+
+  return { created, skipped };
+}

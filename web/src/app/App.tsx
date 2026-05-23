@@ -63,6 +63,7 @@ export function App() {
     projectSlug: project.selectedProjectSlug,
     selectedModelId: rebuildWorkspace.selectedModelId,
     projectFiles: fileWorkspace.projectFiles,
+    onAgentComplete: refreshAfterAiFileAssistApply,
     onNotice: toastWorkspace.setNotice,
     onProposalApplied: refreshAfterAiFileAssistApply,
   });

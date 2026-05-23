@@ -40,6 +40,7 @@ export function AppSidebar({
   onOpenFile: (path: string) => void;
   projectSlug: string;
   rebuildWorkspace: {
+    rebuild: { running: boolean } | null;
     status: ProjectStatus | null;
   };
 }) {
@@ -132,6 +133,7 @@ export function AppSidebar({
           onUploadFiles={fileWorkspace.uploadHumanInputFiles}
           onOpenFile={onOpenFile}
           onOpenView={(nextView, filePath) => route.navigateTo(nextView, filePath)}
+          rebuildRunning={rebuildWorkspace.rebuild?.running ?? false}
         />
       </aside>
     </>

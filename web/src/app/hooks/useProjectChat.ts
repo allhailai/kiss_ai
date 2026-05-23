@@ -27,6 +27,7 @@ export function useProjectChat({
   projectSlug,
   selectedModelId,
   projectFiles,
+  onAgentComplete,
   onNotice,
   onProposalApplied,
 }: {
@@ -34,6 +35,7 @@ export function useProjectChat({
   projectSlug: string | null;
   selectedModelId: string;
   projectFiles: ProjectFile[];
+  onAgentComplete?: () => void;
   onNotice: (message: string) => void;
   onProposalApplied?: () => Promise<void> | void;
 }) {
@@ -330,6 +332,7 @@ export function useProjectChat({
 
   useConversationStream({
     conversationId: activeConversation?.id,
+    onAgentComplete,
     onConversationTruncated: handleConversationTruncated,
     onNotice,
     projectSlug,

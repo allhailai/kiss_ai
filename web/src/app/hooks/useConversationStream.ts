@@ -32,6 +32,7 @@ function applyStreamingDelta(conversation: Conversation, messageId: string, delt
 
 export function useConversationStream({
   conversationId,
+  onAgentComplete,
   onConversationTruncated,
   onNotice,
   projectSlug,
@@ -41,6 +42,7 @@ export function useConversationStream({
   setSending,
 }: {
   conversationId: string | null | undefined;
+  onAgentComplete?: () => void;
   onConversationTruncated: () => void;
   onNotice: (message: string) => void;
   projectSlug: string | null | undefined;
@@ -51,16 +53,18 @@ export function useConversationStream({
 }) {
   const pendingDeltasRef = useRef<Array<Extract<ChatConversationEvent, { type: "message_delta" }>>>([]);
   const deltaFrameRef = useRef<number | null>(null);
+  const onAgentCompleteRef = useRef(onAgentComplete);
   const onConversationTruncatedRef = useRef(onConversationTruncated);
   const onNoticeRef = useRef(onNotice);
   const refreshConversationsRef = useRef(refreshConversations);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
   useEffect(() => {
+    onAgentCompleteRef.current = onAgentComplete;
     onConversationTruncatedRef.current = onConversationTruncated;
     onNoticeRef.current = onNotice;
     refreshConversationsRef.current = refreshConversations;
-  }, [onConversationTruncated, onNotice, refreshConversations]);
+  }, [onAgentComplete, onConversationTruncated, onNotice, refreshConversations]);
 
   useEffect(() => {
     if (!projectSlug || !conversationId) return;
@@ -186,6 +190,8 @@ export function useConversationStream({
           setActiveConversation(payload.conversation);
           setSending(false);
           void refreshConversationsRef.current();
+          // Trigger file refresh — the agent may have edited files
+          onAgentCompleteRef.current?.();
         } else if (payload.type === "error") {
           onNoticeRef.current(payload.message);
           setSending(false);

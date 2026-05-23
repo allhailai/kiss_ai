@@ -5,7 +5,7 @@ const maxEvents = 500;
 const maxLogEntries = 300;
 const streamingPersistDelayMs = 150;
 const rebuildStatuses = new Set(["idle", "running", "finished", "finished_with_attention", "error", "blocked", "interrupted"]);
-const runKinds = new Set(["rebuild", "human_attention_resolve"]);
+const runKinds = new Set(["rebuild", "human_attention_resolve", "artifact_build", "batch_deepen"]);
 const eventTypes = new Set(["system", "assistant_message", "run_status", "tool_activity", "artifact_change", "error"]);
 
 function nowIso() {

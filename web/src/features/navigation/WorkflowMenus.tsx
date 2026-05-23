@@ -27,6 +27,7 @@ export function SimplifiedNavigator({
   loading,
   selectedPath,
   selectedArtifactSlug,
+  rebuildRunning,
   onCreateFolder,
   onCreateTextFile,
   onDeleteFolder,
@@ -45,6 +46,7 @@ export function SimplifiedNavigator({
   loading: boolean;
   selectedPath: string | null;
   selectedArtifactSlug: string | null;
+  rebuildRunning?: boolean;
   onCreateFolder?: (name: string) => void;
   onCreateTextFile?: (name: string, folder?: string) => void;
   onDeleteFolder?: (folder: string) => void;
@@ -237,6 +239,7 @@ export function SimplifiedNavigator({
           projectSlug={projectSlug}
           selectedArtifactSlug={selectedArtifactSlug}
           isActive={currentView === "artifacts"}
+          rebuildRunning={rebuildRunning ?? false}
           onOpenView={onOpenView}
         />
       );
@@ -252,11 +255,13 @@ function ArtifactNavSection({
   projectSlug,
   selectedArtifactSlug,
   isActive,
+  rebuildRunning,
   onOpenView,
 }: {
   projectSlug: string;
   selectedArtifactSlug: string | null;
   isActive: boolean;
+  rebuildRunning: boolean;
   onOpenView: (view: View, path?: string | null) => void;
 }) {
   const [artifacts, setArtifacts] = useState<ArtifactSpec[]>([]);
@@ -264,6 +269,7 @@ function ArtifactNavSection({
   const [newName, setNewName] = useState("");
   const [showForm, setShowForm] = useState(false);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const wasRunningRef = useRef(false);
 
   const refreshList = useCallback(async () => {
     try {
@@ -278,6 +284,21 @@ function ArtifactNavSection({
   useEffect(() => {
     void refreshList();
   }, [refreshList, isActive]);
+
+  // Poll artifact list every 15s while a build is running
+  useEffect(() => {
+    if (!rebuildRunning) return;
+    const interval = window.setInterval(() => void refreshList(), 15_000);
+    return () => window.clearInterval(interval);
+  }, [rebuildRunning, refreshList]);
+
+  // Auto-refresh when build transitions from running → finished
+  useEffect(() => {
+    if (wasRunningRef.current && !rebuildRunning) {
+      void refreshList();
+    }
+    wasRunningRef.current = rebuildRunning;
+  }, [rebuildRunning, refreshList]);
 
   useEffect(() => {
     if (showForm && nameInputRef.current) {

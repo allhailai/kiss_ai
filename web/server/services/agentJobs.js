@@ -5,7 +5,7 @@ import { computeBuildScope } from "./buildScope.js";
 import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
 import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
 import { createPromptBuilders } from "./promptBuilders.js";
-import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs } from "./artifactService.js";
+import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs, createAutoArtifactSpecs } from "./artifactService.js";
 
 import { readTopics, getDeepenQueue, clearDeepenQueue } from "./topicsService.js";
 
@@ -952,6 +952,22 @@ export function createAgentJobService({
         });
       }
 
+      // ── Phase 5: Auto-generate artifact specs and build ──
+      try {
+        await runAutoArtifactPhase({ project, apiKey, modelId, scope });
+      } catch (autoArtifactError) {
+        // Non-fatal — the main build already succeeded
+        console.error("Auto-artifact phase failed:", autoArtifactError);
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Auto-artifact phase failed",
+          text: autoArtifactError instanceof Error ? autoArtifactError.message : "Unknown error",
+          status: "auto_artifact_error",
+          runtime: "server",
+          metadata: { phase: "5" },
+        });
+      }
+
       // ── Completion ──
       const completedState = await getRebuildState(project.slug);
       const buildDurationSeconds = Math.round((Date.now() - buildStartTime) / 1000);
@@ -1003,6 +1019,153 @@ export function createAgentJobService({
       activeRebuilds.delete(project.slug);
       releaseProjectAgent();
     }
+  }
+
+  async function runAutoArtifactPhase({ project, apiKey, modelId, scope }) {
+    // Read current topics
+    const topicsData = await readTopics(project.path);
+
+    // Generate any missing artifact specs
+    const autoResult = await createAutoArtifactSpecs(project.path, {
+      modelId,
+      isFirstBuild: scope.isFirstBuild,
+      topics: topicsData.topics,
+    });
+
+    if (autoResult.created.length === 0) {
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: "Phase 5: No new artifact specs needed",
+        text: `All artifact specs already exist (${autoResult.skipped.length} skipped).`,
+        status: "auto_artifact_skipped",
+        runtime: "server",
+        metadata: { phase: "5", skipped: autoResult.skipped.length },
+      });
+      return;
+    }
+
+    await appendRunEvent(project.slug, {
+      type: "system",
+      title: `Phase 5: Created ${autoResult.created.length} artifact spec(s)`,
+      text: `New specs: ${autoResult.created.join(", ")}`,
+      status: "auto_artifact_specs_created",
+      runtime: "server",
+      metadata: { phase: "5", created: autoResult.created, skipped: autoResult.skipped.length },
+    });
+
+    // Build the newly created artifact specs in parallel
+    const specsToBuild = autoResult.created;
+    const concurrency = Math.min(Math.ceil(specsToBuild.length / 3), 8);
+
+    const stateBeforeArtifacts = await getRebuildState(project.slug);
+    await setRebuildState(project.slug, {
+      ...stateBeforeArtifacts,
+      buildPhase: "auto_artifacts",
+      buildPhaseDetail: `Building ${specsToBuild.length} artifact(s) (${concurrency} concurrent)`,
+    });
+
+    await appendRunEvent(project.slug, {
+      type: "system",
+      title: `Phase 5: Building ${specsToBuild.length} artifact(s)`,
+      text: `Dynamic concurrency: ${concurrency} agent(s) for ${specsToBuild.length} artifact(s).`,
+      status: "auto_artifact_build_start",
+      runtime: "server",
+      metadata: { phase: "5", totalArtifacts: specsToBuild.length, concurrency },
+    });
+
+    let completed = 0;
+    let succeeded = 0;
+    let failed = 0;
+
+    // Process in batches
+    for (let i = 0; i < specsToBuild.length; i += concurrency) {
+      const batch = specsToBuild.slice(i, i + concurrency);
+
+      const batchPromises = batch.map(async (artifactSlug) => {
+        try {
+          // Prepare the artifact build (same logic as startArtifactBuild, but inline)
+          const spec = await readArtifactSpec(project.path, artifactSlug);
+          const sourceGlobs = Array.isArray(spec.frontmatter.sources) ? spec.frontmatter.sources : [];
+          const resolvedSources = await resolveArtifactSources(project.path, sourceGlobs);
+          const explicitPaths = resolvedSources.map((s) => s.relativePath);
+          const discoveryInventory = await discoverRelevantSources(project.path, explicitPaths);
+
+          // Clear and recreate build directory
+          const buildDir = path.join(project.path, "artifacts/builds", artifactSlug);
+          try {
+            await fs.rm(buildDir, { recursive: true, force: true });
+            await fs.mkdir(buildDir, { recursive: true });
+          } catch { /* directory may not exist yet */ }
+
+          const artifactPrompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory);
+
+          await appendRunEvent(project.slug, {
+            type: "system",
+            title: `Phase 5: Building artifact "${spec.frontmatter.name || artifactSlug}"`,
+            text: `Agent is generating HTML artifact with ${resolvedSources.length} source(s) and ${discoveryInventory.length} discovery file(s).`,
+            status: "auto_artifact_building",
+            runtime: "cursor",
+            metadata: { phase: "5", artifactSlug },
+          });
+
+          const result = await runSingleAgentPhase({
+            project,
+            apiKey,
+            modelId,
+            prompt: artifactPrompt,
+            phaseName: `Artifact: ${spec.frontmatter.name || artifactSlug}`,
+          });
+
+          completed++;
+          if (result.status === "finished") {
+            succeeded++;
+          } else {
+            failed++;
+          }
+
+          await appendRunEvent(project.slug, {
+            type: "system",
+            title: `Phase 5: "${spec.frontmatter.name || artifactSlug}" ${result.status === "finished" ? "complete" : "failed"} (${completed}/${specsToBuild.length})`,
+            text: result.status === "finished"
+              ? `Successfully built artifact.`
+              : `Artifact build ended with status: ${result.status}`,
+            status: result.status === "finished" ? "auto_artifact_complete" : "auto_artifact_error",
+            runtime: "cursor",
+            metadata: { phase: "5", artifactSlug, completed, total: specsToBuild.length },
+          });
+
+          return { slug: artifactSlug, status: result.status };
+        } catch (buildError) {
+          completed++;
+          failed++;
+          console.error(`Auto-artifact build failed for ${artifactSlug}:`, buildError);
+
+          await appendRunEvent(project.slug, {
+            type: "system",
+            title: `Phase 5: "${artifactSlug}" failed (${completed}/${specsToBuild.length})`,
+            text: buildError instanceof Error ? buildError.message : "Unknown build error",
+            status: "auto_artifact_error",
+            runtime: "server",
+            metadata: { phase: "5", artifactSlug, completed, total: specsToBuild.length },
+          });
+
+          return { slug: artifactSlug, status: "error" };
+        }
+      });
+
+      await Promise.all(batchPromises);
+    }
+
+    await appendRunEvent(project.slug, {
+      type: "system",
+      title: `Phase 5 complete: ${succeeded} succeeded, ${failed} failed`,
+      text: failed > 0
+        ? `${succeeded} artifacts built successfully, ${failed} failed.`
+        : `All ${succeeded} artifacts built successfully.`,
+      status: failed > 0 ? "auto_artifact_partial" : "auto_artifact_all_complete",
+      runtime: "server",
+      metadata: { phase: "5", succeeded, failed, total: specsToBuild.length },
+    });
   }
 
   async function runBatchDeepenJob({ project, apiKey, modelId, prompt, jobName, topics, releaseProjectAgent }) {
