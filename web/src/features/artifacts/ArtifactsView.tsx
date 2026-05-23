@@ -23,6 +23,7 @@ export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selec
   const [notice, setNotice] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const popoutRef = useRef<Window | null>(null);
   const noopOpenFile = useCallback(() => {}, []);
 
   const selectedArtifact = artifacts.find((a) => a.slug === selectedSlug) ?? null;
@@ -82,10 +83,11 @@ export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selec
     lastContentHashRef.current = selectedFileContent.contentHash;
   }, [projectSlug, selectedSlug, selectedFileContent?.contentHash, selectedFileContent?.path]);
 
-  // Clean up poll on unmount
+  // Clean up poll and popout ref on unmount
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      popoutRef.current = null;
     };
   }, []);
 
@@ -134,6 +136,12 @@ export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selec
           setBuilding(false);
           setPreviewKey((k) => k + 1);
           setActiveTab("preview");
+          // Auto-refresh popped-out preview window
+          try {
+            if (popoutRef.current && !popoutRef.current.closed) {
+              popoutRef.current.location.reload();
+            }
+          } catch { /* cross-origin or closed — ignore */ }
           flash("Build complete ✓");
         }
       }, 5000);
@@ -203,6 +211,23 @@ export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selec
           >
             Preview
           </button>
+          {activeTab === "preview" && isBuilt ? (
+            <button
+              className="artifacts-tab artifacts-popout-btn"
+              onClick={() => {
+                const url = artifactsApi.previewUrl(projectSlug, selectedSlug);
+                if (popoutRef.current && !popoutRef.current.closed) {
+                  popoutRef.current.focus();
+                } else {
+                  popoutRef.current = window.open(url, `artifact-preview-${selectedSlug}`, "noopener");
+                }
+              }}
+              type="button"
+              title="Open preview in a new window"
+            >
+              ↗ Pop Out
+            </button>
+          ) : null}
         </div>
         <div className="artifacts-actions">
           {notice ? <span className="artifacts-notice">{notice}</span> : null}

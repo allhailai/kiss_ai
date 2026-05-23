@@ -55,6 +55,18 @@
   cursor: default;
 }
 
+.artifacts-popout-btn {
+  border-style: dashed;
+  font-size: 12px;
+  margin-left: 2px;
+}
+
+.artifacts-popout-btn:hover {
+  border-color: var(--color-accent, #c87040);
+  color: var(--color-accent, #c87040);
+  border-style: solid;
+}
+
 .artifacts-actions {
   display: flex;
   align-items: center;
