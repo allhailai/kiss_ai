@@ -267,9 +267,14 @@ export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selec
                     void artifactsApi.update(projectSlug, selectedSlug, updated.frontmatter, editBody);
                   }}
                 >
-                  <option value="manual">manual</option>
-                  <option value="on_build">on_build</option>
+                  <option value="manual">manual — build only when you click Build</option>
+                  <option value="on_build">on_build — auto-rebuild with each project build</option>
                 </select>
+                <small className="artifacts-meta-hint">
+                  {String(selectedSpec.frontmatter.lifecycle ?? "manual") === "on_build"
+                    ? "This artifact will be automatically rebuilt whenever the project runs a full build."
+                    : "This artifact is only rebuilt when you manually click the Build button."}
+                </small>
               </dd>
               <dt>Model</dt>
               <dd>
