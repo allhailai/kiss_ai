@@ -35,23 +35,33 @@
 }
 
 .artifacts-tab {
-  padding: 4px 14px;
+  padding: 6px 18px;
   border: 1px solid var(--color-border, #444);
   border-radius: 6px;
-  background: transparent;
+  background: var(--color-bg-subtle, rgba(255, 255, 255, 0.04));
   color: var(--color-text-muted, #aaa);
   cursor: pointer;
   font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.artifacts-tab:hover:not(:disabled):not(.active) {
+  background: var(--color-bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--color-text, #ddd);
+  border-color: var(--color-text-muted, #888);
 }
 
 .artifacts-tab.active {
-  background: var(--color-accent-muted, rgba(180, 120, 80, 0.15));
-  color: var(--color-accent, #c87040);
+  background: var(--color-accent, #c87040);
+  color: var(--color-on-accent, #fff);
   border-color: var(--color-accent, #c87040);
+  box-shadow: 0 1px 4px rgba(200, 112, 64, 0.35);
 }
 
 .artifacts-tab:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: default;
 }
 

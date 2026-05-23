@@ -28,6 +28,19 @@ export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selec
 
   const selectedArtifact = artifacts.find((a) => a.slug === selectedSlug) ?? null;
   const isBuilt = selectedArtifact?.status === "built";
+
+  // Default to preview tab when selecting an artifact that's already built
+  const prevSlugRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedSlug !== prevSlugRef.current) {
+      prevSlugRef.current = selectedSlug;
+      if (selectedArtifact?.status === "built") {
+        setActiveTab("preview");
+      } else {
+        setActiveTab("spec");
+      }
+    }
+  }, [selectedSlug, selectedArtifact?.status]);
   const tieredModels = useMemo(() => groupModelsByTier(models), [models]);
 
   const refreshList = useCallback(async () => {
