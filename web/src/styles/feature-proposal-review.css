@@ -1,6 +1,6 @@
 .agent-edit-proposal {
   min-width: 0;
-  max-height: min(360px, 40vh);
+  max-height: min(320px, 30vh);
   overflow: auto;
   display: grid;
   gap: 9px;

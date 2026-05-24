@@ -185,16 +185,18 @@
   min-height: 0;
   height: 100%;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto auto auto auto;
+  grid-template-rows: auto minmax(160px, 1fr) auto auto auto auto auto auto;
   gap: 8px;
   overflow: hidden;
 }
 
 /* Anchor messages to the bottom of the thread so the latest message
    sits close to the proposal section below, eliminating whitespace
-   when the conversation is short. */
+   when the conversation is short. Use `safe` so the browser falls
+   back to `start` when content overflows, keeping the top reachable
+   via scrolling. */
 .right-panel-agent-chat .chat-thread {
-  align-content: end;
+  align-content: safe end;
 }
 
 .right-panel-mode-switch {
@@ -400,6 +402,8 @@
 
 .agent-file-context {
   min-width: 0;
+  max-height: 100px;
+  overflow: auto;
   display: grid;
   gap: 6px;
   padding: 0;
