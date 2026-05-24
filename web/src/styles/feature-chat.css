@@ -354,6 +354,20 @@
   gap: 5px;
 }
 
+.chat-spec-edit-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--color-success) 32%, var(--color-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-success) 6%, white);
+  color: var(--color-success);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .chat-message-context code,
 .chat-context-chip {
   border: 1px solid var(--color-border);

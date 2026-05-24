@@ -119,6 +119,11 @@ function ChatMessageBubbleComponent({
       ) : (
         <div className="chat-message-content">{renderMarkdownMessageContent(message.content)}</div>
       )}
+      {fileEdits.some((edit) => edit.path.includes("artifact_specs/")) ? (
+        <div className="chat-spec-edit-indicator" aria-label="Spec updated">
+          <span aria-hidden="true">✅</span> Spec updated
+        </div>
+      ) : null}
       {contextEntries.length ? (
         <div className="chat-message-context">
           {contextEntries.map((entry) => (
