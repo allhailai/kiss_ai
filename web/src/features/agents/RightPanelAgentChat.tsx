@@ -3,22 +3,17 @@ import type {
   AgentContextFile,
   ChatContextFile,
   ChatMessageFileEdit,
-  ChatMessageTopicProposal,
   Conversation,
   ConversationSummary,
-  CreateTopicResponse,
   EditProposal,
   ProjectFile,
   RebuildModel,
 } from "../../contracts/api";
-import { useBuildContext } from "../../app/contexts/BuildContext";
 import { labeledFileDisplayName, projectFileDisplayName, uniqueByPathPreserveFirst } from "../../domain/files";
-import { projectsApi } from "../../data/projectsApi";
 import { ChatComposer } from "../../shared/chat/ChatComposer";
 import { ChatThread } from "../../shared/chat/ChatThread";
 import { formatChatDateTime } from "../../shared/chat/chatRendering";
 import { ConceptualDiffReviewItem } from "../../shared/conceptualDiff/ConceptualDiffReviewItem";
-import { TopicConfirmationCard } from "./TopicConfirmationCard";
 
 type RightPanelChatController = {
   activeConversation: Conversation | null;
@@ -97,9 +92,7 @@ export function RightPanelAgentChat({
   onContextFilesChange,
   onModelChange,
   onModifyCurrentFile,
-  onNavigateToTopics,
   onRemoveAiEditableFile,
-  onTopicCreated,
   projectFiles,
   projectSlug,
   selectedModelId,
@@ -116,9 +109,7 @@ export function RightPanelAgentChat({
   onContextFilesChange: Dispatch<SetStateAction<ChatContextFile[]>>;
   onModelChange: (modelId: string) => void;
   onModifyCurrentFile: () => void;
-  onNavigateToTopics?: () => void;
   onRemoveAiEditableFile: (path: string) => void;
-  onTopicCreated?: () => void;
   projectFiles: ProjectFile[];
   projectSlug: string;
   selectedModelId: string;
@@ -129,39 +120,11 @@ export function RightPanelAgentChat({
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
-  const [showTopicCard, setShowTopicCard] = useState(false);
-  const [topicPrefill, setTopicPrefill] = useState<{ label: string; justification: string } | null>(null);
-  const [createdTopicLabels, setCreatedTopicLabels] = useState<Set<string>>(new Set());
   const [bottomPanelHeight, setBottomPanelHeight] = useState<number | null>(null);
   const bottomDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const bottomPanelRef = useRef<HTMLDivElement | null>(null);
   const titleTriggerRef = useRef<HTMLButtonElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const build = useBuildContext();
-
-  // Pre-populate createdTopicLabels from existing topics so chat chips
-  // immediately show "✅ Topic created" for topics that already exist.
-  useEffect(() => {
-    let cancelled = false;
-    projectsApi.topics(projectSlug)
-      .then((data) => {
-        if (cancelled) return;
-        const labels = new Set<string>(
-          data.topics
-            .filter((t) => t.state !== "deprecated")
-            .map((t) => t.label.toLowerCase()),
-        );
-        if (labels.size) {
-          setCreatedTopicLabels((prev) => {
-            const merged = new Set(prev);
-            for (const label of labels) merged.add(label);
-            return merged;
-          });
-        }
-      })
-      .catch(() => { /* best effort */ });
-    return () => { cancelled = true; };
-  }, [projectSlug]);
 
   const onBottomResizePointerDown = useCallback((event: React.PointerEvent) => {
     event.preventDefault();
@@ -240,67 +203,6 @@ export function RightPanelAgentChat({
     textareaRef.current?.focus();
   };
 
-  const topicCardRef = useRef<HTMLDivElement | null>(null);
-
-  const startNewTopicBrainstorm = () => {
-    setShowTopicCard((prev) => {
-      const next = !prev;
-      if (next) {
-        // Expand bottom panel to fit the topic card form
-        const panel = bottomPanelRef.current;
-        if (panel) {
-          const currentHeight = panel.getBoundingClientRect().height;
-          if (currentHeight < 320) {
-            setBottomPanelHeight(320);
-          }
-        }
-        // Scroll the topic card into view after render
-        window.requestAnimationFrame(() => {
-          topicCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        });
-      } else {
-        setBottomPanelHeight(null);
-        setTopicPrefill(null);
-      }
-      return next;
-    });
-  };
-
-  const handleTopicCreated = (result: CreateTopicResponse) => {
-    if (result.topic?.label) {
-      setCreatedTopicLabels((prev) => new Set(prev).add(result.topic!.label.toLowerCase()));
-    }
-    onTopicCreated?.();
-  };
-
-  const handleCreateTopicFromProposal = (proposal: ChatMessageTopicProposal) => {
-    setTopicPrefill({ label: proposal.label, justification: proposal.justification });
-    setShowTopicCard(true);
-    // Expand bottom panel to fit the topic card form
-    const panel = bottomPanelRef.current;
-    if (panel) {
-      const currentHeight = panel.getBoundingClientRect().height;
-      if (currentHeight < 320) {
-        setBottomPanelHeight(320);
-      }
-    }
-    window.requestAnimationFrame(() => {
-      topicCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    });
-  };
-
-  const handleDeepenNow = async (topicId: string) => {
-    try {
-      await fetch(
-        `/api/projects/${encodeURIComponent(projectSlug)}/topics/${encodeURIComponent(topicId)}/queue-deepen`,
-        { method: "POST" },
-      );
-      // Kick off a rebuild so the queued deepening actually runs
-      build.startRebuild();
-    } catch {
-      // Best-effort queue
-    }
-  };
 
   const selectConversation = (conversationId: string) => {
     if (controlsDisabled) return;
@@ -467,7 +369,6 @@ export function RightPanelAgentChat({
       </div>
       <div className="right-panel-agent-thread">
         <ChatThread
-          createdTopicLabels={createdTopicLabels}
           disabled={chat.sending}
           editable={false}
           emptyDescription="Ask the side-panel agent about this project."
@@ -475,7 +376,6 @@ export function RightPanelAgentChat({
           editProposals={chat.activeConversation?.editProposals ?? []}
           messages={chat.activeConversation?.messages ?? []}
           onApplyFileEdit={onApplyFileEdit}
-          onCreateTopic={handleCreateTopicFromProposal}
           onJumpToLatest={() => chat.scrollToLatest()}
           onScroll={chat.handleThreadScroll}
           onViewEditProposal={(proposalId) => setSelectedProposalId((current) => (current === proposalId ? null : proposalId))}
@@ -684,25 +584,6 @@ export function RightPanelAgentChat({
               </div>
             </section>
           ) : null}
-          {showTopicCard ? (
-            <div ref={topicCardRef}>
-              <TopicConfirmationCard
-                projectSlug={projectSlug}
-                initialLabel={topicPrefill?.label ?? ""}
-                initialJustification={topicPrefill?.justification ?? ""}
-                conversationId={chat.activeConversation?.id ?? null}
-                isBuilding={build.isBuilding}
-                onCreated={handleTopicCreated}
-                onNavigateToTopics={onNavigateToTopics}
-                onDeepenNow={handleDeepenNow}
-                onCancel={() => {
-                  setShowTopicCard(false);
-                  setTopicPrefill(null);
-                  setBottomPanelHeight(null);
-                }}
-              />
-            </div>
-          ) : null}
           <ChatComposer
             attachedContextFiles={contextFiles}
             contextFiles={projectFiles}
@@ -731,13 +612,6 @@ export function RightPanelAgentChat({
             selectedModelId={selectedModelId}
             showContextControls={false}
             submitLabel="Ask"
-            tertiaryAction={{
-              ariaLabel: "Create a new research topic",
-              disabled: controlsDisabled,
-              label: showTopicCard ? "Cancel" : "+ Topic",
-              onClick: startNewTopicBrainstorm,
-              title: showTopicCard ? "Close topic card" : "Create a new research topic",
-            }}
             textareaRef={textareaRef}
           />
         </div>

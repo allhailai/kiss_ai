@@ -85,7 +85,6 @@ export function RightPanelOrchestrator({
             onContextFilesChange={projectChat.setContextFiles}
             onModelChange={rebuildWorkspace.setSelectedModelId}
             onModifyCurrentFile={() => agentFileContext.currentFile && agentFileContext.addEditableFile(agentFileContext.currentFile.path)}
-            onNavigateToTopics={() => route.navigateTo("topics")}
             onRemoveAiEditableFile={agentFileContext.removeAiEditableFile}
             projectFiles={fileWorkspaceProjectFiles}
             projectSlug={projectSlug}

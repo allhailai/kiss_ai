@@ -2,10 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Topic, TopicDisposition, TopicState } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
 import { useBuildContext } from "../../app/contexts/BuildContext";
+import { TopicConfirmationCard } from "../agents/TopicConfirmationCard";
 
-type TopicsFilter = "all" | "seeds" | "active" | "shallow" | "deep" | "queued" | "deepened" | "parked" | "settled" | "deprecated";
+type TopicsFilter = "all" | "needs_review" | "active" | "in_progress" | "archived" | "shallow" | "deep";
 
-const VALID_FILTERS = new Set<TopicsFilter>(["all", "seeds", "active", "shallow", "deep", "queued", "deepened", "parked", "settled", "deprecated"]);
+const VALID_FILTERS = new Set<TopicsFilter>(["all", "needs_review", "active", "in_progress", "archived", "shallow", "deep"]);
 
 function parseFilterFromHash(): TopicsFilter {
   const hash = window.location.hash;
@@ -402,11 +403,13 @@ export function TopicsWorkspace({
   onNavigateToFile: (path: string) => void;
   projectSlug: string;
 }) {
-  const { isBuilding, openBuildPanel } = useBuildContext();
+  const build = useBuildContext();
+  const { isBuilding, openBuildPanel } = build;
   const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilterState] = useState<TopicsFilter>(parseFilterFromHash);
   const [error, setError] = useState<string | null>(null);
+  const [showNewTopicForm, setShowNewTopicForm] = useState(false);
 
   const setFilter = useCallback((f: TopicsFilter) => {
     setFilterState(f);
@@ -557,42 +560,44 @@ export function TopicsWorkspace({
     [projectSlug, fetchTopics],
   );
 
-  const seedCount = topics.filter((t) => t.state === "seed").length;
+  const handleDeepenNow = useCallback(
+    async (topicId: string) => {
+      try {
+        await fetch(
+          `/api/projects/${encodeURIComponent(projectSlug)}/topics/${encodeURIComponent(topicId)}/queue-deepen`,
+          { method: "POST" },
+        );
+        build.startRebuild();
+      } catch {
+        // Best-effort queue
+      }
+    },
+    [projectSlug, build],
+  );
+
+  const needsReviewCount = topics.filter((t) => t.state === "seed").length;
   const activeCount = topics.filter((t) => isActiveTopic(t)).length;
   const shallowCount = topics.filter((t) => t.state === "shallow" && !t.disposition).length;
   const deepCount = topics.filter((t) => t.state === "deep" && !t.disposition).length;
-  const queuedCount = topics.filter((t) => t.queued_for_deepen).length;
-  const deepenedCount = topics.filter((t) => (t.discovery?.deepening_count ?? 0) > 0).length;
-  const parkedCount = topics.filter((t) => t.disposition === "parked").length;
-  const settledCount = topics.filter((t) => t.disposition === "settled").length;
-  const deprecatedCount = topics.filter((t) => t.state === "deprecated").length;
+  const inProgressCount = topics.filter((t) => t.queued_for_deepen).length;
+  const archivedCount = topics.filter((t) => t.disposition === "parked" || t.disposition === "settled" || t.state === "deprecated").length;
 
   const filteredTopics = topics.filter((t) => {
-    if (filter === "seeds") return t.state === "seed";
+    if (filter === "needs_review") return t.state === "seed";
     if (filter === "active") return isActiveTopic(t);
     if (filter === "shallow") return t.state === "shallow" && !t.disposition;
     if (filter === "deep") return t.state === "deep" && !t.disposition;
-    if (filter === "queued") return t.queued_for_deepen;
-    if (filter === "deepened") return (t.discovery?.deepening_count ?? 0) > 0;
-    if (filter === "parked") return t.disposition === "parked";
-    if (filter === "settled") return t.disposition === "settled";
-    if (filter === "deprecated") return t.state === "deprecated";
+    if (filter === "in_progress") return t.queued_for_deepen;
+    if (filter === "archived") return t.disposition === "parked" || t.disposition === "settled" || t.state === "deprecated";
     return true;
   });
 
   // Sort logic depends on active filter
   const sortedTopics = [...filteredTopics].sort((a, b) => {
-    // Parked/Settled filters: sort by disposition_at descending (most recently decided first)
-    if (filter === "parked" || filter === "settled") {
-      const aTime = a.disposition_at ? new Date(a.disposition_at).getTime() : 0;
-      const bTime = b.disposition_at ? new Date(b.disposition_at).getTime() : 0;
-      return bTime - aTime;
-    }
-
-    // Deepened filter: sort by last_deepened descending (most recently deepened first)
-    if (filter === "deepened") {
-      const aTime = a.discovery?.last_deepened ? new Date(a.discovery.last_deepened).getTime() : 0;
-      const bTime = b.discovery?.last_deepened ? new Date(b.discovery.last_deepened).getTime() : 0;
+    // Archived filter: sort by disposition_at descending (most recently decided first)
+    if (filter === "archived") {
+      const aTime = a.disposition_at ? new Date(a.disposition_at).getTime() : (a.deprecation?.deprecated_at ? new Date(a.deprecation.deprecated_at).getTime() : 0);
+      const bTime = b.disposition_at ? new Date(b.disposition_at).getTime() : (b.deprecation?.deprecated_at ? new Date(b.deprecation.deprecated_at).getTime() : 0);
       return bTime - aTime;
     }
 
@@ -619,37 +624,70 @@ export function TopicsWorkspace({
     );
   }
 
-  const filterLabels: Record<TopicsFilter, string> = {
-    all: "All",
-    seeds: "Seeds",
-    active: "Active",
-    shallow: "Shallow",
-    deep: "Deep",
-    queued: "Queued",
-    deepened: "Deepened",
-    parked: "Parked",
-    settled: "Settled",
-    deprecated: "Deprecated",
-  };
+  const filterConfig: Array<{ id: TopicsFilter; label: string; count: number; warn?: boolean }> = [
+    { id: "all", label: "All", count: topics.length },
+    { id: "needs_review", label: "Needs Review", count: needsReviewCount, warn: needsReviewCount > 0 },
+    { id: "active", label: "Active", count: activeCount },
+    { id: "in_progress", label: "In Progress", count: inProgressCount },
+    { id: "archived", label: "Archived", count: archivedCount },
+  ];
 
   return (
     <div className="topics-workspace">
       <header className="topics-header">
         <h2>Topics</h2>
         <p className="topics-summary">
-          {seedCount} seeds · {activeCount} active · {shallowCount} shallow · {deepCount} deep · {queuedCount} queued · {deepenedCount} deepened · {parkedCount} parked · {settledCount} settled · {deprecatedCount} deprecated · {topics.length} total
+          {topics.length} topic{topics.length !== 1 ? "s" : ""}
+          {activeCount > 0 ? (
+            <>
+              {" \u00b7 "}{activeCount} active (
+              <button
+                className={`topics-summary-link${filter === "deep" ? " active" : ""}`}
+                onClick={() => setFilter(filter === "deep" ? "active" : "deep")}
+                type="button"
+              >
+                {deepCount} deep
+              </button>
+              ,{" "}
+              <button
+                className={`topics-summary-link${filter === "shallow" ? " active" : ""}`}
+                onClick={() => setFilter(filter === "shallow" ? "active" : "shallow")}
+                type="button"
+              >
+                {shallowCount} shallow
+              </button>
+              )
+            </>
+          ) : null}
+          {inProgressCount > 0 ? <>{" \u00b7 "}{inProgressCount} in deepening queue</> : null}
+          {needsReviewCount > 0 ? <>{" \u00b7 "}{needsReviewCount} awaiting review</> : null}
         </p>
-        <div className="topics-filter-bar">
-          {(["all", "seeds", "active", "shallow", "deep", "queued", "deepened", "parked", "settled", "deprecated"] as const).map((f) => (
-            <button
-              className={`topics-filter-button${filter === f ? " active" : ""}`}
-              key={f}
-              onClick={() => setFilter(f)}
-              type="button"
-            >
-              {filterLabels[f]}
-            </button>
-          ))}
+        <div className="topics-filter-row">
+          <div className="topics-filter-bar">
+            {filterConfig.map((f) => (
+              <button
+                className={`topics-filter-button${filter === f.id ? " active" : ""}`}
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                type="button"
+              >
+                {f.label}
+                {f.count > 0 ? (
+                  <span className={`topics-filter-badge${f.warn ? " topics-filter-badge-warn" : ""}`}>
+                    {f.count}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+          <button
+            className={`topics-new-topic-button${showNewTopicForm ? " active" : ""}`}
+            onClick={() => setShowNewTopicForm((prev) => !prev)}
+            title={showNewTopicForm ? "Close new topic form" : "Create a new research topic"}
+            type="button"
+          >
+            {showNewTopicForm ? "Cancel" : "+ New Topic"}
+          </button>
           <div className="topics-action-buttons">
             {shallowCount > 0 ? (
               <button
@@ -662,18 +700,32 @@ export function TopicsWorkspace({
                 Queue All Shallow ({shallowCount})
               </button>
             ) : null}
-            {queuedCount > 0 ? (
+            {inProgressCount > 0 ? (
               <button
                 className="topics-run-deepen-button"
                 onClick={() => void handleRunDeepen()}
-                title={`Run deepening on ${queuedCount} queued topic(s)`}
+                title={`Run deepening on ${inProgressCount} queued topic(s)`}
                 type="button"
               >
-                Run Deepening ({queuedCount})
+                Run Deepening ({inProgressCount})
               </button>
             ) : null}
           </div>
         </div>
+        {showNewTopicForm ? (
+          <div className="topics-new-topic-form">
+            <TopicConfirmationCard
+              projectSlug={projectSlug}
+              isBuilding={isBuilding}
+              onCreated={() => {
+                setShowNewTopicForm(false);
+                void fetchTopics();
+              }}
+              onDeepenNow={handleDeepenNow}
+              onCancel={() => setShowNewTopicForm(false)}
+            />
+          </div>
+        ) : null}
       </header>
 
       {error ? <p className="topics-error">{error}</p> : null}
@@ -683,7 +735,7 @@ export function TopicsWorkspace({
           <p>
             {topics.length === 0
               ? "No topics yet. Run a build to discover topics from your project's evidence."
-              : `No ${filter} topics.`}
+              : `No ${filterConfig.find((f) => f.id === filter)?.label.toLowerCase() ?? filter} topics.`}
           </p>
         </div>
       ) : (
