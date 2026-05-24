@@ -14,6 +14,7 @@ import { normalizeChatContext } from "./chatContext.js";
 import { prepareCursorAgentRun } from "./cursorAgentRun.js";
 import { buildGitDiffPromptEntries } from "./gitDiffPrompt.js";
 import { readTopics } from "./topicsService.js";
+import { listArtifactSpecs } from "./artifactService.js";
 
 const maxPromptFileBytes = 24 * 1024;
 const maxPromptHistoryMessages = 40;
@@ -228,13 +229,14 @@ async function readCurrentFileContext({ project, readTextFile, currentFile }) {
 }
 
 async function createChatPrompt({ project, conversation, readTextFile, displayProjectName, readProjectHarness }) {
-  const [harness, goal, inputs, outputs, openQuestions, topicsData] = await Promise.all([
+  const [harness, goal, inputs, outputs, openQuestions, topicsData, artifactsData] = await Promise.all([
     readProjectHarness(project.path),
     readOptionalProjectText(readTextFile, project.path, "human_goal_requirements.md"),
     readOptionalProjectText(readTextFile, project.path, "human_input_requirements.md"),
     readOptionalProjectText(readTextFile, project.path, "human_output_requirements.md"),
     readOptionalProjectText(readTextFile, project.path, "human_open_questions.md"),
     readTopics(project.path).catch(() => ({ topics: [] })),
+    listArtifactSpecs(project.path).catch(() => []),
   ]);
   const currentFile = [...conversation.messages].reverse().find((message) => message.context?.currentFile)?.context?.currentFile ?? null;
   const aiEditableFiles = conversation.fileContext?.ai_editable_files ?? [];
@@ -280,6 +282,9 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
       .filter((t) => t.state !== "deprecated")
       .map((t) => ({ label: t.label, state: t.state, disposition: t.disposition }))
       .slice(0, 100),
+    existingArtifacts: artifactsData
+      .map((a) => ({ name: a.name, slug: a.slug, status: a.status, format: a.format }))
+      .slice(0, 50),
   };
 
   const prompt = [
@@ -313,6 +318,25 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     "- You may include a topic_proposal tag proactively after brainstorming if the user has clearly expressed intent to create the topic.",
     "- Do NOT create topics yourself. The tag creates a UI button; the user clicks it to finalize.",
     "- If the user seems to be developing a concept that could be a research topic but hasn't asked to create one, do not output a topic_proposal tag (that feature comes later).",
+    "",
+    "Artifact Creation Guidance:",
+    "- When a user message contains the marker [System: The user wants to create an artifact], enter artifact design mode:",
+    "  1. Evaluate whether the conversation so far contains enough substance for an artifact (summary, analysis, structured content).",
+    "  2. Check the existingArtifacts list in the payload. If similar artifacts exist, explicitly mention them by name and ask if this is different before proposing.",
+    "  3. If you have enough context, present a proposal summary and emit an artifact_proposal tag.",
+    "  4. If you need more detail, provide a brief summary of what you see so far, then ask targeted questions (purpose, audience, key sections, tone, data to include).",
+    "  5. Continue the Q&A until you are confident, then say you are ready and emit the artifact_proposal tag.",
+    "  6. Tag format: <artifact_proposal><title>Artifact Title</title><summary>High-level description of the artifact.</summary><details>- Bullet point 1\n- Bullet point 2\n- Bullet point 3</details><spec_body>Markdown spec body content for the artifact specification file.</spec_body></artifact_proposal>",
+    "  7. The spec_body should be a complete artifact specification in markdown: goal statement, content sections, tone/style guidance, and any specific data or visualizations to include.",
+    "- When a user message contains the marker [System: Create the artifact now], emit an artifact_proposal tag immediately with the best spec you can produce from available context.",
+    "- Do NOT create artifact files yourself. The tag creates a UI card; the user clicks it to finalize.",
+    "",
+    "Artifact Editing Mode:",
+    "- When an artifact spec file (artifacts/artifact_specs/*.artifact.md) is listed in ai_editable_files, you are in artifact editing mode.",
+    "- Treat user messages as refinement instructions for that spec.",
+    "- Propose file_edit tags to update the artifact spec content directly.",
+    "- Respond with a brief confirmation of what changed. Keep responses concise.",
+    "- Do not ask clarifying questions unless the instruction is genuinely ambiguous.",
     "",
     conversationSummaryText(conversation),
     "",
@@ -563,6 +587,31 @@ export function extractTopicProposals(rawText) {
     .filter(Boolean);
 }
 
+/**
+ * Extract artifact proposals from assistant text.
+ * The agent outputs <artifact_proposal><title>...</title><summary>...</summary><details>...</details><spec_body>...</spec_body></artifact_proposal> tags.
+ */
+export function extractArtifactProposals(rawText) {
+  return allTagContent(rawText, "artifact_proposal")
+    .map((proposalText) => {
+      const title = firstTagContent(proposalText, "title");
+      const summary = firstTagContent(proposalText, "summary");
+      const detailsRaw = firstTagContent(proposalText, "details");
+      const specBody = firstTagContent(proposalText, "spec_body");
+      if (!title) return null;
+      const details = detailsRaw
+        ? detailsRaw.split("\n").map((line) => line.replace(/^\s*[-•*]\s*/, "").trim()).filter(Boolean)
+        : [];
+      return {
+        title,
+        summary: summary || "",
+        details,
+        ...(specBody ? { specBody } : {}),
+      };
+    })
+    .filter(Boolean);
+}
+
 export function createChatAgentService({
   appendMessage,
   displayProjectName,
@@ -621,6 +670,7 @@ export function createChatAgentService({
         const assistantText = assistantTextChunks.join("");
         const fileEdits = extractFileEditProposals(assistantText, conversationWithUser, authorizedEditablePaths);
         const topicProposals = extractTopicProposals(assistantText);
+        const artifactProposals = extractArtifactProposals(assistantText);
         const finalConversation = await appendMessage(project, conversationId, {
           id: assistantMessageId,
           role: "assistant",
@@ -632,6 +682,7 @@ export function createChatAgentService({
             cursorApiKeySource: cursorApiKey.source,
             ...(fileEdits.length ? { fileEdits } : {}),
             ...(topicProposals.length ? { topicProposals } : {}),
+            ...(artifactProposals.length ? { artifactProposals } : {}),
           },
         });
         const nextConversation =

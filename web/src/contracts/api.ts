@@ -475,9 +475,25 @@ export type ChatMessageTopicProposal = {
   justification: string;
 };
 
+export type ChatMessageArtifactProposal = {
+  /** Suggested title for the artifact */
+  title: string;
+  /** High-level summary of what the artifact will contain */
+  summary: string;
+  /** Bullet-point details about the artifact's content */
+  details: string[];
+  /** Suggested spec body content (markdown) */
+  specBody?: string;
+  /** Suggested format (default: "html") */
+  format?: string;
+  /** Suggested sources to include as context hints */
+  suggestedSources?: string[];
+};
+
 export type ChatMessageMetadata = Record<string, unknown> & {
   fileEdits?: ChatMessageFileEdit[];
   topicProposals?: ChatMessageTopicProposal[];
+  artifactProposals?: ChatMessageArtifactProposal[];
 };
 
 export type ConceptualDiff = {

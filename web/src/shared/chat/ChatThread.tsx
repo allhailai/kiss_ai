@@ -1,9 +1,10 @@
 import { useEffect, useRef, type RefObject } from "react";
-import type { ChatMessage, ChatMessageFileEdit, ChatMessageTopicProposal, EditProposal } from "../../contracts/api";
+import type { ChatMessage, ChatMessageArtifactProposal, ChatMessageFileEdit, ChatMessageTopicProposal, EditProposal } from "../../contracts/api";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 
 export function ChatThread({
   createdTopicLabels,
+  createdArtifactTitles,
   disabled,
   editDraft = "",
   editable = true,
@@ -13,6 +14,7 @@ export function ChatThread({
   editProposals = [],
   messages,
   onCancelEdit = () => undefined,
+  onCreateArtifact,
   onCreateTopic,
   onEditDraftChange = () => undefined,
   onApplyFileEdit,
@@ -27,6 +29,7 @@ export function ChatThread({
   threadRef,
 }: {
   createdTopicLabels?: Set<string>;
+  createdArtifactTitles?: Set<string>;
   disabled: boolean;
   editDraft?: string;
   editable?: boolean;
@@ -36,6 +39,7 @@ export function ChatThread({
   editProposals?: EditProposal[];
   messages: ChatMessage[];
   onCancelEdit?: () => void;
+  onCreateArtifact?: (proposal: ChatMessageArtifactProposal) => void;
   onCreateTopic?: (proposal: ChatMessageTopicProposal) => void;
   onEditDraftChange?: (value: string) => void;
   onApplyFileEdit?: (edit: ChatMessageFileEdit) => void | Promise<void>;
@@ -85,6 +89,7 @@ export function ChatThread({
           messages.map((message) => (
             <ChatMessageBubble
               createdTopicLabels={createdTopicLabels}
+              createdArtifactTitles={createdArtifactTitles}
               disabled={disabled}
               editDraft={editDraft}
               editable={editable}
@@ -94,6 +99,7 @@ export function ChatThread({
               linkedEditProposals={editProposals.filter((proposal) => proposal.sourceMessageId === message.id)}
               onApplyFileEdit={onApplyFileEdit}
               onCancelEdit={onCancelEdit}
+              onCreateArtifact={onCreateArtifact}
               onCreateTopic={onCreateTopic}
               onEditDraftChange={onEditDraftChange}
               onSaveEdit={onSaveEdit}

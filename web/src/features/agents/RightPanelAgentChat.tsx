@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import type {
   AgentContextFile,
   ChatContextFile,
+  ChatMessageArtifactProposal,
   ChatMessageFileEdit,
   Conversation,
   ConversationSummary,
@@ -9,11 +10,18 @@ import type {
   ProjectFile,
   RebuildModel,
 } from "../../contracts/api";
+import { artifactsApi } from "../../data/artifactsApi";
 import { labeledFileDisplayName, projectFileDisplayName, uniqueByPathPreserveFirst } from "../../domain/files";
 import { ChatComposer } from "../../shared/chat/ChatComposer";
 import { ChatThread } from "../../shared/chat/ChatThread";
 import { formatChatDateTime } from "../../shared/chat/chatRendering";
+import { ArtifactProposalCard } from "./ArtifactProposalCard";
 import { ConceptualDiffReviewItem } from "../../shared/conceptualDiff/ConceptualDiffReviewItem";
+
+type ArtifactSession =
+  | { phase: "idle" }
+  | { phase: "designing" }
+  | { phase: "editing"; slug: string; name: string };
 
 type RightPanelChatController = {
   activeConversation: Conversation | null;
@@ -92,6 +100,7 @@ export function RightPanelAgentChat({
   onContextFilesChange,
   onModelChange,
   onModifyCurrentFile,
+  onNavigateToArtifact,
   onRemoveAiEditableFile,
   projectFiles,
   projectSlug,
@@ -109,6 +118,7 @@ export function RightPanelAgentChat({
   onContextFilesChange: Dispatch<SetStateAction<ChatContextFile[]>>;
   onModelChange: (modelId: string) => void;
   onModifyCurrentFile: () => void;
+  onNavigateToArtifact: (slug: string) => void;
   onRemoveAiEditableFile: (path: string) => void;
   projectFiles: ProjectFile[];
   projectSlug: string;
@@ -120,6 +130,9 @@ export function RightPanelAgentChat({
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
+  const [artifactSession, setArtifactSession] = useState<ArtifactSession>({ phase: "idle" });
+  const [activeArtifactProposal, setActiveArtifactProposal] = useState<ChatMessageArtifactProposal | null>(null);
+  const [createdArtifactTitles, setCreatedArtifactTitles] = useState<Set<string>>(new Set());
   const [bottomPanelHeight, setBottomPanelHeight] = useState<number | null>(null);
   const bottomDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const bottomPanelRef = useRef<HTMLDivElement | null>(null);
@@ -200,6 +213,8 @@ export function RightPanelAgentChat({
     setFilePickerQuery("");
     setFilePickerOpen(false);
     setHistoryOpen(false);
+    setArtifactSession({ phase: "idle" });
+    setActiveArtifactProposal(null);
     textareaRef.current?.focus();
   };
 
@@ -301,6 +316,49 @@ export function RightPanelAgentChat({
     void chat.applyEditProposal(proposal.id);
   };
 
+  const startArtifactSession = () => {
+    if (controlsDisabled) return;
+    setArtifactSession({ phase: "designing" });
+    void chat.sendMessage({
+      content: "[System: The user wants to create an artifact. Evaluate the conversation so far and guide them through artifact design. If you have enough context, present a proposal. If not, ask targeted questions about purpose, audience, key sections, and content.]",
+      context: currentFile ? { currentFile } : undefined,
+    });
+  };
+
+  const forceCreateArtifact = () => {
+    if (controlsDisabled) return;
+    void chat.sendMessage({
+      content: "[System: Create the artifact now with the information gathered so far. Do your best with available context. Emit an artifact_proposal in your response.]",
+    });
+  };
+
+  const handleCreateArtifact = (proposal: ChatMessageArtifactProposal) => {
+    setActiveArtifactProposal(proposal);
+  };
+
+  const handleArtifactCreated = (slug: string, name: string) => {
+    setArtifactSession({ phase: "editing", slug, name });
+    setActiveArtifactProposal(null);
+    setCreatedArtifactTitles((prev) => new Set(prev).add(name.toLowerCase()));
+    onNavigateToArtifact(slug);
+  };
+
+  const exitEditingMode = () => {
+    if (artifactSession.phase === "editing") {
+      // Remove the auto-added editable file
+      const specPath = `artifacts/artifact_specs/${artifactSession.slug}.artifact.md`;
+      onRemoveAiEditableFile(specPath);
+    }
+    setArtifactSession({ phase: "idle" });
+    setActiveArtifactProposal(null);
+  };
+
+  // Composer mode based on artifact session phase
+  const composerPlaceholder = artifactSession.phase === "editing"
+    ? "Describe changes to the artifact..."
+    : "Ask the side-panel agent...";
+  const composerSubmitLabel = artifactSession.phase === "editing" ? "Update" : "Ask";
+
   return (
     <div className="right-panel-agent-chat">
       <div className="agent-conversation-header">
@@ -368,7 +426,24 @@ export function RightPanelAgentChat({
         </div>
       </div>
       <div className="right-panel-agent-thread">
+        {artifactSession.phase === "editing" ? (
+          <div className="agent-artifact-editing-banner">
+            <span className="agent-artifact-editing-icon" aria-hidden="true">✏️</span>
+            <span className="agent-artifact-editing-label">
+              Editing: <strong>{artifactSession.name}</strong>
+            </span>
+            <button
+              aria-label="Exit artifact editing mode"
+              className="agent-artifact-editing-close"
+              onClick={exitEditingMode}
+              type="button"
+            >
+              ✕
+            </button>
+          </div>
+        ) : null}
         <ChatThread
+          createdArtifactTitles={createdArtifactTitles}
           disabled={chat.sending}
           editable={false}
           emptyDescription="Ask the side-panel agent about this project."
@@ -376,6 +451,7 @@ export function RightPanelAgentChat({
           editProposals={chat.activeConversation?.editProposals ?? []}
           messages={chat.activeConversation?.messages ?? []}
           onApplyFileEdit={onApplyFileEdit}
+          onCreateArtifact={handleCreateArtifact}
           onJumpToLatest={() => chat.scrollToLatest()}
           onScroll={chat.handleThreadScroll}
           onViewEditProposal={(proposalId) => setSelectedProposalId((current) => (current === proposalId ? null : proposalId))}
@@ -584,6 +660,17 @@ export function RightPanelAgentChat({
               </div>
             </section>
           ) : null}
+          {activeArtifactProposal ? (
+            <section className="agent-artifact-proposal-section" aria-label="Artifact Proposal">
+              <ArtifactProposalCard
+                disabled={controlsDisabled}
+                onCreated={handleArtifactCreated}
+                projectSlug={projectSlug}
+                proposal={activeArtifactProposal}
+                selectedBuildModelId={selectedModelId}
+              />
+            </section>
+          ) : null}
           <ChatComposer
             attachedContextFiles={contextFiles}
             contextFiles={projectFiles}
@@ -595,7 +682,7 @@ export function RightPanelAgentChat({
             onModelChange={onModelChange}
             onRemoveContextFile={removeContextFile}
             onSubmit={() => void sendMessage()}
-            placeholder="Ask the side-panel agent..."
+            placeholder={composerPlaceholder}
             modelAdjacentAction={{
               ariaLabel: "New AI Chat",
               disabled: controlsDisabled,
@@ -609,9 +696,22 @@ export function RightPanelAgentChat({
               onClick: proposeEdits,
               title: !requestAiEditableFiles.length ? "Add AI Editable files to allow the agent to propose edits." : undefined,
             }}
+            tertiaryAction={artifactSession.phase === "designing" ? {
+              ariaLabel: "Create artifact now",
+              disabled: controlsDisabled,
+              label: "Create Artifact",
+              onClick: forceCreateArtifact,
+              title: "Create the artifact with information gathered so far",
+            } : artifactSession.phase === "idle" ? {
+              ariaLabel: "Suggest an artifact from this conversation",
+              disabled: controlsDisabled,
+              label: "Suggest Artifact",
+              onClick: startArtifactSession,
+              title: "Ask the agent to design an artifact from this conversation",
+            } : undefined}
             selectedModelId={selectedModelId}
             showContextControls={false}
-            submitLabel="Ask"
+            submitLabel={composerSubmitLabel}
             textareaRef={textareaRef}
           />
         </div>

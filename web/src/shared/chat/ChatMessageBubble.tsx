@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import type { ChatMessage, ChatMessageFileEdit, ChatMessageTopicProposal, EditProposal } from "../../contracts/api";
+import type { ChatMessage, ChatMessageArtifactProposal, ChatMessageFileEdit, ChatMessageTopicProposal, EditProposal } from "../../contracts/api";
 import { formatChatDateTime, renderMarkdownMessageContent } from "./chatRendering";
 
 function linkedProposalLabel(proposal: EditProposal) {
@@ -11,6 +11,7 @@ function linkedProposalLabel(proposal: EditProposal) {
 
 function ChatMessageBubbleComponent({
   createdTopicLabels,
+  createdArtifactTitles,
   disabled,
   editDraft,
   editable = true,
@@ -20,12 +21,14 @@ function ChatMessageBubbleComponent({
   onCancelEdit,
   onEditDraftChange,
   onApplyFileEdit,
+  onCreateArtifact,
   onCreateTopic,
   onSaveEdit,
   onStartEdit,
   onViewEditProposal,
 }: {
   createdTopicLabels?: Set<string>;
+  createdArtifactTitles?: Set<string>;
   disabled: boolean;
   editDraft: string;
   editable?: boolean;
@@ -35,6 +38,7 @@ function ChatMessageBubbleComponent({
   onCancelEdit: () => void;
   onEditDraftChange: (value: string) => void;
   onApplyFileEdit?: (edit: ChatMessageFileEdit) => void | Promise<void>;
+  onCreateArtifact?: (proposal: ChatMessageArtifactProposal) => void;
   onCreateTopic?: (proposal: ChatMessageTopicProposal) => void;
   onSaveEdit: (message: ChatMessage) => void;
   onStartEdit: (message: ChatMessage) => void;
@@ -43,6 +47,7 @@ function ChatMessageBubbleComponent({
   const canEdit = editable && message.role === "user";
   const fileEdits = message.metadata?.fileEdits ?? [];
   const topicProposals = message.metadata?.topicProposals ?? [];
+  const artifactProposals = message.metadata?.artifactProposals ?? [];
   const viewableEditProposals = linkedEditProposals.filter((proposal) => proposal.status === "applied" || proposal.status === "partial");
   const [applyingEditKey, setApplyingEditKey] = useState<string | null>(null);
   const currentFilePath = message.context?.currentFile?.path;
@@ -179,6 +184,25 @@ function ChatMessageBubbleComponent({
                 type="button"
               >
                 {alreadyCreated ? "✅" : "🔬"} {alreadyCreated ? "Topic created:" : "Create topic:"} {proposal.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+      {artifactProposals.length ? (
+        <div className="chat-message-context" aria-label="Artifact proposals">
+          {artifactProposals.map((proposal) => {
+            const alreadyCreated = createdArtifactTitles?.has(proposal.title.toLowerCase()) ?? false;
+            return (
+              <button
+                className={alreadyCreated ? "chat-artifact-proposal-chip chat-artifact-proposal-created" : "chat-artifact-proposal-chip"}
+                disabled={disabled || alreadyCreated}
+                key={proposal.title}
+                onClick={() => onCreateArtifact?.(proposal)}
+                title={alreadyCreated ? `Artifact already created: ${proposal.title}` : (proposal.summary || `Create artifact: ${proposal.title}`)}
+                type="button"
+              >
+                {alreadyCreated ? "✅" : "📄"} {alreadyCreated ? "Artifact created:" : "Create artifact:"} {proposal.title}
               </button>
             );
           })}
