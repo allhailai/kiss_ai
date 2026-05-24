@@ -13,6 +13,7 @@ import type {
 } from "../../contracts/api";
 import { useBuildContext } from "../../app/contexts/BuildContext";
 import { labeledFileDisplayName, projectFileDisplayName, uniqueByPathPreserveFirst } from "../../domain/files";
+import { projectsApi } from "../../data/projectsApi";
 import { ChatComposer } from "../../shared/chat/ChatComposer";
 import { ChatThread } from "../../shared/chat/ChatThread";
 import { formatChatDateTime } from "../../shared/chat/chatRendering";
@@ -137,6 +138,30 @@ export function RightPanelAgentChat({
   const titleTriggerRef = useRef<HTMLButtonElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const build = useBuildContext();
+
+  // Pre-populate createdTopicLabels from existing topics so chat chips
+  // immediately show "✅ Topic created" for topics that already exist.
+  useEffect(() => {
+    let cancelled = false;
+    projectsApi.topics(projectSlug)
+      .then((data) => {
+        if (cancelled) return;
+        const labels = new Set<string>(
+          data.topics
+            .filter((t) => t.state !== "deprecated")
+            .map((t) => t.label.toLowerCase()),
+        );
+        if (labels.size) {
+          setCreatedTopicLabels((prev) => {
+            const merged = new Set(prev);
+            for (const label of labels) merged.add(label);
+            return merged;
+          });
+        }
+      })
+      .catch(() => { /* best effort */ });
+    return () => { cancelled = true; };
+  }, [projectSlug]);
 
   const onBottomResizePointerDown = useCallback((event: React.PointerEvent) => {
     event.preventDefault();
