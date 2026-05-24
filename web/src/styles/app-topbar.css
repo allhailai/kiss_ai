@@ -178,3 +178,48 @@
   outline: 2px solid color-mix(in srgb, var(--color-accent) 14%, transparent);
   outline-offset: 2px;
 }
+
+/* ── Global Activity Badge ── */
+
+.global-activity-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--color-success) 36%, var(--color-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-success) 7%, white);
+  color: color-mix(in srgb, var(--color-success) 80%, var(--color-primary));
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+  animation: activity-badge-appear 0.25s ease-out;
+}
+
+.global-activity-badge:hover,
+.global-activity-badge:focus-visible {
+  border-color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 14%, white);
+  outline: 2px solid color-mix(in srgb, var(--color-success) 16%, transparent);
+  outline-offset: 2px;
+}
+
+.global-activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-success);
+  animation: activity-dot-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes activity-badge-appear {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes activity-dot-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+}

@@ -1,8 +1,9 @@
 import { useEffect, useRef, type RefObject } from "react";
-import type { ChatMessage, ChatMessageFileEdit, EditProposal } from "../../contracts/api";
+import type { ChatMessage, ChatMessageFileEdit, ChatMessageTopicProposal, EditProposal } from "../../contracts/api";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 
 export function ChatThread({
+  createdTopicLabels,
   disabled,
   editDraft = "",
   editable = true,
@@ -12,6 +13,7 @@ export function ChatThread({
   editProposals = [],
   messages,
   onCancelEdit = () => undefined,
+  onCreateTopic,
   onEditDraftChange = () => undefined,
   onApplyFileEdit,
   onJumpToLatest,
@@ -24,6 +26,7 @@ export function ChatThread({
   showJumpToLatest = false,
   threadRef,
 }: {
+  createdTopicLabels?: Set<string>;
   disabled: boolean;
   editDraft?: string;
   editable?: boolean;
@@ -33,6 +36,7 @@ export function ChatThread({
   editProposals?: EditProposal[];
   messages: ChatMessage[];
   onCancelEdit?: () => void;
+  onCreateTopic?: (proposal: ChatMessageTopicProposal) => void;
   onEditDraftChange?: (value: string) => void;
   onApplyFileEdit?: (edit: ChatMessageFileEdit) => void | Promise<void>;
   onJumpToLatest?: () => void;
@@ -55,6 +59,17 @@ export function ChatThread({
     target?.scrollIntoView({ block: "start", behavior: "smooth" });
   }, [resolvedThreadRef, scrollToMessageId]);
 
+  // Scroll to bottom on initial mount when messages are already present
+  // (e.g. when the right panel opens with a pre-loaded conversation)
+  useEffect(() => {
+    const thread = resolvedThreadRef.current;
+    if (!thread || !messages.length) return;
+    window.requestAnimationFrame(() => {
+      thread.scrollTo({ top: thread.scrollHeight, behavior: "auto" });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally runs only on mount
+  }, []);
+
   useEffect(() => {
     const thread = resolvedThreadRef.current;
     if (!thread || !showThinking) return;
@@ -69,6 +84,7 @@ export function ChatThread({
         {messages.length ? (
           messages.map((message) => (
             <ChatMessageBubble
+              createdTopicLabels={createdTopicLabels}
               disabled={disabled}
               editDraft={editDraft}
               editable={editable}
@@ -78,6 +94,7 @@ export function ChatThread({
               linkedEditProposals={editProposals.filter((proposal) => proposal.sourceMessageId === message.id)}
               onApplyFileEdit={onApplyFileEdit}
               onCancelEdit={onCancelEdit}
+              onCreateTopic={onCreateTopic}
               onEditDraftChange={onEditDraftChange}
               onSaveEdit={onSaveEdit}
               onStartEdit={onStartEdit}

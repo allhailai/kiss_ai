@@ -38,6 +38,7 @@ export function ChatComposer({
   secondaryAction,
   showContextControls = true,
   submitLabel = "Send",
+  tertiaryAction,
   textareaRef,
 }: {
   contextFiles: ProjectFile[];
@@ -67,6 +68,13 @@ export function ChatComposer({
   };
   showContextControls?: boolean;
   submitLabel?: string;
+  tertiaryAction?: {
+    ariaLabel?: string;
+    disabled: boolean;
+    label: string;
+    onClick: () => void;
+    title?: string;
+  };
   textareaRef: RefObject<HTMLTextAreaElement | null>;
 }) {
   const [contextPickerOpen, setContextPickerOpen] = useState(false);
@@ -261,6 +269,18 @@ export function ChatComposer({
               </button>
               <span aria-hidden="true" className="chat-composer-action-spacer" />
             </>
+          ) : null}
+          {tertiaryAction ? (
+            <button
+              aria-label={tertiaryAction.ariaLabel}
+              className="chat-composer-tertiary-action"
+              disabled={tertiaryAction.disabled}
+              onClick={tertiaryAction.onClick}
+              title={tertiaryAction.title}
+              type="button"
+            >
+              {tertiaryAction.label}
+            </button>
           ) : null}
           <button disabled={disabled || !draft.trim() || !selectedModelId} type="submit">
             {disabled ? "Sending..." : submitLabel}

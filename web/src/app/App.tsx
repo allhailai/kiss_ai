@@ -258,6 +258,7 @@ export function App() {
               draftSeed={agentDraftSeed}
               fileWorkspaceProjectFiles={fileWorkspace.projectFiles}
               projectChat={projectChat}
+              projectSlug={project.selectedProjectSlug}
               rebuildWorkspace={rebuildWorkspace}
               resize={
                 rightPanelWidth.isResizable

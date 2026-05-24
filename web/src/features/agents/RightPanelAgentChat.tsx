@@ -1,19 +1,23 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
 import type {
   AgentContextFile,
   ChatContextFile,
   ChatMessageFileEdit,
+  ChatMessageTopicProposal,
   Conversation,
   ConversationSummary,
+  CreateTopicResponse,
   EditProposal,
   ProjectFile,
   RebuildModel,
 } from "../../contracts/api";
+import { useBuildContext } from "../../app/contexts/BuildContext";
 import { labeledFileDisplayName, projectFileDisplayName, uniqueByPathPreserveFirst } from "../../domain/files";
 import { ChatComposer } from "../../shared/chat/ChatComposer";
 import { ChatThread } from "../../shared/chat/ChatThread";
 import { formatChatDateTime } from "../../shared/chat/chatRendering";
 import { ConceptualDiffReviewItem } from "../../shared/conceptualDiff/ConceptualDiffReviewItem";
+import { TopicConfirmationCard } from "./TopicConfirmationCard";
 
 type RightPanelChatController = {
   activeConversation: Conversation | null;
@@ -92,8 +96,11 @@ export function RightPanelAgentChat({
   onContextFilesChange,
   onModelChange,
   onModifyCurrentFile,
+  onNavigateToTopics,
   onRemoveAiEditableFile,
+  onTopicCreated,
   projectFiles,
+  projectSlug,
   selectedModelId,
 }: {
   aiEditableFiles: AgentContextFile[];
@@ -108,8 +115,11 @@ export function RightPanelAgentChat({
   onContextFilesChange: Dispatch<SetStateAction<ChatContextFile[]>>;
   onModelChange: (modelId: string) => void;
   onModifyCurrentFile: () => void;
+  onNavigateToTopics?: () => void;
   onRemoveAiEditableFile: (path: string) => void;
+  onTopicCreated?: () => void;
   projectFiles: ProjectFile[];
+  projectSlug: string;
   selectedModelId: string;
 }) {
   const draft = chat.messageDraft;
@@ -118,8 +128,36 @@ export function RightPanelAgentChat({
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
+  const [showTopicCard, setShowTopicCard] = useState(false);
+  const [topicPrefill, setTopicPrefill] = useState<{ label: string; justification: string } | null>(null);
+  const [createdTopicLabels, setCreatedTopicLabels] = useState<Set<string>>(new Set());
+  const [bottomPanelHeight, setBottomPanelHeight] = useState<number | null>(null);
+  const bottomDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const bottomPanelRef = useRef<HTMLDivElement | null>(null);
   const titleTriggerRef = useRef<HTMLButtonElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const build = useBuildContext();
+
+  const onBottomResizePointerDown = useCallback((event: React.PointerEvent) => {
+    event.preventDefault();
+    const panel = bottomPanelRef.current;
+    if (!panel) return;
+    const startHeight = panel.getBoundingClientRect().height;
+    bottomDragRef.current = { startY: event.clientY, startHeight };
+    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+  }, []);
+
+  const onBottomResizePointerMove = useCallback((event: React.PointerEvent) => {
+    const drag = bottomDragRef.current;
+    if (!drag) return;
+    const delta = drag.startY - event.clientY;
+    const newHeight = Math.max(120, Math.min(drag.startHeight + delta, window.innerHeight * 0.75));
+    setBottomPanelHeight(newHeight);
+  }, []);
+
+  const onBottomResizePointerUp = useCallback(() => {
+    bottomDragRef.current = null;
+  }, []);
   const currentFileInAiEditable = Boolean(currentFile && aiEditableFiles.some((file) => file.path === currentFile.path));
   const currentFileInContext = Boolean(currentFile && contextFiles.some((file) => file.path === currentFile.path));
   const visibleEditableTargets = useMemo<VisibleEditableTarget[]>(() => {
@@ -175,6 +213,68 @@ export function RightPanelAgentChat({
     setFilePickerOpen(false);
     setHistoryOpen(false);
     textareaRef.current?.focus();
+  };
+
+  const topicCardRef = useRef<HTMLDivElement | null>(null);
+
+  const startNewTopicBrainstorm = () => {
+    setShowTopicCard((prev) => {
+      const next = !prev;
+      if (next) {
+        // Expand bottom panel to fit the topic card form
+        const panel = bottomPanelRef.current;
+        if (panel) {
+          const currentHeight = panel.getBoundingClientRect().height;
+          if (currentHeight < 320) {
+            setBottomPanelHeight(320);
+          }
+        }
+        // Scroll the topic card into view after render
+        window.requestAnimationFrame(() => {
+          topicCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+      } else {
+        setBottomPanelHeight(null);
+        setTopicPrefill(null);
+      }
+      return next;
+    });
+  };
+
+  const handleTopicCreated = (result: CreateTopicResponse) => {
+    if (result.topic?.label) {
+      setCreatedTopicLabels((prev) => new Set(prev).add(result.topic!.label.toLowerCase()));
+    }
+    onTopicCreated?.();
+  };
+
+  const handleCreateTopicFromProposal = (proposal: ChatMessageTopicProposal) => {
+    setTopicPrefill({ label: proposal.label, justification: proposal.justification });
+    setShowTopicCard(true);
+    // Expand bottom panel to fit the topic card form
+    const panel = bottomPanelRef.current;
+    if (panel) {
+      const currentHeight = panel.getBoundingClientRect().height;
+      if (currentHeight < 320) {
+        setBottomPanelHeight(320);
+      }
+    }
+    window.requestAnimationFrame(() => {
+      topicCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  };
+
+  const handleDeepenNow = async (topicId: string) => {
+    try {
+      await fetch(
+        `/api/projects/${encodeURIComponent(projectSlug)}/topics/${encodeURIComponent(topicId)}/queue-deepen`,
+        { method: "POST" },
+      );
+      // Kick off a rebuild so the queued deepening actually runs
+      build.startRebuild();
+    } catch {
+      // Best-effort queue
+    }
   };
 
   const selectConversation = (conversationId: string) => {
@@ -342,6 +442,7 @@ export function RightPanelAgentChat({
       </div>
       <div className="right-panel-agent-thread">
         <ChatThread
+          createdTopicLabels={createdTopicLabels}
           disabled={chat.sending}
           editable={false}
           emptyDescription="Ask the side-panel agent about this project."
@@ -349,6 +450,7 @@ export function RightPanelAgentChat({
           editProposals={chat.activeConversation?.editProposals ?? []}
           messages={chat.activeConversation?.messages ?? []}
           onApplyFileEdit={onApplyFileEdit}
+          onCreateTopic={handleCreateTopicFromProposal}
           onJumpToLatest={() => chat.scrollToLatest()}
           onScroll={chat.handleThreadScroll}
           onViewEditProposal={(proposalId) => setSelectedProposalId((current) => (current === proposalId ? null : proposalId))}
@@ -357,220 +459,264 @@ export function RightPanelAgentChat({
           threadRef={chat.threadRef}
         />
       </div>
-      <div className="agent-current-file" aria-label="Current file context">
-        <span className="agent-context-label">Viewing</span>
-        {currentFile ? (
-          <div className="agent-current-file-main">
-            <code title={currentFile.path}>
-              {labeledFileDisplayName(currentFile)}
-              {currentFile.draftState === "unsaved" ? " (unsaved)" : ""}
-            </code>
-            {!currentFileInContext || (currentFile.editable && !currentFileInAiEditable) ? (
-              <div className="agent-current-file-actions" aria-label="Current file actions">
-                <details className="agent-current-file-help">
-                  <summary aria-label="Explain Context and Editable targets">?</summary>
-                  <span className="agent-current-file-help-text" role="tooltip">
-                    <strong>Current file</strong>
-                    The open file is sent as the current file so AI knows what you are viewing.
-                    <strong>Context</strong> tells AI this file may be helpful when answering your questions. AI can still look at other project
-                    files if needed.
-                    <strong>Editable targets</strong>
-                    Editable files will be updated by AI. Add files that you want AI to update & edit.
-                  </span>
-                </details>
-                {!currentFileInContext ? (
-                  <button className="agent-current-file-action-button" disabled={controlsDisabled} onClick={() => onAddContextFile(currentFile.path)} type="button">
-                    + Context
-                  </button>
-                ) : null}
-                {currentFile.editable && !currentFileInAiEditable ? (
-                  <button className="agent-current-file-action-button" disabled={controlsDisabled} onClick={pinCurrentFileAsEditableTarget} type="button">
-                    + Editable
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <span className="agent-current-file-status">No file open</span>
-        )}
-      </div>
-      {visibleEditableTargets.length ? (
-        <div className="agent-file-context agent-file-context-editable" aria-label="Editable target files">
-          <div className="agent-context-header">
-            <span className="agent-context-label">AI Editable</span>
-          </div>
-          <div className="agent-context-chips">
-            {visibleEditableTargets.map(({ file, isCurrent }) => (
-              <span
-                className={
-                  highlightedContext?.target === "editable" && highlightedContext.path === file.path
-                    ? "agent-context-chip highlighted"
-                    : "agent-context-chip"
-                }
-                key={file.path}
-              >
-                <code title={file.path}>
-                  {labeledFileDisplayName(file)}
-                  {file.draftState === "unsaved" ? " (unsaved)" : ""}
+      <div
+        className="agent-bottom-panel"
+        ref={bottomPanelRef}
+        style={bottomPanelHeight ? { height: `${bottomPanelHeight}px` } : undefined}
+      >
+        <div
+          className="agent-bottom-panel-handle"
+          onPointerDown={onBottomResizePointerDown}
+          onPointerMove={onBottomResizePointerMove}
+          onPointerUp={onBottomResizePointerUp}
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize bottom panel"
+          tabIndex={0}
+        />
+        <div className="agent-bottom-panel-content">
+          <div className="agent-current-file" aria-label="Current file context">
+            <span className="agent-context-label">Viewing</span>
+            {currentFile ? (
+              <div className="agent-current-file-main">
+                <code title={currentFile.path}>
+                  {labeledFileDisplayName(currentFile)}
+                  {currentFile.draftState === "unsaved" ? " (unsaved)" : ""}
                 </code>
-                {isCurrent ? <small>Current</small> : null}
-                <button
-                  aria-label={`Remove ${file.path} from editable targets`}
-                  disabled={controlsDisabled}
-                  onClick={() => onRemoveAiEditableFile(file.path)}
-                  type="button"
-                >
-                  x
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {activeProposal ? (
-        <section className="agent-edit-proposal" aria-label={proposalReadOnly ? "Edit Proposal Details" : "Proposed Changes"}>
-          <div className="agent-edit-proposal-header">
-            <div>
-              <span className="agent-context-label">{proposalReadOnly ? "Proposal Details" : "Proposed Changes"}</span>
-              <p>{activeProposal.notice || "Review which conceptual changes should be applied."}</p>
-            </div>
-            <strong>{proposalStatusLabel(activeProposal.status)}</strong>
-          </div>
-          {activeProposal.conceptualDiffs.length ? (
-            <>
-              {proposalReadOnly ? (
-                <div className="agent-edit-proposal-actions">
-                  <button disabled={controlsDisabled} onClick={() => setSelectedProposalId(null)} type="button">
-                    Hide
-                  </button>
-                </div>
-              ) : (
-                <div className="agent-edit-proposal-actions">
-                  <button disabled={controlsDisabled} onClick={() => setAllProposalDiffs(activeProposal, "accepted")} type="button">
-                    Accept all
-                  </button>
-                  <button disabled={controlsDisabled} onClick={() => setAllProposalDiffs(activeProposal, "rejected")} type="button">
-                    Reject all
-                  </button>
-                </div>
-              )}
-              <div className="agent-edit-proposal-files">
-                {proposalDiffGroups(activeProposal).map((group) => (
-                  <div className="agent-edit-proposal-file" key={group.filePath}>
-                    <code title={group.filePath}>{group.filePath}</code>
-                    {group.conceptualDiffs.map((diff) => {
-                      return (
-                        <ConceptualDiffReviewItem
-                          controlsDisabled={controlsDisabled}
-                          diff={diff}
-                          key={diff.id}
-                          onStatusChange={(status) => setProposalDiffStatus(activeProposal, diff.id, status)}
-                          readOnly={proposalReadOnly}
-                        />
-                      );
-                    })}
+                {!currentFileInContext || (currentFile.editable && !currentFileInAiEditable) ? (
+                  <div className="agent-current-file-actions" aria-label="Current file actions">
+                    <details className="agent-current-file-help">
+                      <summary aria-label="Explain Context and Editable targets">?</summary>
+                      <span className="agent-current-file-help-text" role="tooltip">
+                        <strong>Current file</strong>
+                        The open file is sent as the current file so AI knows what you are viewing.
+                        <strong>Context</strong> tells AI this file may be helpful when answering your questions. AI can still look at other project
+                        files if needed.
+                        <strong>Editable targets</strong>
+                        Editable files will be updated by AI. Add files that you want AI to update & edit.
+                      </span>
+                    </details>
+                    {!currentFileInContext ? (
+                      <button className="agent-current-file-action-button" disabled={controlsDisabled} onClick={() => onAddContextFile(currentFile.path)} type="button">
+                        + Context
+                      </button>
+                    ) : null}
+                    {currentFile.editable && !currentFileInAiEditable ? (
+                      <button className="agent-current-file-action-button" disabled={controlsDisabled} onClick={pinCurrentFileAsEditableTarget} type="button">
+                        + Editable
+                      </button>
+                    ) : null}
                   </div>
-                ))}
+                ) : null}
               </div>
-              {proposalReadOnly ? null : (
-                <button
-                  className="agent-edit-proposal-apply"
-                  disabled={controlsDisabled || !canApplyProposal(activeProposal)}
-                  onClick={() => applyProposal(activeProposal)}
-                  type="button"
-                >
-                  {activeProposal.status === "applying" || chat.sending ? "Applying..." : "Apply Proposal"}
-                </button>
-              )}
-            </>
-          ) : null}
-        </section>
-      ) : null}
-      {contextFiles.length ? (
-        <div className="agent-file-context" aria-label="Source context files">
-          <button className="agent-context-label agent-context-label-button" onClick={toggleFilePicker} type="button">
-            Context
-          </button>
-          <div className="agent-context-chips">
-            {contextFiles.map((file) => (
-              <span
-                className={
-                  highlightedContext?.target === "context" && highlightedContext.path === file.path
-                    ? "agent-context-chip highlighted"
-                    : "agent-context-chip"
-                }
-                key={file.path}
-              >
-                <code title={file.path}>{labeledFileDisplayName(file)}</code>
-                <button aria-label={`Remove ${file.path} from context`} disabled={controlsDisabled} onClick={() => removeContextFile(file.path)} type="button">
-                  x
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {contextFiles.length && filePickerOpen ? (
-        <section className="agent-file-picker" aria-label="Add context file">
-          <div className="agent-file-picker-topbar">
-            <strong>Add context file</strong>
-            <button onClick={() => setFilePickerOpen(false)} type="button">
-              Close
-            </button>
-          </div>
-          <input
-            aria-label="Search project files"
-            autoComplete="off"
-            onChange={(event) => setFilePickerQuery(event.currentTarget.value)}
-            placeholder="Search files..."
-            type="search"
-            value={filePickerQuery}
-          />
-          <div className="agent-file-picker-results">
-            {filePickerOptions.length ? (
-              filePickerOptions.map((file) => (
-                <button key={file.path} onClick={() => addPickerFile(file.path)} title={file.path} type="button">
-                  <strong>{projectFileDisplayName(file)}</strong>
-                  <span>{file.path}</span>
-                </button>
-              ))
             ) : (
-              <p>No matching files.</p>
+              <span className="agent-current-file-status">No file open</span>
             )}
           </div>
-        </section>
-      ) : null}
-      <ChatComposer
-        attachedContextFiles={contextFiles}
-        contextFiles={projectFiles}
-        disabled={controlsDisabled}
-        draft={draft}
-        models={models}
-        onAddContextFile={addContextFile}
-        onChangeDraft={(event) => chat.setMessageDraft(event.currentTarget.value)}
-        onModelChange={onModelChange}
-        onRemoveContextFile={removeContextFile}
-        onSubmit={() => void sendMessage()}
-        placeholder="Ask the side-panel agent..."
-        modelAdjacentAction={{
-          ariaLabel: "New AI Chat",
-          disabled: controlsDisabled,
-          label: "New chat",
-          onClick: startNewConversation,
-          title: "New AI Chat",
-        }}
-        secondaryAction={{
-          disabled: controlsDisabled || !draft.trim() || !requestAiEditableFiles.length || !selectedModelId,
-          label: chat.sending ? "Working..." : "Propose edits",
-          onClick: proposeEdits,
-          title: !requestAiEditableFiles.length ? "Add AI Editable files to allow the agent to propose edits." : undefined,
-        }}
-        selectedModelId={selectedModelId}
-        showContextControls={false}
-        submitLabel="Ask"
-        textareaRef={textareaRef}
-      />
+          {visibleEditableTargets.length ? (
+            <div className="agent-file-context agent-file-context-editable" aria-label="Editable target files">
+              <div className="agent-context-header">
+                <span className="agent-context-label">AI Editable</span>
+              </div>
+              <div className="agent-context-chips">
+                {visibleEditableTargets.map(({ file, isCurrent }) => (
+                  <span
+                    className={
+                      highlightedContext?.target === "editable" && highlightedContext.path === file.path
+                        ? "agent-context-chip highlighted"
+                        : "agent-context-chip"
+                    }
+                    key={file.path}
+                  >
+                    <code title={file.path}>
+                      {labeledFileDisplayName(file)}
+                      {file.draftState === "unsaved" ? " (unsaved)" : ""}
+                    </code>
+                    {isCurrent ? <small>Current</small> : null}
+                    <button
+                      aria-label={`Remove ${file.path} from editable targets`}
+                      disabled={controlsDisabled}
+                      onClick={() => onRemoveAiEditableFile(file.path)}
+                      type="button"
+                    >
+                      x
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {activeProposal ? (
+            <section className="agent-edit-proposal" aria-label={proposalReadOnly ? "Edit Proposal Details" : "Proposed Changes"}>
+              <div className="agent-edit-proposal-header">
+                <div>
+                  <span className="agent-context-label">{proposalReadOnly ? "Proposal Details" : "Proposed Changes"}</span>
+                  <p>{activeProposal.notice || "Review which conceptual changes should be applied."}</p>
+                </div>
+                <strong>{proposalStatusLabel(activeProposal.status)}</strong>
+              </div>
+              {activeProposal.conceptualDiffs.length ? (
+                <>
+                  {proposalReadOnly ? (
+                    <div className="agent-edit-proposal-actions">
+                      <button disabled={controlsDisabled} onClick={() => setSelectedProposalId(null)} type="button">
+                        Hide
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="agent-edit-proposal-actions">
+                      <button disabled={controlsDisabled} onClick={() => setAllProposalDiffs(activeProposal, "accepted")} type="button">
+                        Accept all
+                      </button>
+                      <button disabled={controlsDisabled} onClick={() => setAllProposalDiffs(activeProposal, "rejected")} type="button">
+                        Reject all
+                      </button>
+                    </div>
+                  )}
+                  <div className="agent-edit-proposal-files">
+                    {proposalDiffGroups(activeProposal).map((group) => (
+                      <div className="agent-edit-proposal-file" key={group.filePath}>
+                        <code title={group.filePath}>{group.filePath}</code>
+                        {group.conceptualDiffs.map((diff) => {
+                          return (
+                            <ConceptualDiffReviewItem
+                              controlsDisabled={controlsDisabled}
+                              diff={diff}
+                              key={diff.id}
+                              onStatusChange={(status) => setProposalDiffStatus(activeProposal, diff.id, status)}
+                              readOnly={proposalReadOnly}
+                            />
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                  {proposalReadOnly ? null : (
+                    <button
+                      className="agent-edit-proposal-apply"
+                      disabled={controlsDisabled || !canApplyProposal(activeProposal)}
+                      onClick={() => applyProposal(activeProposal)}
+                      type="button"
+                    >
+                      {activeProposal.status === "applying" || chat.sending ? "Applying..." : "Apply Proposal"}
+                    </button>
+                  )}
+                </>
+              ) : null}
+            </section>
+          ) : null}
+          {contextFiles.length ? (
+            <div className="agent-file-context" aria-label="Source context files">
+              <button className="agent-context-label agent-context-label-button" onClick={toggleFilePicker} type="button">
+                Context
+              </button>
+              <div className="agent-context-chips">
+                {contextFiles.map((file) => (
+                  <span
+                    className={
+                      highlightedContext?.target === "context" && highlightedContext.path === file.path
+                        ? "agent-context-chip highlighted"
+                        : "agent-context-chip"
+                    }
+                    key={file.path}
+                  >
+                    <code title={file.path}>{labeledFileDisplayName(file)}</code>
+                    <button aria-label={`Remove ${file.path} from context`} disabled={controlsDisabled} onClick={() => removeContextFile(file.path)} type="button">
+                      x
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {contextFiles.length && filePickerOpen ? (
+            <section className="agent-file-picker" aria-label="Add context file">
+              <div className="agent-file-picker-topbar">
+                <strong>Add context file</strong>
+                <button onClick={() => setFilePickerOpen(false)} type="button">
+                  Close
+                </button>
+              </div>
+              <input
+                aria-label="Search project files"
+                autoComplete="off"
+                onChange={(event) => setFilePickerQuery(event.currentTarget.value)}
+                placeholder="Search files..."
+                type="search"
+                value={filePickerQuery}
+              />
+              <div className="agent-file-picker-results">
+                {filePickerOptions.length ? (
+                  filePickerOptions.map((file) => (
+                    <button key={file.path} onClick={() => addPickerFile(file.path)} title={file.path} type="button">
+                      <strong>{projectFileDisplayName(file)}</strong>
+                      <span>{file.path}</span>
+                    </button>
+                  ))
+                ) : (
+                  <p>No matching files.</p>
+                )}
+              </div>
+            </section>
+          ) : null}
+          {showTopicCard ? (
+            <div ref={topicCardRef}>
+              <TopicConfirmationCard
+                projectSlug={projectSlug}
+                initialLabel={topicPrefill?.label ?? ""}
+                initialJustification={topicPrefill?.justification ?? ""}
+                conversationId={chat.activeConversation?.id ?? null}
+                isBuilding={build.isBuilding}
+                onCreated={handleTopicCreated}
+                onNavigateToTopics={onNavigateToTopics}
+                onDeepenNow={handleDeepenNow}
+                onCancel={() => {
+                  setShowTopicCard(false);
+                  setTopicPrefill(null);
+                  setBottomPanelHeight(null);
+                }}
+              />
+            </div>
+          ) : null}
+          <ChatComposer
+            attachedContextFiles={contextFiles}
+            contextFiles={projectFiles}
+            disabled={controlsDisabled}
+            draft={draft}
+            models={models}
+            onAddContextFile={addContextFile}
+            onChangeDraft={(event) => chat.setMessageDraft(event.currentTarget.value)}
+            onModelChange={onModelChange}
+            onRemoveContextFile={removeContextFile}
+            onSubmit={() => void sendMessage()}
+            placeholder="Ask the side-panel agent..."
+            modelAdjacentAction={{
+              ariaLabel: "New AI Chat",
+              disabled: controlsDisabled,
+              label: "New chat",
+              onClick: startNewConversation,
+              title: "New AI Chat",
+            }}
+            secondaryAction={{
+              disabled: controlsDisabled || !draft.trim() || !requestAiEditableFiles.length || !selectedModelId,
+              label: chat.sending ? "Working..." : "Propose edits",
+              onClick: proposeEdits,
+              title: !requestAiEditableFiles.length ? "Add AI Editable files to allow the agent to propose edits." : undefined,
+            }}
+            selectedModelId={selectedModelId}
+            showContextControls={false}
+            submitLabel="Ask"
+            tertiaryAction={{
+              ariaLabel: "Create a new research topic",
+              disabled: controlsDisabled,
+              label: showTopicCard ? "Cancel" : "+ Topic",
+              onClick: startNewTopicBrainstorm,
+              title: showTopicCard ? "Close topic card" : "Create a new research topic",
+            }}
+            textareaRef={textareaRef}
+          />
+        </div>
+      </div>
     </div>
   );
 }

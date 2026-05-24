@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import type { ChatMessage, ChatMessageFileEdit, EditProposal } from "../../contracts/api";
+import type { ChatMessage, ChatMessageFileEdit, ChatMessageTopicProposal, EditProposal } from "../../contracts/api";
 import { formatChatDateTime, renderMarkdownMessageContent } from "./chatRendering";
 
 function linkedProposalLabel(proposal: EditProposal) {
@@ -10,6 +10,7 @@ function linkedProposalLabel(proposal: EditProposal) {
 }
 
 function ChatMessageBubbleComponent({
+  createdTopicLabels,
   disabled,
   editDraft,
   editable = true,
@@ -19,10 +20,12 @@ function ChatMessageBubbleComponent({
   onCancelEdit,
   onEditDraftChange,
   onApplyFileEdit,
+  onCreateTopic,
   onSaveEdit,
   onStartEdit,
   onViewEditProposal,
 }: {
+  createdTopicLabels?: Set<string>;
   disabled: boolean;
   editDraft: string;
   editable?: boolean;
@@ -32,12 +35,14 @@ function ChatMessageBubbleComponent({
   onCancelEdit: () => void;
   onEditDraftChange: (value: string) => void;
   onApplyFileEdit?: (edit: ChatMessageFileEdit) => void | Promise<void>;
+  onCreateTopic?: (proposal: ChatMessageTopicProposal) => void;
   onSaveEdit: (message: ChatMessage) => void;
   onStartEdit: (message: ChatMessage) => void;
   onViewEditProposal?: (proposalId: string) => void;
 }) {
   const canEdit = editable && message.role === "user";
   const fileEdits = message.metadata?.fileEdits ?? [];
+  const topicProposals = message.metadata?.topicProposals ?? [];
   const viewableEditProposals = linkedEditProposals.filter((proposal) => proposal.status === "applied" || proposal.status === "partial");
   const [applyingEditKey, setApplyingEditKey] = useState<string | null>(null);
   const currentFilePath = message.context?.currentFile?.path;
@@ -158,6 +163,25 @@ function ChatMessageBubbleComponent({
               {linkedProposalLabel(proposal)}
             </button>
           ))}
+        </div>
+      ) : null}
+      {topicProposals.length ? (
+        <div className="chat-message-context" aria-label="Topic proposals">
+          {topicProposals.map((proposal) => {
+            const alreadyCreated = createdTopicLabels?.has(proposal.label.toLowerCase()) ?? false;
+            return (
+              <button
+                className={alreadyCreated ? "chat-topic-proposal-chip chat-topic-proposal-created" : "chat-topic-proposal-chip"}
+                disabled={disabled || alreadyCreated}
+                key={proposal.label}
+                onClick={() => onCreateTopic?.(proposal)}
+                title={alreadyCreated ? `Topic already created: ${proposal.label}` : (proposal.justification || `Create topic: ${proposal.label}`)}
+                type="button"
+              >
+                {alreadyCreated ? "✅" : "🔬"} {alreadyCreated ? "Topic created:" : "Create topic:"} {proposal.label}
+              </button>
+            );
+          })}
         </div>
       ) : null}
       {message.status === "streaming" ? <span className="agent-event-status">Streaming</span> : null}

@@ -1,7 +1,7 @@
 import { buildLogQuerySchema, createProjectBodySchema, parseRequestBody, parseRequestQuery, updateProjectUiStateBodySchema } from "./requestSchemas.js";
 import { readQuestions, answerQuestion, getQuestionCounts } from "../services/questionsService.js";
 
-import { readTopics, resolveTopic, updateTopic, setDisposition, getTopicCounts, toggleDeepenQueue, queueAllShallowForDeepen, getDeepenLog } from "../services/topicsService.js";
+import { readTopics, resolveTopic, updateTopic, setDisposition, getTopicCounts, toggleDeepenQueue, queueAllShallowForDeepen, getDeepenLog, createTopic } from "../services/topicsService.js";
 
 function extractOpenQuestions(content) {
   const lines = content.split("\n");
@@ -234,6 +234,29 @@ export function registerProjectRoutes(app, {
   app.get("/api/projects/:projectSlug/topics", async (request, response, next) => {
     try {
       response.json(await readTopics(request.project.path));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/topics/create", async (request, response, next) => {
+    try {
+      const label = request.body?.label;
+      const justification = request.body?.justification || null;
+      const conversationId = request.body?.conversationId || null;
+      const force = Boolean(request.body?.force);
+
+      if (!label || typeof label !== "string" || !label.trim()) {
+        throw httpError("Topic label is required.", 400, "missing_label");
+      }
+
+      const result = await createTopic(request.project.path, { label, justification, conversationId, force });
+
+      if (result.error) {
+        throw httpError(result.error, 400, "create_topic_error");
+      }
+
+      response.status(result.created ? 201 : 200).json(result);
     } catch (error) {
       next(error);
     }

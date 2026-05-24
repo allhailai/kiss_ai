@@ -13,6 +13,7 @@ import { extractApplyResultFromText, extractConceptualDiffsFromText, firstTagCon
 import { normalizeChatContext } from "./chatContext.js";
 import { prepareCursorAgentRun } from "./cursorAgentRun.js";
 import { buildGitDiffPromptEntries } from "./gitDiffPrompt.js";
+import { readTopics } from "./topicsService.js";
 
 const maxPromptFileBytes = 24 * 1024;
 const maxPromptHistoryMessages = 40;
@@ -227,12 +228,13 @@ async function readCurrentFileContext({ project, readTextFile, currentFile }) {
 }
 
 async function createChatPrompt({ project, conversation, readTextFile, displayProjectName, readProjectHarness }) {
-  const [harness, goal, inputs, outputs, openQuestions] = await Promise.all([
+  const [harness, goal, inputs, outputs, openQuestions, topicsData] = await Promise.all([
     readProjectHarness(project.path),
     readOptionalProjectText(readTextFile, project.path, "human_goal_requirements.md"),
     readOptionalProjectText(readTextFile, project.path, "human_input_requirements.md"),
     readOptionalProjectText(readTextFile, project.path, "human_output_requirements.md"),
     readOptionalProjectText(readTextFile, project.path, "human_open_questions.md"),
+    readTopics(project.path).catch(() => ({ topics: [] })),
   ]);
   const currentFile = [...conversation.messages].reverse().find((message) => message.context?.currentFile)?.context?.currentFile ?? null;
   const aiEditableFiles = conversation.fileContext?.ai_editable_files ?? [];
@@ -274,6 +276,10 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     ai_editable_files: authorizedAiEditableFiles,
     rejected_ai_editable_files: rejectedAiEditableFiles,
     context_files: contextFileResults,
+    existingTopics: topicsData.topics
+      .filter((t) => t.state !== "deprecated")
+      .map((t) => ({ label: t.label, state: t.state, disposition: t.disposition }))
+      .slice(0, 100),
   };
 
   const prompt = [
@@ -294,6 +300,19 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     "- Stay inside the current project. User-selected source context files are limited to human_*.md, inputs_human/, inputs_ai/, and outputs_ai/.",
     "- Do not expose hidden chain-of-thought. Provide concise reasoning summaries when useful.",
     "- If context is missing, say what is missing and suggest the next best step.",
+    "",
+    "Topic Creation Guidance:",
+    "- The payload includes existingTopics: a list of current research topics with their labels, states, and dispositions.",
+    "- If the user says they want to create a new topic, research this more, make this a topic, or similar intent:",
+    "  1. Ask 1-2 brief clarifying questions to refine the concept (scope and relevance).",
+    "  2. Before confirming, check the existingTopics list. If similar topics exist, explicitly caution the user:",
+    "     List the similar topics by name and state, then ask: 'Is this different from those topics?'",
+    "  3. Once the user confirms the topic concept, include a topic proposal tag in your response:",
+    "     <topic_proposal><label>Topic Name Here</label><justification>One or two sentences explaining why this is a distinct research topic and how it connects to project goals.</justification></topic_proposal>",
+    "  4. The UI will render this as a clickable 'Create Topic' button that pre-fills the topic creation form.",
+    "- You may include a topic_proposal tag proactively after brainstorming if the user has clearly expressed intent to create the topic.",
+    "- Do NOT create topics yourself. The tag creates a UI button; the user clicks it to finalize.",
+    "- If the user seems to be developing a concept that could be a research topic but hasn't asked to create one, do not output a topic_proposal tag (that feature comes later).",
     "",
     conversationSummaryText(conversation),
     "",
@@ -529,6 +548,21 @@ export function extractFileEditProposals(rawText, conversation, authorizedEditab
     .filter(Boolean);
 }
 
+/**
+ * Extract topic proposals from assistant text.
+ * The agent outputs <topic_proposal><label>...</label><justification>...</justification></topic_proposal> tags.
+ */
+export function extractTopicProposals(rawText) {
+  return allTagContent(rawText, "topic_proposal")
+    .map((proposalText) => {
+      const label = firstTagContent(proposalText, "label");
+      const justification = firstTagContent(proposalText, "justification");
+      if (!label) return null;
+      return { label, justification: justification || "" };
+    })
+    .filter(Boolean);
+}
+
 export function createChatAgentService({
   appendMessage,
   displayProjectName,
@@ -586,6 +620,7 @@ export function createChatAgentService({
 
         const assistantText = assistantTextChunks.join("");
         const fileEdits = extractFileEditProposals(assistantText, conversationWithUser, authorizedEditablePaths);
+        const topicProposals = extractTopicProposals(assistantText);
         const finalConversation = await appendMessage(project, conversationId, {
           id: assistantMessageId,
           role: "assistant",
@@ -596,6 +631,7 @@ export function createChatAgentService({
           metadata: {
             cursorApiKeySource: cursorApiKey.source,
             ...(fileEdits.length ? { fileEdits } : {}),
+            ...(topicProposals.length ? { topicProposals } : {}),
           },
         });
         const nextConversation =

@@ -17,6 +17,7 @@ export function RightPanelOrchestrator({
   draftSeed,
   fileWorkspaceProjectFiles,
   projectChat,
+  projectSlug,
   rebuildWorkspace,
   resize,
   rightPanel,
@@ -37,6 +38,7 @@ export function RightPanelOrchestrator({
   draftSeed: { id: string; draft: string } | null;
   fileWorkspaceProjectFiles: ProjectFile[];
   projectChat: ProjectChatController;
+  projectSlug: string;
   rebuildWorkspace: {
     models: RebuildModel[];
     rebuild: RebuildState | null;
@@ -83,8 +85,10 @@ export function RightPanelOrchestrator({
             onContextFilesChange={projectChat.setContextFiles}
             onModelChange={rebuildWorkspace.setSelectedModelId}
             onModifyCurrentFile={() => agentFileContext.currentFile && agentFileContext.addEditableFile(agentFileContext.currentFile.path)}
+            onNavigateToTopics={() => route.navigateTo("topics")}
             onRemoveAiEditableFile={agentFileContext.removeAiEditableFile}
             projectFiles={fileWorkspaceProjectFiles}
+            projectSlug={projectSlug}
             selectedModelId={rebuildWorkspace.selectedModelId}
           />
         </div>

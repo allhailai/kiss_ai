@@ -288,6 +288,99 @@ export async function getDeepenLog(projectPath) {
 }
 
 /**
+ * Create a new user-originated topic.
+ * Skips the seed stage — the user has already confirmed intent.
+ * Returns { created, topic, duplicates }.
+ * If duplicates are found and force is false, created will be false.
+ */
+export async function createTopic(projectPath, { label, justification, conversationId, force = false }) {
+  if (!label || typeof label !== "string" || !label.trim()) {
+    return { created: false, topic: null, duplicates: [], error: "Topic label is required." };
+  }
+
+  const trimmedLabel = label.trim();
+  const data = await readTopics(projectPath);
+  const existing = data.topics;
+
+  // Fuzzy duplicate detection: case-insensitive substring + normalized comparison
+  const normalizedLabel = trimmedLabel.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+  const duplicates = existing
+    .filter((t) => t.state !== "deprecated")
+    .filter((t) => {
+      const normalizedExisting = (t.label || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+      // Exact match
+      if (normalizedExisting === normalizedLabel) return true;
+      // Substring containment (either direction)
+      if (normalizedExisting.length > 3 && normalizedLabel.length > 3) {
+        if (normalizedExisting.includes(normalizedLabel) || normalizedLabel.includes(normalizedExisting)) return true;
+      }
+      return false;
+    })
+    .map((t) => ({
+      id: t.id,
+      label: t.label,
+      state: t.state,
+      disposition: t.disposition,
+    }));
+
+  if (duplicates.length > 0 && !force) {
+    return { created: false, topic: null, duplicates };
+  }
+
+  const now = new Date().toISOString();
+  const topicId = `topic_${trimmedLabel.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 60)}_${Date.now().toString(36)}`;
+
+  const newTopic = {
+    id: topicId,
+    label: trimmedLabel,
+    state: "shallow",
+    confidence: "high",
+    depth: 0,
+    parent: null,
+    children: [],
+    cluster: null,
+    wiki_page: null,
+    sources: [],
+    depends_on: [],
+    outputs: [],
+    justification: justification
+      ? { goal_support: justification, graph_support: "", questions_addressed: [] }
+      : null,
+    discovery: {
+      origin: "user_chat",
+      discovered_at: now,
+      discovered_from: conversationId || null,
+      reason: justification || "User-created topic from AI chat",
+      last_deepened: null,
+      deepening_count: 0,
+    },
+    deprecation: null,
+    metrics: {
+      source_count: 0,
+      cross_references: 0,
+      word_count: 0,
+      last_updated: now,
+    },
+    coverage_gaps: [],
+    disposition: null,
+    disposition_at: null,
+    disposition_note: null,
+    queued_for_deepen: false,
+    deepen_log: [],
+  };
+
+  data.topics.push(newTopic);
+  await writeTopics(projectPath, data.topics, data.clusters);
+
+  return {
+    created: true,
+    topic: newTopic,
+    duplicates: duplicates.length > 0 ? duplicates : [],
+    acknowledgedDuplicates: force && duplicates.length > 0,
+  };
+}
+
+/**
  * Migrate legacy topic_graph.json format to v2 topics.json format.
  * Existing topics become "shallow" state with "high" confidence.
  */

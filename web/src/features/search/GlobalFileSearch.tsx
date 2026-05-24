@@ -1,5 +1,6 @@
 import { useEffect, useState, type KeyboardEvent } from "react";
 import type { ProjectFile } from "../../contracts/api";
+import { useBuildContext } from "../../app/contexts/BuildContext";
 import { api } from "../../data/apiClient";
 import { errorMessage } from "../../domain/errors";
 import { fileBasename, humanizePathSegment } from "../../domain/files";
@@ -113,6 +114,8 @@ export function GlobalFileSearch({
   }
 
   const showResults = isOpen && Boolean(trimmedQuery);
+  const { isBuilding, openBuildPanel, rebuild } = useBuildContext();
+  const buildPhaseLabel = rebuild?.buildPhase ? rebuild.buildPhase.replace(/_/g, " ") : null;
 
   return (
     <header className="global-topbar">
@@ -188,6 +191,18 @@ export function GlobalFileSearch({
         </div>
       </div>
       <div className="global-topbar-actions">
+        {isBuilding ? (
+          <button
+            aria-label="Build in progress — click to view"
+            className="global-activity-badge"
+            onClick={openBuildPanel}
+            title={buildPhaseLabel ? `Building: ${buildPhaseLabel}` : "Build in progress"}
+            type="button"
+          >
+            <span className="global-activity-dot" aria-hidden="true" />
+            <span>{buildPhaseLabel || "Working…"}</span>
+          </button>
+        ) : null}
         <button
           aria-label="Open technical dashboard"
           className="technical-dashboard-button"

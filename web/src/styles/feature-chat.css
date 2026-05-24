@@ -810,3 +810,360 @@
 .chat-markdown th {
   background: color-mix(in srgb, var(--color-background) 74%, white);
 }
+
+/* ── Tertiary action (+ Topic button) ── */
+
+.chat-composer-tertiary-action {
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 8%, white);
+  color: var(--color-accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.chat-composer-tertiary-action:hover,
+.chat-composer-tertiary-action:focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 14%, white);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+  outline-offset: 2px;
+}
+
+.chat-composer-tertiary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ── Topic Confirmation Card ── */
+
+.topic-confirmation-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 32%, var(--color-border));
+  border-left: 3px solid var(--color-accent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-accent) 4%, var(--color-surface));
+  animation: topic-card-appear 0.2s ease-out;
+}
+
+@keyframes topic-card-appear {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.topic-confirmation-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topic-confirmation-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.topic-confirmation-header strong {
+  color: var(--color-primary);
+  font-size: 0.92rem;
+}
+
+.topic-confirmation-field {
+  display: grid;
+  gap: 4px;
+}
+
+.topic-confirmation-field label {
+  color: var(--color-secondary);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.topic-confirmation-field small {
+  font-weight: 400;
+}
+
+.topic-confirmation-field input,
+.topic-confirmation-field textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: white;
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  outline: 2px solid transparent;
+  transition: border-color 0.12s ease, outline-color 0.12s ease;
+}
+
+.topic-confirmation-field input:focus,
+.topic-confirmation-field textarea:focus {
+  border-color: color-mix(in srgb, var(--color-accent) 54%, var(--color-border));
+  outline-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.topic-confirmation-field textarea {
+  resize: vertical;
+  min-height: 44px;
+}
+
+.topic-confirmation-error {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-danger) 8%, white);
+  color: var(--color-danger);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.topic-confirmation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.topic-confirmation-deepen-button,
+.topic-confirmation-create-button,
+.topic-confirmation-cancel-button,
+.topic-confirmation-view-button {
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: background 0.12s ease;
+}
+
+.topic-confirmation-deepen-button {
+  background: var(--color-accent);
+  color: white;
+}
+
+.topic-confirmation-deepen-button:hover,
+.topic-confirmation-deepen-button:focus-visible {
+  background: color-mix(in srgb, var(--color-accent) 85%, black);
+}
+
+.topic-confirmation-create-button {
+  border: 1px solid var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, white);
+  color: var(--color-accent);
+}
+
+.topic-confirmation-create-button:hover,
+.topic-confirmation-create-button:focus-visible {
+  background: color-mix(in srgb, var(--color-accent) 16%, white);
+}
+
+.topic-confirmation-cancel-button {
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-background) 72%, white);
+  color: var(--color-secondary);
+}
+
+.topic-confirmation-cancel-button:hover,
+.topic-confirmation-cancel-button:focus-visible {
+  background: color-mix(in srgb, var(--color-secondary) 8%, white);
+}
+
+.topic-confirmation-view-button {
+  border: 1px solid var(--color-secondary);
+  background: color-mix(in srgb, var(--color-secondary) 8%, white);
+  color: var(--color-secondary);
+}
+
+.topic-confirmation-view-button:hover,
+.topic-confirmation-view-button:focus-visible {
+  background: color-mix(in srgb, var(--color-secondary) 14%, white);
+}
+
+.topic-confirmation-deepen-button:disabled,
+.topic-confirmation-create-button:disabled,
+.topic-confirmation-cancel-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ── Duplicates state ── */
+
+.topic-confirmation-duplicates {
+  border-left-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 4%, var(--color-surface));
+}
+
+.topic-confirmation-notice {
+  margin: 0;
+  color: var(--color-secondary);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.topic-confirmation-duplicate-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.topic-confirmation-duplicate-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: white;
+  font-size: 0.84rem;
+}
+
+.topic-confirmation-duplicate-list li strong {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topic-confirmation-force-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.topic-confirmation-force-label input[type="checkbox"] {
+  accent-color: var(--color-accent);
+}
+
+/* ── Created state ── */
+
+.topic-confirmation-created {
+  border-left-color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 4%, var(--color-surface));
+}
+
+.topic-confirmation-created-label {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: 0.94rem;
+  font-weight: 700;
+}
+
+.topic-confirmation-created-meta {
+  display: flex;
+  gap: 12px;
+  color: var(--color-secondary);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+/* ── Topic Proposal Chip (in chat message) ── */
+
+.chat-topic-proposal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 8%, white);
+  color: var(--color-accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.1s ease;
+}
+
+.chat-topic-proposal-chip:hover,
+.chat-topic-proposal-chip:focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 16%, white);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+  outline-offset: 2px;
+  transform: translateY(-1px);
+}
+
+.chat-topic-proposal-chip:active {
+  transform: translateY(0);
+}
+
+.chat-topic-proposal-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+}
+
+/* ── Created chip state ── */
+
+.chat-topic-proposal-created {
+  border-color: color-mix(in srgb, var(--color-success) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-success) 8%, white);
+  color: var(--color-success);
+  cursor: default;
+  opacity: 0.85;
+}
+
+.chat-topic-proposal-created:disabled {
+  opacity: 0.85;
+}
+
+.chat-topic-proposal-created:hover,
+.chat-topic-proposal-created:focus-visible {
+  border-color: color-mix(in srgb, var(--color-success) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-success) 8%, white);
+  outline: none;
+  transform: none;
+}
+
+/* ── Deepening state (topic card) ── */
+
+.topic-confirmation-deepening {
+  border-left-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 4%, var(--color-surface));
+}
+
+.topic-confirmation-deepening-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-accent);
+  font-weight: 700;
+  animation: topic-deepen-pulse 1.6s ease-in-out infinite;
+}
+
+.topic-confirmation-deepening-badge::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  animation: topic-deepen-dot 1.6s ease-in-out infinite;
+}
+
+@keyframes topic-deepen-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+@keyframes topic-deepen-dot {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}

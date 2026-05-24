@@ -185,8 +185,8 @@
   min-height: 0;
   height: 100%;
   display: grid;
-  grid-template-rows: auto minmax(160px, 1fr) auto auto auto auto auto auto;
-  gap: 8px;
+  grid-template-rows: auto minmax(120px, 1fr) auto;
+  gap: 0;
   overflow: hidden;
 }
 
@@ -398,6 +398,76 @@
 
 .right-panel-agent-thread > .chat-thread-shell {
   width: 100%;
+}
+
+/* ── Agent Bottom Panel (resizable) ── */
+
+.agent-bottom-panel {
+  min-width: 0;
+  min-height: 120px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border-top: 1px solid var(--color-border);
+}
+
+.agent-bottom-panel-handle {
+  height: 8px;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  user-select: none;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
+.agent-bottom-panel-handle::after {
+  content: "";
+  width: 36px;
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-secondary) 28%, var(--color-border));
+  transition: background 0.12s ease, width 0.12s ease;
+}
+
+.agent-bottom-panel-handle:hover::after,
+.agent-bottom-panel-handle:active::after {
+  width: 52px;
+  background: color-mix(in srgb, var(--color-secondary) 54%, var(--color-border));
+}
+
+.agent-bottom-panel-content {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 0 4px;
+}
+
+.agent-bottom-panel-content > .topic-confirmation-card,
+.agent-bottom-panel-content > div > .topic-confirmation-card {
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-bottom-panel-content > .topic-confirmation-card .topic-confirmation-field:last-of-type,
+.agent-bottom-panel-content > div > .topic-confirmation-card .topic-confirmation-field:last-of-type {
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-bottom-panel-content > .topic-confirmation-card .topic-confirmation-field:last-of-type textarea,
+.agent-bottom-panel-content > div > .topic-confirmation-card .topic-confirmation-field:last-of-type textarea {
+  flex: 0 0 auto;
+  min-height: 60px;
 }
 
 .agent-file-context {

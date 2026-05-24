@@ -259,6 +259,28 @@ export type Topic = {
   }>;
 };
 
+export type TopicDuplicate = {
+  id: string;
+  label: string;
+  state: TopicState;
+  disposition: TopicDisposition;
+};
+
+export type CreateTopicRequest = {
+  label: string;
+  justification?: string | null;
+  conversationId?: string | null;
+  force?: boolean;
+};
+
+export type CreateTopicResponse = {
+  created: boolean;
+  topic: Topic | null;
+  duplicates: TopicDuplicate[];
+  acknowledgedDuplicates?: boolean;
+  error?: string;
+};
+
 export type CreateProjectRequest = {
   name: string;
   slug?: string;
@@ -448,8 +470,14 @@ export type ChatMessageFileEdit = {
   status: "proposed" | "applied" | "rejected" | "failed";
 };
 
+export type ChatMessageTopicProposal = {
+  label: string;
+  justification: string;
+};
+
 export type ChatMessageMetadata = Record<string, unknown> & {
   fileEdits?: ChatMessageFileEdit[];
+  topicProposals?: ChatMessageTopicProposal[];
 };
 
 export type ConceptualDiff = {

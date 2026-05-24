@@ -1,6 +1,8 @@
 import type {
   BuildLogState,
   CreateProjectRequest,
+  CreateTopicRequest,
+  CreateTopicResponse,
   DesignState,
   ProjectListResponse,
   ProjectStatus,
@@ -9,6 +11,7 @@ import type {
   QuestionAiAssistRequest,
   QuestionAiAssistResponse,
   RebuildModelsResponse,
+  Topic,
   UpdateProjectUiStateRequest,
 } from "../contracts/api";
 import { projectBase, request } from "./request";
@@ -40,6 +43,13 @@ export const projectsApi = {
   },
   questionAiAssist: (projectSlug: string, body: QuestionAiAssistRequest) =>
     request<QuestionAiAssistResponse>(`${projectBase(projectSlug)}/questions/ai-assist`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  topics: (projectSlug: string) =>
+    request<{ topics: Topic[] }>(`${projectBase(projectSlug)}/topics`),
+  createTopic: (projectSlug: string, body: CreateTopicRequest) =>
+    request<CreateTopicResponse>(`${projectBase(projectSlug)}/topics/create`, {
       method: "POST",
       body: JSON.stringify(body),
     }),
