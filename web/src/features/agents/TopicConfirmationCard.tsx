@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { CreateTopicResponse, TopicDuplicate } from "../../contracts/api";
 import { projectsApi } from "../../data/projectsApi";
 
@@ -22,7 +22,7 @@ type TopicConfirmationCardProps = {
   onCancel?: () => void;
 };
 
-type CardState = "input" | "duplicates" | "created" | "error";
+type CardState = "input" | "checking" | "exists" | "duplicates" | "created" | "error";
 
 export function TopicConfirmationCard({
   projectSlug,
@@ -44,6 +44,36 @@ export function TopicConfirmationCard({
   const [error, setError] = useState<string | null>(null);
   const [createdTopic, setCreatedTopic] = useState<CreateTopicResponse | null>(null);
   const [requestedDeepen, setRequestedDeepen] = useState(false);
+  const [existingMatch, setExistingMatch] = useState<{ id: string; label: string; state: string } | null>(null);
+
+  // On mount: if a label is pre-filled, check if this topic already exists
+  useEffect(() => {
+    if (!initialLabel.trim()) return;
+    let cancelled = false;
+    setCardState("checking");
+
+    projectsApi.topics(projectSlug)
+      .then((data) => {
+        if (cancelled) return;
+        const normalizedInput = initialLabel.trim().toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+        const match = data.topics.find((t) => {
+          if (t.state === "deprecated") return false;
+          const normalizedExisting = (t.label || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+          return normalizedExisting === normalizedInput;
+        });
+        if (match) {
+          setExistingMatch({ id: match.id, label: match.label, state: match.state });
+          setCardState("exists");
+        } else {
+          setCardState("input");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCardState("input");
+      });
+
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally runs only on mount
 
   const handleCreate = useCallback(
     async (force: boolean, andDeepen: boolean) => {
@@ -90,6 +120,56 @@ export function TopicConfirmationCard({
     },
     [label, justification, conversationId, projectSlug, saving, onCreated, onDeepenNow],
   );
+
+  // ── "Already exists" state ──
+  if (cardState === "exists" && existingMatch) {
+    return (
+      <div className="topic-confirmation-card topic-confirmation-created">
+        <div className="topic-confirmation-header">
+          <span className="topic-confirmation-icon" aria-hidden="true">✅</span>
+          <strong>Topic Already Exists</strong>
+        </div>
+        <p className="topic-confirmation-created-label">{existingMatch.label}</p>
+        <div className="topic-confirmation-created-meta">
+          <span>State: {existingMatch.state.charAt(0).toUpperCase() + existingMatch.state.slice(1)}</span>
+          <span>This topic was already created.</span>
+        </div>
+        <div className="topic-confirmation-actions">
+          {onDeepenNow && (existingMatch.state === "shallow" || existingMatch.state === "deep") ? (
+            <button
+              className="topic-confirmation-deepen-button"
+              disabled={isBuilding}
+              onClick={() => {
+                setRequestedDeepen(true);
+                onDeepenNow(existingMatch.id);
+              }}
+              type="button"
+            >
+              {isBuilding ? "Build running…" : "Go Deeper Now"}
+            </button>
+          ) : null}
+          {onNavigateToTopics ? (
+            <button
+              className="topic-confirmation-view-button"
+              onClick={onNavigateToTopics}
+              type="button"
+            >
+              View in Topics
+            </button>
+          ) : null}
+          {onCancel ? (
+            <button
+              className="topic-confirmation-cancel-button"
+              onClick={onCancel}
+              type="button"
+            >
+              Dismiss
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   if (cardState === "created" && createdTopic?.topic) {
     const deepeningActive = requestedDeepen && isBuilding;
@@ -138,14 +218,24 @@ export function TopicConfirmationCard({
   }
 
   if (cardState === "duplicates") {
+    // Check if any duplicate is an exact match (not just similar)
+    const normalizedInput = label.trim().toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+    const hasExactMatch = duplicates.some((dup) => {
+      const normalizedDup = (dup.label || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+      return normalizedDup === normalizedInput;
+    });
+
     return (
       <div className="topic-confirmation-card topic-confirmation-duplicates">
         <div className="topic-confirmation-header">
-          <span className="topic-confirmation-icon" aria-hidden="true">⚠️</span>
-          <strong>Potentially Similar Topics</strong>
+          <span className="topic-confirmation-icon" aria-hidden="true">{hasExactMatch ? "✅" : "⚠️"}</span>
+          <strong>{hasExactMatch ? "Topic Already Exists" : "Potentially Similar Topics"}</strong>
         </div>
         <p className="topic-confirmation-notice">
-          These existing topics look similar to &ldquo;{label.trim()}&rdquo;:
+          {hasExactMatch
+            ? <>This topic already exists as &ldquo;{label.trim()}&rdquo;:</>
+            : <>These existing topics look similar to &ldquo;{label.trim()}&rdquo;:</>
+          }
         </p>
         <ul className="topic-confirmation-duplicate-list">
           {duplicates.map((dup) => (
@@ -186,6 +276,17 @@ export function TopicConfirmationCard({
           >
             Go Back
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (cardState === "checking") {
+    return (
+      <div className="topic-confirmation-card">
+        <div className="topic-confirmation-header">
+          <span className="topic-confirmation-icon" aria-hidden="true">🔬</span>
+          <strong>Checking topic…</strong>
         </div>
       </div>
     );
