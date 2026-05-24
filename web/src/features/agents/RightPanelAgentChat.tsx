@@ -101,6 +101,7 @@ export function RightPanelAgentChat({
   onModelChange,
   onModifyCurrentFile,
   onNavigateToArtifact,
+  onRebuildArtifact,
   onRemoveAiEditableFile,
   projectFiles,
   projectSlug,
@@ -119,6 +120,7 @@ export function RightPanelAgentChat({
   onModelChange: (modelId: string) => void;
   onModifyCurrentFile: () => void;
   onNavigateToArtifact: (slug: string) => void;
+  onRebuildArtifact: (slug: string, modelId: string) => void;
   onRemoveAiEditableFile: (path: string) => void;
   projectFiles: ProjectFile[];
   projectSlug: string;
@@ -133,6 +135,7 @@ export function RightPanelAgentChat({
   const [artifactSession, setArtifactSession] = useState<ArtifactSession>({ phase: "idle" });
   const [activeArtifactProposal, setActiveArtifactProposal] = useState<ChatMessageArtifactProposal | null>(null);
   const [createdArtifactTitles, setCreatedArtifactTitles] = useState<Set<string>>(new Set());
+  const [specModified, setSpecModified] = useState(false);
   const [bottomPanelHeight, setBottomPanelHeight] = useState<number | null>(null);
   const bottomDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const bottomPanelRef = useRef<HTMLDivElement | null>(null);
@@ -340,6 +343,10 @@ export function RightPanelAgentChat({
     setArtifactSession({ phase: "editing", slug, name });
     setActiveArtifactProposal(null);
     setCreatedArtifactTitles((prev) => new Set(prev).add(name.toLowerCase()));
+    setSpecModified(false);
+    // Auto-add the spec file as AI Editable so the agent can edit it
+    const specPath = `artifacts/artifact_specs/${slug}.artifact.md`;
+    onAddContextFile(specPath);
     onNavigateToArtifact(slug);
   };
 
@@ -351,6 +358,12 @@ export function RightPanelAgentChat({
     }
     setArtifactSession({ phase: "idle" });
     setActiveArtifactProposal(null);
+    setSpecModified(false);
+  };
+
+  const handleRebuildArtifact = () => {
+    if (artifactSession.phase !== "editing" || !selectedModelId) return;
+    onRebuildArtifact(artifactSession.slug, selectedModelId);
   };
 
   // Composer mode based on artifact session phase
@@ -426,22 +439,6 @@ export function RightPanelAgentChat({
         </div>
       </div>
       <div className="right-panel-agent-thread">
-        {artifactSession.phase === "editing" ? (
-          <div className="agent-artifact-editing-banner">
-            <span className="agent-artifact-editing-icon" aria-hidden="true">✏️</span>
-            <span className="agent-artifact-editing-label">
-              Editing: <strong>{artifactSession.name}</strong>
-            </span>
-            <button
-              aria-label="Exit artifact editing mode"
-              className="agent-artifact-editing-close"
-              onClick={exitEditingMode}
-              type="button"
-            >
-              ✕
-            </button>
-          </div>
-        ) : null}
         <ChatThread
           createdArtifactTitles={createdArtifactTitles}
           disabled={chat.sending}
@@ -670,6 +667,32 @@ export function RightPanelAgentChat({
                 selectedBuildModelId={selectedModelId}
               />
             </section>
+          ) : null}
+          {artifactSession.phase === "editing" ? (
+            <div className="agent-artifact-editing-banner">
+              <span className="agent-artifact-editing-icon" aria-hidden="true">✏️</span>
+              <span className="agent-artifact-editing-label">
+                Editing: <strong>{artifactSession.name}</strong>
+              </span>
+              <button
+                aria-label="Rebuild artifact"
+                className="agent-artifact-rebuild-button"
+                disabled={controlsDisabled || !selectedModelId}
+                onClick={handleRebuildArtifact}
+                title="Rebuild the artifact with the current spec"
+                type="button"
+              >
+                🔄 Rebuild
+              </button>
+              <button
+                aria-label="Exit artifact editing mode"
+                className="agent-artifact-editing-close"
+                onClick={exitEditingMode}
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
           ) : null}
           <ChatComposer
             attachedContextFiles={contextFiles}
