@@ -715,7 +715,7 @@ export function RightPanelAgentChat({
             }}
             secondaryAction={{
               disabled: controlsDisabled || !draft.trim() || !requestAiEditableFiles.length || !selectedModelId,
-              label: chat.sending ? "Working..." : "Propose edits",
+              label: "Propose edits",
               onClick: proposeEdits,
               title: !requestAiEditableFiles.length ? "Add AI Editable files to allow the agent to propose edits." : undefined,
             }}
