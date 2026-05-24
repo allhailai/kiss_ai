@@ -713,12 +713,11 @@ export function RightPanelAgentChat({
               onClick: startNewConversation,
               title: "New AI Chat",
             }}
-            secondaryAction={{
-              disabled: controlsDisabled || !draft.trim() || !requestAiEditableFiles.length || !selectedModelId,
+            secondaryAction={requestAiEditableFiles.length ? {
+              disabled: controlsDisabled || !draft.trim() || !selectedModelId,
               label: "Propose edits",
               onClick: proposeEdits,
-              title: !requestAiEditableFiles.length ? "Add AI Editable files to allow the agent to propose edits." : undefined,
-            }}
+            } : undefined}
             tertiaryAction={artifactSession.phase === "designing" ? {
               ariaLabel: "Create artifact now",
               disabled: controlsDisabled,
