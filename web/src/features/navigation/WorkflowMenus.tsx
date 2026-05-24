@@ -9,9 +9,9 @@ import {
 } from "../../navigation/navigationModel";
 import { projectPathPrefixes } from "../../domain/projectPaths";
 import { type View } from "../../navigation/views";
-import type { ProjectFile } from "../../contracts/api";
+import type { ArtifactSpec, ProjectFile } from "../../contracts/api";
 import { FileTreeNav } from "./FileTreeNav";
-import { artifactsApi, type ArtifactSpec } from "../../data/artifactsApi";
+import { artifactsApi } from "../../data/artifactsApi";
 
 const defaultExpandedSections = new Set<SimplifiedNavSectionId>(
   simplifiedNavSections.filter((section) => section.id !== "source-data").map((section) => section.id),

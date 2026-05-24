@@ -6,7 +6,7 @@ The web UI should preserve a persistent left panel for orientation and affordanc
 
 Initial state:
 - The left panel shows the main workflow menu.
-- Main workflow items include `Dashboard`, `Requirements`, `Inputs`, `Outputs`, `Annotations`, `Design`, and `Rebuild`.
+- Main workflow items include `Dashboard`, `Define`, `Source Data`, `Results`, `Artifacts`, and `Build`.
 - The design should allow more workflow items to be added over time without requiring a second permanent navigation column.
 
 After a user selects a main workflow:
@@ -16,12 +16,11 @@ After a user selects a main workflow:
 - The main document or task view receives the remaining horizontal space.
 
 Examples:
-- `Requirements` shows the human-owned requirement files in the left panel.
-- `Inputs` shows human input files in the left panel.
-- `Outputs` shows generated output files in the left panel.
-- `Annotations` shows AI-managed files that can be edited as annotations.
-- `Design` shows design identity controls or files.
-- `Rebuild` shows rebuild status and actions without a separate file list unless needed later.
+- `Define` shows the project requirement files and AI review controls in the left panel.
+- `Source Data` shows human and AI source files in the left panel.
+- `Results` shows generated output files in the left panel.
+- `Artifacts` shows artifact specs and build status in the left panel.
+- `Build` shows build status and actions without a separate file list unless needed later.
 
 Principles:
 - Do not use a permanent main navigation column plus a permanent sub-navigation column.
@@ -52,11 +51,11 @@ Principles:
 
 For the local Vite lab, hash routes are acceptable because they preserve refresh behavior without requiring server-side route fallback. Example routes:
 - `#/dashboard`
-- `#/requirements/human_goal_requirements.md`
-- `#/outputs/outputs_ai/macro_snapshot.md`
-- `#/annotations/outputs_ai/wiki/topics/macro_current_snapshot.md`
-- `#/design/human_design_identity.md`
-- `#/rebuild`
+- `#/p/<slug>/requirements/project.md`
+- `#/p/<slug>/outputs/outputs_ai/macro_snapshot.md`
+- `#/p/<slug>/artifacts/<artifact-slug>`
+- `#/p/<slug>/design/human_design_identity.md`
+- `#/p/<slug>/build`
 
 ## Save, Undo, and Revert Workflow
 

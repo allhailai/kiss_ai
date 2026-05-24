@@ -41,6 +41,7 @@ src/
   features/   User-facing workflow components
   navigation/ Route, view, and navigation models
   shared/     App-neutral shared UI components and types
+  styles/     CSS per feature, design tokens, reset, and responsive utilities
 ```
 
 ## App Layer
@@ -109,6 +110,7 @@ workspace orchestration.
 Current features:
 
 - `agents/`
+- `artifacts/`
 - `chat/`
 - `dashboard/`
 - `design/`
@@ -181,6 +183,8 @@ Use this checklist before adding an import:
 - `navigation/` owns route and view policy without importing UI workflows.
 - `shared/` remains app-neutral and does not call APIs.
 - `features/` do not import `app/` or other feature implementations.
+  Exception: features may import from `app/contexts/` to consume shared
+  React Contexts (e.g., toast, build state, route context).
 - `app/` may compose root-level feature entrypoints, but should not reach into
   deeper feature implementation subdirectories.
 - Server routes use services; approved service/runtime modules own filesystem,
@@ -197,8 +201,6 @@ These areas are intentionally not split during routine cleanup because their
 blast radius is higher than a local edit:
 
 - `app/App.tsx`: shell composition, right-panel wiring, and workflow roots.
-- `app/hooks/useProjectChat.ts`: chat state, proposal lifecycle, and streaming
-  recovery.
 - `features/agents/RightPanelAgentChat.tsx`: agent chat panel composition and
   conceptual diff review wiring.
 - `features/rebuild/BuildProjectRightPanel.tsx`: rebuild right panel composition,
@@ -208,9 +210,17 @@ blast radius is higher than a local edit:
   queue, and disposition controls.
 - `features/navigation/FileTreeNav.tsx`: navigation tree with inline edit,
   drag-drop, and folder management.
+- `features/navigation/WorkflowMenus.tsx`: workflow menu structure and inline
+  status badges.
 - `features/questions/QuestionsWorkspace.tsx`: question management with AI
   assist, answer flow, and priority sorting.
+- `features/artifacts/ArtifactsView.tsx`: combined artifact list, detail
+  editor, and build action surface.
 - `contracts/api.ts`: shared API contract hub.
+- `server/services/agentJobs.js`: rebuild, deepen, and artifact build
+  pipeline orchestration.
+- `server/services/artifactService.js`: artifact spec CRUD, source
+  resolution, prompt templates, and auto-generation.
 
 When one of these files needs significant change, first identify the stable
 sub-boundary being extracted, add or update focused tests, and keep the public

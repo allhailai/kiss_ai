@@ -1,29 +1,5 @@
-import type { RebuildState } from "../contracts/api";
+import type { ArtifactSpec, ArtifactSpecDetail, AvailableSourceFile, RebuildState } from "../contracts/api";
 import { projectBase, request } from "./request";
-
-export type ArtifactSpec = {
-  slug: string;
-  name: string;
-  format: string;
-  lifecycle: string;
-  modelId: string | null;
-  sources: string[];
-  lastBuilt: string | null;
-  status: string;
-};
-
-export type ArtifactSpecDetail = {
-  slug: string;
-  frontmatter: Record<string, unknown>;
-  body: string;
-  rawContent: string;
-};
-
-export type AvailableSourceFile = {
-  relativePath: string;
-  kind: string;
-  name: string;
-};
 
 export const artifactsApi = {
   list: (projectSlug: string) =>

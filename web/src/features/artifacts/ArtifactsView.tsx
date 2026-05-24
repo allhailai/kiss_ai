@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { artifactsApi, type ArtifactSpec, type ArtifactSpecDetail, type AvailableSourceFile } from "../../data/artifactsApi";
+import { artifactsApi } from "../../data/artifactsApi";
 import { useRouteContext } from "../../app/contexts/RouteContext";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
 import { groupModelsByTier, modelDisplayName, modelTierLabels } from "../../domain/modelLabels";
-import type { FileContent, RebuildModel } from "../../contracts/api";
-import "./artifacts.css";
+import type { ArtifactSpec, ArtifactSpecDetail, AvailableSourceFile, FileContent, RebuildModel } from "../../contracts/api";
 
 type Tab = "spec" | "preview";
 

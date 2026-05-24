@@ -65,8 +65,8 @@ const srcRules = [
   },
   {
     from: "data",
-    test: (specifier, filePath) => importsLayer(specifier, filePath, "app") || importsLayer(specifier, filePath, "features"),
-    message: "data modules must not import app or feature modules",
+    test: (specifier, filePath) => importsLayer(specifier, filePath, "app") || importsLayer(specifier, filePath, "features") || importsLayer(specifier, filePath, "navigation"),
+    message: "data modules must not import app, feature, or navigation modules",
   },
   {
     from: "domain",
@@ -80,6 +80,11 @@ const srcRules = [
       specifier === "../api" ||
       specifier === "../../api",
     message: "domain modules must stay pure and must not import React, app, feature, editor, or transport modules",
+  },
+  {
+    from: "domain",
+    test: (specifier, filePath) => importsLayer(specifier, filePath, "navigation"),
+    message: "domain modules must not import navigation modules (route/view policy should not leak into pure helpers)",
   },
   {
     from: "editor",
@@ -125,6 +130,7 @@ const serverRules = [
       (specifier === "node:fs" || specifier === "node:fs/promises") &&
       !new Set([
         "agentJobs.js",
+        "artifactService.js",
         "buildLogs.js",
         "buildScope.js",
         "conversations.js",
@@ -144,7 +150,7 @@ const serverRules = [
   {
     from: "services",
     test: (specifier, filePath) =>
-      specifier === "node:child_process" && !new Set(["buildScope.js", "cursorModels.js", "designIdentity.js", "projectFiles.js"]).has(path.basename(filePath)),
+      specifier === "node:child_process" && !new Set(["buildScope.js", "cursorModels.js", "designIdentity.js", "kissAiUpdate.js", "projectFiles.js"]).has(path.basename(filePath)),
     message: "server services must keep process execution in approved service modules",
   },
   {

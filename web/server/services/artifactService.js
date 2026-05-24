@@ -347,6 +347,15 @@ export function getArtifactBuildPath(projectPath, slug) {
 }
 
 /**
+ * Read the built artifact HTML for preview.
+ * Throws with code ENOENT if the artifact has not been built yet.
+ */
+export async function readArtifactPreviewHtml(projectPath, slug) {
+  const htmlPath = path.join(projectPath, ARTIFACT_BUILDS_DIR, slug, "index.html");
+  return await fs.readFile(htmlPath, "utf8");
+}
+
+/**
  * Slugify a name into a valid artifact slug.
  */
 export function slugifyArtifactName(name) {

@@ -215,6 +215,25 @@ export const editProposalParamsSchema = conversationParamsSchema.extend({
   proposalId: z.string().trim().regex(/^[a-zA-Z0-9_-]+$/, "Invalid edit proposal id."),
 });
 
+export const createArtifactBodySchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  frontmatter: z.record(z.unknown()).optional(),
+  body: z.string().max(100_000).optional().default(""),
+});
+
+export const updateArtifactBodySchema = z
+  .object({
+    frontmatter: z.record(z.unknown()).optional(),
+    body: z.string().max(100_000).optional(),
+  })
+  .refine((value) => value.frontmatter !== undefined || value.body !== undefined, {
+    message: "Provide frontmatter and/or body to update.",
+  });
+
+export const buildArtifactBodySchema = z.object({
+  modelId: optionalTrimmedString(160),
+});
+
 function parseRequestPart(schema, value, httpError, label) {
   const result = schema.safeParse(value);
   if (result.success) return result.data;

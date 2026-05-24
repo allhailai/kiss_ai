@@ -21,7 +21,7 @@ This is an internal backlog for maintainers. It is not setup or usage documentat
 -----------------------------------------------------
 
 - Curated Outputs
-  - Webpages
+  - ~~Webpages~~ ✅ Shipped — artifacts feature
   - PDFs
   - PPT
 

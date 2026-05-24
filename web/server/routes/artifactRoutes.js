@@ -1,15 +1,19 @@
-import fs from "node:fs/promises";
-import path from "node:path";
 import {
   listArtifactSpecs,
   listAvailableSourceFiles,
   readArtifactSpec,
   writeArtifactSpec,
   deleteArtifactSpec,
-  getArtifactBuildPath,
+  readArtifactPreviewHtml,
   slugifyArtifactName,
   ensureArtifactDirs,
 } from "../services/artifactService.js";
+import {
+  createArtifactBodySchema,
+  updateArtifactBodySchema,
+  buildArtifactBodySchema,
+  parseRequestBody,
+} from "./requestSchemas.js";
 
 export function registerArtifactRoutes(app, { httpError, startArtifactBuild }) {
   // List all artifact specs + build status
@@ -46,8 +50,7 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild }) {
   // Create a new artifact spec
   app.post("/api/projects/:projectSlug/artifacts", async (request, response, next) => {
     try {
-      const { name, frontmatter = {}, body = "" } = request.body || {};
-      if (!name) return next(httpError("Artifact name is required.", 400, "artifact_name_required"));
+      const { name, frontmatter = {}, body = "" } = parseRequestBody(createArtifactBodySchema, request.body, httpError);
 
       const slug = slugifyArtifactName(name);
 
@@ -71,10 +74,7 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild }) {
   // Update an artifact spec
   app.put("/api/projects/:projectSlug/artifacts/:artifactSlug", async (request, response, next) => {
     try {
-      const { frontmatter, body } = request.body || {};
-      if (!frontmatter && body === undefined) {
-        return next(httpError("Provide frontmatter and/or body to update.", 400, "artifact_update_empty"));
-      }
+      const { frontmatter, body } = parseRequestBody(updateArtifactBodySchema, request.body, httpError);
 
       // Read existing spec to merge
       let existing;
@@ -108,7 +108,8 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild }) {
   // Trigger artifact build (single)
   app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/build", async (request, response, next) => {
     try {
-      let modelId = request.body?.modelId ?? null;
+      const { modelId: requestedModelId } = parseRequestBody(buildArtifactBodySchema, request.body || {}, httpError);
+      let modelId = requestedModelId ?? null;
       // Fall back to the model saved in the artifact spec's frontmatter
       if (!modelId) {
         try {
@@ -126,18 +127,10 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild }) {
   // Serve built artifact HTML
   app.get("/api/projects/:projectSlug/artifacts/:artifactSlug/preview", async (request, response, next) => {
     try {
-      const buildDir = getArtifactBuildPath(request.project.path, request.params.artifactSlug);
-      const htmlPath = path.join(buildDir, "index.html");
-
-      try {
-        await fs.access(htmlPath);
-      } catch {
-        return next(httpError("Artifact has not been built yet.", 404, "artifact_not_built"));
-      }
-
-      const html = await fs.readFile(htmlPath, "utf8");
+      const html = await readArtifactPreviewHtml(request.project.path, request.params.artifactSlug);
       response.type("html").send(html);
     } catch (error) {
+      if (error.code === "ENOENT") return next(httpError("Artifact has not been built yet.", 404, "artifact_not_built"));
       next(error);
     }
   });
