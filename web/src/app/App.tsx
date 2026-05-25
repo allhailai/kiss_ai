@@ -143,7 +143,15 @@ export function App() {
     }
 
     fileWorkspace.setDraft(decision.content);
-    toastWorkspace.setNotice(decision.message);
+
+    // Auto-save artifact spec edits — these should persist immediately
+    // rather than requiring the user to manually save
+    if (edit.path.includes("artifact_specs/")) {
+      await fileWorkspace.saveSelected();
+      toastWorkspace.setNotice("Artifact spec updated and saved.");
+    } else {
+      toastWorkspace.setNotice(decision.message);
+    }
     return true;
   };
   const startRebuildWithRequirementsCheck = () => {
