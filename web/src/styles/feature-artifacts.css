@@ -77,6 +77,40 @@
   border-style: solid;
 }
 
+/* ── Stale Notice (inline in tabs area) ──────────────────────── */
+
+.artifacts-stale-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-warning, #e0a030) 10%, transparent);
+  color: var(--color-warning, #e0a030);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.artifacts-stale-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.artifacts-stale-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-warning, #e0a030) 15%, transparent);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .artifacts-actions {
   display: flex;
   align-items: center;

@@ -7,7 +7,6 @@ import { BuildProjectRightPanel } from "../features/rebuild/BuildProjectRightPan
 import { RightPanelAgentChat } from "../features/agents/RightPanelAgentChat";
 import { RightPanelModeSwitch } from "../shared/rightPanel/RightPanelModeSwitch";
 import type { ProjectStatus } from "../contracts/api";
-import { artifactsApi } from "../data/artifactsApi";
 
 
 
@@ -87,9 +86,8 @@ export function RightPanelOrchestrator({
             onModelChange={rebuildWorkspace.setSelectedModelId}
             onModifyCurrentFile={() => agentFileContext.currentFile && agentFileContext.addEditableFile(agentFileContext.currentFile.path)}
             onNavigateToArtifact={(slug) => route.navigateTo("artifacts", slug)}
-            onRebuildArtifact={(slug, modelId) => {
-              void artifactsApi.build(projectSlug, slug, modelId);
-              route.navigateTo("artifacts", slug);
+            onRebuildArtifact={(slug, _modelId) => {
+              route.navigateTo("artifacts", slug, { action: "build" });
             }}
             onRemoveAiEditableFile={agentFileContext.removeAiEditableFile}
             projectFiles={fileWorkspaceProjectFiles}

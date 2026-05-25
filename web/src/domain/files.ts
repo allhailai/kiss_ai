@@ -153,3 +153,11 @@ export function humanizePathSegment(pathSegment: string) {
 export function humanizeFilePath(path: string) {
   return path.split("/").filter(Boolean).map(humanizePathSegment).join(" / ");
 }
+
+const ARTIFACT_SPEC_PATTERN = /^artifacts\/artifact_specs\/(.+)\.artifact\.md$/;
+
+export function parseArtifactSpecPath(path: string): { slug: string; name: string } | null {
+  const match = path.match(ARTIFACT_SPEC_PATTERN);
+  if (!match?.[1]) return null;
+  return { slug: match[1], name: humanizePathSegment(match[1]) };
+}

@@ -107,6 +107,7 @@ export function MainContentArea({
       ) : null}
       {route.view === "artifacts" ? (
         <ArtifactsView
+          lastProjectBuildAt={rebuildWorkspace.status?.lastSuccessfulRunAt ?? null}
           models={rebuildWorkspace.models}
           projectSlug={projectSlug}
           selectedBuildModelId={rebuildWorkspace.selectedModelId}

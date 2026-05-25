@@ -11,7 +11,7 @@ import type {
   RebuildModel,
 } from "../../contracts/api";
 import { artifactsApi } from "../../data/artifactsApi";
-import { labeledFileDisplayName, projectFileDisplayName, uniqueByPathPreserveFirst } from "../../domain/files";
+import { labeledFileDisplayName, parseArtifactSpecPath, projectFileDisplayName, uniqueByPathPreserveFirst } from "../../domain/files";
 import { ChatComposer } from "../../shared/chat/ChatComposer";
 import { ChatThread } from "../../shared/chat/ChatThread";
 import { formatChatDateTime } from "../../shared/chat/chatRendering";
@@ -20,7 +20,6 @@ import { ConceptualDiffReviewItem } from "../../shared/conceptualDiff/Conceptual
 
 type ArtifactSession =
   | { phase: "idle" }
-  | { phase: "designing" }
   | { phase: "editing"; slug: string; name: string };
 
 type RightPanelChatController = {
@@ -164,6 +163,16 @@ export function RightPanelAgentChat({
   }, []);
   const currentFileInAiEditable = Boolean(currentFile && aiEditableFiles.some((file) => file.path === currentFile.path));
   const currentFileInContext = Boolean(currentFile && contextFiles.some((file) => file.path === currentFile.path));
+  const currentFileArtifact = useMemo(() => currentFile ? parseArtifactSpecPath(currentFile.path) : null, [currentFile]);
+
+  // Restore artifact editing mode on page refresh:
+  // If the current file is an artifact spec that's already in AI editable files,
+  // the user was in editing mode before the refresh. Re-enter it.
+  useEffect(() => {
+    if (artifactSession.phase !== "idle") return;
+    if (!currentFileArtifact || !currentFileInAiEditable) return;
+    setArtifactSession({ phase: "editing", slug: currentFileArtifact.slug, name: currentFileArtifact.name });
+  }, [currentFileArtifact, currentFileInAiEditable]); // eslint-disable-line react-hooks/exhaustive-deps
   const visibleEditableTargets = useMemo<VisibleEditableTarget[]>(() => {
     const seen = new Set<string>();
     const targets: VisibleEditableTarget[] = [];
@@ -259,6 +268,13 @@ export function RightPanelAgentChat({
     onModifyCurrentFile();
   };
 
+  const enterArtifactEditingMode = () => {
+    if (!currentFile || !currentFileArtifact || controlsDisabled) return;
+    setArtifactSession({ phase: "editing", slug: currentFileArtifact.slug, name: currentFileArtifact.name });
+    onModifyCurrentFile();
+    onNavigateToArtifact(currentFileArtifact.slug);
+  };
+
   const sendMessage = async () => {
     const content = draft.trim();
     if (!content || controlsDisabled) return;
@@ -319,21 +335,7 @@ export function RightPanelAgentChat({
     void chat.applyEditProposal(proposal.id);
   };
 
-  const startArtifactSession = () => {
-    if (controlsDisabled) return;
-    setArtifactSession({ phase: "designing" });
-    void chat.sendMessage({
-      content: "[System: The user wants to create an artifact. Evaluate the conversation so far and guide them through artifact design. If you have enough context, present a proposal. If not, ask targeted questions about purpose, audience, key sections, and content.]",
-      context: currentFile ? { currentFile } : undefined,
-    });
-  };
 
-  const forceCreateArtifact = () => {
-    if (controlsDisabled) return;
-    void chat.sendMessage({
-      content: "[System: Create the artifact now with the information gathered so far. Do your best with available context. Emit an artifact_proposal in your response.]",
-    });
-  };
 
   const handleCreateArtifact = (proposal: ChatMessageArtifactProposal) => {
     setActiveArtifactProposal(proposal);
@@ -500,9 +502,21 @@ export function RightPanelAgentChat({
                       </button>
                     ) : null}
                     {currentFile.editable && !currentFileInAiEditable ? (
-                      <button className="agent-current-file-action-button" disabled={controlsDisabled} onClick={pinCurrentFileAsEditableTarget} type="button">
-                        + Editable
-                      </button>
+                      currentFileArtifact && artifactSession.phase !== "editing" ? (
+                        <button
+                          className="agent-current-file-action-button agent-current-file-edit-artifact"
+                          disabled={controlsDisabled}
+                          onClick={enterArtifactEditingMode}
+                          title={`Edit artifact: ${currentFileArtifact.name}`}
+                          type="button"
+                        >
+                          + Edit
+                        </button>
+                      ) : (
+                        <button className="agent-current-file-action-button" disabled={controlsDisabled} onClick={pinCurrentFileAsEditableTarget} type="button">
+                          + Editable
+                        </button>
+                      )
                     ) : null}
                   </div>
                 ) : null}
@@ -668,37 +682,39 @@ export function RightPanelAgentChat({
               />
             </section>
           ) : null}
-          {artifactSession.phase === "editing" ? (
-            <div className="agent-artifact-editing-banner">
-              <span className="agent-artifact-editing-icon" aria-hidden="true">✏️</span>
-              <span className="agent-artifact-editing-label">
-                Editing: <strong>{artifactSession.name}</strong>
-              </span>
-              <button
-                aria-label="Rebuild artifact"
-                className="agent-artifact-rebuild-button"
-                disabled={controlsDisabled || !selectedModelId}
-                onClick={handleRebuildArtifact}
-                title="Rebuild the artifact with the current spec"
-                type="button"
-              >
-                🔄 Rebuild
-              </button>
-              <button
-                aria-label="Exit artifact editing mode"
-                className="agent-artifact-editing-close"
-                onClick={exitEditingMode}
-                type="button"
-              >
-                ✕
-              </button>
-            </div>
-          ) : null}
           <ChatComposer
             attachedContextFiles={contextFiles}
             contextFiles={projectFiles}
             disabled={controlsDisabled}
             draft={draft}
+            editingIndicator={
+              artifactSession.phase === "editing" ? (
+                <div className="agent-artifact-editing-banner">
+                  <span className="agent-artifact-editing-icon" aria-hidden="true">✏️</span>
+                  <span className="agent-artifact-editing-label">
+                    Editing: <strong>{artifactSession.name}</strong>
+                  </span>
+                  <button
+                    aria-label="Rebuild artifact"
+                    className="agent-artifact-rebuild-button"
+                    disabled={controlsDisabled || !selectedModelId}
+                    onClick={handleRebuildArtifact}
+                    title="Rebuild the artifact with the current spec"
+                    type="button"
+                  >
+                    🔄 Rebuild
+                  </button>
+                  <button
+                    aria-label="Exit artifact editing mode"
+                    className="agent-artifact-editing-close"
+                    onClick={exitEditingMode}
+                    type="button"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : undefined
+            }
             models={models}
             onAddContextFile={addContextFile}
             onChangeDraft={(event) => chat.setMessageDraft(event.currentTarget.value)}
@@ -713,23 +729,10 @@ export function RightPanelAgentChat({
               onClick: startNewConversation,
               title: "New AI Chat",
             }}
-            secondaryAction={requestAiEditableFiles.length ? {
+            secondaryAction={requestAiEditableFiles.length && artifactSession.phase !== "editing" ? {
               disabled: controlsDisabled || !draft.trim() || !selectedModelId,
               label: "Propose edits",
               onClick: proposeEdits,
-            } : undefined}
-            tertiaryAction={artifactSession.phase === "designing" ? {
-              ariaLabel: "Create artifact now",
-              disabled: controlsDisabled,
-              label: "Create Artifact",
-              onClick: forceCreateArtifact,
-              title: "Create the artifact with information gathered so far",
-            } : artifactSession.phase === "idle" ? {
-              ariaLabel: "Suggest an artifact from this conversation",
-              disabled: controlsDisabled,
-              label: "Suggest Artifact",
-              onClick: startArtifactSession,
-              title: "Ask the agent to design an artifact from this conversation",
             } : undefined}
             selectedModelId={selectedModelId}
             showContextControls={false}

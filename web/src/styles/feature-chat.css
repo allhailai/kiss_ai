@@ -368,6 +368,33 @@
   font-weight: 700;
 }
 
+/* ── Artifact spec apply button (pronounced CTA) ─────────────── */
+
+.chat-artifact-apply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--color-accent, #c87040);
+  border-radius: 10px;
+  background: var(--color-accent, #c87040);
+  color: var(--color-on-accent, #fff);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s, box-shadow 0.15s;
+}
+
+.chat-artifact-apply-btn:hover:not(:disabled) {
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent, #c87040) 35%, transparent);
+}
+
+.chat-artifact-apply-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .chat-message-context code,
 .chat-context-chip {
   border: 1px solid var(--color-border);
@@ -825,32 +852,6 @@
   background: color-mix(in srgb, var(--color-background) 74%, white);
 }
 
-/* ── Tertiary action (+ Topic button) ── */
-
-.chat-composer-tertiary-action {
-  padding: 6px 10px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-accent) 8%, white);
-  color: var(--color-accent);
-  font-size: 0.78rem;
-  font-weight: 800;
-  white-space: nowrap;
-  transition: background 0.12s ease, border-color 0.12s ease;
-}
-
-.chat-composer-tertiary-action:hover,
-.chat-composer-tertiary-action:focus-visible {
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 14%, white);
-  outline: 2px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
-  outline-offset: 2px;
-}
-
-.chat-composer-tertiary-action:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
 
 /* ── Topic Confirmation Card ── */
 
@@ -1372,7 +1373,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  border-top: 1px solid color-mix(in srgb, var(--color-secondary) 24%, var(--color-border));
+  border-bottom: 1px solid color-mix(in srgb, var(--color-secondary) 24%, var(--color-border));
   background: color-mix(in srgb, var(--color-secondary) 6%, var(--color-surface));
   animation: artifact-card-appear 0.2s ease-out;
 }

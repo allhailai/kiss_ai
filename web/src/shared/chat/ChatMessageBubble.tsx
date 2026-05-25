@@ -119,7 +119,7 @@ function ChatMessageBubbleComponent({
       ) : (
         <div className="chat-message-content">{renderMarkdownMessageContent(message.content)}</div>
       )}
-      {fileEdits.some((edit) => edit.path.includes("artifact_specs/")) ? (
+      {fileEdits.some((edit) => edit.path.includes("artifact_specs/") && edit.status === "applied") ? (
         <div className="chat-spec-edit-indicator" aria-label="Spec updated">
           <span aria-hidden="true">✅</span> Spec updated
         </div>
@@ -140,7 +140,7 @@ function ChatMessageBubbleComponent({
             const applying = applyingEditKey === editKey;
             return (
               <button
-                className="chat-context-chip"
+                className={edit.path.includes("artifact_specs/") ? "chat-artifact-apply-btn" : "chat-context-chip"}
                 disabled={disabled || applying || !edit.proposedContent || edit.status !== "proposed"}
                 key={editKey}
                 onClick={() => {
@@ -154,7 +154,9 @@ function ChatMessageBubbleComponent({
                 title={edit.summary}
                 type="button"
               >
-                {applying ? "Applying draft edit:" : "Apply draft edit:"} {edit.path}
+              {edit.path.includes("artifact_specs/")
+                ? (applying ? "Applying…" : "Update Artifact \u2014 with the change above?")
+                : (<>{applying ? "Applying draft edit:" : "Apply draft edit:"} {edit.path}</>)}
               </button>
             );
           })}

@@ -1,6 +1,8 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import matter from "gray-matter";
+import { readTopics } from "./topicsService.js";
 
 const ARTIFACT_SPECS_DIR = "artifacts/artifact_specs";
 const ARTIFACT_BUILDS_DIR = "artifacts/builds";
@@ -99,6 +101,12 @@ export async function listArtifactSpecs(projectPath) {
     return [];
   }
 
+  // Pre-load topics data once for deepening checks
+  let topicsData = null;
+  try {
+    topicsData = await readTopics(projectPath);
+  } catch { /* topics may not exist */ }
+
   const specs = [];
 
   for (const file of files) {
@@ -110,6 +118,19 @@ export async function listArtifactSpecs(projectPath) {
       const raw = await fs.readFile(path.join(specsDir, file), "utf8");
       const { data: frontmatter } = matter(raw);
       const buildStatus = await getArtifactBuildStatus(projectPath, slug);
+      const lastBuilt = buildStatus?.builtAt || null;
+
+      // Compute current spec content hash
+      const currentSpecHash = crypto.createHash("sha256").update(raw).digest("hex");
+
+      // Check if linked topic was deepened after last build
+      let sourcesUpdatedSinceLastBuild = false;
+      if (lastBuilt && topicsData && frontmatter.topicId) {
+        const linkedTopic = topicsData.topics.find((t) => t.id === frontmatter.topicId);
+        if (linkedTopic?.discovery?.last_deepened && linkedTopic.discovery.last_deepened > lastBuilt) {
+          sourcesUpdatedSinceLastBuild = true;
+        }
+      }
 
       specs.push({
         slug,
@@ -118,8 +139,11 @@ export async function listArtifactSpecs(projectPath) {
         lifecycle: frontmatter.lifecycle || "manual",
         modelId: frontmatter.modelId || null,
         sources: frontmatter.sources || [],
-        lastBuilt: buildStatus?.builtAt || null,
+        lastBuilt,
         status: buildStatus ? "built" : "not_built",
+        buildSpecHash: buildStatus?.specHash || null,
+        currentSpecHash,
+        sourcesUpdatedSinceLastBuild,
       });
     } catch {
       specs.push({
@@ -131,6 +155,9 @@ export async function listArtifactSpecs(projectPath) {
         sources: [],
         lastBuilt: null,
         status: "error",
+        buildSpecHash: null,
+        currentSpecHash: null,
+        sourcesUpdatedSinceLastBuild: false,
       });
     }
   }

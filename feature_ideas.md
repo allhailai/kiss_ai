@@ -1,5 +1,10 @@
 # Maintainer Feature Ideas
 
+- AI Agent -> create an artifact from the conversation
+
+
+
+
 This is an internal backlog for maintainers. It is not setup or usage documentation for external users. Start with [`README.md`](README.md) for the public onboarding path.
 
 - Need the agent proposed conceptual diffs to have Apply Proposal button in the chat area not beneath the conceptual diffs - easy to not see / miss that button

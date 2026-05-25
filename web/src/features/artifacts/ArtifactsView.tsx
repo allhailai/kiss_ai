@@ -7,7 +7,7 @@ import type { ArtifactSpec, ArtifactSpecDetail, AvailableSourceFile, FileContent
 
 type Tab = "spec" | "preview";
 
-export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selectedFileContent }: { models: RebuildModel[]; projectSlug: string; selectedBuildModelId: string; selectedFileContent: FileContent | null }) {
+export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selectedBuildModelId, selectedFileContent }: { lastProjectBuildAt: string | null; models: RebuildModel[]; projectSlug: string; selectedBuildModelId: string; selectedFileContent: FileContent | null }) {
   const route = useRouteContext();
 
   // The selected artifact slug comes from the URL (deep link)
@@ -27,6 +27,18 @@ export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selec
 
   const selectedArtifact = artifacts.find((a) => a.slug === selectedSlug) ?? null;
   const isBuilt = selectedArtifact?.status === "built";
+
+  // Compute staleness reasons
+  const staleReasons = useMemo(() => {
+    const reasons: string[] = [];
+    if (!selectedArtifact?.lastBuilt) return reasons;
+    const built = selectedArtifact.lastBuilt;
+    if (lastProjectBuildAt && lastProjectBuildAt > built) reasons.push("build");
+    if (selectedArtifact.sourcesUpdatedSinceLastBuild) reasons.push("deepened");
+    if (selectedArtifact.buildSpecHash && selectedArtifact.currentSpecHash
+        && selectedArtifact.buildSpecHash !== selectedArtifact.currentSpecHash) reasons.push("spec");
+    return reasons;
+  }, [selectedArtifact, lastProjectBuildAt]);
 
   // Default to preview tab when selecting an artifact that's already built
   const prevSlugRef = useRef<string | null>(null);
@@ -55,7 +67,7 @@ export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selec
 
   useEffect(() => {
     void refreshList();
-  }, [refreshList]);
+  }, [refreshList, lastProjectBuildAt]);
 
   // Load spec detail when selectedSlug changes
   useEffect(() => {
@@ -91,6 +103,8 @@ export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selec
         setEditBody(spec.body);
         flash("Spec updated by agent");
       }).catch(() => {});
+      // Refresh the artifacts list so staleness signals (currentSpecHash) update
+      void refreshList();
     }
     lastContentHashRef.current = selectedFileContent.contentHash;
   }, [projectSlug, selectedSlug, selectedFileContent?.contentHash, selectedFileContent?.path]);
@@ -103,6 +117,24 @@ export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selec
     };
   }, []);
 
+  // Handle "build" action from route context (e.g. Rebuild button in side panel)
+  const pendingBuildRef = useRef(false);
+  useEffect(() => {
+    if (route.context.action === "build" && selectedSlug) {
+      pendingBuildRef.current = true;
+      // Clear the context so it doesn't re-trigger
+      route.navigateTo("artifacts", selectedSlug, {});
+    }
+  }, [route.context.action, selectedSlug]);
+
+  // Fire the build once the spec is loaded
+  useEffect(() => {
+    if (pendingBuildRef.current && selectedSpec && selectedSlug && !building) {
+      pendingBuildRef.current = false;
+      void handleBuild();
+    }
+  }, [selectedSpec, selectedSlug, building]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleSave() {
     if (!selectedSlug || !selectedSpec) return;
     setSaving(true);
@@ -111,6 +143,8 @@ export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selec
       flash("Saved");
       const updated = await artifactsApi.read(projectSlug, selectedSlug);
       setSelectedSpec(updated);
+      // Refresh the artifacts list so staleness signals (currentSpecHash) update
+      void refreshList();
     } catch (error) {
       flash(error instanceof Error ? error.message : "Failed to save");
     } finally {
@@ -239,6 +273,15 @@ export function ArtifactsView({ models, projectSlug, selectedBuildModelId, selec
             >
               ↗ Pop Out
             </button>
+          ) : null}
+          {staleReasons.length > 0 ? (
+            <span className="artifacts-stale-notice" title="The preview may not reflect recent changes">
+              <span className="artifacts-stale-icon">⚠</span>
+              Stale:
+              {staleReasons.includes("build") ? <span className="artifacts-stale-pill">🔨 Build</span> : null}
+              {staleReasons.includes("deepened") ? <span className="artifacts-stale-pill">📚 Deepened</span> : null}
+              {staleReasons.includes("spec") ? <span className="artifacts-stale-pill">✏️ Spec</span> : null}
+            </span>
           ) : null}
         </div>
         <div className="artifacts-actions">

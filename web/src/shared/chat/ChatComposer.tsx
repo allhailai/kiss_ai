@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import type { ChatContextFile, ProjectFile, RebuildModel } from "../../contracts/api";
 import { labeledFileDisplayName, projectFileDisplayName } from "../../domain/files";
 import { CompactModelPicker } from "../CompactModelPicker";
@@ -26,6 +26,7 @@ export function ChatComposer({
   attachedContextFiles,
   disabled,
   draft,
+  editingIndicator,
   models,
   onAddContextFile = () => undefined,
   onChangeDraft,
@@ -38,13 +39,13 @@ export function ChatComposer({
   secondaryAction,
   showContextControls = true,
   submitLabel = "Send",
-  tertiaryAction,
   textareaRef,
 }: {
   contextFiles: ProjectFile[];
   attachedContextFiles: ChatContextFile[];
   disabled: boolean;
   draft: string;
+  editingIndicator?: ReactNode;
   models: RebuildModel[];
   onAddContextFile?: (path: string) => void;
   onChangeDraft: (event: ChangeEvent<HTMLTextAreaElement>) => void;
@@ -68,13 +69,6 @@ export function ChatComposer({
   };
   showContextControls?: boolean;
   submitLabel?: string;
-  tertiaryAction?: {
-    ariaLabel?: string;
-    disabled: boolean;
-    label: string;
-    onClick: () => void;
-    title?: string;
-  };
   textareaRef: RefObject<HTMLTextAreaElement | null>;
 }) {
   const [contextPickerOpen, setContextPickerOpen] = useState(false);
@@ -168,6 +162,7 @@ export function ChatComposer({
         onSubmit();
       }}
     >
+      {editingIndicator}
       <textarea
         disabled={disabled}
         ref={textareaRef}
@@ -270,18 +265,7 @@ export function ChatComposer({
               <span aria-hidden="true" className="chat-composer-action-spacer" />
             </>
           ) : null}
-          {tertiaryAction ? (
-            <button
-              aria-label={tertiaryAction.ariaLabel}
-              className="chat-composer-tertiary-action"
-              disabled={tertiaryAction.disabled}
-              onClick={tertiaryAction.onClick}
-              title={tertiaryAction.title}
-              type="button"
-            >
-              {tertiaryAction.label}
-            </button>
-          ) : null}
+
           <button disabled={disabled || !draft.trim() || !selectedModelId} type="submit">
             {disabled ? "Sending..." : submitLabel}
           </button>

@@ -705,6 +705,9 @@ export type ArtifactSpec = {
   sources: string[];
   lastBuilt: string | null;
   status: string;
+  buildSpecHash: string | null;
+  currentSpecHash: string | null;
+  sourcesUpdatedSinceLastBuild: boolean;
 };
 
 export type ArtifactSpecDetail = {

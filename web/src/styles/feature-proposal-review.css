@@ -286,6 +286,24 @@
   outline-offset: 2px;
 }
 
+/* ── Visually distinct "+ Edit" artifact button ── */
+
+.agent-current-file-edit-artifact {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: white;
+  font-weight: 900;
+}
+
+.agent-current-file-edit-artifact:hover:not(:disabled),
+.agent-current-file-edit-artifact:focus-visible {
+  border-color: color-mix(in srgb, var(--color-accent) 85%, black);
+  background: color-mix(in srgb, var(--color-accent) 85%, black);
+  color: white;
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 28%, transparent);
+  outline-offset: 2px;
+}
+
 .agent-current-file-help {
   position: absolute;
   right: 9px;
