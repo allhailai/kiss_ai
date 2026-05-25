@@ -101,9 +101,12 @@ export async function discoverDirectedOutputs(projectPath) {
 /**
  * Build the source mapping for all directed outputs in a project.
  *
- * Every output gets the full set of wiki pages and digest files.
- * The agent decides relevance at synthesis time based on the file's
- * topic and the wiki/digest content.
+ * Uses topics.json to create topic-aware mappings: each output gets only the
+ * wiki pages, digests, and sources from its related topics (plus dependencies).
+ * Non-primary wiki pages are listed in a discoveryWikiPages array so the agent
+ * can read them on demand if cross-cutting context is needed.
+ *
+ * Falls back to "give everything" when an output has no topic mapping.
  *
  * @param {string} projectPath - absolute path to project root
  * @returns {Promise<{ mapping: Object, discoverySource: string }>}
@@ -125,18 +128,78 @@ export async function buildSourceMapping(projectPath) {
   }
 
   // Discover all digest files
-  const digestFiles = await listMdFilesRecursive(
+  const allDigestFiles = await listMdFilesRecursive(
     path.join(projectPath, "sources", "digests"),
     projectPath,
   );
 
-  // Build the mapping — every output gets everything
+  // Read topics.json for topic-to-output mapping
+  const topicsData = await readJsonSafe(path.join(projectPath, ".build", "topics.json"));
+  const topicsList = topicsData?.topics ?? [];
+
+  // Build reverse index: output path → list of topics that reference it
+  const outputToTopics = new Map();
+  for (const topic of topicsList) {
+    for (const output of topic.outputs ?? []) {
+      if (!outputToTopics.has(output)) outputToTopics.set(output, []);
+      outputToTopics.get(output).push(topic);
+    }
+  }
+
+  // Build the mapping — topic-aware when possible, full fallback otherwise
   const mapping = {};
 
   for (const outputFile of directedOutputs) {
+    const relatedTopics = outputToTopics.get(outputFile) ?? [];
+
+    if (relatedTopics.length === 0) {
+      // Fallback: no topic mapping found — give everything (safe default)
+      mapping[outputFile] = {
+        wikiPages: [...resolvedWikiPages],
+        digestFiles: [...allDigestFiles],
+        discoveryWikiPages: [],
+      };
+      continue;
+    }
+
+    // Collect wiki pages from related topics
+    const topicWikiPages = new Set();
+    const topicDigestFiles = new Set();
+
+    for (const topic of relatedTopics) {
+      // Direct wiki page
+      if (topic.wiki_page) topicWikiPages.add(topic.wiki_page);
+
+      // Wiki pages from dependencies
+      for (const depId of topic.depends_on ?? []) {
+        const dep = topicsList.find((t) => t.id === depId);
+        if (dep?.wiki_page) topicWikiPages.add(dep.wiki_page);
+      }
+
+      // Source digests from the topic's sources
+      for (const source of topic.sources ?? []) {
+        const sourcePath = typeof source === "string" ? source : source.path;
+        if (!sourcePath) continue;
+        // Map source path to its digest file (digest filenames match source filenames)
+        const baseName = path.basename(sourcePath);
+        const digestPath = allDigestFiles.find((d) => path.basename(d) === baseName);
+        if (digestPath) topicDigestFiles.add(digestPath);
+      }
+    }
+
+    // Always include the wiki index for context
+    const indexPage = resolvedWikiPages.find((p) => p.endsWith("_index.md"));
+    if (indexPage) topicWikiPages.add(indexPage);
+
+    // Collect remaining wiki pages as discovery inventory (not pre-loaded)
+    const discoveryWikiPages = resolvedWikiPages.filter((p) => !topicWikiPages.has(p));
+
     mapping[outputFile] = {
-      wikiPages: [...resolvedWikiPages],
-      digestFiles: digestFiles.map((d) => path.relative("sources/digests", d).replace(/^\.\.\//, "")),
+      wikiPages: [...topicWikiPages],
+      digestFiles: [...topicDigestFiles],
+      discoveryWikiPages,
+      topicCount: relatedTopics.length,
+      topicIds: relatedTopics.map((t) => t.id),
     };
   }
 

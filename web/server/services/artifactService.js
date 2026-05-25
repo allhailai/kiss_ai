@@ -139,6 +139,7 @@ export async function listArtifactSpecs(projectPath) {
         lifecycle: frontmatter.lifecycle || "manual",
         modelId: frontmatter.modelId || null,
         sources: frontmatter.sources || [],
+        outputFile: frontmatter.outputFile || null,
         lastBuilt,
         status: buildStatus ? "built" : "not_built",
         buildSpecHash: buildStatus?.specHash || null,
@@ -519,14 +520,141 @@ Use **inline SVG** for all diagrams. Make them information-dense and visually po
 // ── Auto-Artifact Spec Generation ─────────────────────────────────────
 
 /**
+ * Find directed outputs that don't have a corresponding artifact spec.
+ * Returns an array of { outputFile, topics } for each output needing a spec.
+ */
+export async function findDirectedOutputsWithoutArtifacts(projectPath) {
+  // Read manifest for directed outputs
+  let directedOutputs = [];
+  try {
+    const manifestRaw = await fs.readFile(path.join(projectPath, ".build", "manifest.json"), "utf8");
+    const manifest = JSON.parse(manifestRaw);
+    directedOutputs = manifest.directed_outputs ?? [];
+  } catch {
+    // No manifest — try topics.json fallback
+    try {
+      const topicsRaw = await fs.readFile(path.join(projectPath, ".build", "topics.json"), "utf8");
+      const topicsData = JSON.parse(topicsRaw);
+      const outputSet = new Set();
+      for (const topic of topicsData.topics ?? []) {
+        for (const output of topic.outputs ?? []) {
+          if (typeof output === "string" && output.trim()) outputSet.add(output.trim());
+        }
+      }
+      directedOutputs = [...outputSet];
+    } catch {
+      return [];
+    }
+  }
+
+  if (directedOutputs.length === 0) return [];
+
+  // Read existing artifact specs
+  const existingSpecs = await listArtifactSpecs(projectPath);
+  const coveredOutputFiles = new Set(
+    existingSpecs
+      .map((s) => s.outputFile)
+      .filter(Boolean),
+  );
+
+  // Also check by slug pattern to catch manually created specs
+  const existingSlugs = new Set(existingSpecs.map((s) => s.slug));
+
+  // Read topics for mapping
+  let topicsList = [];
+  try {
+    const topicsData = await readTopics(projectPath);
+    topicsList = topicsData.topics ?? [];
+  } catch { /* topics may not exist */ }
+
+  // Build output → topics mapping
+  const outputToTopics = new Map();
+  for (const topic of topicsList) {
+    for (const output of topic.outputs ?? []) {
+      if (!outputToTopics.has(output)) outputToTopics.set(output, []);
+      outputToTopics.get(output).push(topic);
+    }
+  }
+
+  // Filter to outputs that don't have specs
+  const needsSpec = [];
+  for (const outputFile of directedOutputs) {
+    // Check if already covered by outputFile frontmatter
+    if (coveredOutputFiles.has(outputFile)) continue;
+
+    // Check if a matching slug already exists
+    const baseName = path.basename(outputFile, ".md").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    const expectedSlug = `output_${baseName}`;
+    if (existingSlugs.has(expectedSlug)) continue;
+
+    const topics = outputToTopics.get(outputFile) ?? [];
+    needsSpec.push({
+      outputFile,
+      topics: topics.map((t) => ({ id: t.id, label: t.label, wiki_page: t.wiki_page })),
+    });
+  }
+
+  return needsSpec;
+}
+
+/**
+ * After the agent writes output artifact specs, collect the topic IDs
+ * that are covered by those specs (for deduplication with per-topic artifacts).
+ *
+ * @param {string} projectPath
+ * @param {string[]} newOutputSpecSlugs - slugs of newly created output artifact specs
+ * @returns {Promise<Set<string>>} - Set of topic IDs covered by the output specs
+ */
+export async function collectCoveredTopicIds(projectPath, newOutputSpecSlugs) {
+  const coveredTopicIds = new Set();
+
+  // Read topics for output→topic mapping
+  let topicsList = [];
+  try {
+    const topicsData = await readTopics(projectPath);
+    topicsList = topicsData.topics ?? [];
+  } catch {
+    return coveredTopicIds;
+  }
+
+  // Build output→topics reverse map
+  const outputToTopicIds = new Map();
+  for (const topic of topicsList) {
+    for (const output of topic.outputs ?? []) {
+      if (!outputToTopicIds.has(output)) outputToTopicIds.set(output, []);
+      outputToTopicIds.get(output).push(topic.id);
+    }
+  }
+
+  // For each new output spec, look up its outputFile and find covered topics
+  for (const slug of newOutputSpecSlugs) {
+    try {
+      const spec = await readArtifactSpec(projectPath, slug);
+      const outputFile = spec.frontmatter.outputFile;
+      if (outputFile && outputToTopicIds.has(outputFile)) {
+        for (const topicId of outputToTopicIds.get(outputFile)) {
+          coveredTopicIds.add(topicId);
+        }
+      }
+    } catch {
+      // Spec might not be readable — skip
+    }
+  }
+
+  return coveredTopicIds;
+}
+
+/**
  * Automatically generate artifact specs at the end of a build.
  * - Project overview: created on first build only (if not already present).
  * - Per-topic deep dives: created for each active (non-seed, non-deprecated) topic
- *   that doesn't already have a matching spec.
+ *   that doesn't already have a matching spec AND is not covered by a directed output artifact.
  *
+ * @param {object} options
+ * @param {Set<string>} [options.coveredTopicIds] - Topic IDs covered by output artifacts (skip these)
  * Returns { created: string[], skipped: string[] } for logging.
  */
-export async function createAutoArtifactSpecs(projectPath, { modelId, isFirstBuild, topics }) {
+export async function createAutoArtifactSpecs(projectPath, { modelId, isFirstBuild, topics, coveredTopicIds }) {
   await ensureArtifactDirs(projectPath);
 
   const existingSpecs = await listArtifactSpecs(projectPath);
@@ -558,6 +686,12 @@ export async function createAutoArtifactSpecs(projectPath, { modelId, isFirstBui
     const topicSlug = `topic_${topic.id}`;
 
     if (existingSlugs.has(topicSlug)) {
+      skipped.push(topicSlug);
+      continue;
+    }
+
+    // Skip topics covered by directed output artifacts
+    if (coveredTopicIds?.has(topic.id)) {
       skipped.push(topicSlug);
       continue;
     }

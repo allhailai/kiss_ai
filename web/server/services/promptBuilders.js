@@ -164,6 +164,15 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
       }
     }
 
+    // Add discovery inventory for non-primary wiki pages
+    const discoveryPages = fileMapping.discoveryWikiPages ?? [];
+    if (discoveryPages.length > 0) {
+      lines.push("", "ADDITIONAL WIKI PAGES (available if needed — read only if your primary context is insufficient):");
+      for (const dp of discoveryPages) {
+        lines.push(`  - ${dp}`);
+      }
+    }
+
     // Discover human inputs dynamically
     try {
       const humanInputs = await fs.readdir(path.join(project.path, "inputs_human"));
@@ -475,6 +484,84 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
 
     return lines.join("\n");
   }
+  /**
+   * Build the prompt for the agent to propose and write artifact specs for directed outputs.
+   * The agent reads each output's content and writes tailored .artifact.md spec files.
+   *
+   * @param {object} project - { path, slug, name }
+   * @param {Array} outputsNeedingSpecs - from findDirectedOutputsWithoutArtifacts()
+   * @param {Array} existingSpecs - from listArtifactSpecs()
+   * @param {string} modelId - model to set in spec frontmatter
+   */
+  async function createProposeOutputArtifactsPrompt(project, outputsNeedingSpecs, existingSpecs, modelId) {
+    const lines = [
+      `Propose and write artifact specs for ${outputsNeedingSpecs.length} directed output(s).`,
+      "",
+      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_propose_output_artifacts.md")} exactly.`,
+      "This is a non-interactive web-triggered build phase. Never ask the user for confirmation or wait for input mid-run.",
+      `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
+      `Project root: ${project.path}`,
+      `Model ID to set in spec frontmatter: ${modelId}`,
+      "",
+    ];
+
+    // Project context
+    lines.push("── PROJECT CONTEXT ──────────────────────────────────────────", "");
+    try {
+      const projectMd = await fs.readFile(path.join(project.path, "project.md"), "utf8");
+      lines.push(projectMd.slice(0, 3000));
+      if (projectMd.length > 3000) lines.push("\n[... truncated ...]");
+    } catch {
+      lines.push("No project.md found.");
+    }
+
+    // Design identity
+    lines.push("", "── DESIGN IDENTITY ──────────────────────────────────────────", "");
+    try {
+      const designIdentity = await fs.readFile(path.join(project.path, "human_design_identity.md"), "utf8");
+      lines.push(designIdentity.slice(0, 2000));
+      if (designIdentity.length > 2000) lines.push("\n[... truncated ...]");
+    } catch {
+      lines.push("No human_design_identity.md found. Use a clean, professional design.");
+    }
+
+    // Directed outputs needing specs
+    lines.push("", "── DIRECTED OUTPUTS NEEDING ARTIFACT SPECS ──────────────────", "");
+
+    for (let i = 0; i < outputsNeedingSpecs.length; i++) {
+      const { outputFile, topics } = outputsNeedingSpecs[i];
+      const topicLabels = topics.map((t) => t.label).join(", ") || "none";
+      const topicWikiPages = topics.map((t) => t.wiki_page).filter(Boolean);
+
+      lines.push(`${i + 1}. ${outputFile}`);
+      lines.push(`   Topics: ${topicLabels}`);
+      if (topicWikiPages.length > 0) {
+        lines.push(`   Wiki pages: ${topicWikiPages.join(", ")}`);
+      }
+
+      // Add content preview
+      try {
+        const content = await fs.readFile(path.join(project.path, outputFile), "utf8");
+        const preview = content.slice(0, 500).replace(/\n/g, " ").trim();
+        lines.push(`   Preview: ${preview}${content.length > 500 ? "…" : ""}`);
+      } catch {
+        lines.push("   Preview: [file not readable]");
+      }
+
+      lines.push("");
+    }
+
+    // Existing artifact specs
+    if (existingSpecs.length > 0) {
+      lines.push("── EXISTING ARTIFACT SPECS (do not duplicate) ──────────────────", "");
+      for (const spec of existingSpecs) {
+        lines.push(`- ${spec.slug} (${spec.name})`);
+      }
+      lines.push("");
+    }
+
+    return lines.join("\n");
+  }
 
   return {
     createArtifactPrompt,
@@ -482,6 +569,7 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
     createBatchDeepenResearchPrompt,
     createBatchDeepenSynthesisPrompt,
     createFilePrompt,
+    createProposeOutputArtifactsPrompt,
     createResearchPrompt,
     createSynthesisPrompt,
     createValidationPrompt,

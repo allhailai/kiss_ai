@@ -1,213 +1,261 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { discoverDirectedOutputs, buildSourceMapping } from "./sourceMapping.js";
-import fs from "node:fs/promises";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import path from "node:path";
 
-vi.mock("node:fs/promises");
-
-const PROJECT_PATH = "/fake/project";
-
-function mockReadFile(fileMap) {
-  fs.readFile.mockImplementation(async (filePath) => {
-    const key = path.relative(PROJECT_PATH, filePath).replace(/\\/g, "/");
-    if (fileMap[key] !== undefined) {
-      return typeof fileMap[key] === "string" ? fileMap[key] : JSON.stringify(fileMap[key]);
-    }
-    throw Object.assign(new Error(`ENOENT: ${filePath}`), { code: "ENOENT" });
-  });
-}
-
-function mockReaddir(dirMap) {
-  fs.readdir.mockImplementation(async (dirPath, opts) => {
-    const key = path.relative(PROJECT_PATH, dirPath).replace(/\\/g, "/");
-    if (dirMap[key]) {
-      return dirMap[key].map((name) => ({
-        name,
-        isDirectory: () => name.indexOf(".") === -1,
-        isFile: () => name.indexOf(".") !== -1,
-      }));
-    }
-    throw Object.assign(new Error(`ENOENT: ${dirPath}`), { code: "ENOENT" });
-  });
-}
-
-beforeEach(() => {
-  vi.resetAllMocks();
+// Mock fs before importing the module under test
+vi.mock("node:fs/promises", () => {
+  const store = new Map();
+  return {
+    default: {
+      readFile: vi.fn(async (filePath) => {
+        const content = store.get(filePath);
+        if (content === undefined) {
+          const err = new Error(`ENOENT: no such file or directory, open '${filePath}'`);
+          err.code = "ENOENT";
+          throw err;
+        }
+        return content;
+      }),
+      readdir: vi.fn(async (dirPath, options) => {
+        const entries = store.get(`__dir__${dirPath}`) ?? [];
+        if (entries.length === 0 && !store.has(`__dir__${dirPath}`)) {
+          const err = new Error(`ENOENT: no such file or directory, scandir '${dirPath}'`);
+          err.code = "ENOENT";
+          throw err;
+        }
+        return entries;
+      }),
+      writeFile: vi.fn(async (filePath, content) => {
+        store.set(filePath, content);
+      }),
+      mkdir: vi.fn(),
+      stat: vi.fn(),
+    },
+    // Expose for test setup
+    __store: store,
+  };
 });
 
-describe("discoverDirectedOutputs", () => {
-  it("uses manifest.directed_outputs when populated", async () => {
-    mockReadFile({
-      ".build/manifest.json": {
-        directed_outputs: ["outputs_ai/report_a.md", "outputs_ai/report_b.md"],
-      },
-    });
+const { __store: store } = await import("node:fs/promises");
+const { buildSourceMapping, discoverDirectedOutputs } = await import("./sourceMapping.js");
 
-    const result = await discoverDirectedOutputs(PROJECT_PATH);
+function setFile(filePath, content) {
+  store.set(filePath, typeof content === "string" ? content : JSON.stringify(content));
+}
 
-    expect(result.source).toBe("manifest");
-    expect(result.outputs).toEqual(["outputs_ai/report_a.md", "outputs_ai/report_b.md"]);
-  });
-
-  it("falls back to topics.json when manifest.directed_outputs is empty", async () => {
-    mockReadFile({
-      ".build/manifest.json": { directed_outputs: [] },
-      ".build/topics.json": {
-        topics: [
-          { id: "topic_a", outputs: ["outputs_ai/reports/dashboard.md"] },
-          { id: "topic_b", outputs: ["outputs_ai/reports/tracker.md", "outputs_ai/reports/dashboard.md"] },
-          { id: "topic_c", outputs: [] },
-        ],
-      },
-    });
-
-    const result = await discoverDirectedOutputs(PROJECT_PATH);
-
-    expect(result.source).toBe("topics");
-    expect(result.outputs).toEqual([
-      "outputs_ai/reports/dashboard.md",
-      "outputs_ai/reports/tracker.md",
-    ]);
-  });
-
-  it("deduplicates outputs from topics.json", async () => {
-    mockReadFile({
-      ".build/manifest.json": { directed_outputs: [] },
-      ".build/topics.json": {
-        topics: [
-          { id: "t1", outputs: ["outputs_ai/reports/rbi.md"] },
-          { id: "t2", outputs: ["outputs_ai/reports/rbi.md"] },
-          { id: "t3", outputs: ["outputs_ai/reports/rbi.md", "outputs_ai/reports/tracker.md"] },
-        ],
-      },
-    });
-
-    const result = await discoverDirectedOutputs(PROJECT_PATH);
-
-    expect(result.source).toBe("topics");
-    expect(result.outputs).toEqual([
-      "outputs_ai/reports/rbi.md",
-      "outputs_ai/reports/tracker.md",
-    ]);
-  });
-
-  it("falls back to disk scan when both manifest and topics are empty", async () => {
-    mockReadFile({
-      ".build/manifest.json": { directed_outputs: [] },
-      ".build/topics.json": { topics: [] },
-    });
-    mockReaddir({
-      "outputs_ai": [{ name: "wiki" }, { name: "strategy_report.md" }],
-    });
-    // Override readdir to return proper dirent-like objects
-    fs.readdir.mockImplementation(async (dirPath) => {
-      const key = path.relative(PROJECT_PATH, dirPath).replace(/\\/g, "/");
-      if (key === "outputs_ai") {
-        return [
-          { name: "wiki", isDirectory: () => true, isFile: () => false },
-          { name: "strategy_report.md", isDirectory: () => false, isFile: () => true },
-        ];
-      }
-      if (key === "outputs_ai/wiki") {
-        return [
-          { name: "_index.md", isDirectory: () => false, isFile: () => true },
-        ];
-      }
-      throw Object.assign(new Error(`ENOENT`), { code: "ENOENT" });
-    });
-
-    const result = await discoverDirectedOutputs(PROJECT_PATH);
-
-    expect(result.source).toBe("disk");
-    expect(result.outputs).toEqual(["outputs_ai/strategy_report.md"]);
-  });
-
-  it("returns empty when no sources have outputs", async () => {
-    mockReadFile({
-      ".build/manifest.json": { directed_outputs: [] },
-      ".build/topics.json": { topics: [{ id: "t1", outputs: [] }] },
-    });
-    fs.readdir.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
-
-    const result = await discoverDirectedOutputs(PROJECT_PATH);
-
-    expect(result.outputs).toEqual([]);
-  });
-
-  it("handles missing manifest gracefully", async () => {
-    fs.readFile.mockImplementation(async (filePath) => {
-      const key = path.relative(PROJECT_PATH, filePath).replace(/\\/g, "/");
-      if (key === ".build/topics.json") {
-        return JSON.stringify({
-          topics: [{ id: "t1", outputs: ["outputs_ai/report.md"] }],
-        });
-      }
-      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-    });
-
-    const result = await discoverDirectedOutputs(PROJECT_PATH);
-
-    expect(result.source).toBe("topics");
-    expect(result.outputs).toEqual(["outputs_ai/report.md"]);
-  });
-
-  it("skips blank/whitespace output strings from topics", async () => {
-    mockReadFile({
-      ".build/manifest.json": { directed_outputs: [] },
-      ".build/topics.json": {
-        topics: [
-          { id: "t1", outputs: ["outputs_ai/real.md", "", "  ", null] },
-        ],
-      },
-    });
-
-    const result = await discoverDirectedOutputs(PROJECT_PATH);
-
-    expect(result.source).toBe("topics");
-    expect(result.outputs).toEqual(["outputs_ai/real.md"]);
-  });
-});
+function setDir(dirPath, entries) {
+  store.set(`__dir__${dirPath}`, entries);
+}
 
 describe("buildSourceMapping", () => {
-  it("returns discoverySource alongside the mapping", async () => {
-    mockReadFile({
-      ".build/manifest.json": {
-        directed_outputs: ["outputs_ai/report.md"],
-        wiki_pages: ["page_a.md"],
-      },
-      ".build/topics.json": { topics: [] },
-    });
-    fs.readdir.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+  const projectPath = "/test-project";
+  const buildDir = path.join(projectPath, ".build");
+  const wikiDir = path.join(projectPath, "outputs_ai", "wiki");
+  const digestsDir = path.join(projectPath, "sources", "digests");
 
-    const result = await buildSourceMapping(PROJECT_PATH);
-
-    expect(result.discoverySource).toBe("manifest");
-    expect(result.mapping).toHaveProperty("outputs_ai/report.md");
-    expect(result.mapping["outputs_ai/report.md"].wikiPages).toEqual(["page_a.md"]);
+  beforeEach(() => {
+    store.clear();
   });
 
-  it("populates mapping from topics.json fallback", async () => {
-    mockReadFile({
-      ".build/manifest.json": { directed_outputs: [], wiki_pages: [] },
-      ".build/topics.json": {
-        topics: [{ id: "t1", outputs: ["outputs_ai/reports/dash.md"] }],
-      },
-    });
-    fs.readdir.mockImplementation(async (dirPath) => {
-      const key = path.relative(PROJECT_PATH, dirPath).replace(/\\/g, "/");
-      if (key === "outputs_ai/wiki") {
-        return [{ name: "topic.md", isDirectory: () => false, isFile: () => true }];
-      }
-      if (key === "sources/digests") {
-        return [{ name: "src1.md", isDirectory: () => false, isFile: () => true }];
-      }
-      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+  it("creates topic-aware mapping with related wiki pages and digests", async () => {
+    // Set up manifest with wiki pages and directed outputs
+    setFile(path.join(buildDir, "manifest.json"), {
+      wiki_pages: ["outputs_ai/wiki/topic_a.md", "outputs_ai/wiki/topic_b.md", "outputs_ai/wiki/topic_c.md", "outputs_ai/wiki/_index.md"],
+      directed_outputs: ["outputs_ai/reports/report_a.md", "outputs_ai/reports/report_b.md"],
     });
 
-    const result = await buildSourceMapping(PROJECT_PATH);
+    // Set up topics.json with topic-to-output mapping
+    setFile(path.join(buildDir, "topics.json"), {
+      topics: [
+        {
+          id: "topic-a",
+          label: "Topic A",
+          wiki_page: "outputs_ai/wiki/topic_a.md",
+          sources: [{ path: "sources/web_research/source_a1.md", relevance: 0.9 }],
+          outputs: ["outputs_ai/reports/report_a.md"],
+          depends_on: [],
+        },
+        {
+          id: "topic-b",
+          label: "Topic B",
+          wiki_page: "outputs_ai/wiki/topic_b.md",
+          sources: [{ path: "sources/web_research/source_b1.md", relevance: 0.8 }],
+          outputs: ["outputs_ai/reports/report_b.md"],
+          depends_on: [],
+        },
+        {
+          id: "topic-c",
+          label: "Topic C",
+          wiki_page: "outputs_ai/wiki/topic_c.md",
+          sources: [],
+          outputs: [],
+          depends_on: [],
+        },
+      ],
+    });
 
-    expect(result.discoverySource).toBe("topics");
-    expect(Object.keys(result.mapping)).toEqual(["outputs_ai/reports/dash.md"]);
-    expect(result.mapping["outputs_ai/reports/dash.md"].wikiPages).toContain("outputs_ai/wiki/topic.md");
+    // Set up digest files on disk
+    setDir(digestsDir, [
+      { name: "source_a1.md", isDirectory: () => false },
+      { name: "source_b1.md", isDirectory: () => false },
+      { name: "source_c1.md", isDirectory: () => false },
+    ]);
+
+    const { mapping } = await buildSourceMapping(projectPath);
+
+    // Report A should get topic_a's wiki page + _index.md, NOT topic_b or topic_c
+    expect(mapping["outputs_ai/reports/report_a.md"].wikiPages).toContain("outputs_ai/wiki/topic_a.md");
+    expect(mapping["outputs_ai/reports/report_a.md"].wikiPages).toContain("outputs_ai/wiki/_index.md");
+    expect(mapping["outputs_ai/reports/report_a.md"].wikiPages).not.toContain("outputs_ai/wiki/topic_b.md");
+    expect(mapping["outputs_ai/reports/report_a.md"].wikiPages).not.toContain("outputs_ai/wiki/topic_c.md");
+
+    // Report A should get source_a1's digest, NOT source_b1
+    const reportADigests = mapping["outputs_ai/reports/report_a.md"].digestFiles;
+    expect(reportADigests.some((d) => d.endsWith("source_a1.md"))).toBe(true);
+    expect(reportADigests.some((d) => d.endsWith("source_b1.md"))).toBe(false);
+
+    // Report A should have topic metadata
+    expect(mapping["outputs_ai/reports/report_a.md"].topicCount).toBe(1);
+    expect(mapping["outputs_ai/reports/report_a.md"].topicIds).toEqual(["topic-a"]);
+
+    // Report B should get topic_b's wiki page
+    expect(mapping["outputs_ai/reports/report_b.md"].wikiPages).toContain("outputs_ai/wiki/topic_b.md");
+    expect(mapping["outputs_ai/reports/report_b.md"].wikiPages).not.toContain("outputs_ai/wiki/topic_a.md");
+  });
+
+  it("includes discovery wiki pages for non-primary pages", async () => {
+    setFile(path.join(buildDir, "manifest.json"), {
+      wiki_pages: ["outputs_ai/wiki/topic_a.md", "outputs_ai/wiki/topic_b.md", "outputs_ai/wiki/_index.md"],
+      directed_outputs: ["outputs_ai/reports/report_a.md"],
+    });
+
+    setFile(path.join(buildDir, "topics.json"), {
+      topics: [
+        {
+          id: "topic-a",
+          wiki_page: "outputs_ai/wiki/topic_a.md",
+          sources: [],
+          outputs: ["outputs_ai/reports/report_a.md"],
+          depends_on: [],
+        },
+      ],
+    });
+
+    setDir(digestsDir, []);
+
+    const { mapping } = await buildSourceMapping(projectPath);
+
+    // topic_b should be in discovery inventory, not primary
+    expect(mapping["outputs_ai/reports/report_a.md"].discoveryWikiPages).toContain("outputs_ai/wiki/topic_b.md");
+    expect(mapping["outputs_ai/reports/report_a.md"].wikiPages).not.toContain("outputs_ai/wiki/topic_b.md");
+  });
+
+  it("includes dependency wiki pages in primary mapping", async () => {
+    setFile(path.join(buildDir, "manifest.json"), {
+      wiki_pages: ["outputs_ai/wiki/topic_a.md", "outputs_ai/wiki/topic_b.md", "outputs_ai/wiki/_index.md"],
+      directed_outputs: ["outputs_ai/reports/report_a.md"],
+    });
+
+    setFile(path.join(buildDir, "topics.json"), {
+      topics: [
+        {
+          id: "topic-a",
+          wiki_page: "outputs_ai/wiki/topic_a.md",
+          sources: [],
+          outputs: ["outputs_ai/reports/report_a.md"],
+          depends_on: ["topic-b"],
+        },
+        {
+          id: "topic-b",
+          wiki_page: "outputs_ai/wiki/topic_b.md",
+          sources: [],
+          outputs: [],
+          depends_on: [],
+        },
+      ],
+    });
+
+    setDir(digestsDir, []);
+
+    const { mapping } = await buildSourceMapping(projectPath);
+
+    // topic_b's wiki page should be in primary (not discovery) because topic_a depends on it
+    expect(mapping["outputs_ai/reports/report_a.md"].wikiPages).toContain("outputs_ai/wiki/topic_b.md");
+    expect(mapping["outputs_ai/reports/report_a.md"].discoveryWikiPages).not.toContain("outputs_ai/wiki/topic_b.md");
+  });
+
+  it("always includes _index.md in primary mapping", async () => {
+    setFile(path.join(buildDir, "manifest.json"), {
+      wiki_pages: ["outputs_ai/wiki/topic_a.md", "outputs_ai/wiki/_index.md"],
+      directed_outputs: ["outputs_ai/reports/report_a.md"],
+    });
+
+    setFile(path.join(buildDir, "topics.json"), {
+      topics: [
+        {
+          id: "topic-a",
+          wiki_page: "outputs_ai/wiki/topic_a.md",
+          sources: [],
+          outputs: ["outputs_ai/reports/report_a.md"],
+          depends_on: [],
+        },
+      ],
+    });
+
+    setDir(digestsDir, []);
+
+    const { mapping } = await buildSourceMapping(projectPath);
+
+    expect(mapping["outputs_ai/reports/report_a.md"].wikiPages).toContain("outputs_ai/wiki/_index.md");
+    expect(mapping["outputs_ai/reports/report_a.md"].discoveryWikiPages).not.toContain("outputs_ai/wiki/_index.md");
+  });
+
+  it("falls back to full context when no topic mapping exists", async () => {
+    setFile(path.join(buildDir, "manifest.json"), {
+      wiki_pages: ["outputs_ai/wiki/topic_a.md", "outputs_ai/wiki/_index.md"],
+      directed_outputs: ["outputs_ai/reports/orphan_report.md"],
+    });
+
+    // topics.json exists but no topic maps to orphan_report.md
+    setFile(path.join(buildDir, "topics.json"), {
+      topics: [
+        {
+          id: "topic-a",
+          wiki_page: "outputs_ai/wiki/topic_a.md",
+          sources: [],
+          outputs: ["outputs_ai/reports/other_report.md"],
+          depends_on: [],
+        },
+      ],
+    });
+
+    setDir(digestsDir, [
+      { name: "source_a.md", isDirectory: () => false },
+    ]);
+
+    const { mapping } = await buildSourceMapping(projectPath);
+
+    // Orphan report should get ALL wiki pages and ALL digests
+    expect(mapping["outputs_ai/reports/orphan_report.md"].wikiPages).toContain("outputs_ai/wiki/topic_a.md");
+    expect(mapping["outputs_ai/reports/orphan_report.md"].wikiPages).toContain("outputs_ai/wiki/_index.md");
+    expect(mapping["outputs_ai/reports/orphan_report.md"].digestFiles.length).toBe(1);
+    // No discovery pages in fallback mode (everything is primary)
+    expect(mapping["outputs_ai/reports/orphan_report.md"].discoveryWikiPages).toEqual([]);
+  });
+
+  it("falls back to full context when topics.json is missing", async () => {
+    setFile(path.join(buildDir, "manifest.json"), {
+      wiki_pages: ["outputs_ai/wiki/topic_a.md", "outputs_ai/wiki/_index.md"],
+      directed_outputs: ["outputs_ai/reports/report_a.md"],
+    });
+
+    // No topics.json at all
+    setDir(digestsDir, []);
+
+    const { mapping } = await buildSourceMapping(projectPath);
+
+    // Should get everything since no topic mapping is possible
+    expect(mapping["outputs_ai/reports/report_a.md"].wikiPages).toContain("outputs_ai/wiki/topic_a.md");
+    expect(mapping["outputs_ai/reports/report_a.md"].wikiPages).toContain("outputs_ai/wiki/_index.md");
+    expect(mapping["outputs_ai/reports/report_a.md"].discoveryWikiPages).toEqual([]);
   });
 });

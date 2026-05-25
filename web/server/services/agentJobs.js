@@ -4,7 +4,7 @@ import { computeBuildScope } from "./buildScope.js";
 import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
 import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
 import { createPromptBuilders } from "./promptBuilders.js";
-import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs, createAutoArtifactSpecs } from "./artifactService.js";
+import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs, createAutoArtifactSpecs, findDirectedOutputsWithoutArtifacts, collectCoveredTopicIds } from "./artifactService.js";
 import { runFetchPhase, runDigestPhase } from "./fetchAndDigestPhases.js";
 import { readTopics, getDeepenQueue, clearDeepenQueue } from "./topicsService.js";
 
@@ -34,6 +34,7 @@ export function createAgentJobService({
     createBatchDeepenResearchPrompt,
     createBatchDeepenSynthesisPrompt,
     createFilePrompt,
+    createProposeOutputArtifactsPrompt,
     createResearchPrompt,
     createSynthesisPrompt,
     createValidationPrompt,
@@ -49,7 +50,7 @@ export function createAgentJobService({
     });
   }
 
-  const MAX_FILE_CONCURRENCY = 3;
+  const MAX_FILE_CONCURRENCY = 5;
 
   async function runFileSynthesisPhase({ project, apiKey, modelId, sourceMap }) {
     const outputFiles = Object.keys(sourceMap);
@@ -64,16 +65,19 @@ export function createAgentJobService({
 
       const batchPromises = batch.map(async (outputFile) => {
         const filePrompt = await createFilePrompt(project, outputFile, sourceMap);
+        const fileMapping = sourceMap[outputFile] || {};
+        const topicInfo = fileMapping.topicCount ? ` (${fileMapping.topicCount} topic${fileMapping.topicCount === 1 ? "" : "s"})` : "";
 
         await appendRunEvent(project.slug, {
           type: "system",
           title: `Phase 3b: Building ${outputFile}`,
-          text: `Synthesizing directed output with ${sourceMap[outputFile]?.wikiPages?.length || 0} wiki pages, ${sourceMap[outputFile]?.sourceFiles?.length || 0} full sources, ${sourceMap[outputFile]?.digestFiles?.length || 0} digests.`,
+          text: `Synthesizing directed output with ${fileMapping.wikiPages?.length || 0} wiki pages, ${fileMapping.digestFiles?.length || 0} digests${topicInfo}.`,
           status: "file_synthesis",
           runtime: "cursor",
-          metadata: { outputFile, phase: "3b" },
+          metadata: { outputFile, phase: "3b", topicCount: fileMapping.topicCount || null, topicIds: fileMapping.topicIds || null },
         });
 
+        const fileStart = Date.now();
         const result = await runSingleAgentPhase({
           project,
           apiKey,
@@ -82,19 +86,20 @@ export function createAgentJobService({
           phaseName: `File: ${outputFile}`,
           signal: undefined,
         });
+        const fileDurationSeconds = Math.round((Date.now() - fileStart) / 1000);
 
         completed++;
 
         await appendRunEvent(project.slug, {
           type: "system",
-          title: `Phase 3b: ${outputFile} complete (${completed}/${outputFiles.length})`,
+          title: `Phase 3b: ${outputFile} complete (${completed}/${outputFiles.length}, ${fileDurationSeconds}s)`,
           text: result.status === "finished" ? `Successfully built ${outputFile}` : `${outputFile} ended with status: ${result.status}`,
           status: result.status === "finished" ? "file_complete" : "file_error",
           runtime: "cursor",
-          metadata: { outputFile, completed, total: outputFiles.length, phase: "3b" },
+          metadata: { outputFile, completed, total: outputFiles.length, phase: "3b", durationSeconds: fileDurationSeconds },
         });
 
-        return { file: outputFile, result };
+        return { file: outputFile, result, durationSeconds: fileDurationSeconds };
       });
 
       results.push(...(await Promise.all(batchPromises)));
@@ -419,6 +424,7 @@ export function createAgentJobService({
   }
 
   async function runSingleAgentPhase({ project, apiKey, modelId, prompt, phaseName, signal }) {
+    const promptBytes = Buffer.byteLength(prompt, "utf8");
     const result = await runCursorAgent({
       project,
       apiKey,
@@ -429,6 +435,11 @@ export function createAgentJobService({
         if (event.type === "assistant_delta") {
           await appendAssistantDelta(project.slug, event.text, event.metadata);
           return;
+        }
+
+        // Attach prompt size to the run_started event
+        if (event.status === "run_started") {
+          event = { ...event, metadata: { ...event.metadata, promptBytes, phaseName } };
         }
 
         const current = await getRebuildState(project.slug);
@@ -458,6 +469,7 @@ export function createAgentJobService({
 
     activeRebuilds.add(project.slug);
     const buildStartTime = Date.now();
+    const phaseTimings = {};
 
     try {
       // ── Compute build scope ──
@@ -496,6 +508,7 @@ export function createAgentJobService({
       });
 
       if (scope.skipResearchPlan) {
+        phaseTimings.research = 0;
         await appendRunEvent(project.slug, {
           type: "system",
           title: "Phase 1: Skipped (no project changes)",
@@ -514,6 +527,7 @@ export function createAgentJobService({
           runtime: "cursor",
         });
 
+        const researchStart = Date.now();
         const researchResult = await runSingleAgentPhase({
           project,
           apiKey,
@@ -522,6 +536,7 @@ export function createAgentJobService({
           phaseName: "Research Plan",
           signal,
         });
+        phaseTimings.research = Math.round((Date.now() - researchStart) / 1000);
 
         if (researchResult.status !== "finished") {
           throw new Error(`Research plan phase failed: ${researchResult.result || "unknown error"}`);
@@ -544,11 +559,13 @@ export function createAgentJobService({
         runtime: "server",
       });
 
+      const fetchStart = Date.now();
       const fetchResults = await runFetchPhase(project.path, {
         appendRunEvent,
         projectSlug: project.slug,
         phaseLabel: "Phase 2",
       });
+      phaseTimings.fetch = Math.round((Date.now() - fetchStart) / 1000);
 
       // ── Phase 2.5: Generate Source Digests ──
       const stateBeforeDigests = await getRebuildState(project.slug);
@@ -566,7 +583,9 @@ export function createAgentJobService({
         runtime: "server",
       });
 
+      const digestStart = Date.now();
       await runDigestPhase(project.path, { appendRunEvent, projectSlug: project.slug });
+      phaseTimings.digests = Math.round((Date.now() - digestStart) / 1000);
 
       // ── Phase 3a: Wiki Synthesis (agent builds wiki pages only) ──
       await appendRunEvent(project.slug, {
@@ -587,6 +606,7 @@ export function createAgentJobService({
       });
 
       const wikiPrompt = createWikiOnlyPrompt(project, scope);
+      const wikiStart = Date.now();
       const wikiResult = await runSingleAgentPhase({
         project,
         apiKey,
@@ -595,6 +615,7 @@ export function createAgentJobService({
         phaseName: "Wiki Synthesis",
         signal,
       });
+      phaseTimings.wiki = Math.round((Date.now() - wikiStart) / 1000);
 
       if (wikiResult.status !== "finished") {
         throw new Error(`Wiki synthesis phase failed: ${wikiResult.result || "unknown error"}`);
@@ -643,12 +664,14 @@ export function createAgentJobService({
           metadata: { outputFileCount, phase: "3b" },
         });
 
+        const directedStart = Date.now();
         const fileResults = await runFileSynthesisPhase({
           project,
           apiKey,
           modelId,
           sourceMap,
         });
+        phaseTimings.directedOutputs = Math.round((Date.now() - directedStart) / 1000);
 
         const succeededFiles = fileResults.filter((r) => r.result.status === "finished").length;
         const failedFiles = fileResults.filter((r) => r.result.status !== "finished").length;
@@ -710,6 +733,7 @@ export function createAgentJobService({
       });
 
       const validationPrompt = createValidationPrompt(project, modelId, rawBuildQuestions);
+      const validationStart = Date.now();
       const synthesisResult = await runSingleAgentPhase({
         project,
         apiKey,
@@ -718,6 +742,7 @@ export function createAgentJobService({
         phaseName: "Validation",
         signal,
       });
+      phaseTimings.validation = Math.round((Date.now() - validationStart) / 1000);
 
       // ── Phase 3d: Auto-answer open questions from evidence ──
       try {
@@ -742,6 +767,7 @@ export function createAgentJobService({
           });
 
           const autoAnswerPrompt = createAutoAnswerPrompt(project, openQuestions);
+          const autoAnswerStart = Date.now();
           await runSingleAgentPhase({
             project,
             apiKey,
@@ -750,6 +776,7 @@ export function createAgentJobService({
             phaseName: "Auto-Answer Questions",
             signal,
           });
+          phaseTimings.autoAnswer = Math.round((Date.now() - autoAnswerStart) / 1000);
 
           // Check results
           const updatedQuestions = await readQuestions(project.path);
@@ -867,7 +894,9 @@ export function createAgentJobService({
 
       // ── Phase 5: Auto-generate artifact specs and build ──
       try {
+        const autoArtifactStart = Date.now();
         await runAutoArtifactPhase({ project, apiKey, modelId, scope });
+        phaseTimings.autoArtifacts = Math.round((Date.now() - autoArtifactStart) / 1000);
       } catch (autoArtifactError) {
         // Non-fatal — the main build already succeeded
         console.error("Auto-artifact phase failed:", autoArtifactError);
@@ -907,6 +936,7 @@ export function createAgentJobService({
           fetchResults,
           buildDurationSeconds,
           modelId,
+          phaseTimings,
         },
       });
     } catch (error) {
@@ -942,19 +972,92 @@ export function createAgentJobService({
   async function runAutoArtifactPhase({ project, apiKey, modelId, scope }) {
     // Read current topics
     const topicsData = await readTopics(project.path);
+    let coveredTopicIds = new Set();
 
-    // Generate any missing artifact specs
+    // ── Step 1: Propose artifact specs for directed outputs ──
+    const outputsNeedingSpecs = await findDirectedOutputsWithoutArtifacts(project.path);
+
+    if (outputsNeedingSpecs.length > 0) {
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: `Phase 5: Proposing artifact designs for ${outputsNeedingSpecs.length} directed output(s)`,
+        text: `Outputs: ${outputsNeedingSpecs.map((o) => o.outputFile).join(", ")}`,
+        status: "auto_artifact_proposing",
+        runtime: "cursor",
+        metadata: { phase: "5", outputCount: outputsNeedingSpecs.length },
+      });
+
+      // Snapshot existing specs before the agent writes new ones
+      const specsBefore = await listArtifactSpecs(project.path);
+      const slugsBefore = new Set(specsBefore.map((s) => s.slug));
+
+      // Run the agent to propose and write .artifact.md files
+      const proposalPrompt = await createProposeOutputArtifactsPrompt(
+        project, outputsNeedingSpecs, specsBefore, modelId,
+      );
+
+      const proposalResult = await runSingleAgentPhase({
+        project,
+        apiKey,
+        modelId,
+        prompt: proposalPrompt,
+        phaseName: "Propose Output Artifact Specs",
+      });
+
+      if (proposalResult.status === "finished") {
+        // Detect which new specs the agent created
+        const specsAfter = await listArtifactSpecs(project.path);
+        const newOutputSpecSlugs = specsAfter
+          .filter((s) => !slugsBefore.has(s.slug))
+          .map((s) => s.slug);
+
+        if (newOutputSpecSlugs.length > 0) {
+          // Collect topic IDs covered by the new output specs (for deduplication)
+          coveredTopicIds = await collectCoveredTopicIds(project.path, newOutputSpecSlugs);
+
+          await appendRunEvent(project.slug, {
+            type: "system",
+            title: `Phase 5: Agent created ${newOutputSpecSlugs.length} output artifact spec(s)`,
+            text: `New specs: ${newOutputSpecSlugs.join(", ")}. ${coveredTopicIds.size} topic(s) covered by output artifacts will be skipped.`,
+            status: "auto_artifact_output_specs_created",
+            runtime: "server",
+            metadata: { phase: "5", created: newOutputSpecSlugs, coveredTopicCount: coveredTopicIds.size },
+          });
+        }
+      } else {
+        // Non-fatal — continue with topic artifacts even if proposal failed
+        console.error("Output artifact proposal phase did not finish:", proposalResult.result);
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Phase 5: Output artifact proposal did not complete",
+          text: `Continuing with topic artifacts. Status: ${proposalResult.status}`,
+          status: "auto_artifact_proposal_warning",
+          runtime: "server",
+          metadata: { phase: "5", proposalStatus: proposalResult.status },
+        });
+      }
+    }
+
+    // ── Step 2: Generate per-topic artifact specs (skipping covered topics) ──
     const autoResult = await createAutoArtifactSpecs(project.path, {
       modelId,
       isFirstBuild: scope.isFirstBuild,
       topics: topicsData.topics,
+      coveredTopicIds,
     });
 
-    if (autoResult.created.length === 0) {
+    // ── Step 3: Collect all new specs to build ──
+    // Re-read all specs and find any that haven't been built yet
+    const allSpecs = await listArtifactSpecs(project.path);
+    const specsToBuild = allSpecs
+      .filter((s) => s.status === "not_built")
+      .map((s) => s.slug);
+
+    if (specsToBuild.length === 0) {
       await appendRunEvent(project.slug, {
         type: "system",
-        title: "Phase 5: No new artifact specs needed",
-        text: `All artifact specs already exist (${autoResult.skipped.length} skipped).`,
+        title: "Phase 5: No new artifact specs to build",
+        text: `All artifact specs already exist (${autoResult.skipped.length} topic(s) skipped).`,
         status: "auto_artifact_skipped",
         runtime: "server",
         metadata: { phase: "5", skipped: autoResult.skipped.length },
@@ -964,15 +1067,14 @@ export function createAgentJobService({
 
     await appendRunEvent(project.slug, {
       type: "system",
-      title: `Phase 5: Created ${autoResult.created.length} artifact spec(s)`,
-      text: `New specs: ${autoResult.created.join(", ")}`,
+      title: `Phase 5: ${specsToBuild.length} artifact spec(s) to build`,
+      text: `Specs: ${specsToBuild.join(", ")}`,
       status: "auto_artifact_specs_created",
       runtime: "server",
-      metadata: { phase: "5", created: autoResult.created, skipped: autoResult.skipped.length },
+      metadata: { phase: "5", created: specsToBuild, skipped: autoResult.skipped.length },
     });
 
     // Build the newly created artifact specs in parallel
-    const specsToBuild = autoResult.created;
     const concurrency = Math.min(Math.ceil(specsToBuild.length / 3), 8);
 
     const stateBeforeArtifacts = await getRebuildState(project.slug);
@@ -1089,6 +1191,7 @@ export function createAgentJobService({
   async function runBatchDeepenJob({ project, apiKey, modelId, prompt, jobName, topics, releaseProjectAgent }) {
     activeRebuilds.add(project.slug);
     const buildStartTime = Date.now();
+    const phaseTimings = {};
     const topicLabels = topics.map((t) => t.label);
 
     try {
@@ -1118,6 +1221,7 @@ export function createAgentJobService({
         runtime: "cursor",
       });
 
+      const researchStart = Date.now();
       const researchResult = await runSingleAgentPhase({
         project,
         apiKey,
@@ -1125,6 +1229,7 @@ export function createAgentJobService({
         prompt,
         phaseName: `Batch Deepen Research (${topics.length} topics)`,
       });
+      phaseTimings.research = Math.round((Date.now() - researchStart) / 1000);
 
       if (researchResult.status !== "finished") {
         throw new Error(`Deepen research phase failed: ${researchResult.result || "unknown error"}`);
@@ -1146,11 +1251,13 @@ export function createAgentJobService({
         runtime: "server",
       });
 
+      const fetchStart = Date.now();
       const fetchResults = await runFetchPhase(project.path, {
         appendRunEvent,
         projectSlug: project.slug,
         phaseLabel: "Deepen Phase 2",
       });
+      phaseTimings.fetch = Math.round((Date.now() - fetchStart) / 1000);
 
       // ── Phase 2.5: Generate Source Digests ──
       const stateBeforeDigests = await getRebuildState(project.slug);
@@ -1160,7 +1267,9 @@ export function createAgentJobService({
         buildPhaseDetail: `Generating digests for ${topics.length} topic(s)`,
       });
 
+      const digestStart = Date.now();
       await runDigestPhase(project.path, { appendRunEvent, projectSlug: project.slug });
+      phaseTimings.digests = Math.round((Date.now() - digestStart) / 1000);
 
       // ── Phase 3: Batch Synthesis (agent updates ALL topics' wiki pages + outputs) ──
       const stateBeforeSynthesis = await getRebuildState(project.slug);
@@ -1179,6 +1288,7 @@ export function createAgentJobService({
       });
 
       const synthesisPrompt = createBatchDeepenSynthesisPrompt(project, topics);
+      const synthesisStart = Date.now();
       const synthesisResult = await runSingleAgentPhase({
         project,
         apiKey,
@@ -1186,6 +1296,7 @@ export function createAgentJobService({
         prompt: synthesisPrompt,
         phaseName: `Batch Deepen Synthesis (${topics.length} topics)`,
       });
+      phaseTimings.synthesis = Math.round((Date.now() - synthesisStart) / 1000);
 
       // ── Clear the deepen queue ──
       await clearDeepenQueue(project.path);
@@ -1217,6 +1328,7 @@ export function createAgentJobService({
           modelId,
           topicIds: topics.map((t) => t.id),
           topicCount: topics.length,
+          phaseTimings,
         },
       });
     } catch (error) {

@@ -71,6 +71,8 @@ export function createProjectService({
         path: projectRootReal,
         setupStatus: manifest.last_build ? "built" : "initialized",
         modifiedAt: stat.mtime.toISOString(),
+        createdAt: stat.birthtime?.toISOString() || null,
+        lastBuildAt: manifest.last_build || null,
       });
     }
 
@@ -113,6 +115,8 @@ export function createProjectService({
       path: projectRootReal,
       setupStatus: manifest.last_build ? "built" : "initialized",
       modifiedAt: stat.mtime.toISOString(),
+      createdAt: stat.birthtime?.toISOString() || null,
+      lastBuildAt: manifest.last_build || null,
     };
   }
 

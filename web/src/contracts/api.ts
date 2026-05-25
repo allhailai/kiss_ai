@@ -133,6 +133,8 @@ export type ProjectSummary = {
   path: string;
   setupStatus: string;
   modifiedAt: string;
+  createdAt: string | null;
+  lastBuildAt: string | null;
 };
 
 export type ProjectListResponse = {

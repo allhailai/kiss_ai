@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import type { ProjectSummary } from "../../contracts/api";
 import { errorMessage } from "../../domain/errors";
+import { formatLocalDate, formatLocalTimeShort } from "../../domain/formatters";
 
 const projectNameTakenMessage = "That project name is taken. Please use another one.";
 
@@ -11,6 +12,16 @@ function slugifyProjectName(name: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
+}
+
+function DateRow({ label, timestamp }: { label: string; timestamp: string | null }) {
+  if (!timestamp) return null;
+  return (
+    <tr>
+      <td>{label}</td>
+      <td><strong>{formatLocalDate(timestamp)}</strong> {formatLocalTimeShort(timestamp)}</td>
+    </tr>
+  );
 }
 
 export function ProjectPicker({
@@ -134,8 +145,13 @@ export function ProjectPicker({
           <button className="project-card" key={project.slug} onClick={() => onSelect(project.slug)} type="button">
             <span className="eyebrow">{project.setupStatus}</span>
             <strong>{project.name}</strong>
-            <span>{project.slug}</span>
-            <small>{project.path}</small>
+            <table className="project-card-dates">
+              <tbody>
+                <DateRow label="Created" timestamp={project.createdAt} />
+                <DateRow label="Last build" timestamp={project.lastBuildAt} />
+                <DateRow label="Updated" timestamp={project.modifiedAt} />
+              </tbody>
+            </table>
           </button>
         ))}
       </div>

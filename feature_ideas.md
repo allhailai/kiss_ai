@@ -3,6 +3,8 @@
 - AI Agent -> create an artifact from the conversation
 
 
+1. Agent indicates that the current artifact spec might need changes
+2. Fix the chat user input buttons taking up more than 1 line.
 
 
 This is an internal backlog for maintainers. It is not setup or usage documentation for external users. Start with [`README.md`](README.md) for the public onboarding path.
