@@ -14,4 +14,8 @@ export const rebuildApi = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  cancelRebuild: (projectSlug: string) =>
+    request<RebuildState>(`${projectBase(projectSlug)}/rebuild/cancel`, {
+      method: "POST",
+    }),
 };

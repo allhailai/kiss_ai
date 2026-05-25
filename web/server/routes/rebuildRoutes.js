@@ -2,6 +2,7 @@ import { openSseStream } from "../utils/sse.js";
 import { parseRequestBody, resolveHumanAttentionBodySchema, startRebuildBodySchema } from "./requestSchemas.js";
 
 export function registerRebuildRoutes(app, {
+  cancelAgentJob,
   getRebuildState,
   httpError,
   startBatchDeepen,
@@ -53,6 +54,14 @@ export function registerRebuildRoutes(app, {
     try {
       const modelId = request.body?.modelId ?? null;
       response.json(await startBatchDeepen(request.project, modelId));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/rebuild/cancel", async (request, response, next) => {
+    try {
+      response.json(await cancelAgentJob(request.project.slug));
     } catch (error) {
       next(error);
     }

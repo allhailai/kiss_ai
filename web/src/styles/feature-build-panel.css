@@ -574,6 +574,33 @@
   box-shadow: none;
 }
 
+.build-project-stop-button {
+  min-height: 32px;
+  padding: 6px 13px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 58%, var(--color-border));
+  border-radius: 999px;
+  background: var(--color-danger);
+  color: white;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-danger) 22%, transparent);
+  font-size: 0.82rem;
+  font-weight: 950;
+  white-space: nowrap;
+  cursor: pointer;
+  animation: stop-button-pulse 2s ease-in-out infinite;
+}
+
+.build-project-stop-button:hover,
+.build-project-stop-button:focus-visible {
+  background: color-mix(in srgb, var(--color-danger) 88%, black);
+  outline: 2px solid color-mix(in srgb, var(--color-danger) 24%, transparent);
+  outline-offset: 2px;
+}
+
+@keyframes stop-button-pulse {
+  0%, 100% { box-shadow: 0 8px 20px color-mix(in srgb, var(--color-danger) 22%, transparent); }
+  50% { box-shadow: 0 4px 14px color-mix(in srgb, var(--color-danger) 40%, transparent); }
+}
+
 
 /* ── Build Phase Tracker ── */
 

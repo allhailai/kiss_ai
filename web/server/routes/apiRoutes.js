@@ -39,6 +39,7 @@ export function registerApiRoutes(app, deps) {
 
   registerChatRoutes(app, {
     applyEditProposal: deps.applyEditProposal,
+    cancelChatAgent: deps.cancelChatAgent,
     createConversation: deps.createConversation,
     editChatMessage: deps.editChatMessage,
     generateEditProposal: deps.generateEditProposal,
@@ -77,6 +78,7 @@ export function registerApiRoutes(app, deps) {
   });
 
   registerRebuildRoutes(app, {
+    cancelAgentJob: deps.cancelAgentJob,
     getRebuildState: deps.getRebuildState,
     httpError: deps.httpError,
     startBatchDeepen: deps.startBatchDeepen,

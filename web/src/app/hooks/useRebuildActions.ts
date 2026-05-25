@@ -51,5 +51,16 @@ export function useRebuildActions({
     [rebuildModels, requireSelectedProjectSlug, selectedRebuildModelId, setNotice, setRebuild],
   );
 
-  return { resolveHumanAttention, startRebuild };
+  const cancelRebuild = useCallback(async () => {
+    setNotice("");
+    try {
+      const next = await api.cancelRebuild(requireSelectedProjectSlug());
+      setRebuild(next);
+      setNotice("Build cancelled.");
+    } catch (error) {
+      setNotice(errorMessage(error, "Could not cancel the build."));
+    }
+  }, [requireSelectedProjectSlug, setNotice, setRebuild]);
+
+  return { cancelRebuild, resolveHumanAttention, startRebuild };
 }

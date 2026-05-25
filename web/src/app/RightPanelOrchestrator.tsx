@@ -40,6 +40,7 @@ export function RightPanelOrchestrator({
   projectChat: ProjectChatController;
   projectSlug: string;
   rebuildWorkspace: {
+    cancelRebuild: () => Promise<void>;
     models: RebuildModel[];
     rebuild: RebuildState | null;
     selectedModelId: string;
@@ -61,6 +62,7 @@ export function RightPanelOrchestrator({
       {rightPanel.kind === "build-project" ? (
         <BuildProjectRightPanel
           models={rebuildWorkspace.models}
+          onCancel={rebuildWorkspace.cancelRebuild}
           onModelChange={rebuildWorkspace.setSelectedModelId}
           onOpenQuestions={() => route.navigateTo("questions")}
           onSelectPanel={selectRightPanelKind}

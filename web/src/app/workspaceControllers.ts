@@ -50,6 +50,7 @@ export type FileWorkspaceController = {
 
 export type RebuildWorkspaceController = {
   buildLog: BuildLogState | null;
+  cancelRebuild: () => Promise<void>;
   models: RebuildModel[];
   rebuild: RebuildState | null;
   refreshBuildLog: (tabId?: string | null, path?: string | null, sectionId?: string | null) => Promise<void>;

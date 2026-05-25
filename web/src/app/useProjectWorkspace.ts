@@ -262,7 +262,7 @@ export function useProjectWorkspace() {
     [refreshProjects, selectProject, setNotice],
   );
 
-  const { resolveHumanAttention, startRebuild } = useRebuildActions({
+  const { cancelRebuild, resolveHumanAttention, startRebuild } = useRebuildActions({
     rebuildModels,
     requireSelectedProjectSlug,
     selectedRebuildModelId,
@@ -348,6 +348,7 @@ export function useProjectWorkspace() {
   } satisfies FileWorkspaceController;
   const rebuildWorkspace = {
     buildLog,
+    cancelRebuild,
     models: rebuildModels,
     rebuild,
     refreshBuildLog,

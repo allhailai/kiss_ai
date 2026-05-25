@@ -285,6 +285,16 @@ export function useProjectChat({
     }
   };
 
+  const cancelAgent = async () => {
+    if (!projectSlug) return;
+    try {
+      await api.cancelChatAgent(projectSlug);
+    } catch {
+      // Cancellation is best-effort
+    }
+    setSending(false);
+  };
+
   // --- Project/conversation initialization ---
 
   useEffect(() => {
@@ -346,6 +356,7 @@ export function useProjectChat({
     activeConversation,
     addContextFile: fileContext.addContextFile,
     aiEditableFiles: fileContext.aiEditableFiles,
+    cancelAgent,
     cancelEditingMessage,
     availableContextFiles: fileContext.availableContextFiles,
     contextFiles: fileContext.contextFiles,

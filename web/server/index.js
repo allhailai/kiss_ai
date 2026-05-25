@@ -241,7 +241,7 @@ const {
   projectPath,
 });
 
-const { applyEditProposal, editChatMessage, generateEditProposal, sendChatMessage, updateEditProposal } = createChatAgentService({
+const { applyEditProposal, cancelChatAgent, editChatMessage, generateEditProposal, sendChatMessage, updateEditProposal } = createChatAgentService({
   appendMessage: appendConversationMessage,
   displayProjectName,
   editUserMessage,
@@ -270,7 +270,7 @@ const { assistQuestion } = createQuestionAiAssistService({
   runCursorAgentText,
 });
 
-const { startArtifactBuild, startBatchDeepen, startHumanAttentionResolution, startRebuild } = createAgentJobService({
+const { cancelAgentJob, startArtifactBuild, startBatchDeepen, startHumanAttentionResolution, startRebuild } = createAgentJobService({
   FRAMEWORK_ROOT,
   activeRebuilds,
   appendAssistantDelta,
@@ -360,10 +360,12 @@ registerApiRoutes(app, {
   saveCursorApiKey,
   searchFiles,
   applyEditProposal,
+  cancelChatAgent,
   editChatMessage,
   generateEditProposal,
   sendChatMessage,
   startBatchDeepen,
+  cancelAgentJob,
   startHumanAttentionResolution,
   startRebuild,
   subscribeToConversation,

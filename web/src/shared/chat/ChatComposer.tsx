@@ -38,6 +38,7 @@ export function ChatComposer({
   selectedModelId,
   secondaryAction,
   showContextControls = true,
+  stopAction,
   submitLabel = "Send",
   textareaRef,
 }: {
@@ -68,6 +69,10 @@ export function ChatComposer({
     title?: string;
   };
   showContextControls?: boolean;
+  stopAction?: {
+    label: string;
+    onClick: () => void;
+  };
   submitLabel?: string;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
 }) {
@@ -269,6 +274,16 @@ export function ChatComposer({
           <button disabled={disabled || !draft.trim() || !selectedModelId} type="submit">
             {disabled ? "Sending..." : submitLabel}
           </button>
+          {stopAction ? (
+            <button
+              className="chat-composer-stop-action"
+              onClick={stopAction.onClick}
+              title="Stop the agent"
+              type="button"
+            >
+              {stopAction.label}
+            </button>
+          ) : null}
           {secondaryAction ? (
             <button
               className="chat-composer-secondary-action"

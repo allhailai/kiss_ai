@@ -25,6 +25,7 @@ type ArtifactSession =
 type RightPanelChatController = {
   activeConversation: Conversation | null;
   applyEditProposal: (proposalId: string) => Promise<boolean>;
+  cancelAgent: () => Promise<void>;
   conversationFilter: string;
   conversations: ConversationSummary[];
   filteredConversations: ConversationSummary[];
@@ -736,6 +737,10 @@ export function RightPanelAgentChat({
             } : undefined}
             selectedModelId={selectedModelId}
             showContextControls={false}
+            stopAction={chat.sending ? {
+              label: "Stop",
+              onClick: () => void chat.cancelAgent(),
+            } : undefined}
             submitLabel={composerSubmitLabel}
             textareaRef={textareaRef}
           />

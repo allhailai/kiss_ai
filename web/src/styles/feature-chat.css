@@ -729,6 +729,30 @@
   opacity: 0.5;
 }
 
+.chat-composer-stop-action {
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 55%, var(--color-border));
+  border-radius: 999px;
+  background: var(--color-danger);
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  animation: chat-stop-pulse 2s ease-in-out infinite;
+}
+
+.chat-composer-stop-action:hover,
+.chat-composer-stop-action:focus-visible {
+  background: color-mix(in srgb, var(--color-danger) 88%, black);
+  outline: 2px solid color-mix(in srgb, var(--color-danger) 22%, transparent);
+  outline-offset: 2px;
+}
+
+@keyframes chat-stop-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.82; }
+}
+
 .chat-markdown {
   min-width: 0;
   display: grid;

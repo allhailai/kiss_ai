@@ -58,6 +58,10 @@ export const chatApi = {
         body: JSON.stringify(body),
       },
     ),
+  cancelChatAgent: (projectSlug: string) =>
+    request<{ ok: boolean; cancelled: boolean }>(`${projectBase(projectSlug)}/conversations/cancel-agent`, {
+      method: "POST",
+    }),
   openConversationEventSource: (projectSlug: string, conversationId: string) =>
     new EventSource(`${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/events`),
 };

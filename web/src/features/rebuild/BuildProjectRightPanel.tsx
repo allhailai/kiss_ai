@@ -178,6 +178,7 @@ function BuildProjectEventBody({ event }: { event: AgentRunEvent }) {
 
 export function BuildProjectRightPanel({
   models,
+  onCancel,
   onModelChange,
   onOpenQuestions,
   onSelectPanel,
@@ -187,6 +188,7 @@ export function BuildProjectRightPanel({
   status,
 }: {
   models: RebuildModel[];
+  onCancel: () => void;
   onModelChange: (modelId: string) => void;
   onOpenQuestions: () => void;
   onSelectPanel: (kind: RightPanelModeKind) => void;
@@ -364,9 +366,15 @@ export function BuildProjectRightPanel({
               {formatModelLabel(selectedModel)} · {modelTierLabels[selectedModel.tier]}
             </p>
           ) : null}
-          <button className="build-project-build-button" disabled={startDisabled} onClick={onStart} type="button">
-            {buildRunning ? "BUILDING" : "BUILD"}
-          </button>
+          {buildRunning ? (
+            <button className="build-project-stop-button" onClick={onCancel} type="button">
+              STOP
+            </button>
+          ) : (
+            <button className="build-project-build-button" disabled={startDisabled} onClick={onStart} type="button">
+              BUILD
+            </button>
+          )}
         </div>
       </section>
     </div>

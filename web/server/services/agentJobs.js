@@ -26,6 +26,7 @@ export function createAgentJobService({
   setRebuildState,
 }) {
   const startLocks = new Map();
+  const activeAbortControllers = new Map();
 
   const {
     createArtifactPrompt,
@@ -79,6 +80,7 @@ export function createAgentJobService({
           modelId,
           prompt: filePrompt,
           phaseName: `File: ${outputFile}`,
+          signal: undefined,
         });
 
         completed++;
@@ -303,6 +305,9 @@ export function createAgentJobService({
 
       const modelId = pickRebuildModelId(models, requestedModelId);
 
+      const abortController = new AbortController();
+      activeAbortControllers.set(project.slug, abortController);
+
       await setRebuildState(project.slug, {
         running: true,
         runId: null,
@@ -325,7 +330,7 @@ export function createAgentJobService({
       await appendRunLog(project.slug, `Using Cursor API key from ${cursorApiKey.source}.`);
       await appendRunLog(project.slug, `Using Cursor model: ${modelId}.`);
 
-      runAgentJob({ project, apiKey: cursorApiKey.apiKey, modelId, prompt, jobName, runKind, deepenContext, releaseProjectAgent }).catch((error) => {
+      runAgentJob({ project, apiKey: cursorApiKey.apiKey, modelId, prompt, jobName, runKind, deepenContext, releaseProjectAgent, signal: activeAbortControllers.get(project.slug)?.signal }).catch((error) => {
         void (async () => {
           const current = await getRebuildState(project.slug);
           await setRebuildState(project.slug, {
@@ -413,12 +418,13 @@ export function createAgentJobService({
     });
   }
 
-  async function runSingleAgentPhase({ project, apiKey, modelId, prompt, phaseName }) {
+  async function runSingleAgentPhase({ project, apiKey, modelId, prompt, phaseName, signal }) {
     const result = await runCursorAgent({
       project,
       apiKey,
       modelId,
       prompt,
+      signal,
       onEvent: async (event) => {
         if (event.type === "assistant_delta") {
           await appendAssistantDelta(project.slug, event.text, event.metadata);
@@ -439,7 +445,7 @@ export function createAgentJobService({
     return result;
   }
 
-  async function runAgentJob({ project, apiKey, modelId, prompt, jobName, runKind, deepenContext, releaseProjectAgent }) {
+  async function runAgentJob({ project, apiKey, modelId, prompt, jobName, runKind, deepenContext, releaseProjectAgent, signal }) {
     // Batch deepen jobs get their own pipeline
     if (runKind === "batch_deepen" && Array.isArray(deepenContext)) {
       return await runBatchDeepenJob({ project, apiKey, modelId, prompt, jobName, topics: deepenContext, releaseProjectAgent });
@@ -514,6 +520,7 @@ export function createAgentJobService({
           modelId,
           prompt, // This is the research prompt
           phaseName: "Research Plan",
+          signal,
         });
 
         if (researchResult.status !== "finished") {
@@ -586,6 +593,7 @@ export function createAgentJobService({
         modelId,
         prompt: wikiPrompt,
         phaseName: "Wiki Synthesis",
+        signal,
       });
 
       if (wikiResult.status !== "finished") {
@@ -708,6 +716,7 @@ export function createAgentJobService({
         modelId,
         prompt: validationPrompt,
         phaseName: "Validation",
+        signal,
       });
 
       // ── Phase 3d: Auto-answer open questions from evidence ──
@@ -739,6 +748,7 @@ export function createAgentJobService({
             modelId,
             prompt: autoAnswerPrompt,
             phaseName: "Auto-Answer Questions",
+            signal,
           });
 
           // Check results
@@ -901,25 +911,30 @@ export function createAgentJobService({
       });
     } catch (error) {
       await finishAssistantMessage(project.slug);
-      const message = error instanceof Error ? error.message : `Unknown Cursor SDK ${jobName.toLowerCase()} failure.`;
+      const isCancelled = error?.name === "AbortError";
+      const status = isCancelled ? "interrupted" : "error";
+      const message = isCancelled
+        ? "Cancelled by user."
+        : (error instanceof Error ? error.message : `Unknown Cursor SDK ${jobName.toLowerCase()} failure.`);
 
       const current = await getRebuildState(project.slug);
       await setRebuildState(project.slug, {
         ...current,
         running: false,
-        status: "error",
+        status,
         finishedAt: new Date().toISOString(),
         message,
       });
       await appendRunEvent(project.slug, {
-        type: "error",
-        title: `${jobName} failed`,
+        type: isCancelled ? "run_status" : "error",
+        title: isCancelled ? `${jobName} cancelled` : `${jobName} failed`,
         text: message,
-        status: "error",
+        status,
         runtime: "cursor",
       });
     } finally {
       activeRebuilds.delete(project.slug);
+      activeAbortControllers.delete(project.slug);
       releaseProjectAgent();
     }
   }
@@ -1335,6 +1350,20 @@ export function createAgentJobService({
     });
   }
 
-  return { startArtifactBuild, startBatchDeepen, startHumanAttentionResolution, startRebuild };
+  async function cancelAgentJob(projectSlug) {
+    const controller = activeAbortControllers.get(projectSlug);
+    if (!controller) {
+      // No running job — return current state
+      return await getRebuildState(projectSlug);
+    }
+
+    controller.abort();
+    // The abort triggers the catch block in runAgentJob which sets interrupted state.
+    // Wait a beat for the state to settle, then return the latest.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    return await getRebuildState(projectSlug);
+  }
+
+  return { cancelAgentJob, startArtifactBuild, startBatchDeepen, startHumanAttentionResolution, startRebuild };
 }
 

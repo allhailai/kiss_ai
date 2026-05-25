@@ -16,6 +16,7 @@ import {
 
 export function registerChatRoutes(app, {
   applyEditProposal,
+  cancelChatAgent,
   editChatMessage,
   generateEditProposal,
   httpError,
@@ -120,6 +121,14 @@ export function registerChatRoutes(app, {
         conversation,
       });
       stream.closeWith(unsubscribe);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/conversations/cancel-agent", async (request, response, next) => {
+    try {
+      response.json(cancelChatAgent(request.project.slug));
     } catch (error) {
       next(error);
     }

@@ -636,7 +636,12 @@ export function createChatAgentService({
   writeConversation,
   writeProjectJson,
 }) {
+  const activeChatControllers = new Map();
+
   function startAssistantGeneration({ project, conversationId, releaseProjectAgent, conversationWithUser, assistantMessageId, cursorApiKey, modelId }) {
+    const controller = new AbortController();
+    activeChatControllers.set(project.slug, controller);
+
     void (async () => {
       const assistantTextChunks = [];
       let assistantTextBytes = 0;
@@ -654,6 +659,7 @@ export function createChatAgentService({
           apiKey: cursorApiKey.apiKey,
           modelId,
           prompt,
+          signal: controller.signal,
           onEvent: async (event) => {
             if (event.type !== "assistant_delta" || !event.text) return;
             assistantTextBytes += Buffer.byteLength(event.text, "utf8");
@@ -705,30 +711,86 @@ export function createChatAgentService({
           message,
         });
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Chat failed.";
-        try {
-          const finalConversation = await appendMessage(project, conversationId, {
-            id: assistantMessageId,
-            role: "assistant",
-            content: errorMessage,
-            createdAt: nowIso(),
-            modelId,
-            status: "error",
-          });
-          notifyConversation(project.slug, conversationId, {
-            type: "message_complete",
-            conversation: finalConversation,
-            message: finalConversation.messages.at(-1),
-          });
-        } catch {
-          notifyConversation(project.slug, conversationId, {
-            type: "error",
-            conversationId,
-            message: errorMessage,
-            updatedAt: nowIso(),
-          });
+        const isCancelled = error?.name === "AbortError";
+        const assistantText = assistantTextChunks.join("");
+
+        if (isCancelled && assistantText.trim()) {
+          // Save partial response on cancellation
+          try {
+            const partialConversation = await appendMessage(project, conversationId, {
+              id: assistantMessageId,
+              role: "assistant",
+              content: assistantText.trim(),
+              createdAt: nowIso(),
+              modelId,
+              status: "complete",
+              metadata: { cancelled: true },
+            });
+            notifyConversation(project.slug, conversationId, {
+              type: "message_complete",
+              conversation: partialConversation,
+              message: partialConversation.messages.find((m) => m.id === assistantMessageId) ?? partialConversation.messages.at(-1),
+            });
+          } catch {
+            notifyConversation(project.slug, conversationId, {
+              type: "error",
+              conversationId,
+              message: "Chat was cancelled.",
+              updatedAt: nowIso(),
+            });
+          }
+        } else if (isCancelled) {
+          // No text accumulated — just notify cancellation
+          try {
+            const cancelledConversation = await appendMessage(project, conversationId, {
+              id: assistantMessageId,
+              role: "assistant",
+              content: "Chat was cancelled.",
+              createdAt: nowIso(),
+              modelId,
+              status: "complete",
+              metadata: { cancelled: true },
+            });
+            notifyConversation(project.slug, conversationId, {
+              type: "message_complete",
+              conversation: cancelledConversation,
+              message: cancelledConversation.messages.at(-1),
+            });
+          } catch {
+            notifyConversation(project.slug, conversationId, {
+              type: "error",
+              conversationId,
+              message: "Chat was cancelled.",
+              updatedAt: nowIso(),
+            });
+          }
+        } else {
+          const errorMessage = error instanceof Error ? error.message : "Chat failed.";
+          try {
+            const finalConversation = await appendMessage(project, conversationId, {
+              id: assistantMessageId,
+              role: "assistant",
+              content: errorMessage,
+              createdAt: nowIso(),
+              modelId,
+              status: "error",
+            });
+            notifyConversation(project.slug, conversationId, {
+              type: "message_complete",
+              conversation: finalConversation,
+              message: finalConversation.messages.at(-1),
+            });
+          } catch {
+            notifyConversation(project.slug, conversationId, {
+              type: "error",
+              conversationId,
+              message: errorMessage,
+              updatedAt: nowIso(),
+            });
+          }
         }
       } finally {
+        activeChatControllers.delete(project.slug);
         releaseProjectAgent();
       }
     })();
@@ -830,15 +892,22 @@ export function createChatAgentService({
       }
 
       let assistantText = "";
-      await runCursorAgent({
-        project,
-        apiKey: cursorApiKey.apiKey,
-        modelId,
-        prompt,
-        onEvent: async (event) => {
-          if (event.type === "assistant_delta" && event.text) assistantText += event.text;
-        },
-      });
+      const proposalController = new AbortController();
+      activeChatControllers.set(project.slug, proposalController);
+      try {
+        await runCursorAgent({
+          project,
+          apiKey: cursorApiKey.apiKey,
+          modelId,
+          prompt,
+          signal: proposalController.signal,
+          onEvent: async (event) => {
+            if (event.type === "assistant_delta" && event.text) assistantText += event.text;
+          },
+        });
+      } finally {
+        activeChatControllers.delete(project.slug);
+      }
 
       const rejectionMemory = normalizeConceptualDiffMemoryFile(await readProjectJson(project.path, conceptualDiffMemoryPath, emptyConceptualDiffMemory()));
       const activeRecords = activeRejectionRecords(rejectionMemory, { filePaths: authorizedEditablePaths, flow: "ai_file_assist" });
@@ -970,15 +1039,22 @@ export function createChatAgentService({
       }
 
       let assistantText = "";
-      await runCursorAgent({
-        project,
-        apiKey: cursorApiKey.apiKey,
-        modelId,
-        prompt,
-        onEvent: async (event) => {
-          if (event.type === "assistant_delta" && event.text) assistantText += event.text;
-        },
-      });
+      const applyController = new AbortController();
+      activeChatControllers.set(project.slug, applyController);
+      try {
+        await runCursorAgent({
+          project,
+          apiKey: cursorApiKey.apiKey,
+          modelId,
+          prompt,
+          signal: applyController.signal,
+          onEvent: async (event) => {
+            if (event.type === "assistant_delta" && event.text) assistantText += event.text;
+          },
+        });
+      } finally {
+        activeChatControllers.delete(project.slug);
+      }
 
       const applyResult = extractApplyResult(assistantText, approvedConceptualDiffIds);
       const completedAt = nowIso();
@@ -1035,5 +1111,12 @@ export function createChatAgentService({
     }
   }
 
-  return { applyEditProposal, editChatMessage, generateEditProposal, sendChatMessage, updateEditProposal };
+  function cancelChatAgent(projectSlug) {
+    const controller = activeChatControllers.get(projectSlug);
+    if (!controller) return { ok: true, cancelled: false };
+    controller.abort();
+    return { ok: true, cancelled: true };
+  }
+
+  return { applyEditProposal, cancelChatAgent, editChatMessage, generateEditProposal, sendChatMessage, updateEditProposal };
 }
