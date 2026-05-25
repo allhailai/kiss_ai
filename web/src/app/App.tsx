@@ -128,22 +128,23 @@ export function App() {
     }
   }, [route.context.panel]);
 
-  const applyChatFileEdit = async (edit: ChatMessageFileEdit) => {
+  const applyChatFileEdit = async (edit: ChatMessageFileEdit): Promise<boolean> => {
     const decision = await resolveChatFileEditApplication({ draft: fileWorkspace.draft, edit, selected: fileWorkspace.selected });
 
     if (decision.kind === "open-file") {
       route.openProjectFile(decision.path);
       toastWorkspace.setNotice(decision.message);
-      return;
+      return false;
     }
 
     if (decision.kind === "notice") {
       toastWorkspace.setNotice(decision.message);
-      return;
+      return false;
     }
 
     fileWorkspace.setDraft(decision.content);
     toastWorkspace.setNotice(decision.message);
+    return true;
   };
   const startRebuildWithRequirementsCheck = () => {
     void rebuildWorkspace.startRebuild();

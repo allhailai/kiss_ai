@@ -42,7 +42,7 @@ export function ChatThread({
   onCreateArtifact?: (proposal: ChatMessageArtifactProposal) => void;
   onCreateTopic?: (proposal: ChatMessageTopicProposal) => void;
   onEditDraftChange?: (value: string) => void;
-  onApplyFileEdit?: (edit: ChatMessageFileEdit) => void | Promise<void>;
+  onApplyFileEdit?: (edit: ChatMessageFileEdit) => Promise<boolean>;
   onJumpToLatest?: () => void;
   onViewEditProposal?: (proposalId: string) => void;
   onSaveEdit?: (message: ChatMessage) => void;

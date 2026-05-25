@@ -115,7 +115,7 @@ export function RightPanelAgentChat({
   highlightedContext: { path: string; target: "editable" | "context" } | null;
   models: RebuildModel[];
   onAddContextFile: (path: string) => void;
-  onApplyFileEdit: (edit: ChatMessageFileEdit) => void;
+  onApplyFileEdit: (edit: ChatMessageFileEdit) => Promise<boolean>;
   onContextFilesChange: Dispatch<SetStateAction<ChatContextFile[]>>;
   onModelChange: (modelId: string) => void;
   onModifyCurrentFile: () => void;
