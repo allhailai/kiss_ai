@@ -92,12 +92,13 @@ function QuestionCard({
 
   const handleApplyAnswer = useCallback(() => {
     if (!aiAnswer) return;
-    setDraft(aiAnswer);
+    onAnswer(question.id, aiAnswer);
+    setDraft("");
     setAiAnswer(null);
     setAiConfidence(null);
     setAiConfidenceReason(null);
     setAiError(null);
-  }, [aiAnswer]);
+  }, [aiAnswer, onAnswer, question.id]);
 
   const handleDismissAiAnswer = useCallback(() => {
     setAiAnswer(null);
