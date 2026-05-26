@@ -1117,7 +1117,11 @@ export function createAgentJobService({
             await fs.mkdir(buildDir, { recursive: true });
           } catch { /* directory may not exist yet */ }
 
-          const artifactPrompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory);
+          // Compute the spec hash server-side (same as startArtifactBuild)
+          const crypto = await import("node:crypto");
+          const batchSpecHash = crypto.createHash("sha256").update(spec.rawContent).digest("hex");
+
+          const artifactPrompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory, batchSpecHash);
 
           await appendRunEvent(project.slug, {
             type: "system",
@@ -1438,6 +1442,11 @@ export function createAgentJobService({
     const discoveryInventory = await discoverRelevantSources(project.path, explicitPaths);
     await ensureArtifactDirs(project.path);
 
+    // Compute the spec hash server-side so the agent writes the correct value
+    // into the manifest (LLMs unreliably compute SHA-256 themselves).
+    const crypto = await import("node:crypto");
+    const specHash = crypto.createHash("sha256").update(spec.rawContent).digest("hex");
+
     // Delete old build output so the agent starts fresh (prevents incremental edits on stale HTML)
     const buildDir = path.join(project.path, "artifacts/builds", artifactSlug);
     try {
@@ -1447,7 +1456,7 @@ export function createAgentJobService({
       // Ignore — directory may not exist yet
     }
 
-    const prompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory);
+    const prompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory, specHash);
 
     return await startAgentJob({
       project,

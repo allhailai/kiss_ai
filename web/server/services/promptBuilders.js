@@ -368,7 +368,7 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
     ].join("\n");
   }
 
-  async function createArtifactPrompt(project, artifactSpec, resolvedSources, discoveryInventory = []) {
+  async function createArtifactPrompt(project, artifactSpec, resolvedSources, discoveryInventory = [], specHash = null) {
     const lines = [
       `Build the artifact: ${artifactSpec.frontmatter.name || artifactSpec.slug}`,
       "",
@@ -382,6 +382,11 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
       "",
       "IMPORTANT: The build output directory has been cleared. Generate index.html entirely from scratch based on the spec below. Do NOT read, reference, or modify any prior build output — the directory is empty.",
       "",
+      ...(specHash ? [
+        `MANIFEST SPEC HASH: Use this exact value for the "specHash" field in the manifest: "${specHash}"`,
+        "Do NOT compute the hash yourself — use this pre-computed value verbatim.",
+        "",
+      ] : []),
       "── ARTIFACT SPEC ──────────────────────────────────────────",
       "",
     ];
