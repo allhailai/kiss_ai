@@ -33,7 +33,7 @@ export function RightPanelOrchestrator({
     addEditableFile: (path: string) => void;
     removeAiEditableFile: (path: string) => void;
   };
-  applyChatFileEdit: (edit: ChatMessageFileEdit) => Promise<boolean>;
+  applyChatFileEdit: (edit: ChatMessageFileEdit, editIndex: number, messageId: string) => Promise<boolean>;
   closeRightPanel: () => void;
   draftSeed: { id: string; draft: string } | null;
   fileWorkspaceProjectFiles: ProjectFile[];

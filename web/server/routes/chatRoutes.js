@@ -6,12 +6,14 @@ import {
   conversationParamsSchema,
   editChatMessageBodySchema,
   editProposalParamsSchema,
+  fileEditStatusParamsSchema,
   generateEditProposalBodySchema,
   parseRequestBody,
   parseRequestParams,
   sendChatMessageBodySchema,
   updateConversationBodySchema,
   updateEditProposalBodySchema,
+  updateFileEditStatusBodySchema,
 } from "./requestSchemas.js";
 
 export function registerChatRoutes(app, {
@@ -27,6 +29,7 @@ export function registerChatRoutes(app, {
   subscribeToConversation,
   updateConversation,
   updateEditProposal,
+  updateMessageFileEditStatus,
 }) {
   app.get("/api/projects/:projectSlug/conversations", async (request, response, next) => {
     try {
@@ -102,6 +105,16 @@ export function registerChatRoutes(app, {
     try {
       const { conversationId, proposalId } = parseRequestParams(editProposalParamsSchema, request.params, httpError);
       response.json(await applyEditProposal(request.project, conversationId, proposalId, parseRequestBody(applyEditProposalBodySchema, request.body, httpError)));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/projects/:projectSlug/conversations/:conversationId/messages/:messageId/file-edits/:editIndex/status", async (request, response, next) => {
+    try {
+      const { conversationId, messageId, editIndex } = parseRequestParams(fileEditStatusParamsSchema, request.params, httpError);
+      const { status } = parseRequestBody(updateFileEditStatusBodySchema, request.body, httpError);
+      response.json(await updateMessageFileEditStatus(request.project, conversationId, messageId, editIndex, status));
     } catch (error) {
       next(error);
     }

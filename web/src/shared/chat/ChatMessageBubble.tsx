@@ -37,7 +37,7 @@ function ChatMessageBubbleComponent({
   message: ChatMessage;
   onCancelEdit: () => void;
   onEditDraftChange: (value: string) => void;
-  onApplyFileEdit?: (edit: ChatMessageFileEdit) => Promise<boolean>;
+  onApplyFileEdit?: (edit: ChatMessageFileEdit, editIndex: number, messageId: string) => Promise<boolean>;
   onCreateArtifact?: (proposal: ChatMessageArtifactProposal) => void;
   onCreateTopic?: (proposal: ChatMessageTopicProposal) => void;
   onSaveEdit: (message: ChatMessage) => void;
@@ -50,7 +50,6 @@ function ChatMessageBubbleComponent({
   const artifactProposals = message.metadata?.artifactProposals ?? [];
   const viewableEditProposals = linkedEditProposals.filter((proposal) => proposal.status === "applied" || proposal.status === "partial");
   const [applyingEditKey, setApplyingEditKey] = useState<string | null>(null);
-  const [appliedEditKeys, setAppliedEditKeys] = useState<Set<string>>(new Set());
   const currentFilePath = message.context?.currentFile?.path;
   const currentFileIsEditable = Boolean(
     currentFilePath && message.context?.ai_editable_files?.some((file) => file.path === currentFilePath),
@@ -136,21 +135,19 @@ function ChatMessageBubbleComponent({
       ) : null}
       {fileEdits.length ? (
         <div className="chat-message-context">
-          {fileEdits.map((edit) => {
+          {fileEdits.map((edit, editIndex) => {
             const editKey = `${edit.path}-${edit.summary}`;
             const applying = applyingEditKey === editKey;
+            const isApplied = edit.status === "applied";
             return (
               <button
-                className={`${edit.path.includes("artifact_specs/") ? "chat-artifact-apply-btn" : "chat-context-chip"} ${(edit.status === "applied" || appliedEditKeys.has(editKey)) ? "chat-edit-applied" : ""}`}
-                disabled={disabled || applying || !edit.proposedContent || edit.status !== "proposed" || appliedEditKeys.has(editKey)}
+                className={`${edit.path.includes("artifact_specs/") ? "chat-artifact-apply-btn" : "chat-context-chip"} ${isApplied ? "chat-edit-applied" : ""}`}
+                disabled={disabled || applying || !edit.proposedContent || edit.status !== "proposed"}
                 key={editKey}
                 onClick={async () => {
                   setApplyingEditKey(editKey);
                   try {
-                    const didApply = await onApplyFileEdit?.(edit);
-                    if (didApply) {
-                      setAppliedEditKeys((prev) => new Set(prev).add(editKey));
-                    }
+                    await onApplyFileEdit?.(edit, editIndex, message.id);
                   } catch (error: unknown) {
                     console.error("[kiss_ai UI warning] Could not apply chat file edit.", error);
                   } finally {
@@ -160,11 +157,11 @@ function ChatMessageBubbleComponent({
                 title={edit.summary}
                 type="button"
               >
-              {(edit.status === "applied" || appliedEditKeys.has(editKey))
+              {isApplied
                 ? (<><span className="chat-edit-applied-check">✓</span> Applied</>)
                 : edit.path.includes("artifact_specs/")
                   ? (applying ? "Applying…" : "Update Artifact \u2014 with the change above?")
-                  : (<>{applying ? "Applying draft edit:" : "Apply draft edit:"} {edit.path}</>)}
+                  : (<>{applying ? "Applying edit:" : "Apply edit:"} {edit.path}</>)}
               </button>
             );
           })}

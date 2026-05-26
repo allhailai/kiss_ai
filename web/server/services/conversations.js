@@ -427,6 +427,36 @@ export function createConversationService({ httpError, projectPath }) {
     return await withProjectMutation(project, () => editUserMessageUnlocked(project, conversationId, messageId, content));
   }
 
+  async function updateMessageFileEditStatusUnlocked(project, conversationId, messageId, editIndex, status) {
+    const conversation = await readConversation(project, conversationId);
+    const message = conversation.messages.find((m) => m.id === messageId);
+    if (!message) throw httpError("Chat message not found.", 404, "chat_message_not_found");
+
+    const fileEdits = message.metadata?.fileEdits;
+    if (!Array.isArray(fileEdits) || editIndex < 0 || editIndex >= fileEdits.length) {
+      throw httpError("File edit not found.", 404, "file_edit_not_found");
+    }
+
+    const validStatuses = ["proposed", "applied", "rejected", "failed"];
+    if (!validStatuses.includes(status)) {
+      throw httpError("Invalid file edit status.", 400, "invalid_file_edit_status");
+    }
+
+    fileEdits[editIndex] = {
+      ...fileEdits[editIndex],
+      status,
+      ...(status === "applied" ? { appliedAt: nowIso() } : {}),
+    };
+
+    return await writeConversationUnlocked(project, { ...conversation, updatedAt: nowIso() });
+  }
+
+  async function updateMessageFileEditStatus(project, conversationId, messageId, editIndex, status) {
+    return await withProjectMutation(project, () =>
+      updateMessageFileEditStatusUnlocked(project, conversationId, messageId, editIndex, status),
+    );
+  }
+
   return {
     appendMessage,
     createConversation,
@@ -436,6 +466,7 @@ export function createConversationService({ httpError, projectPath }) {
     readConversation,
     subscribeToConversation: subscribe,
     updateConversation,
+    updateMessageFileEditStatus,
     writeConversation,
   };
 }

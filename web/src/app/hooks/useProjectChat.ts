@@ -377,6 +377,7 @@ export function useProjectChat({
     scrollToLatest: scroll.scrollToLatest,
     sending,
     proposalUpdating,
+    setActiveConversation,
     setAiEditableFiles: fileContext.setAiEditableFiles,
     setContextFiles: fileContext.setContextFiles,
     setConversationFilter,

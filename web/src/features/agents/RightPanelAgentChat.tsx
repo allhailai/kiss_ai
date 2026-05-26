@@ -115,7 +115,7 @@ export function RightPanelAgentChat({
   highlightedContext: { path: string; target: "editable" | "context" } | null;
   models: RebuildModel[];
   onAddContextFile: (path: string) => void;
-  onApplyFileEdit: (edit: ChatMessageFileEdit) => Promise<boolean>;
+  onApplyFileEdit: (edit: ChatMessageFileEdit, editIndex: number, messageId: string) => Promise<boolean>;
   onContextFilesChange: Dispatch<SetStateAction<ChatContextFile[]>>;
   onModelChange: (modelId: string) => void;
   onModifyCurrentFile: () => void;
@@ -134,7 +134,18 @@ export function RightPanelAgentChat({
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [artifactSession, setArtifactSession] = useState<ArtifactSession>({ phase: "idle" });
   const [activeArtifactProposal, setActiveArtifactProposal] = useState<ChatMessageArtifactProposal | null>(null);
-  const [createdArtifactTitles, setCreatedArtifactTitles] = useState<Set<string>>(new Set());
+  const [localCreatedArtifactTitles, setLocalCreatedArtifactTitles] = useState<Set<string>>(new Set());
+  // Derive artifact titles from project files so the "created" state survives refresh.
+  // Union with local optimistic set for instant feedback on creation.
+  const createdArtifactTitles = useMemo(() => {
+    const fromFiles = new Set<string>();
+    for (const file of projectFiles) {
+      const parsed = parseArtifactSpecPath(file.path);
+      if (parsed) fromFiles.add(parsed.name.toLowerCase());
+    }
+    for (const title of localCreatedArtifactTitles) fromFiles.add(title);
+    return fromFiles;
+  }, [projectFiles, localCreatedArtifactTitles]);
   const [specModified, setSpecModified] = useState(false);
   const [bottomPanelHeight, setBottomPanelHeight] = useState<number | null>(null);
   const bottomDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
@@ -345,7 +356,7 @@ export function RightPanelAgentChat({
   const handleArtifactCreated = (slug: string, name: string) => {
     setArtifactSession({ phase: "editing", slug, name });
     setActiveArtifactProposal(null);
-    setCreatedArtifactTitles((prev) => new Set(prev).add(name.toLowerCase()));
+    setLocalCreatedArtifactTitles((prev) => new Set(prev).add(name.toLowerCase()));
     setSpecModified(false);
     // Auto-add the spec file as AI Editable so the agent can edit it
     const specPath = `artifacts/artifact_specs/${slug}.artifact.md`;

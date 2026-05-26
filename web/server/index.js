@@ -235,6 +235,7 @@ const {
   readConversation,
   subscribeToConversation,
   updateConversation,
+  updateMessageFileEditStatus,
   writeConversation,
 } = createConversationService({
   httpError,
@@ -376,6 +377,7 @@ registerApiRoutes(app, {
   updateConversation,
   updateEditProposal,
   updateKissAi,
+  updateMessageFileEditStatus,
   uploadHumanInputFiles,
   writeTextFile,
   writeProjectUiState,

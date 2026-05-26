@@ -215,6 +215,14 @@ export const editProposalParamsSchema = conversationParamsSchema.extend({
   proposalId: z.string().trim().regex(/^[a-zA-Z0-9_-]+$/, "Invalid edit proposal id."),
 });
 
+export const fileEditStatusParamsSchema = chatMessageParamsSchema.extend({
+  editIndex: z.string().regex(/^\d+$/, "Edit index must be a number.").transform(Number),
+});
+
+export const updateFileEditStatusBodySchema = z.object({
+  status: z.enum(["proposed", "applied", "rejected", "failed"]),
+});
+
 export const createArtifactBodySchema = z.object({
   name: z.string().trim().min(1).max(255),
   frontmatter: z.record(z.unknown()).optional(),

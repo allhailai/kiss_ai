@@ -58,6 +58,14 @@ export const chatApi = {
         body: JSON.stringify(body),
       },
     ),
+  markFileEditApplied: (projectSlug: string, conversationId: string, messageId: string, editIndex: number) =>
+    request<Conversation>(
+      `${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/file-edits/${editIndex}/status`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status: "applied" }),
+      },
+    ),
   cancelChatAgent: (projectSlug: string) =>
     request<{ ok: boolean; cancelled: boolean }>(`${projectBase(projectSlug)}/conversations/cancel-agent`, {
       method: "POST",

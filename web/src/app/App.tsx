@@ -16,6 +16,7 @@ import { ToastViewport } from "../features/toast/ToastViewport";
 import { makeEditableTargetForFile, useAgentFileContext } from "./hooks/useAgentFileContext";
 import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
 import type { ChatMessageFileEdit } from "../contracts/api";
+import { chatApi } from "../data/chatApi";
 import { BuildProvider, type BuildContextValue } from "./contexts/BuildContext";
 import { RouteProvider } from "./contexts/RouteContext";
 import { ToastProvider } from "./contexts/ToastContext";
@@ -128,7 +129,7 @@ export function App() {
     }
   }, [route.context.panel]);
 
-  const applyChatFileEdit = async (edit: ChatMessageFileEdit): Promise<boolean> => {
+  const applyChatFileEdit = async (edit: ChatMessageFileEdit, editIndex: number, messageId: string): Promise<boolean> => {
     const decision = await resolveChatFileEditApplication({ draft: fileWorkspace.draft, edit, selected: fileWorkspace.selected });
 
     if (decision.kind === "open-file") {
@@ -144,14 +145,26 @@ export function App() {
 
     fileWorkspace.setDraft(decision.content);
 
-    // Auto-save artifact spec edits — these should persist immediately
-    // rather than requiring the user to manually save
-    if (edit.path.includes("artifact_specs/")) {
-      await fileWorkspace.saveSelected();
-      toastWorkspace.setNotice("Artifact spec updated and saved.");
-    } else {
-      toastWorkspace.setNotice(decision.message);
+    // Auto-save all AI file edits — the user already reviewed the proposal by clicking Apply
+    await fileWorkspace.saveSelected();
+    toastWorkspace.setNotice(`Applied and saved ${edit.path}.`);
+
+    // Refresh project files and the current file so left nav + ArtifactsView update
+    await fileWorkspace.refreshProjectFiles();
+    await fileWorkspace.refreshSelectedFile();
+
+    // Persist the "applied" status server-side so it survives refresh
+    const conversationId = projectChat.activeConversation?.id;
+    if (conversationId && project.selectedProjectSlug) {
+      try {
+        const updated = await chatApi.markFileEditApplied(project.selectedProjectSlug, conversationId, messageId, editIndex);
+        projectChat.setActiveConversation(updated);
+      } catch {
+        // Non-critical — the edit was still applied to the file, just the status badge won't persist
+        console.warn("[kiss_ai] Could not persist file edit applied status.");
+      }
     }
+
     return true;
   };
   const startRebuildWithRequirementsCheck = () => {

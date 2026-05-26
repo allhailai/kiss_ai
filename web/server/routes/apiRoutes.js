@@ -50,6 +50,7 @@ export function registerApiRoutes(app, deps) {
     subscribeToConversation: deps.subscribeToConversation,
     updateConversation: deps.updateConversation,
     updateEditProposal: deps.updateEditProposal,
+    updateMessageFileEditStatus: deps.updateMessageFileEditStatus,
   });
 
   registerFileRoutes(app, {

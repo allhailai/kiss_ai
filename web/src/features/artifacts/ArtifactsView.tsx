@@ -118,10 +118,10 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   }, []);
 
   // Handle "build" action from route context (e.g. Rebuild button in side panel)
-  const pendingBuildRef = useRef(false);
+  const [pendingBuild, setPendingBuild] = useState(false);
   useEffect(() => {
     if (route.context.action === "build" && selectedSlug) {
-      pendingBuildRef.current = true;
+      setPendingBuild(true);
       // Clear the context so it doesn't re-trigger
       route.navigateTo("artifacts", selectedSlug, {});
     }
@@ -129,11 +129,11 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
 
   // Fire the build once the spec is loaded
   useEffect(() => {
-    if (pendingBuildRef.current && selectedSpec && selectedSlug && !building) {
-      pendingBuildRef.current = false;
+    if (pendingBuild && selectedSpec && selectedSlug && !building) {
+      setPendingBuild(false);
       void handleBuild();
     }
-  }, [selectedSpec, selectedSlug, building]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendingBuild, selectedSpec, selectedSlug, building]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSave() {
     if (!selectedSlug || !selectedSpec) return;
@@ -166,29 +166,45 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
         flash("Build started — agent is generating HTML…");
       }
 
+      // Capture build start time BEFORE the API call so we can distinguish
+      // the new build from a previous one in the polling check.
+      const buildStartedAt = new Date().toISOString();
+
       await artifactsApi.build(projectSlug, selectedSlug, String(selectedSpec?.frontmatter.modelId ?? ""));
 
-      // Poll for build completion every 5 seconds
+      // Poll for build completion every 5 seconds (with 5-minute safety timeout)
       if (pollRef.current) clearInterval(pollRef.current);
       const slugAtBuildTime = selectedSlug;
+      let pollCount = 0;
+      const maxPolls = 60; // 5 minutes at 5-second intervals
       pollRef.current = setInterval(async () => {
+        pollCount++;
         const updatedList = await refreshList();
         const updated = updatedList.find((a) => a.slug === slugAtBuildTime);
-        if (updated?.status === "built") {
+
+        // The server deletes the old build dir before starting a new one.
+        // Wait for a NEW build (lastBuilt >= our start time) to appear.
+        const isNewBuild = updated?.status === "built" && updated.lastBuilt && updated.lastBuilt >= buildStartedAt;
+
+        if (isNewBuild || pollCount >= maxPolls) {
           if (pollRef.current) {
             clearInterval(pollRef.current);
             pollRef.current = null;
           }
           setBuilding(false);
-          setPreviewKey((k) => k + 1);
-          setActiveTab("preview");
-          // Auto-refresh popped-out preview window
-          try {
-            if (popoutRef.current && !popoutRef.current.closed) {
-              popoutRef.current.location.reload();
-            }
-          } catch { /* cross-origin or closed — ignore */ }
-          flash("Build complete ✓");
+          if (isNewBuild) {
+            setPreviewKey((k) => k + 1);
+            setActiveTab("preview");
+            // Auto-refresh popped-out preview window
+            try {
+              if (popoutRef.current && !popoutRef.current.closed) {
+                popoutRef.current.location.reload();
+              }
+            } catch { /* cross-origin or closed — ignore */ }
+            flash("Build complete ✓");
+          } else {
+            flash("Build timed out — check the build log.");
+          }
         }
       }, 5000);
     } catch (error) {
