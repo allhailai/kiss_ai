@@ -66,14 +66,17 @@ One paragraph describing what the artifact should communicate and who it's for.
 
 #### Visualizations
 Specific visualization types for this output's data:
-- What kind of chart/diagram/matrix for each data structure
+- What kind of chart/diagram/matrix for each data structure — prefer conventional types (bar, table, matrix, flow diagram) over novel metaphors (clocks, gauges, spirals)
 - Whether to use inline SVG, Canvas, or a lightweight CDN library
 - Color coding strategy aligned with the design identity
 
 #### Design Direction
 Layout-specific guidance:
 - Single column vs. multi-column vs. dashboard grid
-- Key interactive elements (filters, tabs, hover states, collapsible sections)
+- Filters or highlight toggles for comparing data across scenarios or categories
+- For data with narrow numeric ranges (e.g., allocation bands, percentage ranges), specify a table as the default layout with an optional chart view toggle
+
+IMPORTANT: Do not specify accordions, collapsible sections, or expandable panels for primary analytical content (strategy rationale, risk assessments, permitted/prohibited actions, data comparisons). The build prompt's Interaction Discipline rules will override collapse instructions for primary content. Use collapse only for genuinely supplementary material like methodology notes, raw source citations, or verbose backup data. When the artifact needs to present many sections of primary content, use a card grid, scrollable sections, or a table layout — not hidden accordions.
 - Print-friendly considerations if applicable
 
 ### Step 4: Quality Checks
