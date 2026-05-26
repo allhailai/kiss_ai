@@ -4,9 +4,9 @@ import { computeBuildScope } from "./buildScope.js";
 import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
 import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
 import { createPromptBuilders } from "./promptBuilders.js";
-import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs, createAutoArtifactSpecs, findDirectedOutputsWithoutArtifacts, collectCoveredTopicIds } from "./artifactService.js";
+import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs, findDirectedOutputsWithoutArtifacts } from "./artifactService.js";
 import { runFetchPhase, runDigestPhase } from "./fetchAndDigestPhases.js";
-import { readTopics, getDeepenQueue, clearDeepenQueue } from "./topicsService.js";
+import { getDeepenQueue, clearDeepenQueue } from "./topicsService.js";
 
 export function createAgentJobService({
   FRAMEWORK_ROOT,
@@ -895,7 +895,7 @@ export function createAgentJobService({
       // ── Phase 5: Auto-generate artifact specs and build ──
       try {
         const autoArtifactStart = Date.now();
-        await runAutoArtifactPhase({ project, apiKey, modelId, scope });
+        await runAutoArtifactPhase({ project, apiKey, modelId });
         phaseTimings.autoArtifacts = Math.round((Date.now() - autoArtifactStart) / 1000);
       } catch (autoArtifactError) {
         // Non-fatal — the main build already succeeded
@@ -969,11 +969,7 @@ export function createAgentJobService({
     }
   }
 
-  async function runAutoArtifactPhase({ project, apiKey, modelId, scope }) {
-    // Read current topics
-    const topicsData = await readTopics(project.path);
-    let coveredTopicIds = new Set();
-
+  async function runAutoArtifactPhase({ project, apiKey, modelId }) {
     // ── Step 1: Propose artifact specs for directed outputs ──
     const outputsNeedingSpecs = await findDirectedOutputsWithoutArtifacts(project.path);
 
@@ -1012,25 +1008,22 @@ export function createAgentJobService({
           .map((s) => s.slug);
 
         if (newOutputSpecSlugs.length > 0) {
-          // Collect topic IDs covered by the new output specs (for deduplication)
-          coveredTopicIds = await collectCoveredTopicIds(project.path, newOutputSpecSlugs);
-
           await appendRunEvent(project.slug, {
             type: "system",
             title: `Phase 5: Agent created ${newOutputSpecSlugs.length} output artifact spec(s)`,
-            text: `New specs: ${newOutputSpecSlugs.join(", ")}. ${coveredTopicIds.size} topic(s) covered by output artifacts will be skipped.`,
+            text: `New specs: ${newOutputSpecSlugs.join(", ")}`,
             status: "auto_artifact_output_specs_created",
             runtime: "server",
-            metadata: { phase: "5", created: newOutputSpecSlugs, coveredTopicCount: coveredTopicIds.size },
+            metadata: { phase: "5", created: newOutputSpecSlugs },
           });
         }
       } else {
-        // Non-fatal — continue with topic artifacts even if proposal failed
+        // Non-fatal — continue even if proposal failed
         console.error("Output artifact proposal phase did not finish:", proposalResult.result);
         await appendRunEvent(project.slug, {
           type: "system",
           title: "Phase 5: Output artifact proposal did not complete",
-          text: `Continuing with topic artifacts. Status: ${proposalResult.status}`,
+          text: `Status: ${proposalResult.status}`,
           status: "auto_artifact_proposal_warning",
           runtime: "server",
           metadata: { phase: "5", proposalStatus: proposalResult.status },
@@ -1038,16 +1031,11 @@ export function createAgentJobService({
       }
     }
 
-    // ── Step 2: Generate per-topic artifact specs (skipping covered topics) ──
-    const autoResult = await createAutoArtifactSpecs(project.path, {
-      modelId,
-      isFirstBuild: scope.isFirstBuild,
-      topics: topicsData.topics,
-      coveredTopicIds,
-    });
+    // NOTE: Per-topic artifact specs are NOT auto-generated during builds.
+    // Topic artifacts can be created manually from the Artifacts UI.
+    // Only directed output artifact specs are proposed and built automatically.
 
-    // ── Step 3: Collect all new specs to build ──
-    // Re-read all specs and find any that haven't been built yet
+    // ── Step 2: Collect new directed output specs to build ──
     const allSpecs = await listArtifactSpecs(project.path);
     const specsToBuild = allSpecs
       .filter((s) => s.status === "not_built")
@@ -1057,10 +1045,10 @@ export function createAgentJobService({
       await appendRunEvent(project.slug, {
         type: "system",
         title: "Phase 5: No new artifact specs to build",
-        text: `All artifact specs already exist (${autoResult.skipped.length} topic(s) skipped).`,
+        text: "All artifact specs have already been built.",
         status: "auto_artifact_skipped",
         runtime: "server",
-        metadata: { phase: "5", skipped: autoResult.skipped.length },
+        metadata: { phase: "5" },
       });
       return;
     }
