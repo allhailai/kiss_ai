@@ -215,6 +215,32 @@
   gap: 8px;
 }
 
+.agent-context-clear-all {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-secondary);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+
+.agent-context-clear-all:hover:not(:disabled),
+.agent-context-clear-all:focus-visible:not(:disabled) {
+  color: var(--color-danger);
+  opacity: 1;
+  outline: none;
+}
+
+.agent-context-clear-all:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
 .agent-current-file {
   position: relative;
   min-width: 0;

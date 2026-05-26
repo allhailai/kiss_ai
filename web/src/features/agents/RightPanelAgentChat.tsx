@@ -631,9 +631,22 @@ export function RightPanelAgentChat({
           ) : null}
           {contextFiles.length ? (
             <div className="agent-file-context" aria-label="Source context files">
-              <button className="agent-context-label agent-context-label-button" onClick={toggleFilePicker} type="button">
-                Context
-              </button>
+              <div className="agent-context-header">
+                <button className="agent-context-label agent-context-label-button" onClick={toggleFilePicker} type="button">
+                  Context
+                </button>
+                {contextFiles.length > 1 ? (
+                  <button
+                    aria-label="Clear all context files"
+                    className="agent-context-clear-all"
+                    disabled={controlsDisabled}
+                    onClick={() => onContextFilesChange([])}
+                    type="button"
+                  >
+                    Clear all
+                  </button>
+                ) : null}
+              </div>
               <div className="agent-context-chips">
                 {contextFiles.map((file) => (
                   <span
