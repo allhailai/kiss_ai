@@ -402,12 +402,23 @@ export type RebuildState = {
   finishedAt: string | null;
   message: string;
   activeAssistantMessageId: string | null;
-  runKind: "rebuild" | "human_attention_resolve";
+  runKind: "rebuild" | "full_rebuild" | "output_build" | "artifact_build" | "human_attention_resolve";
   attentionContext: Record<string, unknown> | null;
   events: AgentRunEvent[];
   log: string[];
-  buildPhase?: "research" | "fetching" | "digests" | "wiki" | "directed_outputs" | "validation" | "complete" | null;
+  buildPhase?: "research" | "fetching" | "digests" | "wiki" | "output_build" | "recording" | "auto_answer" | "auto_artifacts" | "artifact_build" | "complete" | null;
   buildPhaseDetail?: string | null;
+};
+
+export type OutputFileInfo = {
+  path: string;
+  builtAt: string;
+  stale: boolean;
+};
+
+export type OutputStatusResponse = {
+  lastKnowledgeBuild: string | null;
+  outputs: OutputFileInfo[];
 };
 
 export type AgentRunEvent = {
