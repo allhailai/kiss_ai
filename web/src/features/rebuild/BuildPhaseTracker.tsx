@@ -11,8 +11,7 @@ const PHASES: PhaseStep[] = [
   { id: "fetching", label: "Pulling Sources" },
   { id: "digests", label: "Digesting" },
   { id: "wiki", label: "Wiki Build" },
-  { id: "directed_outputs", label: "Directed Outputs" },
-  { id: "validation", label: "Validating" },
+  { id: "recording", label: "Recording" },
 ];
 
 function getPhaseIndex(phase: string | null | undefined): number {

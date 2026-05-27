@@ -222,7 +222,7 @@ export function BuildProjectRightPanel({
       <header className="build-project-panel-header">
         <RightPanelModeSwitch activeKind="build-project" onSelect={onSelectPanel} />
         <div>
-          <h2>Build: requirements &gt; inputs &gt; outputs</h2>
+          <h2>Build Knowledge</h2>
         </div>
       </header>
 
@@ -252,9 +252,9 @@ export function BuildProjectRightPanel({
           {!hasEvents && !hasLog && !buildRunning ? (
             <div className="build-project-empty">
               <button className="build-project-empty-action" disabled={startDisabled} onClick={onStart} type="button">
-                Build Project
+                Build Knowledge
               </button>
-              <p>Start a build to stream agent progress here.</p>
+              <p>Start a knowledge build to stream agent progress here.</p>
             </div>
           ) : null}
 
@@ -372,7 +372,7 @@ export function BuildProjectRightPanel({
             </button>
           ) : (
             <button className="build-project-build-button" disabled={startDisabled} onClick={onStart} type="button">
-              BUILD
+              BUILD KNOWLEDGE
             </button>
           )}
         </div>
