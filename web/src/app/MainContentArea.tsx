@@ -137,7 +137,16 @@ export function MainContentArea({
           type="report"
         />
       ) : null}
-      {route.view === "artifacts" ? (
+      {route.view === "artifacts" && !route.filePath ? (
+        <OutputSectionPage
+          models={rebuildWorkspace.models}
+          projectFiles={fileWorkspace.projectFiles}
+          projectSlug={projectSlug}
+          selectedModelId={rebuildWorkspace.selectedModelId}
+          type="artifact"
+        />
+      ) : null}
+      {route.view === "artifacts" && route.filePath ? (
         <ArtifactsView
           lastProjectBuildAt={rebuildWorkspace.status?.lastSuccessfulRunAt ?? null}
           models={rebuildWorkspace.models}
