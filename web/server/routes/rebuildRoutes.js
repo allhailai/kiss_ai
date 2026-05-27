@@ -3,10 +3,13 @@ import { parseRequestBody, resolveHumanAttentionBodySchema, startRebuildBodySche
 
 export function registerRebuildRoutes(app, {
   cancelAgentJob,
+  getOutputStatus,
   getRebuildState,
   httpError,
   startFullRebuild,
   startHumanAttentionResolution,
+  startKnowledgeBuild,
+  startOutputBuild,
   startRebuild,
   subscribeToRebuild,
 }) {
@@ -73,6 +76,38 @@ export function registerRebuildRoutes(app, {
   app.post("/api/projects/:projectSlug/rebuild/cancel", async (request, response, next) => {
     try {
       response.json(await cancelAgentJob(request.project.slug));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ── Two-Phase Build Routes ──
+
+  app.post("/api/projects/:projectSlug/build-knowledge", async (request, response, next) => {
+    try {
+      const modelId = request.body?.modelId ?? null;
+      response.json(await startKnowledgeBuild(request.project, modelId));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/build-outputs", async (request, response, next) => {
+    try {
+      const { files, type, modelId } = request.body ?? {};
+      if (!Array.isArray(files) || files.length === 0) {
+        throw httpError("files must be a non-empty array of file paths.", 400);
+      }
+      const outputType = type === "artifact" ? "artifact" : "report";
+      response.json(await startOutputBuild(request.project, modelId ?? null, files, outputType));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/projects/:projectSlug/outputs/status", async (request, response, next) => {
+    try {
+      response.json(await getOutputStatus(request.project.path));
     } catch (error) {
       next(error);
     }

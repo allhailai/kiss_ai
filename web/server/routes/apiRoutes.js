@@ -80,10 +80,13 @@ export function registerApiRoutes(app, deps) {
 
   registerRebuildRoutes(app, {
     cancelAgentJob: deps.cancelAgentJob,
+    getOutputStatus: deps.getOutputStatus,
     getRebuildState: deps.getRebuildState,
     httpError: deps.httpError,
     startFullRebuild: deps.startFullRebuild,
     startHumanAttentionResolution: deps.startHumanAttentionResolution,
+    startKnowledgeBuild: deps.startKnowledgeBuild,
+    startOutputBuild: deps.startOutputBuild,
     startRebuild: deps.startRebuild,
     subscribeToRebuild: deps.subscribeToRebuild,
   });

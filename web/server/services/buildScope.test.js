@@ -100,29 +100,32 @@ describe("buildScope", () => {
     expect(scope.skipResearchPlan).toBe(false); // FEEDBACK markers prevent skip
   });
 
-  it("detects affected outputs from diff keywords", async () => {
+  it("detects affected wiki pages from Topics section changes", async () => {
     const { detectAffectedOutputs } = await import("./buildScope.js");
 
     const manifest = {
-      directed_outputs: [
-        "outputs_ai/reagent_brittleness_index_dashboard.md",
-        "outputs_ai/price_tracker.md",
-        "outputs_ai/triage_monitor.md",
-      ],
-      wiki_pages: ["outputs_ai/wiki/supply_chain.md"],
+      wiki_pages: ["outputs_ai/wiki/supply_chain.md", "outputs_ai/wiki/pricing.md"],
     };
 
-    const diffText = `
+    // Topics section changed → all wiki pages affected
+    const diffWithTopics = `
 @@ -5,0 +6,2 @@
-+Each generated report should also include a Reagent Brittleness Confidence Score.
-+Dashboard releases should also state the current Reagent Brittleness Confidence Score.
++## Topics
++- Supply chain analysis
 `;
 
-    const affected = detectAffectedOutputs(diffText, manifest);
-    // "reagent" and "brittleness" and "dashboard" appear in the diff
-    expect(affected).toContain("outputs_ai/reagent_brittleness_index_dashboard.md");
-    // "triage" does NOT appear in the diff
-    expect(affected).not.toContain("outputs_ai/triage_monitor.md");
+    const affected = detectAffectedOutputs(diffWithTopics, manifest);
+    expect(affected).toContain("outputs_ai/wiki/supply_chain.md");
+    expect(affected).toContain("outputs_ai/wiki/pricing.md");
+
+    // Non-Topics diff → no wiki pages affected
+    const diffWithoutTopics = `
+@@ -5,0 +6,2 @@
++Each generated report should also include a Reagent Brittleness Confidence Score.
+`;
+
+    const notAffected = detectAffectedOutputs(diffWithoutTopics, manifest);
+    expect(notAffected).toHaveLength(0);
   });
 
   it("does not check human inputs (now handled by content ledger)", async () => {

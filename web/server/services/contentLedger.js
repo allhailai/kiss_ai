@@ -174,3 +174,58 @@ export function diffSnapshot(snapshot, ledger) {
     isFirstBuild: false,
   };
 }
+
+// ── Output build tracking ───────────────────────────────────────────
+
+/**
+ * Record a knowledge build timestamp to the ledger.
+ * Called at the end of the knowledge pipeline.
+ */
+export async function recordKnowledgeBuild(projectPath) {
+  const ledger = (await readLedger(projectPath)) ?? {};
+  ledger.last_knowledge_build = new Date().toISOString();
+  await writeLedger(projectPath, ledger);
+  return ledger.last_knowledge_build;
+}
+
+/**
+ * Record a per-file output build timestamp.
+ * Called after each report or artifact is rebuilt.
+ */
+export async function recordOutputBuild(projectPath, filePath) {
+  const ledger = (await readLedger(projectPath)) ?? {};
+  if (!ledger.output_builds) ledger.output_builds = {};
+  const timestamp = new Date().toISOString();
+  ledger.output_builds[filePath] = timestamp;
+  await writeLedger(projectPath, ledger);
+  return timestamp;
+}
+
+/**
+ * Check if a single output file is stale.
+ * An output is stale when its build time is older than the last knowledge build
+ * (or when it has never been built).
+ */
+export function isOutputStale(ledger, filePath) {
+  if (!ledger?.last_knowledge_build) return false; // no knowledge build yet — nothing is stale
+  const outputTime = ledger?.output_builds?.[filePath];
+  if (!outputTime) return true; // never built
+  return new Date(outputTime) < new Date(ledger.last_knowledge_build);
+}
+
+/**
+ * Get the full output status: last knowledge build + per-file stale status.
+ */
+export async function getOutputStatus(projectPath) {
+  const ledger = (await readLedger(projectPath)) ?? {};
+  const lastKnowledgeBuild = ledger.last_knowledge_build ?? null;
+  const outputBuilds = ledger.output_builds ?? {};
+
+  const outputs = Object.entries(outputBuilds).map(([filePath, builtAt]) => ({
+    path: filePath,
+    builtAt,
+    stale: isOutputStale(ledger, filePath),
+  }));
+
+  return { lastKnowledgeBuild, outputs };
+}

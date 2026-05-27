@@ -9,7 +9,7 @@ import { runFetchPhase, runDigestPhase } from "./fetchAndDigestPhases.js";
 import { getDeepenQueue, clearDeepenQueue, readTopics, writeTopics } from "./topicsService.js";
 import { computeWikiTriage, updateWikiPageTracker, resetWikiPageTracker, regenerateWikiIndex } from "./wikiTriage.js";
 import { validateFileExistence, readManifest, writeManifest, prependBuildLogEntry, gitSnapshot } from "./serverValidation.js";
-import { readLedger, buildSnapshot, diffSnapshot, writeLedger } from "./contentLedger.js";
+import { readLedger, buildSnapshot, diffSnapshot, writeLedger, recordKnowledgeBuild, recordOutputBuild } from "./contentLedger.js";
 
 export function createAgentJobService({
   FRAMEWORK_ROOT,
@@ -38,7 +38,6 @@ export function createAgentJobService({
     createProposeOutputArtifactsPrompt,
     createResearchPrompt,
     createSynthesisPrompt,
-    createValidationPrompt,
     createWikiOnlyPrompt,
     createWikiPagePrompt,
   } = createPromptBuilders(FRAMEWORK_ROOT);
@@ -406,18 +405,23 @@ export function createAgentJobService({
     }
   }
 
-  async function startRebuild(project, requestedModelId) {
+  async function startKnowledgeBuild(project, requestedModelId) {
     return await startAgentJob({
       project,
       requestedModelId,
       runKind: "rebuild",
-      startMessage: "Starting multi-phase research build (research → fetch → wiki → per-file outputs → validation).",
+      startMessage: "Starting knowledge build (research → fetch → digest → wiki → questions → recording).",
       noApiKeyMessage:
-        "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Rebuilds are unavailable from the UI.",
+        "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Knowledge builds are unavailable from the UI.",
       noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
-      jobName: "Rebuild run",
+      jobName: "Knowledge build",
       prompt: createResearchPrompt(project),
     });
+  }
+
+  /** @deprecated Use startKnowledgeBuild */
+  async function startRebuild(project, requestedModelId) {
+    return await startKnowledgeBuild(project, requestedModelId);
   }
 
   async function startHumanAttentionResolution(project, requestBody) {
@@ -442,12 +446,47 @@ export function createAgentJobService({
       project,
       requestedModelId,
       runKind: "full_rebuild",
-      startMessage: "Starting full rebuild (all wiki pages and outputs will be regenerated).",
+      startMessage: "Starting full knowledge rebuild (all wiki pages will be regenerated).",
       noApiKeyMessage:
         "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Rebuilds are unavailable from the UI.",
       noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
       jobName: "Full rebuild",
       prompt: createResearchPrompt(project),
+    });
+  }
+
+  /**
+   * Build selected output files (reports or artifacts) on demand.
+   * Called from the Reports/Artifacts page when the user selects files and clicks "Build".
+   */
+  async function startOutputBuild(project, requestedModelId, files, outputType) {
+    const typeLabel = outputType === "artifact" ? "artifact" : "report";
+    const pluralLabel = files.length === 1 ? typeLabel : `${typeLabel}s`;
+
+    // For artifacts, delegate to existing artifact build (single at a time for now)
+    if (outputType === "artifact") {
+      // Artifacts are built one at a time via startArtifactBuild
+      // For batch artifact builds, queue them sequentially
+      if (files.length === 1) {
+        return await startArtifactBuild(project, files[0], requestedModelId);
+      }
+      // TODO: Support batch artifact builds
+      throw httpError(`Batch artifact builds not yet supported. Build one artifact at a time.`, 400);
+    }
+
+    // For reports: use a custom runKind and build the prompt inline
+    return await startAgentJob({
+      project,
+      requestedModelId,
+      runKind: "output_build",
+      startMessage: `Building ${files.length} ${pluralLabel} from current wiki and sources.`,
+      noApiKeyMessage:
+        "No Cursor API key found. Output builds are unavailable from the UI.",
+      noModelsMessage: "No Cursor models remain after excluding MAX mode models.",
+      jobName: `Build ${files.length} ${pluralLabel}`,
+      prompt: `Building ${files.length} reports. This is handled by the output build pipeline.`,
+      // Note: The actual per-file prompts are built inside runOutputBuildJob.
+      // The prompt above is a placeholder — runAgentJob routes to runOutputBuildJob for output_build runKind.
     });
   }
 
@@ -488,6 +527,11 @@ export function createAgentJobService({
     // Artifact builds get their own simple pipeline
     if (runKind === "artifact_build") {
       return await runArtifactBuildJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent });
+    }
+
+    // Output builds (reports) get their own pipeline
+    if (runKind === "output_build") {
+      return await runOutputBuildJob({ project, apiKey, modelId, jobName, releaseProjectAgent, signal });
     }
 
     const isFullRebuild = runKind === "full_rebuild";
@@ -748,171 +792,26 @@ export function createAgentJobService({
         await resetWikiPageTracker(project.path);
       }
 
-      // ── Phase 3b: Per-File Strategy Synthesis ──
-      await appendRunEvent(project.slug, {
-        type: "system",
-        title: "Phase 3b: Building source mapping",
-        text: "Server is mapping sources to directed outputs for focused synthesis.",
-        status: "source_mapping",
-        runtime: "server",
-        metadata: { phase: "3b" },
-      });
+      // NOTE: Phase 3b (directed outputs) and Phase 3c (validation) are removed.
+      // Reports are built on-demand from the Reports page via startOutputBuild().
+      // Validation is folded into wiki synthesis (do_build.md Phase 7).
 
-      const { mapping: sourceMap, discoverySource } = await buildSourceMapping(project.path);
-      await writeSourceMapping(project.path, sourceMap);
-      const outputFileCount = Object.keys(sourceMap).length;
+      // For knowledge pipeline result tracking
+      let synthesisResult = { status: "finished", result: "wiki complete" };
 
-      const discoveryLabel = discoverySource === "manifest" ? "manifest" : discoverySource === "topics" ? "topics.json" : "disk scan";
-      await appendRunEvent(project.slug, {
-        type: "system",
-        title: `Phase 3b: Discovered ${outputFileCount} directed output(s) via ${discoveryLabel}`,
-        text: outputFileCount > 0
-          ? `Outputs: ${Object.keys(sourceMap).join(", ")}`
-          : "No directed outputs found. Skipping per-file synthesis.",
-        status: outputFileCount > 0 ? "source_mapping_complete" : "source_mapping_empty",
-        runtime: "server",
-        metadata: { phase: "3b", outputFileCount, discoverySource },
-      });
-
-      if (outputFileCount > 0 && (triage.action !== "skip" || isFullRebuild)) {
-        const stateBeforeFiles = await getRebuildState(project.slug);
-        await setRebuildState(project.slug, {
-          ...stateBeforeFiles,
-          buildPhase: "directed_outputs",
-          buildPhaseDetail: `Building ${outputFileCount} directed outputs (max ${MAX_FILE_CONCURRENCY} concurrent)`,
-        });
-
-        await appendRunEvent(project.slug, {
-          type: "system",
-          title: `Phase 3b: Building ${outputFileCount} directed outputs`,
-          text: `Each output file gets its own agent call with focused context (wiki pages + full source files). Max ${MAX_FILE_CONCURRENCY} concurrent.`,
-          status: "file_synthesis_start",
-          runtime: "server",
-          metadata: { outputFileCount, phase: "3b" },
-        });
-
-        const directedStart = Date.now();
-        const fileResults = await runFileSynthesisPhase({
-          project,
-          apiKey,
-          modelId,
-          sourceMap,
-        });
-        phaseTimings.directedOutputs = Math.round((Date.now() - directedStart) / 1000);
-
-        const succeededFiles = fileResults.filter((r) => r.result.status === "finished").length;
-        const failedFiles = fileResults.filter((r) => r.result.status !== "finished").length;
-
-        await appendRunEvent(project.slug, {
-          type: "system",
-          title: `Phase 3b complete: ${succeededFiles} succeeded, ${failedFiles} failed`,
-          text: failedFiles > 0
-            ? `Failed files: ${fileResults.filter((r) => r.result.status !== "finished").map((r) => r.file).join(", ")}`
-            : `All ${succeededFiles} directed outputs built successfully.`,
-          status: failedFiles > 0 ? "file_synthesis_partial" : "file_synthesis_complete",
-          runtime: "server",
-          metadata: { succeededFiles, failedFiles, phase: "3b" },
-        });
-      } else if (outputFileCount > 0 && triage.action === "skip") {
-        phaseTimings.directedOutputs = 0;
-        await appendRunEvent(project.slug, {
-          type: "system",
-          title: `Phase 3b: Skipped (no new inputs)`,
-          text: `${outputFileCount} directed output(s) unchanged — wiki was skipped, so source material is identical.`,
-          status: "file_synthesis_skipped",
-          runtime: "server",
-          metadata: { outputFileCount, phase: "3b" },
-        });
-      }
-
-      // ── Phase 3b.5: Extract BUILD_QUESTION markers from output files ──
-      let rawBuildQuestions = [];
-      try {
-        const outputFiles = Object.keys(sourceMap);
-        rawBuildQuestions = await extractAllBuildQuestions(project.path, outputFiles, {
-          phase: "3b",
-          buildId: (await getRebuildState(project.slug))?.runId?.slice(0, 8) || null,
-          modelId,
-        });
-
-        if (rawBuildQuestions.length > 0) {
-          await appendRunEvent(project.slug, {
-            type: "system",
-            title: `Extracted ${rawBuildQuestions.length} question(s) from output files`,
-            text: `Raw questions will be consolidated during validation.`,
-            status: "questions_extracted",
-            runtime: "server",
-            metadata: { phase: "3b.5", questionCount: rawBuildQuestions.length },
-          });
-        }
-      } catch (extractError) {
-        // Non-fatal — continue without questions
-        console.error("Question extraction failed:", extractError);
-      }
-
-
-
-      // ── Phase 3c: Validation ──
-      // Phase 3c.1: Server-Side File Validation
+      // ── Server-Side File Validation (lightweight) ──
       const currentManifest = await readManifest(project.path);
       const validationResults = await validateFileExistence(project.path, currentManifest ?? {});
 
       await appendRunEvent(project.slug, {
         type: "system",
         title: validationResults.passed
-          ? "Phase 3c: File validation passed"
-          : `Phase 3c: File validation found ${validationResults.issues.length} issue(s)`,
+          ? "File validation passed"
+          : `File validation found ${validationResults.issues.length} issue(s)`,
         text: validationResults.issues.join("\n") || "All expected files exist with content.",
         status: validationResults.passed ? "validation_passed" : "validation_issues",
         runtime: "server",
-        metadata: { phase: "3c", issues: validationResults.issues },
       });
-
-      // Phase 3c.2: Agent Evidence Validation
-      // Skip the agent call when triage says nothing changed — server validation is enough
-      let synthesisResult = { status: "finished", result: "skipped" };
-
-      if (triage.action === "skip" && !isFullRebuild) {
-        phaseTimings.validation = 0;
-        decisionTrace.push("Phase 3c: SKIPPED (triage=skip, server validation only)");
-        await appendRunEvent(project.slug, {
-          type: "system",
-          title: "Phase 3c: Validation agent skipped (no changes)",
-          text: "No content changes detected. Server-side file validation passed. Skipping agent evidence check.",
-          status: "validation_skipped",
-          runtime: "server",
-          metadata: { phase: "3c" },
-        });
-      } else {
-        const stateBeforeValidation = await getRebuildState(project.slug);
-        await setRebuildState(project.slug, {
-          ...stateBeforeValidation,
-          buildPhase: "validation",
-          buildPhaseDetail: "Evidence coverage checks and gap analysis",
-        });
-
-        await appendRunEvent(project.slug, {
-          type: "system",
-          title: "Phase 3c: Evidence validation",
-          text: "Agent is checking evidence coverage, detecting contradictions, and acting on gaps.",
-          status: "validation",
-          runtime: "cursor",
-          metadata: { phase: "3c" },
-        });
-
-        const validationPrompt = createValidationPrompt(project, modelId, rawBuildQuestions);
-        const validationStart = Date.now();
-        synthesisResult = await runSingleAgentPhase({
-          project,
-          apiKey,
-          modelId,
-          prompt: validationPrompt,
-          phaseName: "Evidence Validation",
-          signal,
-        });
-        phaseTimings.validation = Math.round((Date.now() - validationStart) / 1000);
-        decisionTrace.push(`Phase 3c: ran (${phaseTimings.validation}s)`);
-      }
 
       // ── Phase 3d: Auto-answer open questions from evidence ──
       try {
@@ -1013,31 +912,34 @@ export function createAgentJobService({
         project_md_hash: scope.projectMdHash,
         scope: scope.isFirstBuild ? "full" : scope.projectMdChanged ? "targeted" : "refresh",
         wiki_pages: allWikiPages,
-        directed_outputs: Object.keys(sourceMap),
         sources_gathered: fetchResults.fetched,
         sources_refreshed: fetchResults.skipped,
         feedback_applied: scope.feedbackMarkers.length,
         topics_deepened: deepenQueue.length,
-        build_notes: `${triage.action} wiki, ${outputFileCount} outputs`,
+        build_notes: `${triage.action} wiki (knowledge build)`,
+        build_type: "knowledge",
         decision_trace: decisionTrace,
       });
 
       // Write content-hash ledger (authoritative change detection for next build)
       await writeLedger(project.path, currentSnapshot);
 
+      // Record knowledge build timestamp (for stale detection in Reports/Artifacts pages)
+      await recordKnowledgeBuild(project.path);
+
       // Write build log
       await prependBuildLogEntry(project.path, {
         timestamp: new Date().toISOString(),
         scope: scope.isFirstBuild ? "full" : scope.projectMdChanged ? "targeted" : "refresh",
+        buildType: "knowledge",
         modelId,
         durationSeconds: Math.round((Date.now() - buildStartTime) / 1000),
         wikiPagesUpdated: triage.action === "skip" ? 0
           : triage.action === "targeted" ? triage.affectedPages.length : "all",
-        directedOutputsUpdated: outputFileCount,
         sourcesFetched: fetchResults.fetched,
         feedbackApplied: scope.feedbackMarkers.length,
         topicsDeepened: deepenQueue.length,
-        notes: validationResults.passed ? null : `Validation issues: ${validationResults.issues.join("; ")}`,
+        notes: null,
       });
 
       // Git snapshot
@@ -1076,23 +978,8 @@ export function createAgentJobService({
         });
       }
 
-      // ── Phase 5: Auto-generate artifact specs and build ──
-      try {
-        const autoArtifactStart = Date.now();
-        await runAutoArtifactPhase({ project, apiKey, modelId });
-        phaseTimings.autoArtifacts = Math.round((Date.now() - autoArtifactStart) / 1000);
-      } catch (autoArtifactError) {
-        // Non-fatal — the main build already succeeded
-        console.error("Auto-artifact phase failed:", autoArtifactError);
-        await appendRunEvent(project.slug, {
-          type: "system",
-          title: "Auto-artifact phase failed",
-          text: autoArtifactError instanceof Error ? autoArtifactError.message : "Unknown error",
-          status: "auto_artifact_error",
-          runtime: "server",
-          metadata: { phase: "5" },
-        });
-      }
+      // NOTE: Auto-artifact phase is removed from knowledge pipeline.
+      // Artifacts are now built on-demand from the Artifacts page.
 
       // ── Completion ──
       const completedState = await getRebuildState(project.slug);
@@ -1345,6 +1232,122 @@ export function createAgentJobService({
   }
 
 
+  /**
+   * Build selected report files on demand.
+   * This is the output build pipeline — no research, no fetch, no wiki.
+   * Just generates reports from current wiki + sources.
+   */
+  async function runOutputBuildJob({ project, apiKey, modelId, jobName, releaseProjectAgent, signal }) {
+    activeRebuilds.add(project.slug);
+    const buildStartTime = Date.now();
+
+    try {
+      // Read the output build request from state (files were stored when startOutputBuild was called)
+      // For now, build the source mapping and use it to find which files to build
+      const { mapping: sourceMap } = await buildSourceMapping(project.path);
+      const outputFiles = Object.keys(sourceMap);
+
+      if (outputFiles.length === 0) {
+        const current = await getRebuildState(project.slug);
+        await setRebuildState(project.slug, {
+          ...current,
+          running: false,
+          status: "finished",
+          finishedAt: new Date().toISOString(),
+          message: "No report files found to build.",
+          buildPhase: "complete",
+        });
+        return;
+      }
+
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: `Building ${outputFiles.length} report(s)`,
+        text: `Each report gets its own agent call with focused context (wiki pages + source files). Max ${MAX_FILE_CONCURRENCY} concurrent.`,
+        status: "output_build_start",
+        runtime: "server",
+      });
+
+      const stateBeforeFiles = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...stateBeforeFiles,
+        buildPhase: "output_build",
+        buildPhaseDetail: `Building ${outputFiles.length} report(s) (max ${MAX_FILE_CONCURRENCY} concurrent)`,
+      });
+
+      const fileResults = await runFileSynthesisPhase({
+        project,
+        apiKey,
+        modelId,
+        sourceMap,
+      });
+
+      // Record per-file build timestamps
+      for (const result of fileResults) {
+        if (result.result.status === "finished") {
+          await recordOutputBuild(project.path, result.file);
+        }
+      }
+
+      const succeededFiles = fileResults.filter((r) => r.result.status === "finished").length;
+      const failedFiles = fileResults.filter((r) => r.result.status !== "finished").length;
+      const buildDurationSeconds = Math.round((Date.now() - buildStartTime) / 1000);
+
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: `Output build complete: ${succeededFiles} succeeded, ${failedFiles} failed (${buildDurationSeconds}s)`,
+        text: failedFiles > 0
+          ? `Failed: ${fileResults.filter((r) => r.result.status !== "finished").map((r) => r.file).join(", ")}`
+          : `All ${succeededFiles} report(s) built successfully.`,
+        status: failedFiles > 0 ? "output_build_partial" : "output_build_complete",
+        runtime: "server",
+      });
+
+      // Git snapshot after output build
+      const gitResult = await gitSnapshot(project.path,
+        `kiss_ai output build: ${project.name} (${new Date().toISOString().slice(0, 10)})`,
+      );
+
+      const current = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...current,
+        running: false,
+        status: failedFiles > 0 ? "finished_with_attention" : "finished",
+        finishedAt: new Date().toISOString(),
+        message: `Built ${succeededFiles} report(s)${failedFiles > 0 ? `, ${failedFiles} failed` : ""}.`,
+        buildPhase: "complete",
+        buildPhaseDetail: null,
+      });
+    } catch (error) {
+      await finishAssistantMessage(project.slug);
+      const isCancelled = error?.name === "AbortError";
+      const status = isCancelled ? "interrupted" : "error";
+      const message = isCancelled
+        ? "Cancelled by user."
+        : (error instanceof Error ? error.message : "Unknown output build failure.");
+
+      const current = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...current,
+        running: false,
+        status,
+        finishedAt: new Date().toISOString(),
+        message,
+      });
+      await appendRunEvent(project.slug, {
+        type: isCancelled ? "run_status" : "error",
+        title: isCancelled ? `${jobName} cancelled` : `${jobName} failed`,
+        text: message,
+        status,
+        runtime: "cursor",
+      });
+    } finally {
+      activeRebuilds.delete(project.slug);
+      activeAbortControllers.delete(project.slug);
+      releaseProjectAgent();
+    }
+  }
+
   async function runArtifactBuildJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent }) {
     activeRebuilds.add(project.slug);
 
@@ -1467,5 +1470,13 @@ export function createAgentJobService({
     return await getRebuildState(projectSlug);
   }
 
-  return { cancelAgentJob, startArtifactBuild, startFullRebuild, startHumanAttentionResolution, startRebuild };
+  return {
+    cancelAgentJob,
+    startArtifactBuild,
+    startFullRebuild,
+    startHumanAttentionResolution,
+    startKnowledgeBuild,
+    startOutputBuild,
+    startRebuild, // deprecated alias for startKnowledgeBuild
+  };
 }

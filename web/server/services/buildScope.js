@@ -78,27 +78,14 @@ export async function scanMarkersInDirectory(directoryPath, projectPath) {
 // ── Detect affected outputs from diff text ──────────────────────────
 export function detectAffectedOutputs(diffText, manifest) {
   if (!manifest || !diffText) return [];
-  const allOutputs = [...(manifest.directed_outputs ?? []), ...(manifest.wiki_pages ?? [])];
-  if (!allOutputs.length) return [];
+  const wikiPages = manifest.wiki_pages ?? [];
+  if (!wikiPages.length) return [];
 
-  // Extract output names from manifest paths for keyword matching
   const affected = [];
-  const diffLower = diffText.toLowerCase();
-
-  for (const outputPath of manifest.directed_outputs ?? []) {
-    // Extract a human-readable name from the path
-    const baseName = path.basename(outputPath, ".md").replace(/_/g, " ").toLowerCase();
-    const words = baseName.split(" ").filter((w) => w.length > 3);
-
-    // If any significant word from the output name appears in the diff, it's affected
-    if (words.some((word) => diffLower.includes(word))) {
-      affected.push(outputPath);
-    }
-  }
 
   // If the diff touches the Topics section, all wiki pages are affected
   if (/^\+.*##\s*Topics/m.test(diffText) || /^-.*##\s*Topics/m.test(diffText)) {
-    affected.push(...(manifest.wiki_pages ?? []));
+    affected.push(...wikiPages);
   }
 
   return [...new Set(affected)];

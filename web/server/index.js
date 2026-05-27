@@ -11,6 +11,7 @@ import { registerApiRoutes } from "./routes/apiRoutes.js";
 import { registerArtifactRoutes } from "./routes/artifactRoutes.js";
 import { createAgentJobService } from "./services/agentJobs.js";
 import { createBuildLogService } from "./services/buildLogs.js";
+import { getOutputStatus } from "./services/contentLedger.js";
 import { createChatAgentService } from "./services/chatAgent.js";
 import { createConversationService } from "./services/conversations.js";
 import { createCursorModelService } from "./services/cursorModels.js";
@@ -283,7 +284,7 @@ const { assistQuestion } = createQuestionAiAssistService({
   runCursorAgentText,
 });
 
-const { cancelAgentJob, startArtifactBuild, startFullRebuild, startHumanAttentionResolution, startRebuild } = createAgentJobService({
+const { cancelAgentJob, startArtifactBuild, startFullRebuild, startHumanAttentionResolution, startKnowledgeBuild, startOutputBuild, startRebuild } = createAgentJobService({
   FRAMEWORK_ROOT,
   activeRebuilds,
   appendAssistantDelta,
@@ -350,6 +351,7 @@ registerApiRoutes(app, {
   discoverProjects,
   displayProjectName,
   getHumanAttentionItems,
+  getOutputStatus,
   getRebuildState,
   gitFileDiff,
   gitStatus,
@@ -380,6 +382,8 @@ registerApiRoutes(app, {
   startFullRebuild,
   cancelAgentJob,
   startHumanAttentionResolution,
+  startKnowledgeBuild,
+  startOutputBuild,
   startRebuild,
   subscribeToConversation,
   subscribeToRebuild,
