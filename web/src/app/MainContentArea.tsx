@@ -18,7 +18,10 @@ const fileWorkspaceByView: Partial<Record<View, { title?: string; explainer?: st
     explainer: "Sources are AI-managed. Use annotations to guide the AI.",
   },
   outputs: {
-    explainer: "Outputs are AI-managed. Use annotations to guide the AI.",
+    explainer: "Wiki pages are built during knowledge builds. Use comments to guide the AI.",
+  },
+  reports: {
+    explainer: "Reports are user-curated outputs. Edit directly or use the chat agent.",
   },
 };
 

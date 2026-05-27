@@ -14,7 +14,7 @@ import { FileTreeNav } from "./FileTreeNav";
 import { artifactsApi } from "../../data/artifactsApi";
 
 const defaultExpandedSections = new Set<SimplifiedNavSectionId>(
-  simplifiedNavSections.filter((section) => section.id !== "source-data").map((section) => section.id),
+  simplifiedNavSections.filter((section) => section.id !== "source-data" && section.id !== "wiki").map((section) => section.id),
 );
 
 export function SimplifiedNavigator({
@@ -63,6 +63,8 @@ export function SimplifiedNavigator({
   const humanInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.humanInput)), [projectFiles]);
   const sourceFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.sources)), [projectFiles]);
   const outputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.output)), [projectFiles]);
+  const wikiFiles = useMemo(() => outputFiles.filter((file) => file.path.startsWith("outputs_ai/wiki/")), [outputFiles]);
+  const reportFiles = useMemo(() => outputFiles.filter((file) => !file.path.startsWith("outputs_ai/wiki/") && !file.path.startsWith("outputs_ai/artifacts/")), [outputFiles]);
 
   useEffect(() => {
     setExpandedSections((current) => {
@@ -208,7 +210,7 @@ export function SimplifiedNavigator({
       );
     }
 
-    if (sectionId === "results") {
+    if (sectionId === "wiki") {
       return (
         <>
           <button
@@ -220,12 +222,37 @@ export function SimplifiedNavigator({
             onClick={() => onOpenView("outputs")}
             type="button"
           >
-            <span>Outputs</span>
+            <span>Wiki Pages</span>
           </button>
           <FileTreeBlock
-            emptyLabel="No generated Markdown files yet."
-            files={outputFiles}
+            emptyLabel="No wiki pages yet. Run a knowledge build first."
+            files={wikiFiles}
             loading={loading && currentView === "outputs"}
+            onOpenFile={onOpenFile}
+            selectedPath={selectedPath}
+          />
+        </>
+      );
+    }
+
+    if (sectionId === "reports") {
+      return (
+        <>
+          <button
+            className={
+              currentView === "reports" && !selectedPath
+                ? "simple-nav-item simple-nav-subheader active"
+                : "simple-nav-item simple-nav-subheader"
+            }
+            onClick={() => onOpenView("reports")}
+            type="button"
+          >
+            <span>Reports</span>
+          </button>
+          <FileTreeBlock
+            emptyLabel="No reports yet. Create one with the chat agent."
+            files={reportFiles}
+            loading={loading && currentView === "reports"}
             onOpenFile={onOpenFile}
             selectedPath={selectedPath}
           />

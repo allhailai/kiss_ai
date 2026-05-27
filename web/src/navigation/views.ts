@@ -1,6 +1,6 @@
 import { isDesignIdentityPath, projectPathPrefixes } from "../domain/projectPaths";
 
-export type View = "chat" | "dashboard" | "requirements" | "inputs" | "outputs" | "artifacts" | "design" | "review" | "questions" | "topics";
+export type View = "chat" | "dashboard" | "requirements" | "inputs" | "outputs" | "reports" | "artifacts" | "design" | "review" | "questions" | "topics";
 
 /** Legacy review sub-views that now redirect to the unified "review" view with a tab param.
  *  "suggestions" is kept here only for bookmark redirect compatibility — the feature directory was removed. */
@@ -16,10 +16,10 @@ export type RouteState = {
   context: Record<string, string>;
 };
 
-const views: View[] = ["chat", "requirements", "inputs", "outputs", "artifacts", "design", "dashboard", "review", "questions", "topics"];
+const views: View[] = ["chat", "requirements", "inputs", "outputs", "reports", "artifacts", "design", "dashboard", "review", "questions", "topics"];
 
 export const viewIds = new Set<View>(views);
-export const fileBackedViews = new Set<View>(["requirements", "inputs", "outputs", "artifacts", "design"]);
+export const fileBackedViews = new Set<View>(["requirements", "inputs", "outputs", "reports", "artifacts", "design"]);
 export const defaultRoute: RouteState = { projectSlug: null, view: "dashboard", filePath: null, context: {} };
 
 export function viewForProjectPath(path: string): View | null {

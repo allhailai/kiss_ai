@@ -1,7 +1,7 @@
 import type { View } from "./views";
 import { projectFilePath, designIdentityFilePath } from "../domain/projectPaths";
 
-export type SimplifiedNavSectionId = "chat" | "define" | "source-data" | "results" | "artifacts";
+export type SimplifiedNavSectionId = "chat" | "define" | "source-data" | "wiki" | "reports" | "artifacts";
 
 export type SimplifiedNavLeaf = {
   id: string;
@@ -19,8 +19,9 @@ export const simplifiedNavSections: SimplifiedNavSection[] = [
   { id: "chat", label: "Chat" },
   { id: "define", label: "1) Define the project" },
   { id: "source-data", label: "2) Source data view" },
-  { id: "results", label: "3) Outputs Built" },
-  { id: "artifacts", label: "4) Artifacts" },
+  { id: "wiki", label: "3) Wiki" },
+  { id: "reports", label: "4) Reports" },
+  { id: "artifacts", label: "5) Artifacts" },
 ];
 
 export const requirementNavLeaves: SimplifiedNavLeaf[] = [
@@ -43,7 +44,8 @@ export function sectionForView(view: View): SimplifiedNavSectionId {
   if (view === "chat") return "chat";
   if (view === "requirements" || view === "design" || view === "review" || view === "questions" || view === "topics" || view === "dashboard") return "define";
   if (view === "inputs") return "source-data";
-  if (view === "outputs") return "results";
+  if (view === "outputs") return "wiki";
+  if (view === "reports") return "reports";
   if (view === "artifacts") return "artifacts";
   return "define";
 }
