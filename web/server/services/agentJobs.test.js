@@ -95,18 +95,19 @@ describe("agentJobs", () => {
     });
   });
 
-  describe("startBatchDeepen — precondition checks", () => {
-    it("throws when deepen queue is empty", async () => {
-      const deps = createMockDeps();
+  describe("startFullRebuild — blocked state", () => {
+    it("returns blocked state when no API key is available", async () => {
+      const deps = createMockDeps({
+        resolveCursorApiKey: vi.fn().mockResolvedValue({ available: false }),
+      });
       const service = createAgentJobService(deps);
 
-      // startBatchDeepen reads the deepen queue from disk — with a temp path
-      // that has no topics, it should throw the empty_deepen_queue error
-      await expect(
-        service.startBatchDeepen({ slug: "test-project", path: "/tmp/nonexistent-project" }, null)
-      ).rejects.toMatchObject({
-        message: expect.stringContaining("No topics queued"),
-      });
+      const result = await service.startFullRebuild({ slug: "test-project", path: "/tmp/test" }, null);
+
+      expect(deps.setRebuildState).toHaveBeenCalledWith(
+        "test-project",
+        expect.objectContaining({ status: "blocked", running: false })
+      );
     });
   });
 });

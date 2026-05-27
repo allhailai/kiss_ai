@@ -341,7 +341,7 @@ function formatFailedNote({ url, type, relevance, error, fetchDate }) {
 }
 
 // ── Execute a full research plan ────────────────────────────────────
-const CONCURRENCY_LIMIT = 3;
+const CONCURRENCY_LIMIT = 8;
 
 // ── Freshness check ─────────────────────────────────────────────────
 const DEFAULT_STALE_DAYS = 7;
@@ -364,7 +364,11 @@ async function shouldFetch(filePath, freshness) {
     if (!fetchDate) return true; // Can't determine age, re-fetch
 
     if (freshness === "stable") return false; // Never re-fetch
-    if (freshness === "perishable") return true; // Always re-fetch
+    if (freshness === "perishable") {
+      // Re-fetch if not fetched today; skip if already fetched today
+      const today = new Date().toISOString().slice(0, 10);
+      return fetchDate !== today;
+    }
 
     // Default: re-fetch if older than DEFAULT_STALE_DAYS
     return daysSince(fetchDate) >= DEFAULT_STALE_DAYS;
@@ -782,8 +786,18 @@ export async function generateSourceDigests(projectPath, onProgress) {
         fetchDate: dateMatch?.[1] || "",
       });
 
-      await fs.writeFile(digestPath, digest, "utf-8");
-      results.generated++;
+      // Only write if content actually changed (preserves mtime for triage)
+      let existingDigest = null;
+      try {
+        existingDigest = await fs.readFile(digestPath, "utf-8");
+      } catch { /* file doesn't exist yet */ }
+
+      if (existingDigest === digest) {
+        results.skipped++;
+      } else {
+        await fs.writeFile(digestPath, digest, "utf-8");
+        results.generated++;
+      }
     } catch {
       results.skipped++;
     }

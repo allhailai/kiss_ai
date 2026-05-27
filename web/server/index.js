@@ -91,6 +91,18 @@ const treeRoots = new Map([
 const app = express();
 app.use(express.json({ limit: JSON_BODY_LIMIT_BYTES }));
 
+// ── Server version info (captured at startup) ──
+const SERVER_STARTED_AT = new Date().toISOString();
+let SERVER_GIT_HASH = "unknown";
+try {
+  const { execFileSync } = await import("node:child_process");
+  SERVER_GIT_HASH = execFileSync("git", ["-C", HUB_ROOT, "rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim();
+} catch { /* git may not be available */ }
+
+app.get("/api/version", (_req, res) => {
+  res.json({ gitHash: SERVER_GIT_HASH, startedAt: SERVER_STARTED_AT });
+});
+
 const rebuildStore = createRebuildStore({ stateDir: REBUILD_STATE_DIR, projectSlugPattern });
 const {
   activeRebuilds,
@@ -271,7 +283,7 @@ const { assistQuestion } = createQuestionAiAssistService({
   runCursorAgentText,
 });
 
-const { cancelAgentJob, startArtifactBuild, startBatchDeepen, startHumanAttentionResolution, startRebuild } = createAgentJobService({
+const { cancelAgentJob, startArtifactBuild, startFullRebuild, startHumanAttentionResolution, startRebuild } = createAgentJobService({
   FRAMEWORK_ROOT,
   activeRebuilds,
   appendAssistantDelta,
@@ -365,7 +377,7 @@ registerApiRoutes(app, {
   editChatMessage,
   generateEditProposal,
   sendChatMessage,
-  startBatchDeepen,
+  startFullRebuild,
   cancelAgentJob,
   startHumanAttentionResolution,
   startRebuild,

@@ -1,7 +1,31 @@
-import { useRef, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import type { ProjectFile, ProjectStatus } from "../contracts/api";
 import { useRouteContext } from "./contexts/RouteContext";
 import { SimplifiedNavigator } from "../features/navigation/WorkflowMenus";
+
+function ServerVersion() {
+  const [version, setVersion] = useState<{ gitHash: string; startedAt: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/version")
+      .then((r) => r.json())
+      .then(setVersion)
+      .catch(() => {});
+  }, []);
+
+  if (!version) return null;
+
+  const startedDate = new Date(version.startedAt);
+  const timeStr = startedDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  return (
+    <div className="sidebar-version" title={`Server started at ${version.startedAt}`}>
+      <span className="sidebar-version-hash">{version.gitHash}</span>
+      <span className="sidebar-version-separator">·</span>
+      <span className="sidebar-version-time">↑ {timeStr}</span>
+    </div>
+  );
+}
 
 export function AppSidebar({
   collapsed,
@@ -135,7 +159,9 @@ export function AppSidebar({
           onOpenView={(nextView, filePath) => route.navigateTo(nextView, filePath)}
           rebuildRunning={rebuildWorkspace.rebuild?.running ?? false}
         />
+        <ServerVersion />
       </aside>
     </>
   );
 }
+

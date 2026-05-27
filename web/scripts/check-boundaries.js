@@ -141,16 +141,18 @@ const serverRules = [
         "projects.js",
         "promptBuilders.js",
         "questionsService.js",
+        "serverValidation.js",
         "sourceMapping.js",
         "topicsService.js",
         "webResearch.js",
+        "wikiTriage.js",
       ]).has(path.basename(filePath)),
     message: "server services must keep filesystem access in approved service modules",
   },
   {
     from: "services",
     test: (specifier, filePath) =>
-      specifier === "node:child_process" && !new Set(["buildScope.js", "cursorModels.js", "designIdentity.js", "kissAiUpdate.js", "projectFiles.js"]).has(path.basename(filePath)),
+      specifier === "node:child_process" && !new Set(["buildScope.js", "cursorModels.js", "designIdentity.js", "kissAiUpdate.js", "projectFiles.js", "serverValidation.js"]).has(path.basename(filePath)),
     message: "server services must keep process execution in approved service modules",
   },
   {

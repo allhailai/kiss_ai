@@ -125,7 +125,7 @@ describe("buildScope", () => {
     expect(affected).not.toContain("outputs_ai/triage_monitor.md");
   });
 
-  it("detects changed human inputs", async () => {
+  it("does not check human inputs (now handled by content ledger)", async () => {
     const content = "# Test Project\n\nSame goal\n";
     const { createHash } = await import("node:crypto");
     const hash = createHash("sha256").update(content).digest("hex");
@@ -138,13 +138,14 @@ describe("buildScope", () => {
         project_md_hash: hash,
         directed_outputs: [],
         wiki_pages: [],
-        inputs_human_inventory: [],
       }),
       "inputs_human/new_data.md": "# New data\n",
     });
 
     const scope = await computeBuildScope(TEST_ROOT);
-    expect(scope.humanInputsChanged).toBe(true);
-    expect(scope.skipResearchPlan).toBe(false); // New inputs prevent skip
+    // buildScope no longer tracks humanInputsChanged — that's the ledger's job
+    expect(scope.humanInputsChanged).toBeUndefined();
+    // skipResearchPlan is true because projectMd matches and no feedback markers
+    expect(scope.skipResearchPlan).toBe(true);
   });
 });

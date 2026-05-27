@@ -32,10 +32,11 @@ function gitDiffText(projectPath, relativePath) {
 }
 
 // ── Scan for annotation markers ─────────────────────────────────────
-const FEEDBACK_PATTERN = /<!--\s*FEEDBACK:/;
+// Matches both COMMENT: (current UI) and FEEDBACK: (legacy)
+const FEEDBACK_PATTERN = /<!--\s*(?:COMMENT|FEEDBACK):/;
 
 
-async function scanMarkersInDirectory(directoryPath, projectPath) {
+export async function scanMarkersInDirectory(directoryPath, projectPath) {
   const feedbackPaths = [];
 
   async function walk(currentPath) {
@@ -191,28 +192,14 @@ export async function computeBuildScope(projectPath) {
 
   const feedbackMarkers = [...sourcesMarkers.feedbackPaths, ...outputsMarkers.feedbackPaths].sort();
 
-  // Compare inputs_human
-  const currentHumanInputs = await listHumanInputFiles(projectPath);
-  const previousHumanInputs = (manifest?.inputs_human_inventory ?? []).sort();
-  const humanInputsChanged = JSON.stringify(currentHumanInputs) !== JSON.stringify(previousHumanInputs);
-
-  // Compare source inventory
-  const sourceInventory = await hashSourceInventory(projectPath);
-  const previousSourceHash = manifest?.source_inventory_hash ?? "";
-  const sourcesChanged = isFirstBuild || sourceInventory.hash !== previousSourceHash;
+  // NOTE: humanInputsChanged and projectMdChanged are now also computed
+  // by the content-hash ledger (diffSnapshot). The values here are kept
+  // for backward compatibility with skipResearchPlan and prompt builders.
+  // The ledger is the authoritative source for change detection.
 
   // Determine if we can skip the research plan phase
-  const skipResearchPlan = !isFirstBuild && !projectMdChanged && feedbackMarkers.length === 0 && !humanInputsChanged;
-
-  // Detect affected outputs — if sources changed, all outputs are affected
-  let affectedOutputs;
-  if (sourcesChanged && !isFirstBuild) {
-    affectedOutputs = [...(manifest?.directed_outputs ?? []), ...(manifest?.wiki_pages ?? [])];
-  } else if (projectMdChanged) {
-    affectedOutputs = detectAffectedOutputs(projectMdDiff, manifest);
-  } else {
-    affectedOutputs = [...feedbackMarkers];
-  }
+  // (ledger diff will also be checked, but this gates Phase 1 specifically)
+  const skipResearchPlan = !isFirstBuild && !projectMdChanged && feedbackMarkers.length === 0;
 
   return {
     isFirstBuild,
@@ -220,11 +207,6 @@ export async function computeBuildScope(projectPath) {
     projectMdHash,
     projectMdDiff,
     feedbackMarkers,
-    humanInputsChanged,
-    sourcesChanged,
-    sourceInventoryHash: sourceInventory.hash,
-    sourceCount: sourceInventory.count,
     skipResearchPlan,
-    affectedOutputs,
   };
 }

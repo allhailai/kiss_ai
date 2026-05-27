@@ -5,7 +5,7 @@ export function registerRebuildRoutes(app, {
   cancelAgentJob,
   getRebuildState,
   httpError,
-  startBatchDeepen,
+  startFullRebuild,
   startHumanAttentionResolution,
   startRebuild,
   subscribeToRebuild,
@@ -50,10 +50,21 @@ export function registerRebuildRoutes(app, {
     }
   });
 
+  // Deepen is now folded into the normal build — a normal rebuild will pick up queued topics.
+  // Keep the route for backwards compatibility but redirect to normal rebuild.
   app.post("/api/projects/:projectSlug/rebuild/deepen", async (request, response, next) => {
     try {
       const modelId = request.body?.modelId ?? null;
-      response.json(await startBatchDeepen(request.project, modelId));
+      response.json(await startRebuild(request.project, modelId));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/rebuild/full-rebuild", async (request, response, next) => {
+    try {
+      const modelId = request.body?.modelId ?? null;
+      response.json(await startFullRebuild(request.project, modelId));
     } catch (error) {
       next(error);
     }

@@ -258,7 +258,7 @@ describe("webResearch", () => {
       }
     });
 
-    it("always re-fetches perishable sources", async () => {
+    it("skips perishable sources fetched today (same-day cache)", async () => {
       const { executeResearchPlan, urlToSlug } = await import("./webResearch.js");
 
       const tmpDir = path.resolve("test-project-perishable");
@@ -270,6 +270,40 @@ describe("webResearch", () => {
       await fs.writeFile(
         path.join(webResearchDir, `${slug}.md`),
         `# News Feed\n\n- URL: https://example.com/news-feed\n- Type: news\n- Date fetched: ${today}\n- Word count: 200\n\n## Extracted Content\n\nOld news.\n`,
+      );
+
+      const plan = {
+        queries: [
+          {
+            topic: "Test",
+            query: "test",
+            urls: [{ url: "https://example.com/news-feed", type: "news", relevance: "test", freshness: "perishable" }],
+          },
+        ],
+      };
+
+      try {
+        const results = await executeResearchPlan(tmpDir, plan);
+        // Perishable sources fetched today should be SKIPPED (same-day cache)
+        expect(results.skipped).toBe(1);
+        expect(results.fetched).toBe(0);
+      } finally {
+        globalThis.fetch = originalFetch;
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("re-fetches perishable sources from a previous day", async () => {
+      const { executeResearchPlan, urlToSlug } = await import("./webResearch.js");
+
+      const tmpDir = path.resolve("test-project-perishable-old");
+      const webResearchDir = path.join(tmpDir, "sources", "web_research");
+      await fs.mkdir(webResearchDir, { recursive: true });
+
+      const slug = urlToSlug("https://example.com/news-feed");
+      await fs.writeFile(
+        path.join(webResearchDir, `${slug}.md`),
+        `# News Feed\n\n- URL: https://example.com/news-feed\n- Type: news\n- Date fetched: 2026-01-01\n- Word count: 200\n\n## Extracted Content\n\nOld news.\n`,
       );
 
       // Mock fetch for the re-fetch
@@ -292,7 +326,7 @@ describe("webResearch", () => {
 
       try {
         const results = await executeResearchPlan(tmpDir, plan);
-        // Should attempt to fetch (even though it fails), not skip
+        // Perishable from a previous day should be re-fetched
         expect(results.skipped).toBe(0);
         expect(results.failed).toBe(1);
       } finally {

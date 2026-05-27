@@ -6,7 +6,10 @@ import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
 import { createPromptBuilders } from "./promptBuilders.js";
 import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs, findDirectedOutputsWithoutArtifacts } from "./artifactService.js";
 import { runFetchPhase, runDigestPhase } from "./fetchAndDigestPhases.js";
-import { getDeepenQueue, clearDeepenQueue } from "./topicsService.js";
+import { getDeepenQueue, clearDeepenQueue, readTopics, writeTopics } from "./topicsService.js";
+import { computeWikiTriage, updateWikiPageTracker, resetWikiPageTracker, regenerateWikiIndex } from "./wikiTriage.js";
+import { validateFileExistence, readManifest, writeManifest, prependBuildLogEntry, gitSnapshot } from "./serverValidation.js";
+import { readLedger, buildSnapshot, diffSnapshot, writeLedger } from "./contentLedger.js";
 
 export function createAgentJobService({
   FRAMEWORK_ROOT,
@@ -31,14 +34,13 @@ export function createAgentJobService({
   const {
     createArtifactPrompt,
     createAutoAnswerPrompt,
-    createBatchDeepenResearchPrompt,
-    createBatchDeepenSynthesisPrompt,
     createFilePrompt,
     createProposeOutputArtifactsPrompt,
     createResearchPrompt,
     createSynthesisPrompt,
     createValidationPrompt,
     createWikiOnlyPrompt,
+    createWikiPagePrompt,
   } = createPromptBuilders(FRAMEWORK_ROOT);
 
   async function appendRunLog(projectSlug, message) {
@@ -51,6 +53,57 @@ export function createAgentJobService({
   }
 
   const MAX_FILE_CONCURRENCY = 5;
+  const MAX_WIKI_CONCURRENCY = 5;
+
+  async function runWikiPagePhase({ project, apiKey, modelId, affectedPages }) {
+    const results = [];
+    let completed = 0;
+
+    for (let i = 0; i < affectedPages.length; i += MAX_WIKI_CONCURRENCY) {
+      const batch = affectedPages.slice(i, i + MAX_WIKI_CONCURRENCY);
+
+      const batchPromises = batch.map(async (pageInfo) => {
+        const prompt = createWikiPagePrompt(project, pageInfo);
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Phase 3a: ${pageInfo.mode === "full_rewrite" ? "Rebuilding" : "Updating"} ${pageInfo.page}`,
+          text: `${pageInfo.reason}. ${pageInfo.newDigests.length} new digest(s).`,
+          status: "wiki_page_synthesis",
+          runtime: "cursor",
+          metadata: { page: pageInfo.page, mode: pageInfo.mode, phase: "3a" },
+        });
+
+        const pageStart = Date.now();
+        const result = await runSingleAgentPhase({
+          project,
+          apiKey,
+          modelId,
+          prompt,
+          phaseName: `Wiki: ${pageInfo.page}`,
+          signal: undefined,
+        });
+        const pageDurationSeconds = Math.round((Date.now() - pageStart) / 1000);
+
+        completed++;
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Phase 3a: ${pageInfo.page} complete (${completed}/${affectedPages.length}, ${pageDurationSeconds}s)`,
+          text: result.status === "finished" ? `Successfully ${pageInfo.mode === "full_rewrite" ? "rebuilt" : "updated"} ${pageInfo.page}` : `${pageInfo.page} ended with status: ${result.status}`,
+          status: result.status === "finished" ? "wiki_page_complete" : "wiki_page_error",
+          runtime: "cursor",
+          metadata: { page: pageInfo.page, completed, total: affectedPages.length, phase: "3a", durationSeconds: pageDurationSeconds },
+        });
+
+        return { page: pageInfo.page, mode: pageInfo.mode, result, durationSeconds: pageDurationSeconds };
+      });
+
+      results.push(...(await Promise.all(batchPromises)));
+    }
+
+    return results;
+  }
 
   async function runFileSynthesisPhase({ project, apiKey, modelId, sourceMap }) {
     const outputFiles = Object.keys(sourceMap);
@@ -207,7 +260,6 @@ export function createAgentJobService({
     requestedModelId,
     runKind,
     attentionContext = null,
-    deepenContext = null,
     startMessage,
     noApiKeyMessage,
     noModelsMessage,
@@ -225,7 +277,6 @@ export function createAgentJobService({
       requestedModelId,
       runKind,
       attentionContext,
-      deepenContext,
       startMessage,
       noApiKeyMessage,
       noModelsMessage,
@@ -246,7 +297,6 @@ export function createAgentJobService({
     requestedModelId,
     runKind,
     attentionContext,
-    deepenContext,
     startMessage,
     noApiKeyMessage,
     noModelsMessage,
@@ -335,7 +385,7 @@ export function createAgentJobService({
       await appendRunLog(project.slug, `Using Cursor API key from ${cursorApiKey.source}.`);
       await appendRunLog(project.slug, `Using Cursor model: ${modelId}.`);
 
-      runAgentJob({ project, apiKey: cursorApiKey.apiKey, modelId, prompt, jobName, runKind, deepenContext, releaseProjectAgent, signal: activeAbortControllers.get(project.slug)?.signal }).catch((error) => {
+      runAgentJob({ project, apiKey: cursorApiKey.apiKey, modelId, prompt, jobName, runKind, releaseProjectAgent, signal: activeAbortControllers.get(project.slug)?.signal }).catch((error) => {
         void (async () => {
           const current = await getRebuildState(project.slug);
           await setRebuildState(project.slug, {
@@ -387,39 +437,17 @@ export function createAgentJobService({
     });
   }
 
-  async function startBatchDeepen(project, requestedModelId) {
-    const queue = await getDeepenQueue(project.path);
-
-    if (queue.length === 0) {
-      throw httpError("No topics queued for deepening. Queue topics first.", 400, "empty_deepen_queue");
-    }
-
-    // Validate all queued topics
-    for (const topic of queue) {
-      if (topic.state === "deprecated") {
-        throw httpError(`Topic '${topic.id}' is deprecated and cannot be deepened.`, 400, "topic_deprecated");
-      }
-      if (topic.disposition === "parked" || topic.disposition === "settled") {
-        throw httpError(`Topic '${topic.id}' is ${topic.disposition}. Resume it first.`, 400, "topic_disposition_blocks");
-      }
-      if (topic.state === "seed") {
-        throw httpError(`Topic '${topic.id}' is a seed. Accept it first.`, 400, "topic_is_seed");
-      }
-    }
-
-    const topicLabels = queue.map((t) => t.label).join(", ");
-
+  async function startFullRebuild(project, requestedModelId) {
     return await startAgentJob({
       project,
       requestedModelId,
-      runKind: "batch_deepen",
-      deepenContext: queue,
-      startMessage: `Deepening ${queue.length} topic(s): ${topicLabels}`,
+      runKind: "full_rebuild",
+      startMessage: "Starting full rebuild (all wiki pages and outputs will be regenerated).",
       noApiKeyMessage:
-        "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Topic deepening is unavailable from the UI.",
+        "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Rebuilds are unavailable from the UI.",
       noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
-      jobName: `Deepen (${queue.length} topics)`,
-      prompt: createBatchDeepenResearchPrompt(project, queue),
+      jobName: "Full rebuild",
+      prompt: createResearchPrompt(project),
     });
   }
 
@@ -456,16 +484,13 @@ export function createAgentJobService({
     return result;
   }
 
-  async function runAgentJob({ project, apiKey, modelId, prompt, jobName, runKind, deepenContext, releaseProjectAgent, signal }) {
-    // Batch deepen jobs get their own pipeline
-    if (runKind === "batch_deepen" && Array.isArray(deepenContext)) {
-      return await runBatchDeepenJob({ project, apiKey, modelId, prompt, jobName, topics: deepenContext, releaseProjectAgent });
-    }
-
+  async function runAgentJob({ project, apiKey, modelId, prompt, jobName, runKind, releaseProjectAgent, signal }) {
     // Artifact builds get their own simple pipeline
     if (runKind === "artifact_build") {
       return await runArtifactBuildJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent });
     }
+
+    const isFullRebuild = runKind === "full_rebuild";
 
     activeRebuilds.add(project.slug);
     const buildStartTime = Date.now();
@@ -479,22 +504,18 @@ export function createAgentJobService({
         type: "system",
         title: scope.isFirstBuild
           ? "Build scope: first build (full)"
-          : scope.sourcesChanged
-            ? "Build scope: sources changed"
-            : scope.projectMdChanged
-              ? "Build scope: project.md changed"
-              : scope.feedbackMarkers.length > 0
-                ? `Build scope: ${scope.feedbackMarkers.length} FEEDBACK marker(s)`
-                : "Build scope: no changes detected",
+          : scope.projectMdChanged
+            ? "Build scope: project.md changed"
+            : scope.feedbackMarkers.length > 0
+              ? `Build scope: ${scope.feedbackMarkers.length} FEEDBACK marker(s)`
+              : "Build scope: no changes detected",
         text: scope.isFirstBuild
           ? "No previous build manifest found. Running full build."
-          : scope.sourcesChanged
-            ? `Source inventory changed (${scope.sourceCount} sources). All wiki pages and directed outputs will be regenerated.`
-            : scope.projectMdChanged
-              ? `project.md hash changed. Affected outputs: ${scope.affectedOutputs.length > 0 ? scope.affectedOutputs.join(", ") : "all directed outputs"}.`
-              : scope.feedbackMarkers.length > 0
-                ? `FEEDBACK markers in: ${scope.feedbackMarkers.join(", ")}`
-                : "No changes detected. Refreshing dated reports only.",
+          : scope.projectMdChanged
+            ? "project.md hash changed."
+            : scope.feedbackMarkers.length > 0
+              ? `FEEDBACK markers in: ${scope.feedbackMarkers.join(", ")}`
+              : "No input changes detected. Change detection deferred to content-hash ledger after fetch + digest.",
         status: "scope_computed",
         runtime: "server",
       });
@@ -517,9 +538,29 @@ export function createAgentJobService({
           runtime: "server",
         });
       } else {
+        // Check for deepen-queued topics and inject directives into research prompt
+        const deepenQueue = await getDeepenQueue(project.path);
+        let researchPrompt = prompt; // base research prompt
+
+        if (deepenQueue.length > 0) {
+          const deepenLines = [
+            "",
+            `DEEPEN DIRECTIVE: ${deepenQueue.length} topic(s) need deeper research.`,
+            "For these topics, search more aggressively (see do_build_research.md Deepen Directives section):",
+            "",
+          ];
+          for (const t of deepenQueue) {
+            deepenLines.push(`- ${t.label} (${t.id})`);
+            if (t.coverage_gaps?.length > 0) {
+              deepenLines.push(`  Coverage gaps: ${t.coverage_gaps.map((g) => typeof g === "string" ? g : g.description).join("; ")}`);
+            }
+          }
+          researchPrompt += deepenLines.join("\n");
+        }
+
         await appendRunEvent(project.slug, {
           type: "system",
-          title: "Phase 1: Generating research plan",
+          title: `Phase 1: Generating research plan${deepenQueue.length > 0 ? ` (+ ${deepenQueue.length} deepen directive(s))` : ""}`,
           text: scope.isFirstBuild
             ? "Agent is searching the web and producing a research plan."
             : "Agent is updating the research plan based on project changes.",
@@ -532,7 +573,7 @@ export function createAgentJobService({
           project,
           apiKey,
           modelId,
-          prompt, // This is the research prompt
+          prompt: researchPrompt,
           phaseName: "Research Plan",
           signal,
         });
@@ -587,38 +628,124 @@ export function createAgentJobService({
       await runDigestPhase(project.path, { appendRunEvent, projectSlug: project.slug });
       phaseTimings.digests = Math.round((Date.now() - digestStart) / 1000);
 
-      // ── Phase 3a: Wiki Synthesis (agent builds wiki pages only) ──
+      // ── Content-hash ledger: compute what actually changed ──
+      const previousLedger = await readLedger(project.path);
+      const currentSnapshot = await buildSnapshot(project.path);
+      const ledgerDiff = diffSnapshot(currentSnapshot, previousLedger);
+
+      // Build a decision trace for the build log
+      const decisionTrace = [];
+      decisionTrace.push(`Phase 1: ${scope.skipResearchPlan ? "SKIPPED" : "ran"}`);
+      decisionTrace.push(`Phase 2: ${fetchResults.fetched} fetched, ${fetchResults.skipped} cached`);
+      decisionTrace.push(`Ledger: ${ledgerDiff.changedDigests.length} digest(s) changed, projectMd=${ledgerDiff.projectMdChanged}, humanInputs=${ledgerDiff.humanInputsChanged}`);
+
       await appendRunEvent(project.slug, {
         type: "system",
-        title: "Phase 3a: Building wiki pages",
-        text: "Agent is synthesizing wiki pages from source digests. Directed outputs will be built in a separate focused pass.",
-        status: "wiki_synthesis",
-        runtime: "cursor",
-        metadata: { phase: "3a" },
+        title: `Content ledger: ${ledgerDiff.changedDigests.length} digest(s) changed`,
+        text: ledgerDiff.changedDigests.length > 0
+          ? `Changed: ${ledgerDiff.changedDigests.map((d) => path.basename(d)).slice(0, 10).join(", ")}${ledgerDiff.changedDigests.length > 10 ? ` (+${ledgerDiff.changedDigests.length - 10} more)` : ""}`
+          : "All digest content hashes match previous build. No source material changes.",
+        status: "ledger_computed",
+        runtime: "server",
       });
 
-      // Update rebuild state with phase tracking
-      const stateBeforeWiki = await getRebuildState(project.slug);
-      await setRebuildState(project.slug, {
-        ...stateBeforeWiki,
-        buildPhase: "wiki",
-        buildPhaseDetail: "Building wiki pages from source digests",
-      });
+      // Merge ledger diff into scope for triage (ledger is authoritative)
+      scope.humanInputsChanged = ledgerDiff.humanInputsChanged;
 
-      const wikiPrompt = createWikiOnlyPrompt(project, scope);
-      const wikiStart = Date.now();
-      const wikiResult = await runSingleAgentPhase({
-        project,
-        apiKey,
-        modelId,
-        prompt: wikiPrompt,
-        phaseName: "Wiki Synthesis",
-        signal,
-      });
-      phaseTimings.wiki = Math.round((Date.now() - wikiStart) / 1000);
+      // ── Phase 3a: Wiki Synthesis (triage-based) ──
+      const triage = await computeWikiTriage(project.path, scope, ledgerDiff.changedDigests, isFullRebuild);
 
-      if (wikiResult.status !== "finished") {
-        throw new Error(`Wiki synthesis phase failed: ${wikiResult.result || "unknown error"}`);
+      if (triage.action === "skip") {
+        phaseTimings.wiki = 0;
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Phase 3a: Skipped (no new inputs)",
+          text: "No new sources, feedback, answered questions, or deepen-queued topics. Wiki pages unchanged.",
+          status: "wiki_skipped",
+          runtime: "server",
+          metadata: { phase: "3a" },
+        });
+
+      } else if (triage.action === "targeted") {
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Phase 3a: Updating ${triage.affectedPages.length} wiki page(s)`,
+          text: `Pages: ${triage.affectedPages.map((p) => p.page).join(", ")}. Unchanged: ${triage.unchangedPages.length} page(s).`,
+          status: "wiki_targeted",
+          runtime: "server",
+          metadata: { phase: "3a", affectedCount: triage.affectedPages.length, unchangedCount: triage.unchangedPages.length },
+        });
+
+        const stateBeforeWiki = await getRebuildState(project.slug);
+        await setRebuildState(project.slug, {
+          ...stateBeforeWiki,
+          buildPhase: "wiki",
+          buildPhaseDetail: `Updating ${triage.affectedPages.length} wiki page(s) (max ${MAX_WIKI_CONCURRENCY} concurrent)`,
+        });
+
+        const wikiStart = Date.now();
+        const pageResults = await runWikiPagePhase({
+          project, apiKey, modelId,
+          affectedPages: triage.affectedPages,
+        });
+        phaseTimings.wiki = Math.round((Date.now() - wikiStart) / 1000);
+
+        // Update per-page edit tracker
+        await updateWikiPageTracker(project.path, pageResults);
+
+        // Server-side: regenerate _index.md
+        await regenerateWikiIndex(project.path);
+
+        const wikiSucceeded = pageResults.filter((r) => r.result.status === "finished").length;
+        const wikiFailed = pageResults.filter((r) => r.result.status !== "finished").length;
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Phase 3a complete: ${wikiSucceeded} succeeded, ${wikiFailed} failed`,
+          text: wikiFailed > 0
+            ? `Failed: ${pageResults.filter((r) => r.result.status !== "finished").map((r) => r.page).join(", ")}`
+            : `All ${wikiSucceeded} wiki pages updated successfully.`,
+          status: wikiFailed > 0 ? "wiki_partial" : "wiki_complete",
+          runtime: "server",
+          metadata: { phase: "3a", succeeded: wikiSucceeded, failed: wikiFailed },
+        });
+
+      } else {
+        // Full wiki rebuild (first build, project.md changed, or user-requested)
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Phase 3a: Full wiki rebuild${triage.fullRebuildReason ? ` (${triage.fullRebuildReason})` : ""}`,
+          text: "Agent is synthesizing all wiki pages from source digests.",
+          status: "wiki_synthesis",
+          runtime: "cursor",
+          metadata: { phase: "3a", reason: triage.fullRebuildReason },
+        });
+
+        const stateBeforeWiki = await getRebuildState(project.slug);
+        await setRebuildState(project.slug, {
+          ...stateBeforeWiki,
+          buildPhase: "wiki",
+          buildPhaseDetail: "Full wiki rebuild from source digests",
+        });
+
+        const wikiPrompt = createWikiOnlyPrompt(project, scope);
+        const wikiStart = Date.now();
+        const wikiResult = await runSingleAgentPhase({
+          project,
+          apiKey,
+          modelId,
+          prompt: wikiPrompt,
+          phaseName: "Wiki Synthesis",
+          signal,
+        });
+        phaseTimings.wiki = Math.round((Date.now() - wikiStart) / 1000);
+
+        if (wikiResult.status !== "finished") {
+          throw new Error(`Wiki synthesis phase failed: ${wikiResult.result || "unknown error"}`);
+        }
+
+        // Reset all page edit counts after full rebuild
+        await resetWikiPageTracker(project.path);
       }
 
       // ── Phase 3b: Per-File Strategy Synthesis ──
@@ -647,7 +774,7 @@ export function createAgentJobService({
         metadata: { phase: "3b", outputFileCount, discoverySource },
       });
 
-      if (outputFileCount > 0) {
+      if (outputFileCount > 0 && (triage.action !== "skip" || isFullRebuild)) {
         const stateBeforeFiles = await getRebuildState(project.slug);
         await setRebuildState(project.slug, {
           ...stateBeforeFiles,
@@ -686,6 +813,16 @@ export function createAgentJobService({
           runtime: "server",
           metadata: { succeededFiles, failedFiles, phase: "3b" },
         });
+      } else if (outputFileCount > 0 && triage.action === "skip") {
+        phaseTimings.directedOutputs = 0;
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Phase 3b: Skipped (no new inputs)`,
+          text: `${outputFileCount} directed output(s) unchanged — wiki was skipped, so source material is identical.`,
+          status: "file_synthesis_skipped",
+          runtime: "server",
+          metadata: { outputFileCount, phase: "3b" },
+        });
       }
 
       // ── Phase 3b.5: Extract BUILD_QUESTION markers from output files ──
@@ -715,34 +852,67 @@ export function createAgentJobService({
 
 
 
-      // ── Phase 3c: Validation Pass ──
-      const stateBeforeValidation = await getRebuildState(project.slug);
-      await setRebuildState(project.slug, {
-        ...stateBeforeValidation,
-        buildPhase: "validation",
-        buildPhaseDetail: "Validating outputs, acting on gaps, recording snapshot",
-      });
+      // ── Phase 3c: Validation ──
+      // Phase 3c.1: Server-Side File Validation
+      const currentManifest = await readManifest(project.path);
+      const validationResults = await validateFileExistence(project.path, currentManifest ?? {});
 
       await appendRunEvent(project.slug, {
         type: "system",
-        title: "Phase 3c: Validating and recording",
-        text: "Agent is validating outputs, acting on gaps, updating manifest, and creating git snapshot.",
-        status: "validation",
-        runtime: "cursor",
-        metadata: { phase: "3c" },
+        title: validationResults.passed
+          ? "Phase 3c: File validation passed"
+          : `Phase 3c: File validation found ${validationResults.issues.length} issue(s)`,
+        text: validationResults.issues.join("\n") || "All expected files exist with content.",
+        status: validationResults.passed ? "validation_passed" : "validation_issues",
+        runtime: "server",
+        metadata: { phase: "3c", issues: validationResults.issues },
       });
 
-      const validationPrompt = createValidationPrompt(project, modelId, rawBuildQuestions);
-      const validationStart = Date.now();
-      const synthesisResult = await runSingleAgentPhase({
-        project,
-        apiKey,
-        modelId,
-        prompt: validationPrompt,
-        phaseName: "Validation",
-        signal,
-      });
-      phaseTimings.validation = Math.round((Date.now() - validationStart) / 1000);
+      // Phase 3c.2: Agent Evidence Validation
+      // Skip the agent call when triage says nothing changed — server validation is enough
+      let synthesisResult = { status: "finished", result: "skipped" };
+
+      if (triage.action === "skip" && !isFullRebuild) {
+        phaseTimings.validation = 0;
+        decisionTrace.push("Phase 3c: SKIPPED (triage=skip, server validation only)");
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Phase 3c: Validation agent skipped (no changes)",
+          text: "No content changes detected. Server-side file validation passed. Skipping agent evidence check.",
+          status: "validation_skipped",
+          runtime: "server",
+          metadata: { phase: "3c" },
+        });
+      } else {
+        const stateBeforeValidation = await getRebuildState(project.slug);
+        await setRebuildState(project.slug, {
+          ...stateBeforeValidation,
+          buildPhase: "validation",
+          buildPhaseDetail: "Evidence coverage checks and gap analysis",
+        });
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Phase 3c: Evidence validation",
+          text: "Agent is checking evidence coverage, detecting contradictions, and acting on gaps.",
+          status: "validation",
+          runtime: "cursor",
+          metadata: { phase: "3c" },
+        });
+
+        const validationPrompt = createValidationPrompt(project, modelId, rawBuildQuestions);
+        const validationStart = Date.now();
+        synthesisResult = await runSingleAgentPhase({
+          project,
+          apiKey,
+          modelId,
+          prompt: validationPrompt,
+          phaseName: "Evidence Validation",
+          signal,
+        });
+        phaseTimings.validation = Math.round((Date.now() - validationStart) / 1000);
+        decisionTrace.push(`Phase 3c: ran (${phaseTimings.validation}s)`);
+      }
 
       // ── Phase 3d: Auto-answer open questions from evidence ──
       try {
@@ -817,76 +987,90 @@ export function createAgentJobService({
         });
       }
 
-      // ── Phase 4: Drain Deepen Queue (if any topics are queued) ──
+      // ── Phase 3c.3: Server-Side Recording ──
+      const stateBeforeRecording = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...stateBeforeRecording,
+        buildPhase: "recording",
+        buildPhaseDetail: "Writing manifest, build log, and git snapshot",
+      });
+
+      // Resolve deepen queue info (may have been used in Phase 1)
       const deepenQueue = await getDeepenQueue(project.path);
+
+      // Collect the full set of wiki pages for the manifest
+      const allWikiPages = triage.action === "skip"
+        ? (currentManifest?.wiki_pages ?? [])
+        : triage.action === "targeted"
+          ? [...new Set([...(currentManifest?.wiki_pages ?? []), ...triage.affectedPages.map((p) => p.page)])]
+          : triage.affectedPages?.map((p) => p.page) ?? [];
+
+      // Write manifest (metadata only — change detection is in content_ledger.json)
+      await writeManifest(project.path, {
+        version: 2,
+        project_name: project.name,
+        last_build: new Date().toISOString(),
+        project_md_hash: scope.projectMdHash,
+        scope: scope.isFirstBuild ? "full" : scope.projectMdChanged ? "targeted" : "refresh",
+        wiki_pages: allWikiPages,
+        directed_outputs: Object.keys(sourceMap),
+        sources_gathered: fetchResults.fetched,
+        sources_refreshed: fetchResults.skipped,
+        feedback_applied: scope.feedbackMarkers.length,
+        topics_deepened: deepenQueue.length,
+        build_notes: `${triage.action} wiki, ${outputFileCount} outputs`,
+        decision_trace: decisionTrace,
+      });
+
+      // Write content-hash ledger (authoritative change detection for next build)
+      await writeLedger(project.path, currentSnapshot);
+
+      // Write build log
+      await prependBuildLogEntry(project.path, {
+        timestamp: new Date().toISOString(),
+        scope: scope.isFirstBuild ? "full" : scope.projectMdChanged ? "targeted" : "refresh",
+        modelId,
+        durationSeconds: Math.round((Date.now() - buildStartTime) / 1000),
+        wikiPagesUpdated: triage.action === "skip" ? 0
+          : triage.action === "targeted" ? triage.affectedPages.length : "all",
+        directedOutputsUpdated: outputFileCount,
+        sourcesFetched: fetchResults.fetched,
+        feedbackApplied: scope.feedbackMarkers.length,
+        topicsDeepened: deepenQueue.length,
+        notes: validationResults.passed ? null : `Validation issues: ${validationResults.issues.join("; ")}`,
+      });
+
+      // Git snapshot
+      const gitResult = await gitSnapshot(project.path,
+        `kiss_ai build: ${project.name} (${new Date().toISOString().slice(0, 10)})`,
+      );
+
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: gitResult.success ? `Git snapshot: ${gitResult.commitHash}` : "Git snapshot failed",
+        text: gitResult.success ? `Committed as ${gitResult.commitHash}` : gitResult.error,
+        status: gitResult.success ? "git_committed" : "git_failed",
+        runtime: "server",
+        metadata: { phase: "3c.3", commitHash: gitResult.commitHash },
+      });
+
+      // Post-build: update deepen state
       if (deepenQueue.length > 0) {
-        const dqLabels = deepenQueue.map((t) => t.label);
-
-        await appendRunEvent(project.slug, {
-          type: "system",
-          title: `Phase 4: Deepening ${deepenQueue.length} queued topic(s)`,
-          text: `Full build will now deepen: ${dqLabels.join(", ")}`,
-          status: "deepen_research",
-          runtime: "server",
-          metadata: { topicIds: deepenQueue.map((t) => t.id), topicLabels: dqLabels },
-        });
-
-        // Phase 4a: Deepen Research
-        const stateBeforeDeepenResearch = await getRebuildState(project.slug);
-        await setRebuildState(project.slug, {
-          ...stateBeforeDeepenResearch,
-          buildPhase: "deepen_research",
-          buildPhaseDetail: `Researching deeper evidence for ${deepenQueue.length} topic(s)`,
-        });
-
-        const deepenResearchPrompt = createBatchDeepenResearchPrompt(project, deepenQueue);
-        const deepenResearchResult = await runSingleAgentPhase({
-          project, apiKey, modelId,
-          prompt: deepenResearchPrompt,
-          phaseName: `Build Deepen Research (${deepenQueue.length} topics)`,
-        });
-
-        if (deepenResearchResult.status === "finished") {
-          // Phase 4b: Fetch
-          const stateBeforeDeepenFetch = await getRebuildState(project.slug);
-          await setRebuildState(project.slug, {
-            ...stateBeforeDeepenFetch,
-            buildPhase: "deepen_fetching",
-            buildPhaseDetail: `Fetching deepen sources for ${deepenQueue.length} topic(s)`,
-          });
-
-          try {
-            await runFetchPhase(project.path, { appendRunEvent, projectSlug: project.slug, phaseLabel: "Phase 4b" });
-          } catch { /* non-fatal */ }
-
-          // Phase 4c: Digests
-          try {
-            await runDigestPhase(project.path, { appendRunEvent, projectSlug: project.slug });
-          } catch { /* non-fatal */ }
-
-          // Phase 4d: Synthesis
-          const stateBeforeDeepenSynthesis = await getRebuildState(project.slug);
-          await setRebuildState(project.slug, {
-            ...stateBeforeDeepenSynthesis,
-            buildPhase: "deepen_synthesis",
-            buildPhaseDetail: `Synthesizing deeper evidence for ${deepenQueue.length} topic(s)`,
-          });
-
-          const deepenSynthesisPrompt = createBatchDeepenSynthesisPrompt(project, deepenQueue);
-          await runSingleAgentPhase({
-            project, apiKey, modelId,
-            prompt: deepenSynthesisPrompt,
-            phaseName: `Build Deepen Synthesis (${deepenQueue.length} topics)`,
-          });
+        const topicsData = await readTopics(project.path);
+        for (const topic of topicsData.topics) {
+          if (topic.queued_for_deepen) {
+            topic.queued_for_deepen = false;
+            topic.discovery = topic.discovery || {};
+            topic.discovery.deepening_count = (topic.discovery.deepening_count || 0) + 1;
+            topic.discovery.last_deepened = new Date().toISOString();
+          }
         }
-
-        // Clear the queue regardless of success
-        await clearDeepenQueue(project.path);
+        await writeTopics(project.path, topicsData.topics, topicsData.clusters);
 
         await appendRunEvent(project.slug, {
           type: "system",
           title: `Deepen queue cleared (${deepenQueue.length} topic(s) processed)`,
-          text: dqLabels.join(", "),
+          text: deepenQueue.map((t) => t.label).join(", "),
           status: "deepen_complete",
           runtime: "server",
         });
@@ -970,7 +1154,7 @@ export function createAgentJobService({
   }
 
   async function runAutoArtifactPhase({ project, apiKey, modelId }) {
-    // ── Step 1: Propose artifact specs for directed outputs ──
+    // ── Step 1: Propose artifact specs for outputs that have NO spec at all (initial creation only) ──
     const outputsNeedingSpecs = await findDirectedOutputsWithoutArtifacts(project.path);
 
     if (outputsNeedingSpecs.length > 0) {
@@ -1035,321 +1219,131 @@ export function createAgentJobService({
     // Topic artifacts can be created manually from the Artifacts UI.
     // Only directed output artifact specs are proposed and built automatically.
 
-    // ── Step 2: Collect new directed output specs to build ──
+    // ── Step 2: Build artifacts with lifecycle = "on_build" ──
     const allSpecs = await listArtifactSpecs(project.path);
-    const specsToBuild = allSpecs
-      .filter((s) => s.status === "not_built")
-      .map((s) => s.slug);
+    const onBuildSpecs = allSpecs.filter((s) => s.lifecycle === "on_build");
 
-    if (specsToBuild.length === 0) {
+    if (onBuildSpecs.length === 0) {
+      // No on_build artifacts — nothing to do
+      const manualCount = allSpecs.filter((s) => s.lifecycle === "manual" || !s.lifecycle).length;
       await appendRunEvent(project.slug, {
         type: "system",
-        title: "Phase 5: No new artifact specs to build",
-        text: "All artifact specs have already been built.",
+        title: "Phase 5: No on_build artifacts to update",
+        text: manualCount > 0
+          ? `${manualCount} artifact(s) have lifecycle=manual. Build them on-demand from the Artifacts UI.`
+          : "No artifact specs found.",
         status: "auto_artifact_skipped",
         runtime: "server",
-        metadata: { phase: "5" },
+        metadata: { phase: "5", manualCount },
       });
       return;
     }
 
+    // For on_build specs: update spec + build HTML
     await appendRunEvent(project.slug, {
       type: "system",
-      title: `Phase 5: ${specsToBuild.length} artifact spec(s) to build`,
-      text: `Specs: ${specsToBuild.join(", ")}`,
-      status: "auto_artifact_specs_created",
+      title: `Phase 5: Building ${onBuildSpecs.length} on_build artifact(s)`,
+      text: `Artifacts: ${onBuildSpecs.map((s) => s.name).join(", ")}`,
+      status: "auto_artifact_build_start",
       runtime: "server",
-      metadata: { phase: "5", created: specsToBuild, skipped: autoResult.skipped.length },
+      metadata: { phase: "5", totalArtifacts: onBuildSpecs.length },
     });
-
-    // Build the newly created artifact specs in parallel
-    const concurrency = Math.min(Math.ceil(specsToBuild.length / 3), 8);
 
     const stateBeforeArtifacts = await getRebuildState(project.slug);
     await setRebuildState(project.slug, {
       ...stateBeforeArtifacts,
       buildPhase: "auto_artifacts",
-      buildPhaseDetail: `Building ${specsToBuild.length} artifact(s) (${concurrency} concurrent)`,
-    });
-
-    await appendRunEvent(project.slug, {
-      type: "system",
-      title: `Phase 5: Building ${specsToBuild.length} artifact(s)`,
-      text: `Dynamic concurrency: ${concurrency} agent(s) for ${specsToBuild.length} artifact(s).`,
-      status: "auto_artifact_build_start",
-      runtime: "server",
-      metadata: { phase: "5", totalArtifacts: specsToBuild.length, concurrency },
+      buildPhaseDetail: `Building ${onBuildSpecs.length} on_build artifact(s)`,
     });
 
     let completed = 0;
     let succeeded = 0;
     let failed = 0;
 
-    // Process in batches
-    for (let i = 0; i < specsToBuild.length; i += concurrency) {
-      const batch = specsToBuild.slice(i, i + concurrency);
+    for (const spec of onBuildSpecs) {
+      try {
+        const fullSpec = await readArtifactSpec(project.path, spec.slug);
+        const sourceGlobs = Array.isArray(fullSpec.frontmatter.sources) ? fullSpec.frontmatter.sources : [];
+        const resolvedSources = await resolveArtifactSources(project.path, sourceGlobs);
+        const explicitPaths = resolvedSources.map((s) => s.relativePath);
+        const discoveryInventory = await discoverRelevantSources(project.path, explicitPaths);
 
-      const batchPromises = batch.map(async (artifactSlug) => {
+        // Clear and recreate build directory
+        const buildDir = path.join(project.path, "artifacts/builds", spec.slug);
         try {
-          // Prepare the artifact build (same logic as startArtifactBuild, but inline)
-          const spec = await readArtifactSpec(project.path, artifactSlug);
-          const sourceGlobs = Array.isArray(spec.frontmatter.sources) ? spec.frontmatter.sources : [];
-          const resolvedSources = await resolveArtifactSources(project.path, sourceGlobs);
-          const explicitPaths = resolvedSources.map((s) => s.relativePath);
-          const discoveryInventory = await discoverRelevantSources(project.path, explicitPaths);
+          await fs.rm(buildDir, { recursive: true, force: true });
+          await fs.mkdir(buildDir, { recursive: true });
+        } catch { /* directory may not exist yet */ }
 
-          // Clear and recreate build directory
-          const buildDir = path.join(project.path, "artifacts/builds", artifactSlug);
-          try {
-            await fs.rm(buildDir, { recursive: true, force: true });
-            await fs.mkdir(buildDir, { recursive: true });
-          } catch { /* directory may not exist yet */ }
+        const crypto = await import("node:crypto");
+        const specHash = crypto.createHash("sha256").update(fullSpec.rawContent).digest("hex");
 
-          // Compute the spec hash server-side (same as startArtifactBuild)
-          const crypto = await import("node:crypto");
-          const batchSpecHash = crypto.createHash("sha256").update(spec.rawContent).digest("hex");
+        const artifactPrompt = await createArtifactPrompt(project, fullSpec, resolvedSources, discoveryInventory, specHash);
 
-          const artifactPrompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory, batchSpecHash);
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Phase 5: Building "${spec.name}" (on_build)`,
+          text: `Agent is generating HTML artifact with ${resolvedSources.length} source(s).`,
+          status: "auto_artifact_building",
+          runtime: "cursor",
+          metadata: { phase: "5", artifactSlug: spec.slug },
+        });
 
-          await appendRunEvent(project.slug, {
-            type: "system",
-            title: `Phase 5: Building artifact "${spec.frontmatter.name || artifactSlug}"`,
-            text: `Agent is generating HTML artifact with ${resolvedSources.length} source(s) and ${discoveryInventory.length} discovery file(s).`,
-            status: "auto_artifact_building",
-            runtime: "cursor",
-            metadata: { phase: "5", artifactSlug },
-          });
-
-          const result = await runSingleAgentPhase({
-            project,
-            apiKey,
-            modelId,
-            prompt: artifactPrompt,
-            phaseName: `Artifact: ${spec.frontmatter.name || artifactSlug}`,
-          });
-
-          completed++;
-          if (result.status === "finished") {
-            succeeded++;
-          } else {
-            failed++;
-          }
-
-          await appendRunEvent(project.slug, {
-            type: "system",
-            title: `Phase 5: "${spec.frontmatter.name || artifactSlug}" ${result.status === "finished" ? "complete" : "failed"} (${completed}/${specsToBuild.length})`,
-            text: result.status === "finished"
-              ? `Successfully built artifact.`
-              : `Artifact build ended with status: ${result.status}`,
-            status: result.status === "finished" ? "auto_artifact_complete" : "auto_artifact_error",
-            runtime: "cursor",
-            metadata: { phase: "5", artifactSlug, completed, total: specsToBuild.length },
-          });
-
-          return { slug: artifactSlug, status: result.status };
-        } catch (buildError) {
-          completed++;
-          failed++;
-          console.error(`Auto-artifact build failed for ${artifactSlug}:`, buildError);
-
-          await appendRunEvent(project.slug, {
-            type: "system",
-            title: `Phase 5: "${artifactSlug}" failed (${completed}/${specsToBuild.length})`,
-            text: buildError instanceof Error ? buildError.message : "Unknown build error",
-            status: "auto_artifact_error",
-            runtime: "server",
-            metadata: { phase: "5", artifactSlug, completed, total: specsToBuild.length },
-          });
-
-          return { slug: artifactSlug, status: "error" };
-        }
-      });
-
-      await Promise.all(batchPromises);
-    }
-
-    await appendRunEvent(project.slug, {
-      type: "system",
-      title: `Phase 5 complete: ${succeeded} succeeded, ${failed} failed`,
-      text: failed > 0
-        ? `${succeeded} artifacts built successfully, ${failed} failed.`
-        : `All ${succeeded} artifacts built successfully.`,
-      status: failed > 0 ? "auto_artifact_partial" : "auto_artifact_all_complete",
-      runtime: "server",
-      metadata: { phase: "5", succeeded, failed, total: specsToBuild.length },
-    });
-  }
-
-  async function runBatchDeepenJob({ project, apiKey, modelId, prompt, jobName, topics, releaseProjectAgent }) {
-    activeRebuilds.add(project.slug);
-    const buildStartTime = Date.now();
-    const phaseTimings = {};
-    const topicLabels = topics.map((t) => t.label);
-
-    try {
-      // ── Emit batch start ──
-      await appendRunEvent(project.slug, {
-        type: "system",
-        title: `Batch deepening ${topics.length} topic(s)`,
-        text: topicLabels.join(", "),
-        status: "batch_deepen_start",
-        runtime: "server",
-        metadata: { topicIds: topics.map((t) => t.id), topicLabels },
-      });
-
-      // ── Phase 1: Batch Research (agent searches web for ALL topics) ──
-      const stateBeforeResearch = await getRebuildState(project.slug);
-      await setRebuildState(project.slug, {
-        ...stateBeforeResearch,
-        buildPhase: "deepen_research",
-        buildPhaseDetail: `Researching deeper evidence for ${topics.length} topic(s)`,
-      });
-
-      await appendRunEvent(project.slug, {
-        type: "system",
-        title: `Deepen Phase 1: Researching ${topics.length} topic(s)`,
-        text: `Agent is searching the web for deeper evidence. Topics: ${topicLabels.join(", ")}`,
-        status: "deepen_research",
-        runtime: "cursor",
-      });
-
-      const researchStart = Date.now();
-      const researchResult = await runSingleAgentPhase({
-        project,
-        apiKey,
-        modelId,
-        prompt,
-        phaseName: `Batch Deepen Research (${topics.length} topics)`,
-      });
-      phaseTimings.research = Math.round((Date.now() - researchStart) / 1000);
-
-      if (researchResult.status !== "finished") {
-        throw new Error(`Deepen research phase failed: ${researchResult.result || "unknown error"}`);
-      }
-
-      // ── Phase 2: Server-Side Fetch ──
-      const stateBeforeFetch = await getRebuildState(project.slug);
-      await setRebuildState(project.slug, {
-        ...stateBeforeFetch,
-        buildPhase: "deepen_fetching",
-        buildPhaseDetail: `Fetching new sources for ${topics.length} topic(s)`,
-      });
-
-      await appendRunEvent(project.slug, {
-        type: "system",
-        title: "Deepen Phase 2: Fetching sources",
-        text: "Server is fetching and extracting content from URLs in the research plan.",
-        status: "fetching_sources",
-        runtime: "server",
-      });
-
-      const fetchStart = Date.now();
-      const fetchResults = await runFetchPhase(project.path, {
-        appendRunEvent,
-        projectSlug: project.slug,
-        phaseLabel: "Deepen Phase 2",
-      });
-      phaseTimings.fetch = Math.round((Date.now() - fetchStart) / 1000);
-
-      // ── Phase 2.5: Generate Source Digests ──
-      const stateBeforeDigests = await getRebuildState(project.slug);
-      await setRebuildState(project.slug, {
-        ...stateBeforeDigests,
-        buildPhase: "deepen_digests",
-        buildPhaseDetail: `Generating digests for ${topics.length} topic(s)`,
-      });
-
-      const digestStart = Date.now();
-      await runDigestPhase(project.path, { appendRunEvent, projectSlug: project.slug });
-      phaseTimings.digests = Math.round((Date.now() - digestStart) / 1000);
-
-      // ── Phase 3: Batch Synthesis (agent updates ALL topics' wiki pages + outputs) ──
-      const stateBeforeSynthesis = await getRebuildState(project.slug);
-      await setRebuildState(project.slug, {
-        ...stateBeforeSynthesis,
-        buildPhase: "deepen_synthesis",
-        buildPhaseDetail: `Synthesizing deeper evidence for ${topics.length} topic(s)`,
-      });
-
-      await appendRunEvent(project.slug, {
-        type: "system",
-        title: `Deepen Phase 3: Synthesizing ${topics.length} topic(s)`,
-        text: `Agent is updating wiki pages and related outputs for: ${topicLabels.join(", ")}`,
-        status: "deepen_synthesis",
-        runtime: "cursor",
-      });
-
-      const synthesisPrompt = createBatchDeepenSynthesisPrompt(project, topics);
-      const synthesisStart = Date.now();
-      const synthesisResult = await runSingleAgentPhase({
-        project,
-        apiKey,
-        modelId,
-        prompt: synthesisPrompt,
-        phaseName: `Batch Deepen Synthesis (${topics.length} topics)`,
-      });
-      phaseTimings.synthesis = Math.round((Date.now() - synthesisStart) / 1000);
-
-      // ── Clear the deepen queue ──
-      await clearDeepenQueue(project.path);
-
-      // ── Completion ──
-      const completedState = await getRebuildState(project.slug);
-      const buildDurationSeconds = Math.round((Date.now() - buildStartTime) / 1000);
-      const { attentionCount, finishedWithAttention, message, status } = await createAgentJobCompletionMessage(jobName)({ project, result: synthesisResult });
-      await setRebuildState(project.slug, {
-        ...completedState,
-        running: false,
-        status,
-        finishedAt: new Date().toISOString(),
-        message,
-        buildPhase: "complete",
-        buildPhaseDetail: null,
-      });
-      await appendRunEvent(project.slug, {
-        type: synthesisResult.status === "finished" ? "run_status" : "error",
-        title: synthesisResult.status === "finished" ? `${jobName} finished (${buildDurationSeconds}s)` : `${jobName} stopped before finishing`,
-        text: message,
-        status,
-        runtime: "cursor",
-        metadata: {
-          resultStatus: synthesisResult.status,
-          attentionCount,
-          fetchResults,
-          buildDurationSeconds,
+        const result = await runSingleAgentPhase({
+          project,
+          apiKey,
           modelId,
-          topicIds: topics.map((t) => t.id),
-          topicCount: topics.length,
-          phaseTimings,
-        },
-      });
-    } catch (error) {
-      await finishAssistantMessage(project.slug);
-      const message = error instanceof Error ? error.message : `Unknown batch deepen failure.`;
+          prompt: artifactPrompt,
+          phaseName: `Artifact: ${spec.name}`,
+        });
 
-      // Clear queue even on failure so user doesn't get stuck
-      await clearDeepenQueue(project.path).catch(() => {});
+        completed++;
+        if (result.status === "finished") {
+          succeeded++;
+        } else {
+          failed++;
+        }
 
-      const current = await getRebuildState(project.slug);
-      await setRebuildState(project.slug, {
-        ...current,
-        running: false,
-        status: "error",
-        finishedAt: new Date().toISOString(),
-        message,
-      });
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Phase 5: "${spec.name}" ${result.status === "finished" ? "complete" : "failed"} (${completed}/${onBuildSpecs.length})`,
+          text: result.status === "finished"
+            ? `Successfully built artifact.`
+            : `Artifact build ended with status: ${result.status}`,
+          status: result.status === "finished" ? "auto_artifact_complete" : "auto_artifact_error",
+          runtime: "cursor",
+          metadata: { phase: "5", artifactSlug: spec.slug, completed, total: onBuildSpecs.length },
+        });
+      } catch (buildError) {
+        completed++;
+        failed++;
+        console.error(`Auto-artifact build failed for ${spec.slug}:`, buildError);
+
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: `Phase 5: "${spec.slug}" failed (${completed}/${onBuildSpecs.length})`,
+          text: buildError instanceof Error ? buildError.message : "Unknown build error",
+          status: "auto_artifact_error",
+          runtime: "server",
+          metadata: { phase: "5", artifactSlug: spec.slug, completed, total: onBuildSpecs.length },
+        });
+      }
+    }
+
+    if (onBuildSpecs.length > 0) {
       await appendRunEvent(project.slug, {
-        type: "error",
-        title: `${jobName} failed`,
-        text: message,
-        status: "error",
-        runtime: "cursor",
+        type: "system",
+        title: `Phase 5 complete: ${succeeded} succeeded, ${failed} failed`,
+        text: failed > 0
+          ? `${succeeded} on_build artifacts built, ${failed} failed.`
+          : `All ${succeeded} on_build artifacts built successfully.`,
+        status: failed > 0 ? "auto_artifact_partial" : "auto_artifact_all_complete",
+        runtime: "server",
+        metadata: { phase: "5", succeeded, failed, total: onBuildSpecs.length },
       });
-    } finally {
-      activeRebuilds.delete(project.slug);
-      releaseProjectAgent();
     }
   }
+
 
   async function runArtifactBuildJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent }) {
     activeRebuilds.add(project.slug);
@@ -1473,6 +1467,5 @@ export function createAgentJobService({
     return await getRebuildState(projectSlug);
   }
 
-  return { cancelAgentJob, startArtifactBuild, startBatchDeepen, startHumanAttentionResolution, startRebuild };
+  return { cancelAgentJob, startArtifactBuild, startFullRebuild, startHumanAttentionResolution, startRebuild };
 }
-

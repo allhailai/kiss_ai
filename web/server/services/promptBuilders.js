@@ -49,21 +49,6 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
           "Update only the outputs affected by this change.",
           "Do not regenerate unchanged wiki pages or outputs.",
         );
-
-        if (scope.affectedOutputs.length > 0) {
-          lines.push(`Affected outputs: ${scope.affectedOutputs.join(", ")}`);
-        }
-      } else if (scope.sourcesChanged) {
-        lines.push(
-          `BUILD SCOPE: Source inventory changed. ${scope.sourceCount} sources now available (previously ${scope.affectedOutputs.length} outputs depend on these sources).`,
-          "New or updated source files have been fetched since the last build.",
-          "Regenerate all wiki pages and directed outputs using the enriched source base.",
-          "Read all source digests in sources/digests/ to incorporate newly available evidence.",
-        );
-
-        if (scope.affectedOutputs.length > 0) {
-          lines.push(`Affected outputs: ${scope.affectedOutputs.join(", ")}`);
-        }
       } else if (!scope.projectMdChanged) {
         lines.push(
           "BUILD SCOPE: project.md has NOT changed since last build.",
@@ -118,11 +103,6 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
           "```diff",
           scope.projectMdDiff.slice(0, 3000),
           "```",
-        );
-      } else if (scope.sourcesChanged) {
-        lines.push(
-          `BUILD SCOPE: Source inventory changed. ${scope.sourceCount} sources now available.`,
-          "Regenerate all wiki pages using the enriched source base.",
         );
       }
 
@@ -202,19 +182,69 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
     return lines.join("\n");
   }
 
+  function createWikiPagePrompt(project, pageInfo) {
+    // pageInfo = { page, topicIds, reason, mode, newDigests, allTopicDigests, feedbackMarkers }
+    const lines = [
+      `${pageInfo.mode === "full_rewrite" ? "Rebuild" : "Update"} the wiki page: ${pageInfo.page}`,
+      "",
+      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build_wiki_page.md")} exactly.`,
+      "This is a non-interactive web-triggered build. Never ask the user for confirmation or wait for input mid-run.",
+      `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
+      `Project root: ${project.path}`,
+      "",
+      `MODE: ${pageInfo.mode}`,
+      `UPDATE REASON: ${pageInfo.reason}`,
+      "",
+    ];
+
+    if (pageInfo.mode === "full_rewrite") {
+      lines.push(
+        "This page has exceeded the incremental edit threshold.",
+        "Regenerate it entirely from all available evidence.",
+        "",
+        "ALL DIGESTS FOR THIS TOPIC (read all):",
+      );
+      for (const d of pageInfo.allTopicDigests) lines.push(`  - ${d}`);
+    } else {
+      lines.push("NEW EVIDENCE (integrate into existing page):");
+      for (const d of pageInfo.newDigests) lines.push(`  - ${d}`);
+      const secondaryDigests = (pageInfo.allTopicDigests ?? []).filter(
+        (x) => !(pageInfo.newDigests ?? []).includes(x),
+      );
+      if (secondaryDigests.length > 0) {
+        lines.push("", "ALL TOPIC DIGESTS (available if needed):");
+        for (const d of secondaryDigests) lines.push(`  - ${d}`);
+      }
+    }
+
+    if (pageInfo.feedbackMarkers?.length > 0) {
+      lines.push("", "FEEDBACK MARKERS TO APPLY:");
+      for (const m of pageInfo.feedbackMarkers) lines.push(`  - ${m}`);
+    }
+
+    return lines.join("\n");
+  }
+
   function createValidationPrompt(project, modelId, rawBuildQuestions = []) {
     const lines = [
-      "Run the kiss_ai validation pass for this project.",
+      "Run the kiss_ai evidence validation for this project.",
       "",
-      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build.md")} Phases 9-11 only (Validate, Act on Gaps, Record and Snapshot).`,
+      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build_validate.md")} exactly.`,
       "This is a non-interactive web-triggered build. Never ask the user for confirmation or wait for input mid-run.",
       `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
       `Project root: ${project.path}`,
       "",
       "Wiki pages and directed outputs have already been built.",
-      "Your job is to validate, act on gaps (coverage_gaps in topics.json or questions), update manifest.json, and git snapshot.",
+      "Your job is evidence coverage checks, contradiction detection, and gap actions.",
+      "Do NOT update manifest.json, write build log entries, or run git commands — the server handles those.",
+      "Do NOT check file existence — the server already validated that.",
       "",
-      `Model used for this build: ${modelId}. Include this in the change_logs/builds.md entry.`,
+      "Focus on:",
+      "- Evidence coverage: verify key claims in outputs cite gathered sources",
+      "- Contradiction detection: find claims where sources disagree",
+      "- Coverage gaps: add structured entries to topics.json for missing evidence",
+      "- Update .build/scratchpad.md with working memory",
+      "- Update .build/topics.json with state changes and metrics",
     ];
 
     // Question consolidation instructions
@@ -308,65 +338,6 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
     ].join("\n");
   }
 
-  function createBatchDeepenResearchPrompt(project, topics) {
-    const topicBlocks = topics.map((t) => [
-      `- TOPIC_ID: ${t.id}`,
-      `  LABEL: ${t.label}`,
-      `  WIKI_PAGE: ${t.wiki_page || "null"}`,
-      `  SOURCES: ${JSON.stringify(t.sources || [])}`,
-      `  COVERAGE_GAPS: ${JSON.stringify(t.coverage_gaps || [])}`,
-      `  DEPENDS_ON: ${JSON.stringify(t.depends_on || [])}`,
-      `  DEEPENING_COUNT: ${t.discovery?.deepening_count ?? 0}`,
-    ].join("\n")).join("\n\n");
-
-    return [
-      `Run a focused deepening research pass on ${topics.length} topic(s):`,
-      "",
-      topicBlocks,
-      "",
-      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_deepen.md")} Phases 1-2 only (Read Context and Search for Deeper Evidence).`,
-      "This is a non-interactive web-triggered deepen run. Never ask the user for confirmation or wait for input mid-run.",
-      `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
-      "Do not create or depend on a project-local framework/ folder.",
-      "Do not operate outside this project root.",
-      `Project root: ${project.path}`,
-      "",
-      "Search the web for deeper evidence on ALL listed topics, then write sources/research_plan.json with the new URLs.",
-      "Cover every topic listed above. Do NOT fetch URLs. Only list them. The build pipeline will fetch them.",
-      "Do NOT write wiki pages, directed outputs, or source notes in this phase.",
-    ].join("\n");
-  }
-
-  function createBatchDeepenSynthesisPrompt(project, topics) {
-    const topicBlocks = topics.map((t) => [
-      `- TOPIC_ID: ${t.id}`,
-      `  LABEL: ${t.label}`,
-      `  WIKI_PAGE: ${t.wiki_page || "null"}`,
-      `  SOURCES: ${JSON.stringify(t.sources || [])}`,
-      `  COVERAGE_GAPS: ${JSON.stringify(t.coverage_gaps || [])}`,
-      `  DEPENDS_ON: ${JSON.stringify(t.depends_on || [])}`,
-      `  DEEPENING_COUNT: ${t.discovery?.deepening_count ?? 0}`,
-    ].join("\n")).join("\n\n");
-
-    return [
-      `Synthesize deeper evidence for ${topics.length} topic(s):`,
-      "",
-      topicBlocks,
-      "",
-      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_deepen.md")} Phases 3-4 only (Synthesize and Snapshot).`,
-      "This is a non-interactive web-triggered deepen run. Never ask the user for confirmation or wait for input mid-run.",
-      `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
-      "Do not create or depend on a project-local framework/ folder.",
-      "Do not operate outside this project root.",
-      `Project root: ${project.path}`,
-      "",
-      "IMPORTANT: Source files have already been fetched and written to sources/web_research/ by the build pipeline.",
-      "Source digests have been generated in sources/digests/.",
-      "Do NOT search the web. Use only the pre-fetched sources.",
-      "Read newly fetched sources, update each topic's wiki page, update affected directed outputs,",
-      "and update .build/topics.json for ALL topics listed above.",
-    ].join("\n");
-  }
 
   async function createArtifactPrompt(project, artifactSpec, resolvedSources, discoveryInventory = [], specHash = null) {
     const lines = [
@@ -571,13 +542,12 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
   return {
     createArtifactPrompt,
     createAutoAnswerPrompt,
-    createBatchDeepenResearchPrompt,
-    createBatchDeepenSynthesisPrompt,
     createFilePrompt,
     createProposeOutputArtifactsPrompt,
     createResearchPrompt,
     createSynthesisPrompt,
     createValidationPrompt,
     createWikiOnlyPrompt,
+    createWikiPagePrompt,
   };
 }

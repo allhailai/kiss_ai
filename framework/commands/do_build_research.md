@@ -75,9 +75,24 @@ When in doubt, use `default`.
 - If a topic has no findable web sources, include it in the plan with an empty `urls` array — this documents the gap.
 - The JSON must be valid and parseable. Do not wrap it in markdown code fences.
 
+### Deepen Directives
+
+If the prompt includes a `DEEPEN DIRECTIVE` section, certain topics need deeper research coverage. For each deepened topic:
+
+- Generate 4–6 URLs instead of the standard 2–4
+- Prioritize primary data sources: government datasets, academic papers, corporate filings, raw data portals
+- Target any listed `coverage_gaps` with specific search queries
+- Search for contrarian or alternative-angle sources that challenge the current wiki narrative
+- Prefer institutional sources (academic, government, industry associations) over general news
+- Include at least one source from a different geographic or methodological perspective if available
+
+Mark all deepen URLs with their topic context in the `query.topic` field so the pipeline can trace which sources came from deepening.
+
 ## Completion
 
 Report:
 - Number of topics covered.
 - Total URLs listed.
+- Number of topics deepened (if DEEPEN DIRECTIVE was present).
 - Any topics with no sources found (gaps).
+
