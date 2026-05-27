@@ -236,8 +236,48 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   if (!selectedSlug) {
     return (
       <div className="artifacts-view">
-        <div className="artifacts-placeholder">
-          <p>Select an artifact from the sidebar or create a new one.</p>
+        <div className="artifacts-list-view">
+          <div className="artifacts-list-header">
+            <h2>Artifacts</h2>
+            <span className="artifacts-list-count">{artifacts.length} artifact{artifacts.length !== 1 ? "s" : ""}</span>
+          </div>
+          {artifacts.length === 0 ? (
+            <div className="artifacts-placeholder">
+              <p>No artifacts yet. Create one from the sidebar.</p>
+            </div>
+          ) : (
+            <div className="artifacts-list-grid">
+              {artifacts.map((artifact) => {
+                const isStale = artifact.lastBuilt && (
+                  (lastProjectBuildAt && lastProjectBuildAt > artifact.lastBuilt)
+                  || artifact.sourcesUpdatedSinceLastBuild
+                  || (artifact.buildSpecHash && artifact.currentSpecHash && artifact.buildSpecHash !== artifact.currentSpecHash)
+                );
+                return (
+                  <button
+                    key={artifact.slug}
+                    className="artifacts-list-card"
+                    onClick={() => route.navigateTo("artifacts", artifact.slug)}
+                    type="button"
+                  >
+                    <div className="artifacts-list-card-name">{artifact.name || artifact.slug.replace(/[_-]/g, " ")}</div>
+                    <div className="artifacts-list-card-meta">
+                      <span className={`artifacts-list-card-status ${artifact.status === "built" ? (isStale ? "stale" : "fresh") : "unbuilt"}`}>
+                        {artifact.status === "built" ? (isStale ? "⚠ Stale" : "✓ Built") : "○ Not built"}
+                      </span>
+                      {artifact.lastBuilt ? (
+                        <span className="artifacts-list-card-date">
+                          {new Date(artifact.lastBuilt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                        </span>
+                      ) : null}
+                      <span className="artifacts-list-card-lifecycle">{artifact.lifecycle}</span>
+                      <span className="artifacts-list-card-format">{artifact.format}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     );
