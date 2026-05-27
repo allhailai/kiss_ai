@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { outputsApi } from "../../data/outputsApi";
+import { artifactsApi } from "../../data/artifactsApi";
 import { filesApi } from "../../data/filesApi";
-import type { OutputStatusResponse, ProjectFile, RebuildModel } from "../../contracts/api";
+import type { ArtifactSpec, OutputStatusResponse, ProjectFile, RebuildModel } from "../../contracts/api";
 import { groupModelsByTier, modelDisplayName, modelTierLabels } from "../../domain/modelLabels";
 
 type SortBy = "name" | "buildDate";
@@ -38,6 +39,7 @@ export function OutputSection({
 
   // ── Data ──────────────────────────────────────────────────────
   const [outputStatus, setOutputStatus] = useState<OutputStatusResponse | null>(null);
+  const [artifactSpecs, setArtifactSpecs] = useState<ArtifactSpec[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -69,33 +71,53 @@ export function OutputSection({
   // ── Fetch output status ───────────────────────────────────────
   const refreshStatus = useCallback(async () => {
     try {
-      const result = await outputsApi.status(projectSlug);
-      setOutputStatus(result);
+      if (type === "artifact") {
+        const result = await artifactsApi.list(projectSlug);
+        setArtifactSpecs(result.artifacts);
+      } else {
+        const result = await outputsApi.status(projectSlug);
+        setOutputStatus(result);
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load output status");
     } finally {
       setLoading(false);
     }
-  }, [projectSlug]);
+  }, [projectSlug, type]);
 
   useEffect(() => {
     void refreshStatus();
   }, [refreshStatus, projectFiles]);
 
-  // ── Build report rows from project files + output status ────────
+  // ── Build rows from project files + output status (reports) or artifact specs (artifacts) ──
   const reportRows: ReportFileRow[] = useMemo(() => {
-    const prefix = type === "report" ? "outputs_ai/reports/" : "outputs_ai/artifacts/";
+    if (type === "artifact") {
+      // Artifacts: derive rows directly from artifactsApi.list() result
+      return artifactSpecs.map((spec) => {
+        const isStale = spec.lastBuilt != null && (
+          (outputStatus?.lastKnowledgeBuild != null && outputStatus.lastKnowledgeBuild > spec.lastBuilt)
+          || spec.sourcesUpdatedSinceLastBuild
+          || (spec.buildSpecHash != null && spec.currentSpecHash != null && spec.buildSpecHash !== spec.currentSpecHash)
+        );
+        return {
+          path: spec.slug,
+          name: spec.name || spec.slug.replace(/[_-]/g, " "),
+          folder: null,
+          builtAt: spec.lastBuilt,
+          stale: spec.status !== "built" || isStale,
+        };
+      });
+    }
 
-    // Build a lookup from the status API (build timestamps + staleness)
+    // Reports: join projectFiles with outputsApi.status() ledger data
+    const prefix = "outputs_ai/reports/";
     const statusByPath = new Map<string, { builtAt: string | null; stale: boolean }>();
     if (outputStatus) {
       for (const o of outputStatus.outputs) {
         statusByPath.set(o.path, { builtAt: o.builtAt ?? null, stale: o.stale });
       }
     }
-
-    // Use projectFiles as the source of truth for what files exist on disk
     return projectFiles
       .filter((f) => f.path.startsWith(prefix))
       .map((f) => {
@@ -110,10 +132,10 @@ export function OutputSection({
           name,
           folder,
           builtAt: status?.builtAt ?? null,
-          stale: status?.stale ?? true, // no build record = stale
+          stale: status?.stale ?? true,
         };
       });
-  }, [projectFiles, outputStatus, type]);
+  }, [type, artifactSpecs, projectFiles, outputStatus]);
 
   // ── Compute unique folders ────────────────────────────────────
   const folders = useMemo(() => {
@@ -236,7 +258,14 @@ export function OutputSection({
     setBuilding(true);
     flash(`Building ${files.length} ${files.length === 1 ? typeSingular.toLowerCase() : typeLabel.toLowerCase()}…`);
     try {
-      await outputsApi.buildOutputs(projectSlug, files, type, buildModelId || undefined);
+      if (type === "artifact") {
+        // Build artifacts one at a time via their dedicated API
+        for (const slug of files) {
+          await artifactsApi.build(projectSlug, slug, buildModelId || undefined);
+        }
+      } else {
+        await outputsApi.buildOutputs(projectSlug, files, type, buildModelId || undefined);
+      }
       flash(`Build started for ${files.length} ${files.length === 1 ? typeSingular.toLowerCase() : typeLabel.toLowerCase()}.`);
       // Poll for completion
       const startTime = Date.now();
@@ -251,19 +280,34 @@ export function OutputSection({
           return;
         }
         try {
-          const updated = await outputsApi.status(projectSlug);
-          setOutputStatus(updated);
-          // Check if any of our files now have a builtAt > our start time
-          const buildStartIso = new Date(startTime).toISOString();
-          const allDone = files.every((f) => {
-            const output = updated.outputs.find((o) => o.path === f);
-            return output && output.builtAt && output.builtAt > buildStartIso;
-          });
-          if (allDone) {
-            clearInterval(poll);
-            setBuilding(false);
-            setSelectedFiles(new Set());
-            flash(`Build complete ✓`);
+          if (type === "artifact") {
+            const result = await artifactsApi.list(projectSlug);
+            setArtifactSpecs(result.artifacts);
+            const buildStartIso = new Date(startTime).toISOString();
+            const allDone = files.every((slug) => {
+              const spec = result.artifacts.find((a) => a.slug === slug);
+              return spec && spec.lastBuilt && spec.lastBuilt > buildStartIso;
+            });
+            if (allDone) {
+              clearInterval(poll);
+              setBuilding(false);
+              setSelectedFiles(new Set());
+              flash(`Build complete ✓`);
+            }
+          } else {
+            const updated = await outputsApi.status(projectSlug);
+            setOutputStatus(updated);
+            const buildStartIso = new Date(startTime).toISOString();
+            const allDone = files.every((f) => {
+              const output = updated.outputs.find((o) => o.path === f);
+              return output && output.builtAt && output.builtAt > buildStartIso;
+            });
+            if (allDone) {
+              clearInterval(poll);
+              setBuilding(false);
+              setSelectedFiles(new Set());
+              flash(`Build complete ✓`);
+            }
           }
         } catch {
           // polling error — continue
@@ -292,7 +336,25 @@ export function OutputSection({
       return;
     }
 
-    // Ensure .md extension
+    if (type === "artifact") {
+      // For artifacts, oldPath is the slug and newBasename is the new slug
+      const newSlug = trimmed.replace(/\.artifact\.md$/, "").replace(/\.md$/, "");
+      if (newSlug === oldPath) {
+        setRenamingPath(null);
+        return;
+      }
+      try {
+        await artifactsApi.rename(projectSlug, oldPath, newSlug);
+        flash(`Renamed to ${newSlug} ✓`);
+        setRenamingPath(null);
+        await refreshStatus();
+      } catch (err) {
+        flash(err instanceof Error ? err.message : "Rename failed");
+      }
+      return;
+    }
+
+    // Reports: rename via file path
     const finalBasename = trimmed.endsWith(".md") ? trimmed : `${trimmed}.md`;
     const dir = oldPath.substring(0, oldPath.lastIndexOf("/") + 1);
     const newPath = dir + finalBasename;
