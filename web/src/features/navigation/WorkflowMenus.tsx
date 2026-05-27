@@ -102,22 +102,41 @@ export function SimplifiedNavigator({
     });
   }
 
+  // Sections where clicking the header should navigate to a list view (not just toggle)
+  const navigableSections: Partial<Record<SimplifiedNavSectionId, View>> = {
+    chat: "chat",
+    reports: "reports",
+    artifacts: "artifacts",
+  };
+
   return (
     <nav className="simple-nav" aria-label="Project workflow">
       {simplifiedNavSections.map((section) => {
         const isExpanded = expandedSections.has(section.id);
         const isActiveSection = activeSection === section.id;
         const isChatSection = section.id === "chat";
+        const navTarget = navigableSections[section.id];
 
         return (
           <section className={isActiveSection ? "nav-section active" : "nav-section"} key={section.id}>
             <button
               className="nav-section-trigger"
-              onClick={() =>
-                isChatSection
-                    ? onOpenView(chatNavLeaf.view)
-                    : toggleSection(section.id)
-              }
+              onClick={() => {
+                if (navTarget) {
+                  onOpenView(navTarget);
+                  // Ensure expanded when navigating
+                  if (!isChatSection) {
+                    setExpandedSections((current) => {
+                      if (current.has(section.id)) return current;
+                      const next = new Set(current);
+                      next.add(section.id);
+                      return next;
+                    });
+                  }
+                } else {
+                  toggleSection(section.id);
+                }
+              }}
               type="button"
               aria-expanded={isChatSection ? undefined : isExpanded}
             >
@@ -249,26 +268,13 @@ export function SimplifiedNavigator({
 
     if (sectionId === "reports") {
       return (
-        <>
-          <button
-            className={
-              currentView === "reports" && !selectedPath
-                ? "simple-nav-item simple-nav-subheader active"
-                : "simple-nav-item simple-nav-subheader"
-            }
-            onClick={() => onOpenView("reports")}
-            type="button"
-          >
-            <span>Reports</span>
-          </button>
-          <FileTreeBlock
-            emptyLabel="No reports yet. Create one with the chat agent."
-            files={reportFiles}
-            loading={loading && currentView === "reports"}
-            onOpenFile={onOpenFile}
-            selectedPath={selectedPath}
-          />
-        </>
+        <FileTreeBlock
+          emptyLabel="No reports yet. Create one with the chat agent."
+          files={reportFiles}
+          loading={loading && currentView === "reports"}
+          onOpenFile={onOpenFile}
+          selectedPath={selectedPath}
+        />
       );
     }
 

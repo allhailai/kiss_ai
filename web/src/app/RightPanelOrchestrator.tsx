@@ -1,4 +1,4 @@
-import type { AgentContextFile, ChatContextFile, ChatMessageFileEdit, ProjectFile, RebuildModel, RebuildState } from "../contracts/api";
+import type { AgentContextFile, ChatContextFile, ChatMessageFileEdit, ChatMessageFileRename, ChatMessageArtifactRename, ProjectFile, RebuildModel, RebuildState } from "../contracts/api";
 import type { ProjectChatController } from "./hooks/useProjectChat";
 import type { RightPanelKind, RightPanelState } from "./hooks/useRightPanelSurface";
 import { useRouteContext } from "./contexts/RouteContext";
@@ -13,6 +13,8 @@ import type { ProjectStatus } from "../contracts/api";
 export function RightPanelOrchestrator({
   agentFileContext,
   applyChatFileEdit,
+  applyChatFileRename,
+  applyChatArtifactRename,
   closeRightPanel,
   draftSeed,
   fileWorkspaceProjectFiles,
@@ -34,6 +36,8 @@ export function RightPanelOrchestrator({
     removeAiEditableFile: (path: string) => void;
   };
   applyChatFileEdit: (edit: ChatMessageFileEdit, editIndex: number, messageId: string) => Promise<boolean>;
+  applyChatFileRename: (rename: ChatMessageFileRename, renameIndex: number, messageId: string) => Promise<boolean>;
+  applyChatArtifactRename: (rename: ChatMessageArtifactRename, renameIndex: number, messageId: string) => Promise<boolean>;
   closeRightPanel: () => void;
   draftSeed: { id: string; draft: string } | null;
   fileWorkspaceProjectFiles: ProjectFile[];
@@ -84,6 +88,8 @@ export function RightPanelOrchestrator({
             models={rebuildWorkspace.models}
             onAddContextFile={agentFileContext.addContextFile}
             onApplyFileEdit={applyChatFileEdit}
+            onApplyFileRename={applyChatFileRename}
+            onApplyArtifactRename={applyChatArtifactRename}
             onContextFilesChange={projectChat.setContextFiles}
             onModelChange={rebuildWorkspace.setSelectedModelId}
             onModifyCurrentFile={() => agentFileContext.currentFile && agentFileContext.addEditableFile(agentFileContext.currentFile.path)}

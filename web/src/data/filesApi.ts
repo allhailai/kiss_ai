@@ -92,4 +92,9 @@ export const filesApi = {
       method: "POST",
       body: JSON.stringify({ path }),
     }),
+  renameOutputFile: (projectSlug: string, fromPath: string, toPath: string) =>
+    request<{ oldPath: string; newPath: string }>(`${projectBase(projectSlug)}/file/rename`, {
+      method: "POST",
+      body: JSON.stringify({ fromPath, toPath }),
+    }),
 };

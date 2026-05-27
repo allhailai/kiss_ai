@@ -7,6 +7,8 @@ import {
   editChatMessageBodySchema,
   editProposalParamsSchema,
   fileEditStatusParamsSchema,
+  fileRenameStatusParamsSchema,
+  artifactRenameStatusParamsSchema,
   generateEditProposalBodySchema,
   parseRequestBody,
   parseRequestParams,
@@ -29,7 +31,9 @@ export function registerChatRoutes(app, {
   subscribeToConversation,
   updateConversation,
   updateEditProposal,
+  updateMessageArtifactRenameStatus,
   updateMessageFileEditStatus,
+  updateMessageFileRenameStatus,
 }) {
   app.get("/api/projects/:projectSlug/conversations", async (request, response, next) => {
     try {
@@ -115,6 +119,26 @@ export function registerChatRoutes(app, {
       const { conversationId, messageId, editIndex } = parseRequestParams(fileEditStatusParamsSchema, request.params, httpError);
       const { status } = parseRequestBody(updateFileEditStatusBodySchema, request.body, httpError);
       response.json(await updateMessageFileEditStatus(request.project, conversationId, messageId, editIndex, status));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/projects/:projectSlug/conversations/:conversationId/messages/:messageId/file-renames/:renameIndex/status", async (request, response, next) => {
+    try {
+      const { conversationId, messageId, renameIndex } = parseRequestParams(fileRenameStatusParamsSchema, request.params, httpError);
+      const { status } = parseRequestBody(updateFileEditStatusBodySchema, request.body, httpError);
+      response.json(await updateMessageFileRenameStatus(request.project, conversationId, messageId, renameIndex, status));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/projects/:projectSlug/conversations/:conversationId/messages/:messageId/artifact-renames/:renameIndex/status", async (request, response, next) => {
+    try {
+      const { conversationId, messageId, renameIndex } = parseRequestParams(artifactRenameStatusParamsSchema, request.params, httpError);
+      const { status } = parseRequestBody(updateFileEditStatusBodySchema, request.body, httpError);
+      response.json(await updateMessageArtifactRenameStatus(request.project, conversationId, messageId, renameIndex, status));
     } catch (error) {
       next(error);
     }

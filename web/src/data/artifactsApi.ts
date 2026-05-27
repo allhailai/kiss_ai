@@ -28,6 +28,15 @@ export const artifactsApi = {
       method: "DELETE",
     }),
 
+  rename: (projectSlug: string, artifactSlug: string, newSlug: string) =>
+    request<{ renamed: boolean; oldSlug: string; newSlug: string }>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/rename`,
+      {
+        method: "POST",
+        body: JSON.stringify({ newSlug }),
+      },
+    ),
+
   build: (projectSlug: string, artifactSlug: string, modelId?: string) =>
     request<RebuildState>(`${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/build`, {
       method: "POST",

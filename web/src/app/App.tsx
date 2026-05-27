@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { resolveChatFileEditApplication } from "./chatFileEdits";
+import { hashDraftContent, resolveChatFileEditApplication } from "./chatFileEdits";
+import { filesApi } from "../data/filesApi";
 import { buildThemeStyle } from "./theme";
 import { useProjectWorkspace } from "./useProjectWorkspace";
 import { RightPanelToggle } from "./RightPanelToggle";
@@ -15,8 +16,9 @@ import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
 import { makeEditableTargetForFile, useAgentFileContext } from "./hooks/useAgentFileContext";
 import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
-import type { ChatMessageFileEdit } from "../contracts/api";
+import type { ChatMessageFileEdit, ChatMessageFileRename, ChatMessageArtifactRename } from "../contracts/api";
 import { chatApi } from "../data/chatApi";
+import { artifactsApi } from "../data/artifactsApi";
 import { BuildProvider, type BuildContextValue } from "./contexts/BuildContext";
 import { RouteProvider } from "./contexts/RouteContext";
 import { ToastProvider } from "./contexts/ToastContext";
@@ -143,15 +145,31 @@ export function App() {
       return false;
     }
 
-    fileWorkspace.setDraft(decision.content);
+    if (decision.kind === "create") {
+      // Write the new file directly to disk — the hash of "" is the expectedContentHash
+      // because the file doesn't exist yet (backend treats missing file as empty content)
+      try {
+        const emptyHash = await hashDraftContent("");
+        await filesApi.saveFile(project.selectedProjectSlug!, decision.path, decision.content, emptyHash);
+        toastWorkspace.setNotice(`Created and saved ${decision.path}.`);
+        await fileWorkspace.refreshProjectFiles();
+        // Navigate to the new file
+        route.openProjectFile(decision.path);
+      } catch (err) {
+        toastWorkspace.setNotice(err instanceof Error ? err.message : `Failed to create ${decision.path}.`);
+        return false;
+      }
+    } else {
+      fileWorkspace.setDraft(decision.content);
 
-    // Auto-save all AI file edits — the user already reviewed the proposal by clicking Apply
-    await fileWorkspace.saveSelected();
-    toastWorkspace.setNotice(`Applied and saved ${edit.path}.`);
+      // Auto-save all AI file edits — the user already reviewed the proposal by clicking Apply
+      await fileWorkspace.saveSelected();
+      toastWorkspace.setNotice(`Applied and saved ${edit.path}.`);
 
-    // Refresh project files and the current file so left nav + ArtifactsView update
-    await fileWorkspace.refreshProjectFiles();
-    await fileWorkspace.refreshSelectedFile();
+      // Refresh project files and the current file so left nav + ArtifactsView update
+      await fileWorkspace.refreshProjectFiles();
+      await fileWorkspace.refreshSelectedFile();
+    }
 
     // Persist the "applied" status server-side so it survives refresh
     const conversationId = projectChat.activeConversation?.id;
@@ -162,6 +180,58 @@ export function App() {
       } catch {
         // Non-critical — the edit was still applied to the file, just the status badge won't persist
         console.warn("[kiss_ai] Could not persist file edit applied status.");
+      }
+    }
+
+    return true;
+  };
+
+  const applyChatFileRename = async (rename: ChatMessageFileRename, renameIndex: number, messageId: string): Promise<boolean> => {
+    if (!project.selectedProjectSlug) return false;
+
+    try {
+      await filesApi.renameOutputFile(project.selectedProjectSlug, rename.from, rename.to);
+      toastWorkspace.setNotice(`Renamed ${rename.from.split("/").pop()} to ${rename.to.split("/").pop()}.`);
+      await fileWorkspace.refreshProjectFiles();
+    } catch (err) {
+      toastWorkspace.setNotice(err instanceof Error ? err.message : `Failed to rename ${rename.from}.`);
+      return false;
+    }
+
+    // Persist the "applied" status server-side
+    const conversationId = projectChat.activeConversation?.id;
+    if (conversationId) {
+      try {
+        const updated = await chatApi.markFileRenameApplied(project.selectedProjectSlug, conversationId, messageId, renameIndex);
+        projectChat.setActiveConversation(updated);
+      } catch {
+        console.warn("[kiss_ai] Could not persist file rename applied status.");
+      }
+    }
+
+    return true;
+  };
+
+  const applyChatArtifactRename = async (rename: ChatMessageArtifactRename, renameIndex: number, messageId: string): Promise<boolean> => {
+    if (!project.selectedProjectSlug) return false;
+
+    try {
+      await artifactsApi.rename(project.selectedProjectSlug, rename.from, rename.to);
+      toastWorkspace.setNotice(`Renamed artifact ${rename.from} to ${rename.to}.`);
+      await fileWorkspace.refreshProjectFiles();
+    } catch (err) {
+      toastWorkspace.setNotice(err instanceof Error ? err.message : `Failed to rename artifact ${rename.from}.`);
+      return false;
+    }
+
+    // Persist the "applied" status server-side
+    const conversationId = projectChat.activeConversation?.id;
+    if (conversationId) {
+      try {
+        const updated = await chatApi.markArtifactRenameApplied(project.selectedProjectSlug, conversationId, messageId, renameIndex);
+        projectChat.setActiveConversation(updated);
+      } catch {
+        console.warn("[kiss_ai] Could not persist artifact rename applied status.");
       }
     }
 
@@ -276,6 +346,8 @@ export function App() {
             <RightPanelOrchestrator
               agentFileContext={agentFileContext}
               applyChatFileEdit={applyChatFileEdit}
+              applyChatFileRename={applyChatFileRename}
+              applyChatArtifactRename={applyChatArtifactRename}
               closeRightPanel={closeRightPanel}
               draftSeed={agentDraftSeed}
               fileWorkspaceProjectFiles={fileWorkspace.projectFiles}

@@ -7,6 +7,7 @@ import { Dashboard } from "../features/dashboard/Dashboard";
 import { DesignWorkspace } from "../features/design/DesignWorkspace";
 import { FileWorkspace } from "../features/files/FileWorkspace";
 import { ArtifactsView } from "../features/artifacts/ArtifactsView";
+import { OutputSectionPage } from "../features/outputs/OutputSectionPage";
 import { ProjectChatConversationHistory } from "../features/chat/ProjectChatConversationHistory";
 import { ReviewWorkspace } from "./ReviewWorkspace";
 
@@ -20,9 +21,10 @@ const fileWorkspaceByView: Partial<Record<View, { title?: string; explainer?: st
   outputs: {
     explainer: "Wiki pages are built during knowledge builds. Use comments to guide the AI.",
   },
-  reports: {
-    explainer: "Reports are user-curated outputs. Edit directly or use the chat agent.",
-  },
+};
+
+const reportsFileWorkspaceConfig = {
+  explainer: "Reports are user-curated outputs. Edit directly or use the chat agent.",
 };
 
 const reviewViews = new Set<View>(["review", "questions", "topics"]);
@@ -106,6 +108,33 @@ export function MainContentArea({
           onNavigateToFile={onOpenFile}
           projectSlug={projectSlug}
           selectedModelId={rebuildWorkspace.selectedModelId}
+        />
+      ) : null}
+      {route.view === "reports" && route.filePath ? (
+        <FileWorkspace
+          explainer={reportsFileWorkspaceConfig.explainer}
+          selected={fileWorkspace.selected}
+          selectedDiff={fileWorkspace.selectedDiff}
+          draft={fileWorkspace.draft}
+          hasUnsavedChanges={fileWorkspace.hasUnsavedChanges}
+          aiFileAssistDisabled={fileWorkspace.loading || projectChat.loading || projectChat.sending || projectChat.proposalUpdating}
+          projectFiles={fileWorkspace.projectFiles}
+          onDraft={fileWorkspace.setDraft}
+          onAiFileAssist={onAiFileAssist}
+          onNotice={toastWorkspace.setNotice}
+          onOpenFile={onOpenFile}
+          onRevert={() => void fileWorkspace.revertSelected()}
+          onSave={() => void fileWorkspace.saveSelected()}
+          projectSlug={projectSlug}
+        />
+      ) : null}
+      {route.view === "reports" && !route.filePath ? (
+        <OutputSectionPage
+          models={rebuildWorkspace.models}
+          projectFiles={fileWorkspace.projectFiles}
+          projectSlug={projectSlug}
+          selectedModelId={rebuildWorkspace.selectedModelId}
+          type="report"
         />
       ) : null}
       {route.view === "artifacts" ? (

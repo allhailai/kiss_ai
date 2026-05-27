@@ -50,7 +50,9 @@ export function registerApiRoutes(app, deps) {
     subscribeToConversation: deps.subscribeToConversation,
     updateConversation: deps.updateConversation,
     updateEditProposal: deps.updateEditProposal,
+    updateMessageArtifactRenameStatus: deps.updateMessageArtifactRenameStatus,
     updateMessageFileEditStatus: deps.updateMessageFileEditStatus,
+    updateMessageFileRenameStatus: deps.updateMessageFileRenameStatus,
   });
 
   registerFileRoutes(app, {
@@ -65,6 +67,7 @@ export function registerApiRoutes(app, deps) {
     listProjectFiles: deps.listProjectFiles,
     moveHumanInputFile: deps.moveHumanInputFile,
     readTextFile: deps.readTextFile,
+    renameOutputFile: deps.renameOutputFile,
     restoreFileFromHead: deps.restoreFileFromHead,
     searchFiles: deps.searchFiles,
     treeRoots: deps.treeRoots,

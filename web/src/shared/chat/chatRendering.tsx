@@ -21,7 +21,7 @@ const chatMarkdownComponents: Components = {
  * and their content from the rendered chat message so raw spec/tag internals
  * don't flood the message bubble.
  */
-const AGENT_TAG_PATTERN = /<(?:file_edit|artifact_proposal|topic_proposal)>[\s\S]*?<\/(?:file_edit|artifact_proposal|topic_proposal)>/gi;
+const AGENT_TAG_PATTERN = /<(?:file_edit|file_rename|artifact_rename|artifact_proposal|topic_proposal)>[\s\S]*?<\/(?:file_edit|file_rename|artifact_rename|artifact_proposal|topic_proposal)>/gi;
 
 function stripAgentTags(content: string): string {
   return content.replace(AGENT_TAG_PATTERN, "").trim();

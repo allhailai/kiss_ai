@@ -384,6 +384,122 @@ export async function readArtifactPreviewHtml(projectPath, slug) {
 }
 
 /**
+ * Rename an artifact by changing its slug.
+ * Renames the spec file, build directory, updates the build manifest slug,
+ * and patches cross-references in other spec sources and build manifests.
+ */
+export async function renameArtifact(projectPath, oldSlug, newSlug) {
+  // Validate newSlug format
+  if (!newSlug || !/^[a-z0-9][a-z0-9_]*$/.test(newSlug)) {
+    throw Object.assign(new Error(`Invalid artifact slug: "${newSlug}". Use lowercase alphanumeric and underscores.`), { statusCode: 400, code: "invalid_artifact_slug" });
+  }
+
+  if (oldSlug === newSlug) {
+    throw Object.assign(new Error("Old and new slugs are identical."), { statusCode: 400, code: "artifact_rename_noop" });
+  }
+
+  const oldSpecPath = path.join(projectPath, ARTIFACT_SPECS_DIR, `${oldSlug}.artifact.md`);
+  const newSpecPath = path.join(projectPath, ARTIFACT_SPECS_DIR, `${newSlug}.artifact.md`);
+
+  // Verify old spec exists
+  try {
+    await fs.access(oldSpecPath);
+  } catch {
+    throw Object.assign(new Error(`Artifact spec not found: ${oldSlug}`), { statusCode: 404, code: "artifact_not_found" });
+  }
+
+  // Verify new spec does NOT exist
+  try {
+    await fs.access(newSpecPath);
+    throw Object.assign(new Error(`Artifact slug already exists: ${newSlug}`), { statusCode: 409, code: "artifact_slug_conflict" });
+  } catch (err) {
+    if (err.statusCode === 409) throw err;
+    // ENOENT is expected — new path should not exist
+  }
+
+  // 1. Rename spec file
+  await fs.rename(oldSpecPath, newSpecPath);
+
+  // 2. Rename build directory (if it exists)
+  const oldBuildDir = path.join(projectPath, ARTIFACT_BUILDS_DIR, oldSlug);
+  const newBuildDir = path.join(projectPath, ARTIFACT_BUILDS_DIR, newSlug);
+
+  let hasBuild = false;
+  try {
+    await fs.access(oldBuildDir);
+    hasBuild = true;
+  } catch {
+    // No build directory — that's fine
+  }
+
+  if (hasBuild) {
+    await fs.rename(oldBuildDir, newBuildDir);
+
+    // 3. Update manifest slug field
+    const manifestPath = path.join(newBuildDir, ".artifact-manifest.json");
+    try {
+      const raw = await fs.readFile(manifestPath, "utf8");
+      const manifest = JSON.parse(raw);
+      manifest.slug = newSlug;
+      await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+    } catch {
+      // Manifest may not exist or be malformed — non-critical
+    }
+  }
+
+  // 4. Update cross-references in other spec files and build manifests
+  const oldBuildPath = `artifacts/builds/${oldSlug}/index.html`;
+  const newBuildPath = `artifacts/builds/${newSlug}/index.html`;
+  await updateCrossReferences(projectPath, oldBuildPath, newBuildPath, oldSlug, newSlug);
+
+  return { oldSlug, newSlug };
+}
+
+/**
+ * Scan all artifact specs and build manifests to update references
+ * from old artifact paths/slugs to new ones.
+ */
+async function updateCrossReferences(projectPath, oldBuildPath, newBuildPath, oldSlug, newSlug) {
+  // Update sources: in spec frontmatter
+  const specsDir = path.join(projectPath, ARTIFACT_SPECS_DIR);
+  try {
+    const files = await fs.readdir(specsDir);
+    for (const file of files) {
+      if (!file.endsWith(".artifact.md")) continue;
+      const filePath = path.join(specsDir, file);
+      const raw = await fs.readFile(filePath, "utf8");
+      if (!raw.includes(oldBuildPath)) continue;
+
+      const updated = raw.replaceAll(oldBuildPath, newBuildPath);
+      await fs.writeFile(filePath, updated, "utf8");
+    }
+  } catch {
+    // specs dir may not exist
+  }
+
+  // Update sourcesUsed in build manifests
+  const buildsDir = path.join(projectPath, ARTIFACT_BUILDS_DIR);
+  try {
+    const dirs = await fs.readdir(buildsDir, { withFileTypes: true });
+    for (const entry of dirs) {
+      if (!entry.isDirectory() || entry.name === newSlug) continue;
+      const manifestPath = path.join(buildsDir, entry.name, ".artifact-manifest.json");
+      try {
+        const raw = await fs.readFile(manifestPath, "utf8");
+        if (!raw.includes(oldBuildPath)) continue;
+
+        const updated = raw.replaceAll(oldBuildPath, newBuildPath);
+        await fs.writeFile(manifestPath, updated, "utf8");
+      } catch {
+        // No manifest — skip
+      }
+    }
+  } catch {
+    // builds dir may not exist
+  }
+}
+
+/**
  * Slugify a name into a valid artifact slug.
  */
 export function slugifyArtifactName(name) {

@@ -945,6 +945,57 @@ export function createProjectFileService({
     return readTextFile(projectRoot, meta.path);
   }
 
+  const renameableOutputPrefixes = ["outputs_ai/reports/", "outputs_ai/artifacts/"];
+
+  function isRenameablePath(relativePath) {
+    return renameableOutputPrefixes.some((prefix) => relativePath.startsWith(prefix));
+  }
+
+  async function renameOutputFile(projectRoot, fromPath, toPath) {
+    const normalizedFrom = projectPath(projectRoot, fromPath).relative;
+    const normalizedTo = projectPath(projectRoot, toPath).relative;
+
+    if (!isRenameablePath(normalizedFrom)) {
+      throw httpError(`Source path must be under ${renameableOutputPrefixes.join(" or ")}.`, 403, "rename_source_not_allowed");
+    }
+
+    if (!isRenameablePath(normalizedTo)) {
+      throw httpError(`Target path must be under ${renameableOutputPrefixes.join(" or ")}.`, 403, "rename_target_not_allowed");
+    }
+
+    if (normalizedFrom === normalizedTo) {
+      throw httpError("Source and target paths are the same.", 409, "rename_same_path");
+    }
+
+    if (isHiddenProjectPath(normalizedFrom) || isHiddenProjectPath(normalizedTo)) {
+      throw httpError("Hidden project files cannot be managed in the lab UI.", 403, "hidden_file");
+    }
+
+    const sourceTarget = await resolveProjectFileTarget(projectRoot, normalizedFrom);
+    const sourceStat = await fs.stat(sourceTarget.absolute);
+
+    if (!sourceStat.isFile()) {
+      throw httpError("Only files can be renamed.", 400, "rename_not_file");
+    }
+
+    const destTarget = await resolveProjectFileTarget(projectRoot, normalizedTo, { allowMissing: true });
+
+    if (await fileExists(destTarget.absolute)) {
+      throw httpError(`A file already exists at ${normalizedTo}.`, 409, "rename_target_exists");
+    }
+
+    // Ensure the destination directory exists (e.g. moving into a subfolder)
+    await fs.mkdir(path.dirname(destTarget.absolute), { recursive: true });
+    await fs.rename(sourceTarget.absolute, destTarget.absolute);
+
+    // Prune empty source directories left behind
+    const outputsRoot = projectPath(projectRoot, "outputs_ai");
+    await pruneEmptyDirectories(outputsRoot.absolute, path.dirname(sourceTarget.absolute));
+
+    invalidateSearchCache(projectRoot);
+    return { oldPath: normalizedFrom, newPath: normalizedTo };
+  }
+
   return {
     classifyPath,
     createHumanInputFolder,
@@ -963,6 +1014,7 @@ export function createProjectFileService({
     projectPath,
     readProjectJson,
     readTextFile,
+    renameOutputFile,
     restoreFileFromHead,
     searchFiles,
     uploadHumanInputFiles,
@@ -970,3 +1022,4 @@ export function createProjectFileService({
     writeTextFile,
   };
 }
+

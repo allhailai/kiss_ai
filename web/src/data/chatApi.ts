@@ -66,6 +66,22 @@ export const chatApi = {
         body: JSON.stringify({ status: "applied" }),
       },
     ),
+  markFileRenameApplied: (projectSlug: string, conversationId: string, messageId: string, renameIndex: number) =>
+    request<Conversation>(
+      `${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/file-renames/${renameIndex}/status`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status: "applied" }),
+      },
+    ),
+  markArtifactRenameApplied: (projectSlug: string, conversationId: string, messageId: string, renameIndex: number) =>
+    request<Conversation>(
+      `${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/artifact-renames/${renameIndex}/status`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status: "applied" }),
+      },
+    ),
   cancelChatAgent: (projectSlug: string) =>
     request<{ ok: boolean; cancelled: boolean }>(`${projectBase(projectSlug)}/conversations/cancel-agent`, {
       method: "POST",

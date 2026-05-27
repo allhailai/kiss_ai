@@ -3,7 +3,9 @@ import type {
   AgentContextFile,
   ChatContextFile,
   ChatMessageArtifactProposal,
+  ChatMessageArtifactRename,
   ChatMessageFileEdit,
+  ChatMessageFileRename,
   Conversation,
   ConversationSummary,
   EditProposal,
@@ -97,6 +99,8 @@ export function RightPanelAgentChat({
   models,
   onAddContextFile,
   onApplyFileEdit,
+  onApplyFileRename,
+  onApplyArtifactRename,
   onContextFilesChange,
   onModelChange,
   onModifyCurrentFile,
@@ -116,6 +120,8 @@ export function RightPanelAgentChat({
   models: RebuildModel[];
   onAddContextFile: (path: string) => void;
   onApplyFileEdit: (edit: ChatMessageFileEdit, editIndex: number, messageId: string) => Promise<boolean>;
+  onApplyFileRename: (rename: ChatMessageFileRename, renameIndex: number, messageId: string) => Promise<boolean>;
+  onApplyArtifactRename: (rename: ChatMessageArtifactRename, renameIndex: number, messageId: string) => Promise<boolean>;
   onContextFilesChange: Dispatch<SetStateAction<ChatContextFile[]>>;
   onModelChange: (modelId: string) => void;
   onModifyCurrentFile: () => void;
@@ -462,6 +468,8 @@ export function RightPanelAgentChat({
           editProposals={chat.activeConversation?.editProposals ?? []}
           messages={chat.activeConversation?.messages ?? []}
           onApplyFileEdit={onApplyFileEdit}
+          onApplyFileRename={onApplyFileRename}
+          onApplyArtifactRename={onApplyArtifactRename}
           onCreateArtifact={handleCreateArtifact}
           onJumpToLatest={() => chat.scrollToLatest()}
           onScroll={chat.handleThreadScroll}

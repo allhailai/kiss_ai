@@ -457,6 +457,66 @@ export function createConversationService({ httpError, projectPath }) {
     );
   }
 
+  async function updateMessageFileRenameStatusUnlocked(project, conversationId, messageId, renameIndex, status) {
+    const conversation = await readConversation(project, conversationId);
+    const message = conversation.messages.find((m) => m.id === messageId);
+    if (!message) throw httpError("Chat message not found.", 404, "chat_message_not_found");
+
+    const fileRenames = message.metadata?.fileRenames;
+    if (!Array.isArray(fileRenames) || renameIndex < 0 || renameIndex >= fileRenames.length) {
+      throw httpError("File rename not found.", 404, "file_rename_not_found");
+    }
+
+    const validStatuses = ["proposed", "applied", "rejected", "failed"];
+    if (!validStatuses.includes(status)) {
+      throw httpError("Invalid file rename status.", 400, "invalid_file_rename_status");
+    }
+
+    fileRenames[renameIndex] = {
+      ...fileRenames[renameIndex],
+      status,
+      ...(status === "applied" ? { appliedAt: nowIso() } : {}),
+    };
+
+    return await writeConversationUnlocked(project, { ...conversation, updatedAt: nowIso() });
+  }
+
+  async function updateMessageFileRenameStatus(project, conversationId, messageId, renameIndex, status) {
+    return await withProjectMutation(project, () =>
+      updateMessageFileRenameStatusUnlocked(project, conversationId, messageId, renameIndex, status),
+    );
+  }
+
+  async function updateMessageArtifactRenameStatusUnlocked(project, conversationId, messageId, renameIndex, status) {
+    const conversation = await readConversation(project, conversationId);
+    const message = conversation.messages.find((m) => m.id === messageId);
+    if (!message) throw httpError("Chat message not found.", 404, "chat_message_not_found");
+
+    const artifactRenames = message.metadata?.artifactRenames;
+    if (!Array.isArray(artifactRenames) || renameIndex < 0 || renameIndex >= artifactRenames.length) {
+      throw httpError("Artifact rename not found.", 404, "artifact_rename_not_found");
+    }
+
+    const validStatuses = ["proposed", "applied", "rejected", "failed"];
+    if (!validStatuses.includes(status)) {
+      throw httpError("Invalid artifact rename status.", 400, "invalid_artifact_rename_status");
+    }
+
+    artifactRenames[renameIndex] = {
+      ...artifactRenames[renameIndex],
+      status,
+      ...(status === "applied" ? { appliedAt: nowIso() } : {}),
+    };
+
+    return await writeConversationUnlocked(project, { ...conversation, updatedAt: nowIso() });
+  }
+
+  async function updateMessageArtifactRenameStatus(project, conversationId, messageId, renameIndex, status) {
+    return await withProjectMutation(project, () =>
+      updateMessageArtifactRenameStatusUnlocked(project, conversationId, messageId, renameIndex, status),
+    );
+  }
+
   return {
     appendMessage,
     createConversation,
@@ -466,7 +526,9 @@ export function createConversationService({ httpError, projectPath }) {
     readConversation,
     subscribeToConversation: subscribe,
     updateConversation,
+    updateMessageArtifactRenameStatus,
     updateMessageFileEditStatus,
+    updateMessageFileRenameStatus,
     writeConversation,
   };
 }

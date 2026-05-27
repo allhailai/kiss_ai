@@ -2,6 +2,7 @@ import {
   listArtifactSpecs,
   listAvailableSourceFiles,
   readArtifactSpec,
+  renameArtifact,
   writeArtifactSpec,
   deleteArtifactSpec,
   readArtifactPreviewHtml,
@@ -10,6 +11,7 @@ import {
 } from "../services/artifactService.js";
 import {
   createArtifactBodySchema,
+  renameArtifactBodySchema,
   updateArtifactBodySchema,
   buildArtifactBodySchema,
   parseRequestBody,
@@ -120,6 +122,18 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild }) {
       const result = await startArtifactBuild(request.project, request.params.artifactSlug, modelId);
       response.json(result);
     } catch (error) {
+      next(error);
+    }
+  });
+
+  // Rename an artifact (slug change)
+  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/rename", async (request, response, next) => {
+    try {
+      const { newSlug } = parseRequestBody(renameArtifactBodySchema, request.body, httpError);
+      const result = await renameArtifact(request.project.path, request.params.artifactSlug, newSlug);
+      response.json({ renamed: true, ...result });
+    } catch (error) {
+      if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
       next(error);
     }
   });

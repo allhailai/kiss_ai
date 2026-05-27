@@ -223,6 +223,23 @@ export const updateFileEditStatusBodySchema = z.object({
   status: z.enum(["proposed", "applied", "rejected", "failed"]),
 });
 
+export const renameOutputFileBodySchema = z.object({
+  fromPath: z.string().trim().min(1).max(1_000),
+  toPath: z.string().trim().min(1).max(1_000),
+});
+
+export const fileRenameStatusParamsSchema = chatMessageParamsSchema.extend({
+  renameIndex: z.string().regex(/^\d+$/, "Rename index must be a number.").transform(Number),
+});
+
+export const renameArtifactBodySchema = z.object({
+  newSlug: z.string().trim().min(1).max(255).regex(/^[a-z0-9][a-z0-9_]*$/, "Slug must be lowercase alphanumeric with underscores."),
+});
+
+export const artifactRenameStatusParamsSchema = chatMessageParamsSchema.extend({
+  renameIndex: z.string().regex(/^\d+$/, "Rename index must be a number.").transform(Number),
+});
+
 export const createArtifactBodySchema = z.object({
   name: z.string().trim().min(1).max(255),
   frontmatter: z.record(z.unknown()).optional(),

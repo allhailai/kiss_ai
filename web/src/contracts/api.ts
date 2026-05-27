@@ -483,6 +483,24 @@ export type ChatMessageFileEdit = {
   status: "proposed" | "applied" | "rejected" | "failed";
 };
 
+export type ChatMessageFileRename = {
+  from: string;
+  to: string;
+  summary: string;
+  appliedAt?: string;
+  status: "proposed" | "applied" | "rejected" | "failed";
+};
+
+export type ChatMessageArtifactRename = {
+  /** Old artifact slug */
+  from: string;
+  /** New artifact slug */
+  to: string;
+  summary: string;
+  appliedAt?: string;
+  status: "proposed" | "applied" | "rejected" | "failed";
+};
+
 export type ChatMessageTopicProposal = {
   label: string;
   justification: string;
@@ -505,6 +523,8 @@ export type ChatMessageArtifactProposal = {
 
 export type ChatMessageMetadata = Record<string, unknown> & {
   fileEdits?: ChatMessageFileEdit[];
+  fileRenames?: ChatMessageFileRename[];
+  artifactRenames?: ChatMessageArtifactRename[];
   topicProposals?: ChatMessageTopicProposal[];
   artifactProposals?: ChatMessageArtifactProposal[];
 };

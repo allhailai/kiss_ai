@@ -8,6 +8,7 @@ import {
   parseRequestBody,
   parseRequestParams,
   parseRequestQuery,
+  renameOutputFileBodySchema,
   searchFilesQuerySchema,
   treeSectionParamsSchema,
   uploadHumanInputsBodySchema,
@@ -26,6 +27,7 @@ export function registerFileRoutes(app, {
   listProjectFiles,
   moveHumanInputFile,
   readTextFile,
+  renameOutputFile,
   restoreFileFromHead,
   searchFiles: searchPathFiles,
   treeRoots,
@@ -165,6 +167,15 @@ export function registerFileRoutes(app, {
     try {
       const body = parseRequestBody(filePathBodySchema, request.body, httpError);
       response.json(await restoreFileFromHead(request.project.path, body.path));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/file/rename", async (request, response, next) => {
+    try {
+      const body = parseRequestBody(renameOutputFileBodySchema, request.body, httpError);
+      response.json(await renameOutputFile(request.project.path, body.fromPath, body.toPath));
     } catch (error) {
       next(error);
     }

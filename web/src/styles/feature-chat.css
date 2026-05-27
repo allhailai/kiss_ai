@@ -420,6 +420,116 @@
   line-height: 1;
 }
 
+/* ── File action cards (edits + renames) ─────────────────────── */
+
+.chat-file-actions {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.chat-file-action-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 28%, var(--color-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-secondary) 5%, white);
+  font-size: 0.78rem;
+  line-height: 1.3;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.chat-file-action-icon {
+  flex: 0 0 auto;
+  font-size: 0.92rem;
+  line-height: 1;
+}
+
+.chat-file-action-details {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.chat-file-action-label {
+  font-weight: 700;
+  color: var(--color-primary);
+  overflow-wrap: anywhere;
+}
+
+.chat-file-action-path {
+  font-size: 0.72rem;
+  color: var(--color-secondary);
+  overflow-wrap: anywhere;
+}
+
+.chat-file-action-apply {
+  flex: 0 0 auto;
+  padding: 5px 14px;
+  border: 1px solid var(--color-secondary);
+  border-radius: 8px;
+  background: var(--color-secondary);
+  color: white;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: box-shadow 0.15s, opacity 0.15s;
+}
+
+.chat-file-action-apply:hover:not(:disabled) {
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--color-secondary) 30%, transparent);
+}
+
+.chat-file-action-apply:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Applied card state */
+.chat-file-action-card-applied {
+  border-color: color-mix(in srgb, var(--color-success) 36%, var(--color-border));
+  background: color-mix(in srgb, var(--color-success) 8%, white);
+}
+
+.chat-file-action-card-applied .chat-file-action-label {
+  color: var(--color-success);
+}
+
+/* Apply All button */
+.chat-file-actions-batch {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.chat-apply-all-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 18px;
+  border: 1px solid var(--color-secondary);
+  border-radius: 10px;
+  background: var(--color-secondary);
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: box-shadow 0.15s, opacity 0.15s;
+}
+
+.chat-apply-all-btn:hover:not(:disabled) {
+  box-shadow: 0 3px 14px color-mix(in srgb, var(--color-secondary) 35%, transparent);
+}
+
+.chat-apply-all-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .chat-message-context code,
 .chat-context-chip {
   border: 1px solid var(--color-border);

@@ -3,7 +3,8 @@ import type { ChatMessageFileEdit, FileContent } from "../contracts/api";
 export type ChatFileEditDecision =
   | { kind: "notice"; message: string }
   | { kind: "open-file"; path: string; message: string }
-  | { kind: "apply"; content: string; message: string };
+  | { kind: "apply"; content: string; message: string }
+  | { kind: "create"; path: string; content: string; message: string };
 
 export async function hashDraftContent(content: string) {
   const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(content));
@@ -21,6 +22,18 @@ export async function resolveChatFileEditApplication({
 }): Promise<ChatFileEditDecision> {
   if (!edit.proposedContent) {
     return { kind: "notice", message: "This chat edit does not include draft content to apply." };
+  }
+
+  // File creation: contentHashBefore is null AND path is under a creatable prefix
+  // (only outputs_ai/reports/ files can be created from chat edits)
+  const creatablePrefixes = ["outputs_ai/reports/"];
+  if (!edit.contentHashBefore && creatablePrefixes.some((p) => edit.path.startsWith(p))) {
+    return {
+      kind: "create",
+      path: edit.path,
+      content: edit.proposedContent,
+      message: `Created ${edit.path}.`,
+    };
   }
 
   if (selected?.path !== edit.path) {
@@ -49,3 +62,4 @@ export async function resolveChatFileEditApplication({
     message: "Applied the chat edit to the unsaved editor draft. Review and save when ready.",
   };
 }
+

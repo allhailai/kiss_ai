@@ -347,13 +347,29 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     "- Wiki pages (outputs_ai/wiki/) are built by the knowledge pipeline. Reports are built on demand.",
     "- When a user asks to create a report (e.g., 'create a report on X', 'write a summary of Y', 'make a new report'):",
     "  1. Ask for the report name if not provided.",
-    "  2. Include a file_edit tag with the new path (outputs_ai/<slug>.md) and the initial content.",
+    "  2. Include a file_edit tag with the new path (outputs_ai/reports/<slug>.md) and the initial content.",
     "  3. Use project wiki pages and sources as the basis for report content.",
     "- When a report file is listed in ai_editable_files, you can edit it via file_edit tags.",
     "- User edits to reports are treated as feedback and direction, not text that must be exactly preserved.",
     "  The user's modifications indicate areas that need polish, emphasis changes, or structural adjustments.",
     "- When editing reports: incorporate user feedback, improve polish, and maintain consistency with wiki/source data.",
     "- The user can request multiple reports at once (e.g., 'create a report for each state'). Generate separate file_edit tags for each report.",
+    "",
+    "File Rename & Reorganization Guidance:",
+    "- When the user asks to rename, move, or reorganize files under outputs_ai/reports/ or outputs_ai/artifacts/, use <file_rename> tags.",
+    "- Each <file_rename> tag must contain <from>, <to>, and <summary> sub-tags:",
+    "  <file_rename><from>outputs_ai/reports/old_name.md</from><to>outputs_ai/reports/new_name.md</to><summary>Rename to group by prefix</summary></file_rename>",
+    "- Only paths starting with outputs_ai/reports/ or outputs_ai/artifacts/ can be renamed.",
+    "- You can propose multiple renames in one response for batch operations.",
+    "- Always explain the rename rationale and list all proposed renames so the user can review before applying.",
+    "",
+    "Artifact Rename Guidance:",
+    "- When the user asks to rename an artifact (spec + built HTML), use <artifact_rename> tags with slugs (NOT file paths).",
+    "- Each <artifact_rename> tag must contain <from>, <to>, and <summary> sub-tags:",
+    "  <artifact_rename><from>old_slug</from><to>new_slug</to><summary>Rename to group by prefix</summary></artifact_rename>",
+    "- Slugs must be lowercase alphanumeric with underscores (e.g., output_uso_etf_research_brief -> etf_uso_research_brief).",
+    "- The system will automatically rename the spec file, build directory, update the manifest, and fix cross-references.",
+    "- You can propose multiple artifact renames in one response for batch operations.",
     "",
     conversationSummaryText(conversation),
     "",
@@ -566,21 +582,34 @@ export function extractFileEditProposals(rawText, conversation, authorizedEditab
       .map((file) => [file.path, file]),
   );
 
+  // Paths under these prefixes can be created by the agent even when not in ai_editable_files.
+  const creatablePrefixes = ["outputs_ai/reports/"];
+  function isCreatablePath(path) {
+    return creatablePrefixes.some((prefix) => path.startsWith(prefix));
+  }
+
   return allTagContent(rawText, "file_edit")
     .map((editText) => {
       const path = firstTagContent(editText, "path");
-      const target = editableTargets.get(path);
       const proposedContent = firstTagContent(editText, "proposedContent", { trim: false });
-      if (authorizedEditablePaths && !authorizedEditablePaths.has(path)) return null;
-      if (!path || !target || !proposedContent) return null;
+      if (!path || !proposedContent) return null;
+
+      const target = editableTargets.get(path);
+      const isCreation = !target && isCreatablePath(path);
+
+      // For existing editable files: enforce authorization
+      if (!isCreation) {
+        if (authorizedEditablePaths && !authorizedEditablePaths.has(path)) return null;
+        if (!target) return null;
+      }
 
       return {
         path,
         summary: firstTagContent(editText, "summary") || `Proposed edit for ${path}.`,
         proposedContent,
-        contentHashBefore: target.contentHash,
-        draftStateBefore: target.draftState,
-        ...(target.draftState === "unsaved" && typeof target.draftContent === "string"
+        contentHashBefore: target?.contentHash ?? null,
+        draftStateBefore: target?.draftState ?? null,
+        ...(target?.draftState === "unsaved" && typeof target.draftContent === "string"
           ? { draftContentHashBefore: hashText(target.draftContent) }
           : {}),
         status: "proposed",
@@ -629,6 +658,60 @@ export function extractArtifactProposals(rawText) {
     .filter(Boolean);
 }
 
+/**
+ * Extract file rename proposals from assistant text.
+ * The agent outputs <file_rename><from>...</from><to>...</to><summary>...</summary></file_rename> tags.
+ */
+const renameablePrefixes = ["outputs_ai/reports/", "outputs_ai/artifacts/"];
+
+export function extractFileRenameProposals(rawText) {
+  return allTagContent(rawText, "file_rename")
+    .map((renameText) => {
+      const from = firstTagContent(renameText, "from");
+      const to = firstTagContent(renameText, "to");
+      if (!from || !to) return null;
+
+      // Security: only allow renames under known prefixes
+      const fromAllowed = renameablePrefixes.some((prefix) => from.startsWith(prefix));
+      const toAllowed = renameablePrefixes.some((prefix) => to.startsWith(prefix));
+      if (!fromAllowed || !toAllowed) return null;
+
+      if (from === to) return null;
+
+      return {
+        from,
+        to,
+        summary: firstTagContent(renameText, "summary") || `Rename ${from} -> ${to}`,
+        status: "proposed",
+      };
+    })
+    .filter(Boolean);
+}
+
+/**
+ * Extract artifact rename proposals from assistant text.
+ * The agent outputs <artifact_rename><from>old_slug</from><to>new_slug</to><summary>...</summary></artifact_rename> tags.
+ */
+const VALID_SLUG_PATTERN = /^[a-z0-9][a-z0-9_]*$/;
+
+export function extractArtifactRenameProposals(rawText) {
+  return allTagContent(rawText, "artifact_rename")
+    .map((renameText) => {
+      const from = firstTagContent(renameText, "from")?.trim();
+      const to = firstTagContent(renameText, "to")?.trim();
+      if (!from || !to) return null;
+      if (from === to) return null;
+      if (!VALID_SLUG_PATTERN.test(from) || !VALID_SLUG_PATTERN.test(to)) return null;
+
+      return {
+        from,
+        to,
+        summary: firstTagContent(renameText, "summary") || `Rename artifact ${from} -> ${to}`,
+        status: "proposed",
+      };
+    })
+    .filter(Boolean);
+}
 export function createChatAgentService({
   appendMessage,
   displayProjectName,
@@ -692,6 +775,8 @@ export function createChatAgentService({
 
         const assistantText = assistantTextChunks.join("");
         const fileEdits = extractFileEditProposals(assistantText, conversationWithUser, authorizedEditablePaths);
+        const fileRenames = extractFileRenameProposals(assistantText);
+        const artifactRenames = extractArtifactRenameProposals(assistantText);
         const topicProposals = extractTopicProposals(assistantText);
         const artifactProposals = extractArtifactProposals(assistantText);
         const finalConversation = await appendMessage(project, conversationId, {
@@ -704,6 +789,8 @@ export function createChatAgentService({
           metadata: {
             cursorApiKeySource: cursorApiKey.source,
             ...(fileEdits.length ? { fileEdits } : {}),
+            ...(fileRenames.length ? { fileRenames } : {}),
+            ...(artifactRenames.length ? { artifactRenames } : {}),
             ...(topicProposals.length ? { topicProposals } : {}),
             ...(artifactProposals.length ? { artifactProposals } : {}),
           },

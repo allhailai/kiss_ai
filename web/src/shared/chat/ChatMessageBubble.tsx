@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import type { ChatMessage, ChatMessageArtifactProposal, ChatMessageFileEdit, ChatMessageTopicProposal, EditProposal } from "../../contracts/api";
+import type { ChatMessage, ChatMessageArtifactProposal, ChatMessageArtifactRename, ChatMessageFileEdit, ChatMessageFileRename, ChatMessageTopicProposal, EditProposal } from "../../contracts/api";
 import { formatChatDateTime, renderMarkdownMessageContent } from "./chatRendering";
 
 function linkedProposalLabel(proposal: EditProposal) {
@@ -7,6 +7,11 @@ function linkedProposalLabel(proposal: EditProposal) {
   const plural = count === 1 ? "" : "s";
   if (proposal.status === "partial") return `Partially applied proposal · ${count} change${plural} · View`;
   return `Applied proposal · ${count} change${plural} · View`;
+}
+
+/** Shorten a path to just the filename for display */
+function shortPath(path: string) {
+  return path.split("/").pop() ?? path;
 }
 
 function ChatMessageBubbleComponent({
@@ -21,6 +26,8 @@ function ChatMessageBubbleComponent({
   onCancelEdit,
   onEditDraftChange,
   onApplyFileEdit,
+  onApplyFileRename,
+  onApplyArtifactRename,
   onCreateArtifact,
   onCreateTopic,
   onSaveEdit,
@@ -38,6 +45,8 @@ function ChatMessageBubbleComponent({
   onCancelEdit: () => void;
   onEditDraftChange: (value: string) => void;
   onApplyFileEdit?: (edit: ChatMessageFileEdit, editIndex: number, messageId: string) => Promise<boolean>;
+  onApplyFileRename?: (rename: ChatMessageFileRename, renameIndex: number, messageId: string) => Promise<boolean>;
+  onApplyArtifactRename?: (rename: ChatMessageArtifactRename, renameIndex: number, messageId: string) => Promise<boolean>;
   onCreateArtifact?: (proposal: ChatMessageArtifactProposal) => void;
   onCreateTopic?: (proposal: ChatMessageTopicProposal) => void;
   onSaveEdit: (message: ChatMessage) => void;
@@ -46,10 +55,12 @@ function ChatMessageBubbleComponent({
 }) {
   const canEdit = editable && message.role === "user";
   const fileEdits = message.metadata?.fileEdits ?? [];
+  const fileRenames = message.metadata?.fileRenames ?? [];
+  const artifactRenames = message.metadata?.artifactRenames ?? [];
   const topicProposals = message.metadata?.topicProposals ?? [];
   const artifactProposals = message.metadata?.artifactProposals ?? [];
   const viewableEditProposals = linkedEditProposals.filter((proposal) => proposal.status === "applied" || proposal.status === "partial");
-  const [applyingEditKey, setApplyingEditKey] = useState<string | null>(null);
+  const [applyingKeys, setApplyingKeys] = useState<Set<string>>(new Set());
   const currentFilePath = message.context?.currentFile?.path;
   const currentFileIsEditable = Boolean(
     currentFilePath && message.context?.ai_editable_files?.some((file) => file.path === currentFilePath),
@@ -69,6 +80,59 @@ function ChatMessageBubbleComponent({
       .map((file) => ({ key: `editable:${file.path}`, label: "AI Editable", path: file.path })),
     ...(message.context?.context_files ?? []).map((file) => ({ key: `context:${file.path}`, label: "Context", path: file.path })),
   ];
+
+  const hasFileActions = fileEdits.length > 0 || fileRenames.length > 0 || artifactRenames.length > 0;
+  const pendingEdits = fileEdits.filter((e) => e.status === "proposed" && e.proposedContent);
+  const pendingRenames = fileRenames.filter((r) => r.status === "proposed");
+  const pendingArtifactRenames = artifactRenames.filter((r) => r.status === "proposed");
+  const pendingCount = pendingEdits.length + pendingRenames.length + pendingArtifactRenames.length;
+
+  const markApplying = (key: string) => setApplyingKeys((prev) => new Set(prev).add(key));
+  const clearApplying = (key: string) =>
+    setApplyingKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+
+  const handleApplyAll = async () => {
+    for (let i = 0; i < fileEdits.length; i++) {
+      const edit = fileEdits[i];
+      if (edit.status !== "proposed" || !edit.proposedContent) continue;
+      const key = `edit:${i}`;
+      markApplying(key);
+      try {
+        await onApplyFileEdit?.(edit, i, message.id);
+      } catch {
+        /* logged by caller */
+      }
+      clearApplying(key);
+    }
+    for (let i = 0; i < fileRenames.length; i++) {
+      const rename = fileRenames[i];
+      if (rename.status !== "proposed") continue;
+      const key = `rename:${i}`;
+      markApplying(key);
+      try {
+        await onApplyFileRename?.(rename, i, message.id);
+      } catch {
+        /* logged by caller */
+      }
+      clearApplying(key);
+    }
+    for (let i = 0; i < artifactRenames.length; i++) {
+      const rename = artifactRenames[i];
+      if (rename.status !== "proposed") continue;
+      const key = `artifact:${i}`;
+      markApplying(key);
+      try {
+        await onApplyArtifactRename?.(rename, i, message.id);
+      } catch {
+        /* logged by caller */
+      }
+      clearApplying(key);
+    }
+  };
 
   return (
     <article className={`chat-message chat-message-${message.role} chat-message-${message.status}`} data-message-id={message.id}>
@@ -133,38 +197,136 @@ function ChatMessageBubbleComponent({
           ))}
         </div>
       ) : null}
-      {fileEdits.length ? (
-        <div className="chat-message-context">
+      {hasFileActions ? (
+        <div className="chat-file-actions" aria-label="File actions">
           {fileEdits.map((edit, editIndex) => {
-            const editKey = `${edit.path}-${edit.summary}`;
-            const applying = applyingEditKey === editKey;
+            const key = `edit:${editIndex}`;
+            const applying = applyingKeys.has(key);
             const isApplied = edit.status === "applied";
+            const isArtifactSpec = edit.path.includes("artifact_specs/");
             return (
-              <button
-                className={`${edit.path.includes("artifact_specs/") ? "chat-artifact-apply-btn" : "chat-context-chip"} ${isApplied ? "chat-edit-applied" : ""}`}
-                disabled={disabled || applying || !edit.proposedContent || edit.status !== "proposed"}
-                key={editKey}
-                onClick={async () => {
-                  setApplyingEditKey(editKey);
-                  try {
-                    await onApplyFileEdit?.(edit, editIndex, message.id);
-                  } catch (error: unknown) {
-                    console.error("[kiss_ai UI warning] Could not apply chat file edit.", error);
-                  } finally {
-                    setApplyingEditKey(null);
-                  }
-                }}
-                title={edit.summary}
-                type="button"
-              >
-              {isApplied
-                ? (<><span className="chat-edit-applied-check">✓</span> Applied</>)
-                : edit.path.includes("artifact_specs/")
-                  ? (applying ? "Applying…" : "Update Artifact \u2014 with the change above?")
-                  : (<>{applying ? "Applying edit:" : "Apply edit:"} {edit.path}</>)}
-              </button>
+              <div key={key} className={`chat-file-action-card${isApplied ? " chat-file-action-card-applied" : ""}`}>
+                <span className="chat-file-action-icon" aria-hidden="true">
+                  {isApplied ? "✅" : isArtifactSpec ? "📄" : "✏️"}
+                </span>
+                <div className="chat-file-action-details">
+                  <span className="chat-file-action-label">
+                    {isApplied ? `Applied ${shortPath(edit.path)}` : isArtifactSpec ? "Update Artifact" : edit.summary}
+                  </span>
+                  <span className="chat-file-action-path">{edit.path}</span>
+                </div>
+                {!isApplied ? (
+                  <button
+                    className="chat-file-action-apply"
+                    disabled={disabled || applying || !edit.proposedContent || edit.status !== "proposed"}
+                    onClick={async () => {
+                      markApplying(key);
+                      try {
+                        await onApplyFileEdit?.(edit, editIndex, message.id);
+                      } catch (error: unknown) {
+                        console.error("[kiss_ai] Could not apply chat file edit.", error);
+                      }
+                      clearApplying(key);
+                    }}
+                    title={edit.summary}
+                    type="button"
+                  >
+                    {applying ? "Applying\u2026" : "Apply"}
+                  </button>
+                ) : null}
+              </div>
             );
           })}
+          {fileRenames.map((rename, renameIndex) => {
+            const key = `rename:${renameIndex}`;
+            const applying = applyingKeys.has(key);
+            const isApplied = rename.status === "applied";
+            return (
+              <div key={key} className={`chat-file-action-card${isApplied ? " chat-file-action-card-applied" : ""}`}>
+                <span className="chat-file-action-icon" aria-hidden="true">
+                  {isApplied ? "✅" : "📝"}
+                </span>
+                <div className="chat-file-action-details">
+                  <span className="chat-file-action-label">
+                    {isApplied ? `Applied ${shortPath(rename.to)}` : `Rename ${shortPath(rename.from)}`}
+                  </span>
+                  <span className="chat-file-action-path">
+                    {isApplied ? rename.to : <>{rename.from} &rarr; {rename.to}</>}
+                  </span>
+                </div>
+                {!isApplied ? (
+                  <button
+                    className="chat-file-action-apply"
+                    disabled={disabled || applying}
+                    onClick={async () => {
+                      markApplying(key);
+                      try {
+                        await onApplyFileRename?.(rename, renameIndex, message.id);
+                      } catch (error: unknown) {
+                        console.error("[kiss_ai] Could not apply chat file rename.", error);
+                      }
+                      clearApplying(key);
+                    }}
+                    title={rename.summary}
+                    type="button"
+                  >
+                    {applying ? "Renaming\u2026" : "Apply"}
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+          {artifactRenames.map((rename, renameIndex) => {
+            const key = `artifact:${renameIndex}`;
+            const applying = applyingKeys.has(key);
+            const isApplied = rename.status === "applied";
+            return (
+              <div key={key} className={`chat-file-action-card${isApplied ? " chat-file-action-card-applied" : ""}`}>
+                <span className="chat-file-action-icon" aria-hidden="true">
+                  {isApplied ? "✅" : "📦"}
+                </span>
+                <div className="chat-file-action-details">
+                  <span className="chat-file-action-label">
+                    {isApplied ? `Applied ${rename.to}` : `Rename artifact ${rename.from}`}
+                  </span>
+                  <span className="chat-file-action-path">
+                    {isApplied ? rename.to : <>{rename.from} &rarr; {rename.to}</>}
+                  </span>
+                </div>
+                {!isApplied ? (
+                  <button
+                    className="chat-file-action-apply"
+                    disabled={disabled || applying}
+                    onClick={async () => {
+                      markApplying(key);
+                      try {
+                        await onApplyArtifactRename?.(rename, renameIndex, message.id);
+                      } catch (error: unknown) {
+                        console.error("[kiss_ai] Could not apply artifact rename.", error);
+                      }
+                      clearApplying(key);
+                    }}
+                    title={rename.summary}
+                    type="button"
+                  >
+                    {applying ? "Renaming\u2026" : "Apply"}
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+          {pendingCount >= 2 ? (
+            <div className="chat-file-actions-batch">
+              <button
+                className="chat-apply-all-btn"
+                disabled={disabled || applyingKeys.size > 0}
+                onClick={handleApplyAll}
+                type="button"
+              >
+                {applyingKeys.size > 0 ? "Applying\u2026" : `\u25B6 Apply All (${pendingCount})`}
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
       {viewableEditProposals.length ? (
