@@ -63,8 +63,20 @@ export function SimplifiedNavigator({
   const humanInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.humanInput)), [projectFiles]);
   const sourceFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.sources)), [projectFiles]);
   const outputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.output)), [projectFiles]);
-  const wikiFiles = useMemo(() => outputFiles.filter((file) => file.path.startsWith("outputs_ai/wiki/")), [outputFiles]);
-  const reportFiles = useMemo(() => outputFiles.filter((file) => !file.path.startsWith("outputs_ai/wiki/") && !file.path.startsWith("outputs_ai/artifacts/")), [outputFiles]);
+  const wikiFiles = useMemo(
+    () =>
+      outputFiles
+        .filter((file) => file.path.startsWith("outputs_ai/wiki/"))
+        .map((file) => ({ ...file, name: file.name.replace(/^wiki\//, "") })),
+    [outputFiles],
+  );
+  const reportFiles = useMemo(
+    () =>
+      outputFiles
+        .filter((file) => file.path.startsWith("outputs_ai/reports/"))
+        .map((file) => ({ ...file, name: file.name.replace(/^reports\//, "") })),
+    [outputFiles],
+  );
 
   useEffect(() => {
     setExpandedSections((current) => {
