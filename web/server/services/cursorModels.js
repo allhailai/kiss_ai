@@ -151,9 +151,18 @@ export function createCursorModelService({ WEB_ROOT, httpError, warnedCursorKeyM
     return "";
   }
 
+  // Cache for Cursor model list — avoids hitting the Cursor API rate limit (30 req/min)
+  let modelsCache = { key: "", models: [], expiresAt: 0 };
+  const MODELS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
   async function listCursorModels(apiKey) {
+    const now = Date.now();
+    if (modelsCache.key === apiKey && now < modelsCache.expiresAt) {
+      return modelsCache.models;
+    }
+
     const models = await Cursor.models.list({ apiKey });
-    return models
+    const filtered = models
       .filter((model) => !isMaxModeModel(model))
       .filter((model) => !isAutoModel(model))
       .map((model) => ({
@@ -163,6 +172,9 @@ export function createCursorModelService({ WEB_ROOT, httpError, warnedCursorKeyM
         provider: getRebuildModelProvider(model),
         tier: getRebuildModelTier(model),
       }));
+
+    modelsCache = { key: apiKey, models: filtered, expiresAt: now + MODELS_CACHE_TTL_MS };
+    return filtered;
   }
 
   /**

@@ -264,6 +264,7 @@ export function createAgentJobService({
     noModelsMessage,
     jobName,
     prompt,
+    jobContext = null,
   }) {
     const existingStart = startLocks.get(project.slug);
     if (existingStart) {
@@ -281,6 +282,7 @@ export function createAgentJobService({
       noModelsMessage,
       jobName,
       prompt,
+      jobContext,
     });
     startLocks.set(project.slug, startPromise);
 
@@ -301,6 +303,7 @@ export function createAgentJobService({
     noModelsMessage,
     jobName,
     prompt,
+    jobContext = null,
   }) {
     const rebuildState = await getRebuildState(project.slug);
 
@@ -379,12 +382,13 @@ export function createAgentJobService({
         attentionContext,
         buildPhase: null,
         buildPhaseDetail: null,
+        buildQueue: jobContext?.artifactSlugs || null,
       });
 
       await appendRunLog(project.slug, `Using Cursor API key from ${cursorApiKey.source}.`);
       await appendRunLog(project.slug, `Using Cursor model: ${modelId}.`);
 
-      runAgentJob({ project, apiKey: cursorApiKey.apiKey, modelId, prompt, jobName, runKind, releaseProjectAgent, signal: activeAbortControllers.get(project.slug)?.signal }).catch((error) => {
+      runAgentJob({ project, apiKey: cursorApiKey.apiKey, modelId, prompt, jobName, runKind, releaseProjectAgent, signal: activeAbortControllers.get(project.slug)?.signal, jobContext }).catch((error) => {
         void (async () => {
           const current = await getRebuildState(project.slug);
           await setRebuildState(project.slug, {
@@ -465,13 +469,11 @@ export function createAgentJobService({
 
     // For artifacts, delegate to existing artifact build (single at a time for now)
     if (outputType === "artifact") {
-      // Artifacts are built one at a time via startArtifactBuild
-      // For batch artifact builds, queue them sequentially
       if (files.length === 1) {
         return await startArtifactBuild(project, files[0], requestedModelId);
       }
-      // TODO: Support batch artifact builds
-      throw httpError(`Batch artifact builds not yet supported. Build one artifact at a time.`, 400);
+      // Batch artifact builds — queue all slugs, run sequentially inside one agent job
+      return await startBatchArtifactBuild(project, files, requestedModelId);
     }
 
     // For reports: use a custom runKind and build the prompt inline
@@ -523,10 +525,15 @@ export function createAgentJobService({
     return result;
   }
 
-  async function runAgentJob({ project, apiKey, modelId, prompt, jobName, runKind, releaseProjectAgent, signal }) {
+  async function runAgentJob({ project, apiKey, modelId, prompt, jobName, runKind, releaseProjectAgent, signal, jobContext }) {
     // Artifact builds get their own simple pipeline
     if (runKind === "artifact_build") {
       return await runArtifactBuildJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent });
+    }
+
+    // Batch artifact builds — run each artifact sequentially
+    if (runKind === "artifact_batch_build") {
+      return await runBatchArtifactBuildJob({ project, apiKey, modelId, jobName, releaseProjectAgent, artifactSlugs: jobContext?.artifactSlugs || [] });
     }
 
     // Output builds (reports) get their own pipeline
@@ -1385,6 +1392,7 @@ export function createAgentJobService({
         status,
         finishedAt: new Date().toISOString(),
         message,
+        buildQueue: null,
       });
 
       await appendRunEvent(project.slug, {
@@ -1405,6 +1413,7 @@ export function createAgentJobService({
         status: "error",
         finishedAt: new Date().toISOString(),
         message,
+        buildQueue: null,
       });
       await appendRunEvent(project.slug, {
         type: "error",
@@ -1417,6 +1426,158 @@ export function createAgentJobService({
       activeRebuilds.delete(project.slug);
       releaseProjectAgent();
     }
+  }
+
+  async function runBatchArtifactBuildJob({ project, apiKey, modelId, jobName, releaseProjectAgent, artifactSlugs }) {
+    activeRebuilds.add(project.slug);
+    const totalCount = artifactSlugs.length;
+    let completed = 0;
+    let failed = 0;
+
+    try {
+      for (const artifactSlug of artifactSlugs) {
+        completed++;
+        const progressLabel = `(${completed}/${totalCount})`;
+
+        try {
+          // Prepare this artifact's prompt (same as startArtifactBuild)
+          const spec = await readArtifactSpec(project.path, artifactSlug);
+          const sourceGlobs = Array.isArray(spec.frontmatter.sources) ? spec.frontmatter.sources : [];
+          const resolvedSources = await resolveArtifactSources(project.path, sourceGlobs);
+          const explicitPaths = resolvedSources.map((s) => s.relativePath);
+          const discoveryInventory = await discoverRelevantSources(project.path, explicitPaths);
+          await ensureArtifactDirs(project.path);
+
+          const crypto = await import("node:crypto");
+          const specHash = crypto.createHash("sha256").update(spec.rawContent).digest("hex");
+
+          // Delete old build output
+          const buildDir = path.join(project.path, "artifacts/builds", artifactSlug);
+          try {
+            await fs.rm(buildDir, { recursive: true, force: true });
+            await fs.mkdir(buildDir, { recursive: true });
+          } catch { /* directory may not exist yet */ }
+
+          const prompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory, specHash);
+          const artifactName = spec.frontmatter.name || artifactSlug;
+
+          await appendRunEvent(project.slug, {
+            type: "system",
+            title: `Building artifact ${progressLabel}: ${artifactName}`,
+            text: `Agent is generating the HTML artifact from research data.`,
+            status: "artifact_build",
+            runtime: "cursor",
+          });
+
+          const stateBeforeBuild = await getRebuildState(project.slug);
+          await setRebuildState(project.slug, {
+            ...stateBeforeBuild,
+            buildPhase: "artifact_build",
+            buildPhaseDetail: `Building ${artifactName} ${progressLabel}`,
+            message: `Building artifact ${progressLabel}: ${artifactName}`,
+          });
+
+          const result = await runSingleAgentPhase({
+            project,
+            apiKey,
+            modelId,
+            prompt,
+            phaseName: `Artifact: ${artifactName}`,
+          });
+
+          if (result.status === "finished") {
+            await appendRunEvent(project.slug, {
+              type: "system",
+              title: `Artifact ${progressLabel}: ${artifactName} finished`,
+              text: `Successfully built ${artifactName}.`,
+              status: "artifact_complete",
+              runtime: "cursor",
+            });
+          } else {
+            failed++;
+            await appendRunEvent(project.slug, {
+              type: "error",
+              title: `Artifact ${progressLabel}: ${artifactName} failed`,
+              text: result.result || `${artifactName} ended with status: ${result.status}`,
+              status: "artifact_error",
+              runtime: "cursor",
+            });
+          }
+        } catch (err) {
+          failed++;
+          await finishAssistantMessage(project.slug);
+          await appendRunEvent(project.slug, {
+            type: "error",
+            title: `Artifact ${progressLabel}: ${artifactSlug} failed`,
+            text: err instanceof Error ? err.message : `Unknown error building ${artifactSlug}`,
+            status: "artifact_error",
+            runtime: "cursor",
+          });
+        }
+      }
+
+      // Final summary
+      const succeeded = totalCount - failed;
+      const message = failed > 0
+        ? `Built ${succeeded} of ${totalCount} artifacts (${failed} failed).`
+        : `All ${totalCount} artifacts built successfully.`;
+      const status = failed > 0 ? (succeeded > 0 ? "finished" : "error") : "finished";
+
+      const current = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...current,
+        running: false,
+        status,
+        finishedAt: new Date().toISOString(),
+        message,
+        buildQueue: null,
+      });
+      await appendRunEvent(project.slug, {
+        type: failed > 0 ? "error" : "system",
+        title: message,
+        text: message,
+        status,
+        runtime: "cursor",
+      });
+    } catch (error) {
+      await finishAssistantMessage(project.slug);
+      const message = error instanceof Error ? error.message : `Unknown batch artifact build failure.`;
+      const current = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...current,
+        running: false,
+        status: "error",
+        finishedAt: new Date().toISOString(),
+        message,
+        buildQueue: null,
+      });
+      await appendRunEvent(project.slug, {
+        type: "error",
+        title: `${jobName} failed`,
+        text: message,
+        status: "error",
+        runtime: "cursor",
+      });
+    } finally {
+      activeRebuilds.delete(project.slug);
+      releaseProjectAgent();
+    }
+  }
+
+  async function startBatchArtifactBuild(project, artifactSlugs, requestedModelId) {
+    const pluralLabel = artifactSlugs.length === 1 ? "artifact" : "artifacts";
+    return await startAgentJob({
+      project,
+      requestedModelId,
+      runKind: "artifact_batch_build",
+      startMessage: `Building ${artifactSlugs.length} ${pluralLabel}.`,
+      noApiKeyMessage:
+        "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Artifact builds are unavailable from the UI.",
+      noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
+      jobName: `Build ${artifactSlugs.length} ${pluralLabel}`,
+      prompt: `Building ${artifactSlugs.length} artifacts sequentially.`,
+      jobContext: { artifactSlugs },
+    });
   }
 
   async function startArtifactBuild(project, artifactSlug, requestedModelId) {
@@ -1447,12 +1608,13 @@ export function createAgentJobService({
       project,
       requestedModelId,
       runKind: "artifact_build",
-      startMessage: `Building artifact: ${spec.frontmatter.name || artifactSlug}`,
+      startMessage: `Building artifact: ${artifactSlug}`,
       noApiKeyMessage:
         "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Artifact builds are unavailable from the UI.",
       noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
-      jobName: `Artifact: ${spec.frontmatter.name || artifactSlug}`,
+      jobName: `Artifact: ${artifactSlug}`,
       prompt,
+      jobContext: { artifactSlugs: [artifactSlug] },
     });
   }
 

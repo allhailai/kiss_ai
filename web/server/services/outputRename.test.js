@@ -18,7 +18,11 @@ vi.mock("node:fs/promises", () => {
       writeFile: vi.fn(async (filePath, content) => {
         store.set(filePath, content);
       }),
-      readdir: vi.fn(async (dirPath) => {
+      readdir: vi.fn(async (dirPath, options) => {
+        const typedKey = `__dir_typed__${dirPath}`;
+        if (options?.withFileTypes && store.has(typedKey)) {
+          return store.get(typedKey);
+        }
         const entries = store.get(`__dir__${dirPath}`);
         if (!entries) {
           const err = new Error(`ENOENT: no such file or directory, scandir '${dirPath}'`);
@@ -59,6 +63,14 @@ function setFile(filePath, content) {
 
 function setDir(dirPath, entries) {
   store.set(`__dir__${dirPath}`, entries);
+}
+
+function setDirWithTypes(dirPath, entries) {
+  store.set(`__dir_typed__${dirPath}`, entries.map((e) => ({
+    name: e.name,
+    isDirectory: () => e.isDirectory,
+    isFile: () => !e.isDirectory,
+  })));
 }
 
 function getFile(filePath) {
@@ -297,6 +309,50 @@ describe("renameOutput", () => {
     expect(result.updated.topics).toBe(0);
     expect(result.updated.questions).toBe(0);
     expect(result.updated.artifactSpecs).toEqual([]);
+    expect(result.updated.buildManifests).toBe(0);
     // Errors for missing stores are collected but don't throw
+  });
+
+  it("updates artifact build manifest sourcesUsed arrays", async () => {
+    const oldPath = "outputs_ai/reports/old_report.md";
+    const newPath = "outputs_ai/reports/new_report.md";
+
+    setFile(path.join(projectPath, oldPath), "content");
+    setDir(reportsDir, ["new_report.md"]);
+    setDir(specsDir, []);
+
+    const buildsDir = path.join(projectPath, "artifacts", "builds");
+    setDirWithTypes(buildsDir, [
+      { name: "my_artifact", isDirectory: true },
+      { name: "unrelated_artifact", isDirectory: true },
+    ]);
+
+    // Manifest that references the old path
+    const manifestPath = path.join(buildsDir, "my_artifact", ".artifact-manifest.json");
+    setFile(manifestPath, {
+      slug: "my_artifact",
+      builtAt: "2026-05-27T10:00:00Z",
+      sourcesUsed: [oldPath, "outputs_ai/wiki/topic.md"],
+      format: "html",
+    });
+
+    // Manifest that does NOT reference the old path
+    const unrelatedManifestPath = path.join(buildsDir, "unrelated_artifact", ".artifact-manifest.json");
+    setFile(unrelatedManifestPath, {
+      slug: "unrelated_artifact",
+      builtAt: "2026-05-27T10:00:00Z",
+      sourcesUsed: ["outputs_ai/wiki/other.md"],
+      format: "html",
+    });
+
+    const result = await renameOutput(projectPath, oldPath, newPath);
+
+    const updatedManifest = getJson(manifestPath);
+    expect(updatedManifest.sourcesUsed).toEqual([newPath, "outputs_ai/wiki/topic.md"]);
+
+    const untouchedManifest = getJson(unrelatedManifestPath);
+    expect(untouchedManifest.sourcesUsed).toEqual(["outputs_ai/wiki/other.md"]);
+
+    expect(result.updated.buildManifests).toBe(1);
   });
 });

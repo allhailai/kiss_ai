@@ -34,6 +34,7 @@ async function writeJson(filePath, data) {
  *   4. .build/questions.json — replaces path in relatedFiles[] and appliedTo[]
  *   5. artifacts/artifact_specs/*.artifact.md — replaces path in sources: and outputFile:
  *   6. Markdown cross-links in sibling .md files — replaces ./old_basename with ./new_basename
+ *   7. Artifact build manifests (.artifact-manifest.json) — replaces path in sourcesUsed[]
  *
  * @param {string} projectPath - absolute path to project root
  * @param {string} oldRelPath - old relative path (e.g. "outputs_ai/reports/old_name.md")
@@ -49,6 +50,7 @@ export async function renameOutput(projectPath, oldRelPath, newRelPath) {
     questions: 0,
     artifactSpecs: /** @type {string[]} */ ([]),
     markdownLinks: /** @type {string[]} */ ([]),
+    buildManifests: 0,
   };
 
   // ── Validation ──────────────────────────────────────────────────
@@ -255,6 +257,42 @@ export async function renameOutput(projectPath, oldRelPath, newRelPath) {
     }
   } catch (err) {
     errors.push(`markdown_links: ${err.message}`);
+  }
+
+  // ── 7. Update artifact build manifests ─────────────────────────────
+
+  try {
+    const buildsDir = path.join(projectPath, "artifacts", "builds");
+    let buildEntries;
+    try {
+      buildEntries = await fs.readdir(buildsDir, { withFileTypes: true });
+    } catch {
+      buildEntries = [];
+    }
+
+    for (const entry of buildEntries) {
+      if (!entry.isDirectory()) continue;
+      const manifestPath = path.join(buildsDir, entry.name, ".artifact-manifest.json");
+      try {
+        const raw = await fs.readFile(manifestPath, "utf-8");
+        if (!raw.includes(oldRelPath)) continue;
+        const manifest = JSON.parse(raw);
+        let changed = false;
+        if (Array.isArray(manifest.sourcesUsed)) {
+          const idx = manifest.sourcesUsed.indexOf(oldRelPath);
+          if (idx !== -1) {
+            manifest.sourcesUsed[idx] = newRelPath;
+            changed = true;
+          }
+        }
+        if (changed) {
+          await writeJson(manifestPath, manifest);
+          updated.buildManifests++;
+        }
+      } catch { /* non-critical */ }
+    }
+  } catch (err) {
+    errors.push(`build_manifests: ${err.message}`);
   }
 
   return { updated, errors };

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { outputsApi } from "../../data/outputsApi";
 import { artifactsApi } from "../../data/artifactsApi";
+import { rebuildApi } from "../../data/rebuildApi";
 import { filesApi } from "../../data/filesApi";
 import type { ArtifactSpec, OutputStatusResponse, ProjectFile, RebuildModel } from "../../contracts/api";
 import { groupModelsByTier, modelDisplayName, modelTierLabels } from "../../domain/modelLabels";
@@ -52,6 +53,7 @@ export function OutputSection({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [buildModelId, setBuildModelId] = useState(selectedModelId);
   const [building, setBuilding] = useState(false);
+  const [buildingSlugs, setBuildingSlugs] = useState<Set<string>>(() => new Set());
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set());
 
   // ── New report form ───────────────────────────────────────────
@@ -89,6 +91,49 @@ export function OutputSection({
   useEffect(() => {
     void refreshStatus();
   }, [refreshStatus, projectFiles]);
+
+  // ── Poll rebuild state for building indicators ─────────────────
+  useEffect(() => {
+    let cancelled = false;
+
+    async function pollRebuildState() {
+      try {
+        const state = await rebuildApi.rebuildState(projectSlug);
+        if (cancelled) return;
+
+        const isArtifactBuild = state.running && (
+          state.runKind === "artifact_build" ||
+          state.runKind === "artifact_batch_build"
+        );
+
+        if (isArtifactBuild && Array.isArray(state.buildQueue) && state.buildQueue.length > 0) {
+          setBuildingSlugs(new Set(state.buildQueue));
+          setBuilding(true);
+        } else if (!state.running && building) {
+          // Build just finished — clear state and refresh artifact list
+          setBuildingSlugs(new Set());
+          setBuilding(false);
+          setSelectedFiles(new Set());
+          flash("Build complete ✓");
+          void refreshStatus();
+        } else if (!state.running) {
+          setBuildingSlugs(new Set());
+        }
+      } catch {
+        // polling error — ignore
+      }
+    }
+
+    // Initial check
+    void pollRebuildState();
+
+    // Poll every 3s
+    const interval = setInterval(pollRebuildState, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [projectSlug, building, refreshStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Build rows from project files + output status (reports) or artifact specs (artifacts) ──
   const reportRows: ReportFileRow[] = useMemo(() => {
@@ -258,61 +303,10 @@ export function OutputSection({
     setBuilding(true);
     flash(`Building ${files.length} ${files.length === 1 ? typeSingular.toLowerCase() : typeLabel.toLowerCase()}…`);
     try {
-      if (type === "artifact") {
-        // Build artifacts one at a time via their dedicated API
-        for (const slug of files) {
-          await artifactsApi.build(projectSlug, slug, buildModelId || undefined);
-        }
-      } else {
-        await outputsApi.buildOutputs(projectSlug, files, type, buildModelId || undefined);
-      }
+      // Both artifact and report builds go through the same API — backend handles queuing
+      await outputsApi.buildOutputs(projectSlug, files, type, buildModelId || undefined);
       flash(`Build started for ${files.length} ${files.length === 1 ? typeSingular.toLowerCase() : typeLabel.toLowerCase()}.`);
-      // Poll for completion
-      const startTime = Date.now();
-      const maxPollTime = 5 * 60 * 1000; // 5 minutes
-      const pollInterval = 8000;
-      const poll = setInterval(async () => {
-        const elapsed = Date.now() - startTime;
-        if (elapsed > maxPollTime) {
-          clearInterval(poll);
-          setBuilding(false);
-          flash("Build timed out — check the build log.");
-          return;
-        }
-        try {
-          if (type === "artifact") {
-            const result = await artifactsApi.list(projectSlug);
-            setArtifactSpecs(result.artifacts);
-            const buildStartIso = new Date(startTime).toISOString();
-            const allDone = files.every((slug) => {
-              const spec = result.artifacts.find((a) => a.slug === slug);
-              return spec && spec.lastBuilt && spec.lastBuilt > buildStartIso;
-            });
-            if (allDone) {
-              clearInterval(poll);
-              setBuilding(false);
-              setSelectedFiles(new Set());
-              flash(`Build complete ✓`);
-            }
-          } else {
-            const updated = await outputsApi.status(projectSlug);
-            setOutputStatus(updated);
-            const buildStartIso = new Date(startTime).toISOString();
-            const allDone = files.every((f) => {
-              const output = updated.outputs.find((o) => o.path === f);
-              return output && output.builtAt && output.builtAt > buildStartIso;
-            });
-            if (allDone) {
-              clearInterval(poll);
-              setBuilding(false);
-              setSelectedFiles(new Set());
-              flash(`Build complete ✓`);
-            }
-          }
-        } catch {
-          // polling error — continue
-        }
-      }, pollInterval);
+      // Completion is detected by the rebuild state polling effect above
     } catch (err) {
       setBuilding(false);
       flash(err instanceof Error ? err.message : "Build failed");
@@ -591,6 +585,7 @@ export function OutputSection({
               row={row}
               checked={selectedFiles.has(row.path)}
               onToggle={() => toggleSelection(row.path)}
+              isBuilding={buildingSlugs.has(row.path)}
               renaming={renamingPath === row.path}
               renameValue={renamingPath === row.path ? renameValue : ""}
               onRenameStart={() => {
@@ -628,6 +623,7 @@ export function OutputSection({
                       row={row}
                       checked={selectedFiles.has(row.path)}
                       onToggle={() => toggleSelection(row.path)}
+                      isBuilding={buildingSlugs.has(row.path)}
                       renaming={renamingPath === row.path}
                       renameValue={renamingPath === row.path ? renameValue : ""}
                       onRenameStart={() => {
@@ -705,6 +701,7 @@ function FileRow({
   row,
   checked,
   onToggle,
+  isBuilding = false,
   renaming,
   renameValue,
   onRenameStart,
@@ -715,6 +712,7 @@ function FileRow({
   row: ReportFileRow;
   checked: boolean;
   onToggle: () => void;
+  isBuilding?: boolean;
   renaming: boolean;
   renameValue: string;
   onRenameStart: () => void;
@@ -746,6 +744,13 @@ function FileRow({
   }, [renaming]);
 
   function statusBadge() {
+    if (isBuilding) {
+      return (
+        <span className="output-status-badge output-status-building">
+          ⏳ Building…
+        </span>
+      );
+    }
     if (!row.builtAt) {
       return (
         <span className="output-status-badge output-status-unbuilt">

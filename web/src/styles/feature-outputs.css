@@ -284,6 +284,17 @@
   color: var(--color-secondary, #5d6d7e);
 }
 
+.output-status-building {
+  background: color-mix(in srgb, var(--color-accent, #a45c40) 14%, transparent);
+  color: var(--color-accent, #a45c40);
+  animation: output-building-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes output-building-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
 .output-file-time {
   flex-shrink: 0;
   font-size: 10px;

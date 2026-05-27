@@ -64,7 +64,7 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild }) {
         // ENOENT = doesn't exist = good, proceed
       }
 
-      const mergedFrontmatter = { name, format: "html", lifecycle: "manual", ...frontmatter };
+      const mergedFrontmatter = { format: "html", lifecycle: "manual", ...frontmatter };
 
       const result = await writeArtifactSpec(request.project.path, slug, mergedFrontmatter, body);
       response.status(201).json(result);
