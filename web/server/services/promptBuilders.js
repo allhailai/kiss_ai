@@ -18,58 +18,7 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
 
   function createSynthesisPrompt(project, scope) {
     const lines = [
-      "Run the kiss_ai build for this project.",
-      "",
-      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build.md")} exactly.`,
-      "This is a non-interactive web-triggered build. Never ask the user for confirmation or wait for input mid-run.",
-      "When a decision is needed, choose the conservative default, log the decision in the build entry, and continue.",
-      `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
-      "Do not create or depend on a project-local framework/ folder.",
-      "Do not operate outside this project root.",
-      `Project root: ${project.path}`,
-      "",
-      "IMPORTANT: Source files have already been fetched and written to sources/web_research/ by the build pipeline.",
-      "Source digests have been generated in sources/digests/ — these are compact key-claim summaries (~200 words each).",
-      "Do NOT search the web. Use only the pre-fetched sources.",
-      "Read sources/digests/ FIRST to understand the evidence landscape.",
-      "Read full source files from sources/web_research/ ONLY when actively writing a specific wiki page or directed output that needs detailed evidence from that source.",
-      "Read sources/source_log.md for the full inventory of what was fetched.",
-    ];
-
-    if (scope && !scope.isFirstBuild) {
-      lines.push("");
-
-      if (scope.projectMdChanged && scope.projectMdDiff) {
-        lines.push(
-          "BUILD SCOPE: project.md changed. Here is the diff:",
-          "```diff",
-          scope.projectMdDiff.slice(0, 3000),
-          "```",
-          "",
-          "Update only the outputs affected by this change.",
-          "Do not regenerate unchanged wiki pages or outputs.",
-        );
-      } else if (!scope.projectMdChanged) {
-        lines.push(
-          "BUILD SCOPE: project.md has NOT changed since last build.",
-          "Only process FEEDBACK markers and refresh dated reports.",
-          "Do not regenerate wiki pages or directed outputs that have no pending markers.",
-        );
-      }
-
-      if (scope.feedbackMarkers.length > 0) {
-        lines.push("", `FEEDBACK markers found in: ${scope.feedbackMarkers.join(", ")}`, "Apply feedback to these files and their downstream dependents only.");
-      }
-
-
-    }
-
-    return lines.join("\n");
-  }
-
-  function createWikiOnlyPrompt(project, scope) {
-    const lines = [
-      "Run the kiss_ai wiki build for this project.",
+      "Run the kiss_ai knowledge build for this project.",
       "",
       `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build.md")} exactly.`,
       "This is a non-interactive web-triggered build. Never ask the user for confirmation or wait for input mid-run.",
@@ -86,28 +35,37 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
       "Read full source files from sources/web_research/ ONLY when actively writing a specific wiki page that needs detailed evidence from that source.",
       "Read sources/source_log.md for the full inventory of what was fetched.",
       "",
-      "WIKI_ONLY: Build wiki pages ONLY (Phase 7). Do NOT write directed outputs (Phase 8).",
-      "Directed outputs will be built in a separate per-file pass with focused context.",
-      "Complete Phases 1-7 and Phase 9-11 (validation, manifest, git snapshot).",
+      "KNOWLEDGE BUILD: Build wiki pages only. Do NOT write reports or directed outputs.",
+      "Reports are built separately by the user via the Reports page.",
+      "Complete all phases in do_build.md (context, annotations, inputs, sources, feedback, wiki, gaps, questions, recording).",
       "",
-      "IMPORTANT: When writing topics.json, populate each topic's `outputs` array with the expected directed output file paths",
-      "(e.g., `outputs_ai/reports/reagent_brittleness_index_dashboard.md`). The build pipeline uses these paths to schedule",
-      "per-file synthesis in Phase 3b. Without them, directed outputs will not be built.",
+      "IMPORTANT: When writing topics.json, populate each topic's `outputs` array with the expected report file paths",
+      "(e.g., `outputs_ai/reports/strategy_overview.md`). The Reports page uses these paths to show the user which reports are available.",
     ];
 
     if (scope && !scope.isFirstBuild) {
       lines.push("");
+
       if (scope.projectMdChanged && scope.projectMdDiff) {
         lines.push(
           "BUILD SCOPE: project.md changed. Here is the diff:",
           "```diff",
           scope.projectMdDiff.slice(0, 3000),
           "```",
+          "",
+          "Update only the wiki pages affected by this change.",
+          "Do not regenerate unchanged wiki pages.",
+        );
+      } else if (!scope.projectMdChanged) {
+        lines.push(
+          "BUILD SCOPE: project.md has NOT changed since last build.",
+          "Only process COMMENT/FEEDBACK markers and refresh dated wiki pages.",
+          "Do not regenerate wiki pages that have no pending markers.",
         );
       }
 
       if (scope.feedbackMarkers.length > 0) {
-        lines.push("", `FEEDBACK markers found in: ${scope.feedbackMarkers.join(", ")}`);
+        lines.push("", `COMMENT/FEEDBACK markers found in: ${scope.feedbackMarkers.join(", ")}`, "Apply feedback to these files only.");
       }
 
     }
@@ -115,15 +73,25 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
     return lines.join("\n");
   }
 
+  /** @deprecated Use createSynthesisPrompt — wiki-only is now the default and only mode. */
+  function createWikiOnlyPrompt(project, scope) {
+    return createSynthesisPrompt(project, scope);
+  }
+
   async function createFilePrompt(project, outputFile, sourceMap) {
     const fileMapping = sourceMap[outputFile] || { wikiPages: [], digestFiles: [] };
     const lines = [
-      `Build the directed output file: ${outputFile}`,
+      `Build the report: ${outputFile}`,
       "",
       `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build_file.md")} exactly.`,
       "This is a non-interactive web-triggered build. Never ask the user for confirmation or wait for input mid-run.",
       `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
       `Project root: ${project.path}`,
+      "",
+      "REPORT REBUILD: If the output file already exists, read it first.",
+      "The existing content represents the user's structural preferences and edits.",
+      "Treat user edits as feedback — incorporate their intent but refresh all data-driven content from current wiki and sources.",
+      "Preserve the user's structural choices (headings, section order, emphasis) while updating data, claims, and citations.",
       "",
       "CONTEXT: The wiki has already been built. The following files are your primary context:",
     ];
@@ -225,67 +193,9 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
     return lines.join("\n");
   }
 
-  function createValidationPrompt(project, modelId, rawBuildQuestions = []) {
-    const lines = [
-      "Run the kiss_ai evidence validation for this project.",
-      "",
-      `Follow ${path.join(FRAMEWORK_ROOT, "commands/do_build_validate.md")} exactly.`,
-      "This is a non-interactive web-triggered build. Never ask the user for confirmation or wait for input mid-run.",
-      `Use ${FRAMEWORK_ROOT} as the canonical framework root.`,
-      `Project root: ${project.path}`,
-      "",
-      "Wiki pages and directed outputs have already been built.",
-      "Your job is evidence coverage checks, contradiction detection, and gap actions.",
-      "Do NOT update manifest.json, write build log entries, or run git commands — the server handles those.",
-      "Do NOT check file existence — the server already validated that.",
-      "",
-      "Focus on:",
-      "- Evidence coverage: verify key claims in outputs cite gathered sources",
-      "- Contradiction detection: find claims where sources disagree",
-      "- Coverage gaps: add structured entries to topics.json for missing evidence",
-      "- Update .build/scratchpad.md with working memory",
-      "- Update .build/topics.json with state changes and metrics",
-    ];
-
-    // Question consolidation instructions
-    if (rawBuildQuestions.length > 0) {
-      lines.push(
-        "",
-        "QUESTION CONSOLIDATION:",
-        `The build produced ${rawBuildQuestions.length} raw question(s) from output files.`,
-        "Consolidate these into the fewest meaningful questions:",
-        "- Merge duplicates and near-duplicates into single questions",
-        "- When merging, combine all relatedFiles from merged questions",
-        "- Preserve the highest priority level when merging (blocking > important > informational)",
-        "- Do not add questions that are already answered in existing .build/questions.json",
-        "- Write the final consolidated list to .build/questions.json",
-        "",
-        "Raw questions:",
-        "```json",
-        JSON.stringify(rawBuildQuestions, null, 2),
-        "```",
-        "",
-        "Write .build/questions.json with this schema:",
-        '{ "questions": [{ "id": "q-...", "text": "...", "context": "...", "priority": "blocking|important|informational", "status": "open|answered|applied", "askedAt": "...", "askedDuring": { "phase": "3b", "buildId": "...", "modelId": "..." }, "relatedFiles": [...], "relatedTopics": [...], "answer": null, "answeredAt": null, "answeredBy": null }] }',
-        "Preserve any existing answered questions from the current .build/questions.json.",
-      );
-    }
-
-    // Auto-answer open questions from evidence
-    lines.push(
-      "",
-      "AUTO-ANSWER OPEN QUESTIONS:",
-      "Read .build/questions.json. For each question with status: \"open\":",
-      "- Check whether gathered sources (sources/web_research/, sources/digests/) or wiki pages already contain the answer.",
-      "- If the answer is clearly supported by evidence, auto-answer it:",
-      '  - Set status: "answered"',
-      "  - Set answer to a concise answer citing the source file(s).",
-      '  - Set answeredBy: "ai_auto" and answeredAt to the current ISO timestamp.',
-      "- If the answer is only partially available or inconclusive, leave the question open — do not guess.",
-      "- This is critical: questions should not linger when the evidence to answer them already exists in the project sources.",
-    );
-
-    return lines.join("\n");
+  /** @deprecated Validation agent removed in two-phase architecture. Evidence checks are now part of wiki synthesis. */
+  function createValidationPrompt(_project, _modelId, _rawBuildQuestions = []) {
+    throw new Error("createValidationPrompt is deprecated. Validation is folded into wiki synthesis (do_build.md Phase 7).");
   }
 
   function createAutoAnswerPrompt(project, openQuestions) {
@@ -546,8 +456,8 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
     createProposeOutputArtifactsPrompt,
     createResearchPrompt,
     createSynthesisPrompt,
-    createValidationPrompt,
-    createWikiOnlyPrompt,
+    createValidationPrompt, // deprecated — throws if called
+    createWikiOnlyPrompt, // deprecated — delegates to createSynthesisPrompt
     createWikiPagePrompt,
   };
 }

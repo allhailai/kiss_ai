@@ -1,8 +1,8 @@
 # do_build
 
-Run the full kiss_ai research project build.
+Run the kiss_ai knowledge build for a research project.
 
-This is the single build command. It reads the project brief, gathers or refreshes sources, processes annotations, generates or updates outputs, acts on gaps autonomously, and snapshots the project in Git.
+This is the knowledge pipeline command. It reads the project brief, gathers or refreshes sources, processes annotations, builds the wiki, acts on gaps autonomously, and snapshots the project in Git. It does NOT build directed outputs (reports/artifacts) — those are built separately via the Reports and Artifacts pages.
 
 ## Preconditions
 
@@ -33,33 +33,34 @@ Two categories of files exist in every project:
 - `project.md`
 - `human_design_identity.md`
 - `inputs_human/**`
+- `outputs_ai/reports/**` (user-editable reports — rebuilt only on user request)
 
-**AI-managed (the build creates and updates these):**
+**AI-managed (the knowledge build creates and updates these):**
 - `sources/**`
-- `outputs_ai/**`
+- `outputs_ai/wiki/**`
 - `.build/questions.json`
 - `.build/manifest.json`
 - `change_logs/**`
 
-Users interact with AI-managed files through `<!-- FEEDBACK: ... -->` annotation markers, never through direct editing. The build scans for these markers, applies the feedback, and removes them.
+Users interact with AI-managed files through `<!-- COMMENT: ... -->` annotation markers, never through direct editing. The build scans for these markers, applies the feedback, and removes them. Legacy `<!-- FEEDBACK: ... -->` markers are treated identically.
 
 ## Annotation Markers
 
 One marker type exists in AI-managed markdown files:
 
-**`<!-- FEEDBACK: ... -->`** — User-to-AI feedback. Added by the user via the web UI [+] affordance. The build must process every FEEDBACK marker: apply the requested change, then remove the marker. If the feedback implies a lasting rule (e.g., "always sort this table by X"), also add the rule to the `## Output Guidance` section of `project.md`.
+**`<!-- COMMENT: ... -->`** — User-to-AI feedback. Added by the user via the web UI [+] affordance. The build must process every COMMENT marker: apply the requested change, then remove the marker. If the feedback implies a lasting rule (e.g., "always sort this table by X"), also add the rule to the `## Output Guidance` section of `project.md`. Legacy `<!-- FEEDBACK: ... -->` markers must be handled identically.
 
 ## Instructions
 
 ### Phase 1: Read Context
 
-1. Read `project.md` in full. This is the single source of truth for project goals, topics, context, constraints, directed output requirements, and output guidance.
+1. Read `project.md` in full. This is the single source of truth for project goals, topics, context, constraints, and output guidance.
 2. Read `human_design_identity.md` for project identity and design tokens.
 3. Read `.build/manifest.json` if it exists. If it does not exist, this is a first build.
-4. Read `.build/questions.json` if it exists. Check for questions with `status: "answered"` that have not yet been applied. Collect these for processing in Phase 10. Treat open questions as context for the current build. If this file does not exist, there are no prior questions.
+4. Read `.build/questions.json` if it exists. Check for questions with `status: "answered"` that have not yet been applied. Collect these for processing in Phase 9. Treat open questions as context for the current build. If this file does not exist, there are no prior questions.
 5. Read `outputs_ai/wiki/_index.md` if it exists. This is a lightweight table of contents for the wiki — it lists every wiki page with its BLUF summary, source references, and last-updated date. Use it to understand the current state of the wiki without reading every page. If this file does not exist, this is a first build.
 6. Read `.build/scratchpad.md` if it exists. This is your working memory from the previous build — it contains key data points, cross-references, contradictions found, and open threads. Use it as context for the current build.
-7. Read `.build/topics.json` if it exists. This is the living topic taxonomy. Each topic has a `state` (seed/shallow/deep/saturated/split_candidate/deprecated), a `disposition` (null/parked/settled), sources, dependencies, and justification. Use it to understand the project's knowledge structure and determine which downstream outputs need updating.
+7. Read `.build/topics.json` if it exists. This is the living topic taxonomy. Each topic has a `state` (seed/shallow/deep/saturated/split_candidate/deprecated), a `disposition` (null/parked/settled), sources, dependencies, and justification. Use it to understand the project's knowledge structure and determine which wiki pages need updating.
    - **Do not modify topics the user has `parked` or `settled`** — these are user-owned disposition decisions. Still update their `metrics` and `sources` if new evidence was found, but do not expand scope or change state.
    - **Do not re-add topics the user has `deprecated`** — these are intentional removals.
    - **If you discover new topics** from sources or evidence that don't exist in `topics.json`, add them with `state: "seed"`, `confidence: "low"`, and `origin: "agent_discovered"` so the user can review them.
@@ -67,14 +68,14 @@ One marker type exists in AI-managed markdown files:
 
 ### Phase 2: Scan Annotations
 
-8. Scan all markdown files under `sources/**` and `outputs_ai/**` for `<!-- FEEDBACK: ... -->` markers. Collect them with their file path and position.
+8. Scan all markdown files under `sources/**` and `outputs_ai/wiki/**` for `<!-- COMMENT: ... -->` and `<!-- FEEDBACK: ... -->` markers. Collect them with their file path and position.
 
 ### Phase 3: Follow Build Scope Directive
 
 11. The build pipeline provides a `BUILD SCOPE` directive in the prompt. Follow it exactly:
-   - If the prompt says **"BUILD SCOPE: project.md changed"** with a diff and affected outputs list, update only the listed affected outputs. Do not regenerate unchanged wiki pages or outputs.
-   - If the prompt says **"FEEDBACK markers found in: ..."**, apply feedback to those files and their downstream dependents only.
-   - If the prompt says **"BUILD SCOPE: project.md has NOT changed"**, only process FEEDBACK markers and refresh dated reports. Do not regenerate wiki pages or directed outputs that have no pending markers.
+   - If the prompt says **"BUILD SCOPE: project.md changed"** with a diff and affected wiki pages list, update only the listed affected wiki pages. Do not regenerate unchanged wiki pages.
+   - If the prompt says **"COMMENT markers found in: ..."**, apply feedback to those files and their downstream dependents only.
+   - If the prompt says **"BUILD SCOPE: project.md has NOT changed"**, only process COMMENT markers and refresh dated wiki pages. Do not regenerate wiki pages that have no pending markers.
    - If **no BUILD SCOPE directive is present**, this is a first build — generate everything.
    - **Do not override the provided scope.** Do not choose a broader scope than instructed. The pipeline has already determined what changed.
 
@@ -100,9 +101,9 @@ Source files have been fetched and written to `sources/web_research/` by the bui
 16. Read all files in `sources/digests/`. These are compact summaries of each source containing key claims, data points, and relevance assessments. Use these to understand the evidence landscape without loading full article text. Each digest is ~200 words vs. the full source which may be 3,000+ words. Each digest includes a `Digest coverage` indicator:
     - **high** — the heuristic extracted good data points. You can rely on the digest for topic planning.
     - **medium** — partial extraction. The digest captures some data but the full source likely contains additional qualitative insights.
-    - **low** — the heuristic could not extract meaningful data points (the source is likely qualitative, narrative, or in an unusual format). **Always read the full source** for low-coverage digests during Phase 7 and 8.
+    - **low** — the heuristic could not extract meaningful data points (the source is likely qualitative, narrative, or in an unusual format). **Always read the full source** for low-coverage digests during Phase 7.
 
-17. **Do not read full source files in `sources/web_research/` at this stage.** You will read specific full sources later in Phase 7 and 8, only when you are actively writing or updating a page that needs detailed evidence from that source. **Exception:** plan to read all low-coverage sources during synthesis — the digest alone is insufficient.
+17. **Do not read full source files in `sources/web_research/` at this stage.** You will read specific full sources later in Phase 7, only when you are actively writing or updating a page that needs detailed evidence from that source. **Exception:** plan to read all low-coverage sources during synthesis — the digest alone is insufficient.
 
 18. If `sources/source_log.md` shows gaps (Unfetched sources or missing topic coverage), add structured `coverage_gaps` entries to the relevant topics in `.build/topics.json` with `search_hints` and `target_urls` so the pipeline can fetch them on the next build.
 
@@ -122,10 +123,10 @@ When two sources conflict, favor the higher-ranked source and note the disagreem
 
 ### Phase 6: Apply Feedback
 
-19. Process each collected FEEDBACK marker:
+19. Process each collected COMMENT/FEEDBACK marker:
     - Read the feedback text and the surrounding content context.
     - Apply the requested change to the file.
-    - Remove the `<!-- FEEDBACK: ... -->` marker.
+    - Remove the `<!-- COMMENT: ... -->` or `<!-- FEEDBACK: ... -->` marker.
     - If the feedback implies a lasting structural or formatting rule, add it to `project.md` under `## Output Guidance`. If that section does not exist, create it.
 
 ### Phase 7: Build Wiki
@@ -136,7 +137,11 @@ When two sources conflict, favor the higher-ranked source and note the disagreem
 22. For each wiki topic that needs writing or updating:
     - **Read the full source files** from `sources/web_research/` that are relevant to *this specific topic only*. Use the digests and source log to identify which sources to load. Do not read sources that are irrelevant to the page you are currently writing.
     - On first build: generate the full page by synthesizing evidence from those sources. Every factual claim must cite a source file or URL. If no source supports a claim, do not include it — instead note `N/A — no source support yet`.
-    - On subsequent builds: update current-data sections with fresh evidence. Leave stable analytical content (definitions, historical context, mechanisms) unless `project.md` has changed those topics or FEEDBACK markers request changes.
+    - On subsequent builds: update current-data sections with fresh evidence. Leave stable analytical content (definitions, historical context, mechanisms) unless `project.md` has changed those topics or COMMENT markers request changes.
+    - **Contradiction detection:** While synthesizing, scan for claims where two or more sources disagree on a data point, date, figure, or conclusion. For each contradiction found:
+      - Note both claims and their sources in the wiki page.
+      - Indicate which source has higher confidence (per the Source Confidence Tiers).
+      - If the contradiction is material to the project thesis, create a **question** in `.build/questions.json` asking the user which interpretation should guide the project.
 23. The wiki structure is dynamic. The AI may add, split, merge, or rename pages when doing so improves readability and organization. When restructuring, mention the change in the build log entry.
 24. Wiki pages should:
     - **Big Idea Up Front (BLUF):** Begin with an executive summary that states the most important finding or conclusion from the gathered evidence. The reader should understand the key takeaway without reading further. Then within each section and subsection, lead with the section-level conclusion or key finding before expanding into supporting evidence and detail. The goal: a reader can stop at any depth and still have the most important information for that level.
@@ -158,60 +163,25 @@ When two sources conflict, favor the higher-ranked source and note the disagreem
 
 Use `[[wiki links]]` for page names and source references so they are navigable in the web UI. For source references, use the full relative path (e.g. `[[sources/web_research/mining_com__slug.md]]`) so the link resolution system can match them to actual files. This index is read by future builds (Phase 1, Step 5) to understand the wiki state without reading every page. Keep the BLUF column to one sentence.
 
-### Phase 8: Build Directed Outputs
+### Phase 8: Act on Gaps and Process Questions
 
-> **Note:** When the build pipeline passes a `WIKI_ONLY` scope directive, skip this phase entirely. Directed outputs will be built in a separate per-file pass with focused context. Only execute this phase if no `WIKI_ONLY` directive is present (e.g., when running do_build manually outside the pipeline).
-
-26. Read the directed outputs list from `project.md`. Each directed output should specify what it is and what it's for. The AI determines the appropriate structure, sections, and depth.
-27. For each directed output:
-    - Identify which wiki pages and source digests are relevant to this output. **Read full source files** from `sources/web_research/` only for sources that are directly needed for this specific output and were not already loaded during Phase 7.
-    - On first build: generate the full output by synthesizing evidence from sources and wiki pages. Do not generate data that is not supported by gathered sources — instead flag gaps.
-    - On subsequent builds: refresh current-data sections. Leave stable analytical content unless affected by a FEEDBACK marker or `project.md` change.
-28. For dated reports (e.g., `outputs_ai/reports/YYYY_MM_DD_*.md`): always generate fresh for the current date. Do not overwrite prior dated reports.
-29. All directed outputs should:
-    - **Big Idea Up Front (BLUF):** Open with an executive summary or key-finding statement that gives the reader the most important conclusion immediately. Within each section, lead with the section-level takeaway before presenting supporting data. Within tables or dashboards, surface the most critical rows or rankings prominently. The reader should be able to stop reading at any level and still hold the most important information for that level.
-    - Cite sources for every factual claim. If a claim has no source, mark it as unsourced.
-    - Distinguish facts from forecasts, scenarios, and interpretations.
-    - Surface low-confidence areas and evidence gaps explicitly.
-    - Never present data fabricated from `project.md` descriptions as if it were researched. If `project.md` says "sulphuric acid consumption is 1.5–2.0 t/t Cu" and no gathered source confirms this, the output must flag it as "per project brief, unverified" — not present it as a research finding.
-    - Follow any rules in `project.md` > Output Guidance.
-    - Follow any constraints in `project.md` > Constraints.
-
-### Phase 9: Validate
-
-30. Run basic health checks:
-    - All directed outputs listed in `project.md` exist.
-    - Wiki pages exist and have content.
-    - Wiki `_index.md` exists and matches the wiki pages.
-    - Source log is current.
-    - No unprocessed FEEDBACK markers remain (all must be applied or flagged).
-31. **Source depth check**: verify that source digests in `sources/digests/` contain substantive key claims (not just metadata). For any thin digests, add a structured `coverage_gap` entry to the relevant topic in `.build/topics.json` with a re-fetch target URL so the pipeline can retry on the next build.
-32. **Evidence coverage check**: for each directed output, verify that key claims cite gathered sources. For unsourced claims, add `coverage_gap` entries to the relevant topics with `search_hints` describing what evidence is needed.
-33. **Contradiction detection**: scan wiki pages and directed outputs for claims where two or more sources disagree on a data point, date, figure, or conclusion. For each contradiction found:
-    - Note both claims and their sources in the relevant wiki page or output.
-    - Indicate which source has higher confidence (per the Source Confidence Tiers).
-    - If the contradiction is material to the project thesis, create a **question** in `.build/questions.json` asking the user which interpretation should guide the project.
-34. If issues are found, act on them directly (coverage_gaps, questions, or inline notes) rather than blocking the build.
-
-### Phase 10: Act on Gaps and Process Questions
-
-35. After generating/updating outputs, identify improvement opportunities and **act on them directly**:
+26. After building the wiki, identify improvement opportunities and **act on them directly**:
     - Missing wiki page for an evidenced topic → create it now.
-    - Output file too long → split it now.
+    - Wiki page too long → split it now.
     - Thin source digest → add a structured `coverage_gap` to the relevant topic with a re-fetch target.
     - Missing source for a key claim → add a structured `coverage_gap` with `search_hints`.
     - Source contradiction (immaterial) → favor higher-ranked source, note inline.
     - Source contradiction (material to project thesis) → create a **question**.
-    - A new topic or directed output would serve the project goal → add it as a seed topic or create the output.
+    - A new topic would serve the project goal → add it as a seed topic.
 
     Act directly or delegate to the pipeline via `coverage_gaps` in `.build/topics.json`.
 
-36. **Question gate:** Before creating any question in `.build/questions.json`, apply the public/private test:
+27. **Question gate:** Before creating any question in `.build/questions.json`, apply the public/private test:
     - If the answer could come from a publicly available source (statutes, regulations, published documents, government databases), do NOT create a question. Add a structured `coverage_gap` to the relevant topic and let the pipeline fetch it on the next build.
     - If the answer requires private information only the human has (business relationships, contract terms, strategic judgment, proprietary data), create a question.
     - If a `coverage_gap` has persisted for 2+ builds without resolution (check the `attempts` field), THEN escalate to a question explaining what the AI already tried.
 
-37. **Auto-answer open questions from evidence:** Before processing human-answered questions, review every question in `.build/questions.json` with `status: "open"`. For each one:
+28. **Auto-answer open questions from evidence:** Before processing human-answered questions, review every question in `.build/questions.json` with `status: "open"`. For each one:
     - Check whether the sources gathered in this build (or resolved `coverage_gaps`) now contain the answer.
     - If the answer is clearly supported by gathered evidence, auto-answer it:
       - Set `status: "answered"`.
@@ -220,22 +190,22 @@ Use `[[wiki links]]` for page names and source references so they are navigable 
     - If the answer is partially available but not conclusive, leave the question open — do not guess.
     - This step ensures questions don't linger when the pipeline has already fetched the information needed to resolve them.
 
-38. Process answered questions collected in Step 4 **and any auto-answered in Step 37** (from `.build/questions.json`):
-    - For each question with `status: "answered"`, determine where the answer should be applied: update `project.md` (e.g., add to `## Output Guidance` or `## Constraints`), adjust output content, or both.
+29. Process answered questions collected in Step 4 **and any auto-answered in Step 28** (from `.build/questions.json`):
+    - For each question with `status: "answered"`, determine where the answer should be applied: update `project.md` (e.g., add to `## Output Guidance` or `## Constraints`), adjust wiki content, or both.
     - Apply the answer: make the concrete changes to the relevant files so the answer is reflected in the project going forward.
     - Update the question's status to `"applied"` in `.build/questions.json`.
-39. If the build prompt includes raw `BUILD_QUESTION` markers for consolidation, consolidate them into `.build/questions.json` (merging duplicates, preserving highest priority, preserving existing answered/applied questions). Before writing each question, apply the question gate (Step 36) — convert publicly-researchable questions to coverage_gaps instead.
+30. If the build prompt includes raw `BUILD_QUESTION` markers for consolidation, consolidate them into `.build/questions.json` (merging duplicates, preserving highest priority, preserving existing answered/applied questions). Before writing each question, apply the question gate (Step 27) — convert publicly-researchable questions to coverage_gaps instead.
 
-### Phase 11: Record and Snapshot
+### Phase 9: Record and Snapshot
 
-38. Update `.build/scratchpad.md` with working memory from this build:
+31. Update `.build/scratchpad.md` with working memory from this build:
     - Key data points discovered or updated during synthesis.
     - Cross-references found between topics.
-    - Contradictions identified (from Step 33).
+    - Contradictions identified.
     - Open threads or areas needing deeper research.
     - This file is not user-facing. It is the agent's persistent working memory between builds. Keep it concise (~500 words max). Overwrite the previous scratchpad — do not append.
 
-39. Create or update `.build/topics.json` with the project's knowledge structure using the v2 schema:
+32. Create or update `.build/topics.json` with the project's knowledge structure using the v2 schema:
 
 ```json
 {
@@ -301,7 +271,7 @@ Behavioral rules for updating topics:
 - **Parked/settled topics:** Preserve `disposition`, `disposition_at`, `disposition_note`. Update `metrics` and `sources` if new evidence was found, but do not change `state` or expand scope.
 - **Do not delete `.build/topic_graph.json`** — the build pipeline handles legacy cleanup automatically.
 
-40. Create or update `.build/manifest.json` with:
+33. Create or update `.build/manifest.json` with:
     ```json
     {
       "version": 1,
@@ -310,7 +280,6 @@ Behavioral rules for updating topics:
       "project_md_hash": "sha256 of project.md at build time",
       "scope": "full | targeted | refresh",
       "wiki_pages": ["list of wiki page filenames"],
-      "directed_outputs": ["list of directed output filenames"],
       "sources_gathered": 0,
       "sources_refreshed": 0,
       "feedback_applied": 0,
@@ -320,8 +289,8 @@ Behavioral rules for updating topics:
       "build_notes": "brief summary of what was done"
     }
     ```
-41. Prepend a build entry to `change_logs/builds.md` with the build timestamp, scope, what was generated/updated, and any caveats.
-42. **Git snapshot:** If the build completed without a fatal execution stop:
+34. Prepend a build entry to `change_logs/builds.md` with the build timestamp, scope, what was generated/updated, and any caveats.
+35. **Git snapshot:** If the build completed without a fatal execution stop:
     - Run from the project root.
     - `git add -A .`
     - `git commit -m "kiss_ai build: <project_name> (YYYY-MM-DD)"`
@@ -329,7 +298,7 @@ Behavioral rules for updating topics:
 
 ### First Build Baseline
 
-43. On the very first build (no prior manifest), before generating AI content:
+36. On the very first build (no prior manifest), before generating AI content:
     - Initialize Git in the project root if not already a repo.
     - Create a human-authored baseline commit with only user-owned files:
       - `project.md`
@@ -348,8 +317,7 @@ Report:
 - Build scope (full, targeted, or refresh).
 - Sources gathered and refreshed.
 - Wiki pages created or updated.
-- Directed outputs created or updated.
-- FEEDBACK markers applied.
+- COMMENT markers applied.
 - Coverage gaps written to `.build/topics.json` (count and brief list).
 - Autonomous actions taken (file splits, wiki pages added, etc.).
 - Questions consolidated and written to `.build/questions.json`.
