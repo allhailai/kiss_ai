@@ -19,4 +19,11 @@ export const outputsApi = {
       method: "POST",
       body: JSON.stringify({ files, type, modelId: modelId ?? null }),
     }),
+
+  /** Rename an output file and update all references. */
+  rename: (projectSlug: string, oldPath: string, newPath: string) =>
+    request<{ updated: Record<string, unknown>; errors: string[] }>(`${projectBase(projectSlug)}/outputs/rename`, {
+      method: "POST",
+      body: JSON.stringify({ oldPath, newPath }),
+    }),
 };

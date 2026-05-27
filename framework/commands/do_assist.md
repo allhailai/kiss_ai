@@ -19,6 +19,10 @@ Do not edit files directly. Do not run builds. Do not modify AI-managed content.
 
 AI Assist is an interactive drafting workflow. The browser will preview the proposal and, if the user accepts it, apply the proposed content to the editor draft. The user must explicitly save afterward.
 
+## File Rename Constraint
+
+**Never rename or move output files** (reports under `outputs_ai/reports/` or artifacts) using filesystem operations like `mv`. Renaming an output file requires updating references in multiple data stores (content ledger, topics, artifact specs, questions, markdown cross-links). Use the **`/api/projects/:slug/outputs/rename`** endpoint instead, which handles all reference updates deterministically.
+
 ## Scope
 
 ### User-Owned Files (Direct Edit Proposals)

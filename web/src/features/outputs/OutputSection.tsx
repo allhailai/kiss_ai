@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { outputsApi } from "../../data/outputsApi";
+import { filesApi } from "../../data/filesApi";
 import type { OutputStatusResponse, ProjectFile, RebuildModel } from "../../contracts/api";
 import { groupModelsByTier, modelDisplayName, modelTierLabels } from "../../domain/modelLabels";
 
@@ -56,6 +57,10 @@ export function OutputSection({
   const [newFileName, setNewFileName] = useState("");
   const newInputRef = useRef<HTMLInputElement | null>(null);
 
+  // ── Rename state ──────────────────────────────────────────────
+  const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
   // Sync buildModelId when the project-level model changes
   useEffect(() => {
     setBuildModelId(selectedModelId);
@@ -76,7 +81,7 @@ export function OutputSection({
 
   useEffect(() => {
     void refreshStatus();
-  }, [refreshStatus]);
+  }, [refreshStatus, projectFiles]);
 
   // ── Build report rows from project files + output status ────────
   const reportRows: ReportFileRow[] = useMemo(() => {
@@ -277,6 +282,34 @@ export function OutputSection({
   function handleNewFormToggle() {
     setShowNewForm((prev) => !prev);
     setNewFileName("");
+  }
+
+  // ── Rename handler ────────────────────────────────────────────
+  async function handleRename(oldPath: string, newBasename: string) {
+    const trimmed = newBasename.trim();
+    if (!trimmed) {
+      setRenamingPath(null);
+      return;
+    }
+
+    // Ensure .md extension
+    const finalBasename = trimmed.endsWith(".md") ? trimmed : `${trimmed}.md`;
+    const dir = oldPath.substring(0, oldPath.lastIndexOf("/") + 1);
+    const newPath = dir + finalBasename;
+
+    if (newPath === oldPath) {
+      setRenamingPath(null);
+      return;
+    }
+
+    try {
+      await filesApi.renameOutputFile(projectSlug, oldPath, newPath);
+      flash(`Renamed to ${finalBasename} ✓`);
+      setRenamingPath(null);
+      await refreshStatus();
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Rename failed");
+    }
   }
 
   useEffect(() => {
@@ -496,6 +529,16 @@ export function OutputSection({
               row={row}
               checked={selectedFiles.has(row.path)}
               onToggle={() => toggleSelection(row.path)}
+              renaming={renamingPath === row.path}
+              renameValue={renamingPath === row.path ? renameValue : ""}
+              onRenameStart={() => {
+                setRenamingPath(row.path);
+                const basename = row.path.split("/").pop()?.replace(/\.md$/, "") ?? "";
+                setRenameValue(basename);
+              }}
+              onRenameChange={setRenameValue}
+              onRenameSubmit={() => void handleRename(row.path, renameValue)}
+              onRenameCancel={() => setRenamingPath(null)}
             />
           ))}
 
@@ -523,6 +566,16 @@ export function OutputSection({
                       row={row}
                       checked={selectedFiles.has(row.path)}
                       onToggle={() => toggleSelection(row.path)}
+                      renaming={renamingPath === row.path}
+                      renameValue={renamingPath === row.path ? renameValue : ""}
+                      onRenameStart={() => {
+                        setRenamingPath(row.path);
+                        const basename = row.path.split("/").pop()?.replace(/\.md$/, "") ?? "";
+                        setRenameValue(basename);
+                      }}
+                      onRenameChange={setRenameValue}
+                      onRenameSubmit={() => void handleRename(row.path, renameValue)}
+                      onRenameCancel={() => setRenamingPath(null)}
                     />
                   ))}
                 </div>
@@ -590,11 +643,25 @@ function FileRow({
   row,
   checked,
   onToggle,
+  renaming,
+  renameValue,
+  onRenameStart,
+  onRenameChange,
+  onRenameSubmit,
+  onRenameCancel,
 }: {
   row: ReportFileRow;
   checked: boolean;
   onToggle: () => void;
+  renaming: boolean;
+  renameValue: string;
+  onRenameStart: () => void;
+  onRenameChange: (value: string) => void;
+  onRenameSubmit: () => void;
+  onRenameCancel: () => void;
 }) {
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+
   const builtAtLabel = useMemo(() => {
     if (!row.builtAt) return null;
     try {
@@ -608,6 +675,13 @@ function FileRow({
       return null;
     }
   }, [row.builtAt]);
+
+  useEffect(() => {
+    if (renaming && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [renaming]);
 
   function statusBadge() {
     if (!row.builtAt) {
@@ -634,10 +708,11 @@ function FileRow({
   return (
     <div
       className={`output-file-row${checked ? " selected" : ""}`}
-      onClick={onToggle}
+      onClick={renaming ? undefined : onToggle}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
+        if (renaming) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onToggle();
@@ -652,9 +727,48 @@ function FileRow({
         onClick={(e) => e.stopPropagation()}
         tabIndex={-1}
       />
-      <span className="output-file-name" title={row.path}>
-        {row.name}
-      </span>
+      {renaming ? (
+        <form
+          className="output-rename-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onRenameSubmit();
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            ref={renameInputRef}
+            className="output-rename-input"
+            type="text"
+            value={renameValue}
+            onChange={(e) => onRenameChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") onRenameCancel();
+            }}
+            maxLength={120}
+          />
+          <span className="output-rename-ext">.md</span>
+          <button className="output-rename-save" type="submit" title="Save">✓</button>
+          <button className="output-rename-cancel" type="button" onClick={onRenameCancel} title="Cancel">✕</button>
+        </form>
+      ) : (
+        <>
+          <span className="output-file-name" title={row.path}>
+            {row.name}
+          </span>
+          <button
+            className="output-rename-btn"
+            type="button"
+            title="Rename"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRenameStart();
+            }}
+          >
+            ✎
+          </button>
+        </>
+      )}
       {builtAtLabel ? (
         <span className="output-file-time" title={row.builtAt ?? undefined}>
           {builtAtLabel}

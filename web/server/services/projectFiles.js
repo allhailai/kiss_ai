@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { renameOutput } from "./outputRename.js";
 
 export function createProjectFileService({
   WEB_ROOT,
@@ -971,29 +972,16 @@ export function createProjectFileService({
       throw httpError("Hidden project files cannot be managed in the lab UI.", 403, "hidden_file");
     }
 
-    const sourceTarget = await resolveProjectFileTarget(projectRoot, normalizedFrom);
-    const sourceStat = await fs.stat(sourceTarget.absolute);
-
-    if (!sourceStat.isFile()) {
-      throw httpError("Only files can be renamed.", 400, "rename_not_file");
-    }
-
-    const destTarget = await resolveProjectFileTarget(projectRoot, normalizedTo, { allowMissing: true });
-
-    if (await fileExists(destTarget.absolute)) {
-      throw httpError(`A file already exists at ${normalizedTo}.`, 409, "rename_target_exists");
-    }
-
-    // Ensure the destination directory exists (e.g. moving into a subfolder)
-    await fs.mkdir(path.dirname(destTarget.absolute), { recursive: true });
-    await fs.rename(sourceTarget.absolute, destTarget.absolute);
+    // Delegate to renameOutput which handles disk rename + all 6 data store updates
+    const result = await renameOutput(projectRoot, normalizedFrom, normalizedTo);
 
     // Prune empty source directories left behind
     const outputsRoot = projectPath(projectRoot, "outputs_ai");
-    await pruneEmptyDirectories(outputsRoot.absolute, path.dirname(sourceTarget.absolute));
+    const sourceAbsolute = path.join(projectRoot, normalizedFrom);
+    await pruneEmptyDirectories(outputsRoot.absolute, path.dirname(sourceAbsolute));
 
     invalidateSearchCache(projectRoot);
-    return { oldPath: normalizedFrom, newPath: normalizedTo };
+    return { oldPath: normalizedFrom, newPath: normalizedTo, ...result };
   }
 
   return {

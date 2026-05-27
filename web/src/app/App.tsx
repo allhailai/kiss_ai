@@ -193,6 +193,7 @@ export function App() {
       await filesApi.renameOutputFile(project.selectedProjectSlug, rename.from, rename.to);
       toastWorkspace.setNotice(`Renamed ${rename.from.split("/").pop()} to ${rename.to.split("/").pop()}.`);
       await fileWorkspace.refreshProjectFiles();
+      await rebuildWorkspace.refreshStatus();
     } catch (err) {
       toastWorkspace.setNotice(err instanceof Error ? err.message : `Failed to rename ${rename.from}.`);
       return false;
@@ -219,6 +220,7 @@ export function App() {
       await artifactsApi.rename(project.selectedProjectSlug, rename.from, rename.to);
       toastWorkspace.setNotice(`Renamed artifact ${rename.from} to ${rename.to}.`);
       await fileWorkspace.refreshProjectFiles();
+      await rebuildWorkspace.refreshStatus();
     } catch (err) {
       toastWorkspace.setNotice(err instanceof Error ? err.message : `Failed to rename artifact ${rename.from}.`);
       return false;

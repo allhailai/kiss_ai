@@ -291,6 +291,94 @@
   white-space: nowrap;
 }
 
+/* ─── Rename affordance ──────────────────────────────────────── */
+
+.output-rename-btn {
+  flex-shrink: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-secondary, #5d6d7e);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.output-file-row:hover .output-rename-btn {
+  display: inline-flex;
+}
+
+.output-rename-btn:hover {
+  background: color-mix(in srgb, var(--color-accent, #a45c40) 12%, transparent);
+  color: var(--color-accent, #a45c40);
+}
+
+.output-rename-form {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.output-rename-input {
+  flex: 1;
+  min-width: 80px;
+  padding: 3px 8px;
+  border: 1px solid var(--color-accent, #a45c40);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--color-surface, #fff);
+  color: var(--color-primary, #17202a);
+  outline: none;
+}
+
+.output-rename-ext {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--color-secondary, #5d6d7e);
+  font-weight: 500;
+}
+
+.output-rename-save,
+.output-rename-cancel {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.output-rename-save {
+  background: color-mix(in srgb, var(--color-success, #2f6f4e) 12%, transparent);
+  color: var(--color-success, #2f6f4e);
+}
+
+.output-rename-save:hover {
+  background: color-mix(in srgb, var(--color-success, #2f6f4e) 22%, transparent);
+}
+
+.output-rename-cancel {
+  background: transparent;
+  color: var(--color-secondary, #5d6d7e);
+}
+
+.output-rename-cancel:hover {
+  background: color-mix(in srgb, var(--color-secondary, #5d6d7e) 12%, transparent);
+}
+
 /* ─── Footer / build bar ─────────────────────────────────────── */
 
 .output-section-footer {
