@@ -115,7 +115,18 @@ export function createProjectFileService({
   async function resolveProjectFileTarget(projectRoot, relativePath, { allowMissing = false } = {}) {
     const target = projectPath(projectRoot, relativePath);
     const projectRootReal = await fs.realpath(projectRoot);
-    const parentReal = await fs.realpath(path.dirname(target.absolute));
+    let parentReal;
+    try {
+      parentReal = await fs.realpath(path.dirname(target.absolute));
+    } catch (error) {
+      if (error?.code === "ENOENT" && allowMissing) {
+        // Parent directory doesn't exist yet — create it and verify it's inside the project root
+        await fs.mkdir(path.dirname(target.absolute), { recursive: true });
+        parentReal = await fs.realpath(path.dirname(target.absolute));
+      } else {
+        throw error;
+      }
+    }
 
     if (!isPathInsideRoot(projectRootReal, parentReal)) {
       throw httpError("Path escapes the project root.", 403, "path_escape");
