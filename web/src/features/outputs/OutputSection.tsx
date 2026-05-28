@@ -93,6 +93,8 @@ export function OutputSection({
   }, [refreshStatus, projectFiles]);
 
   // ── Poll rebuild state for building indicators ─────────────────
+  const buildStartedAtRef = useRef<number>(0);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -101,16 +103,27 @@ export function OutputSection({
         const state = await rebuildApi.rebuildState(projectSlug);
         if (cancelled) return;
 
-        const isArtifactBuild = state.running && (
+        const isTrackedBuild = state.running && (
           state.runKind === "artifact_build" ||
-          state.runKind === "artifact_batch_build"
+          state.runKind === "artifact_batch_build" ||
+          state.runKind === "output_build"
         );
 
-        if (isArtifactBuild && Array.isArray(state.buildQueue) && state.buildQueue.length > 0) {
+        if (isTrackedBuild && Array.isArray(state.buildQueue) && state.buildQueue.length > 0) {
           setBuildingSlugs(new Set(state.buildQueue));
           setBuilding(true);
+        } else if (isTrackedBuild) {
+          // Build is running but no queue data — keep building state
+          setBuilding(true);
         } else if (!state.running && building) {
-          // Build just finished — clear state and refresh artifact list
+          // Build may have just finished — but guard against race conditions
+          // where we poll before the server has actually started the build.
+          const msSinceBuildStart = Date.now() - buildStartedAtRef.current;
+          if (msSinceBuildStart < 6000) {
+            // Too soon after build was initiated — skip this poll cycle
+            return;
+          }
+          // Build genuinely finished — clear state and refresh artifact list
           setBuildingSlugs(new Set());
           setBuilding(false);
           setSelectedFiles(new Set());
@@ -300,11 +313,15 @@ export function OutputSection({
       reportRows.some((r) => r.path === f)
     );
     if (files.length === 0) return;
-    setBuilding(true);
     flash(`Building ${files.length} ${files.length === 1 ? typeSingular.toLowerCase() : typeLabel.toLowerCase()}…`);
     try {
       // Both artifact and report builds go through the same API — backend handles queuing
       await outputsApi.buildOutputs(projectSlug, files, type, buildModelId || undefined);
+      // Only set building state AFTER the API has accepted the build —
+      // setting it before causes a race where the poll fires before the server is running.
+      buildStartedAtRef.current = Date.now();
+      setBuilding(true);
+      setBuildingSlugs(new Set(files));
       flash(`Build started for ${files.length} ${files.length === 1 ? typeSingular.toLowerCase() : typeLabel.toLowerCase()}.`);
       // Completion is detected by the rebuild state polling effect above
     } catch (err) {
