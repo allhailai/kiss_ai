@@ -123,9 +123,13 @@ export function SimplifiedNavigator({
               className="nav-section-trigger"
               onClick={() => {
                 if (navTarget) {
-                  onOpenView(navTarget);
-                  // Ensure expanded when navigating
                   if (!isChatSection) {
+                    if (isActiveSection && isExpanded) {
+                      // Already viewing this section and expanded — collapse
+                      toggleSection(section.id);
+                      return;
+                    }
+                    // Expand if collapsed
                     setExpandedSections((current) => {
                       if (current.has(section.id)) return current;
                       const next = new Set(current);
@@ -133,6 +137,7 @@ export function SimplifiedNavigator({
                       return next;
                     });
                   }
+                  onOpenView(navTarget);
                 } else {
                   toggleSection(section.id);
                 }
