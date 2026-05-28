@@ -34,6 +34,8 @@
 }
 
 .simple-nav {
+  width: 100%;
+  min-width: 0;
   align-self: start;
   align-content: start;
   display: grid;
