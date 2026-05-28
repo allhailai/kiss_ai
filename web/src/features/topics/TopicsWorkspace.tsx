@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Topic, TopicDisposition, TopicState } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
 import { useBuildContext } from "../../app/contexts/BuildContext";
-import { TopicConfirmationCard } from "../agents/TopicConfirmationCard";
+import { TopicConfirmationCard } from "../../shared/TopicConfirmationCard";
+import { projectsApi } from "../../data/projectsApi";
 
 type TopicsFilter = "all" | "needs_review" | "active" | "in_progress" | "archived" | "shallow" | "deep";
 
@@ -717,6 +718,8 @@ export function TopicsWorkspace({
             <TopicConfirmationCard
               projectSlug={projectSlug}
               isBuilding={isBuilding}
+              listTopics={projectsApi.topics}
+              createTopic={projectsApi.createTopic}
               onCreated={() => {
                 setShowNewTopicForm(false);
                 void fetchTopics();

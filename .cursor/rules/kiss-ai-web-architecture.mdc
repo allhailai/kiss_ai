@@ -15,7 +15,7 @@ Use these boundaries when changing `_kiss_ai/web/**`.
 
 - App shell behavior, theme mapping, and workspace orchestration belong in `web/src/app/`.
 - Route parsing, view metadata, navigation models, and file-to-view policy belong in `web/src/navigation/`.
-- API contract types belong in `web/src/contracts/api.ts`; transport helpers belong in `web/src/data/apiClient.ts`.
+- API contract types belong in `web/src/contracts/api.ts`; transport helpers belong in `web/src/data/request.ts`.
 - Shared app-neutral UI types belong in `web/src/shared/`.
 - Reusable project logic belongs in `web/src/domain/`. Domain modules must not import React, app modules, editor modules, or feature components.
 - CodeMirror wrappers, widgets, extensions, and editor-specific styles belong in `web/src/editor/`. Editor modules may import domain helpers and API types, but not app feature components.

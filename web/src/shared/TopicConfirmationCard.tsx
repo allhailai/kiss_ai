@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { CreateTopicResponse, TopicDuplicate } from "../../contracts/api";
-import { projectsApi } from "../../data/projectsApi";
+import type { CreateTopicResponse, TopicDuplicate, CreateTopicRequest, Topic } from "../contracts/api";
 
 type TopicConfirmationCardProps = {
   projectSlug: string;
@@ -12,6 +11,10 @@ type TopicConfirmationCardProps = {
   isBuilding?: boolean;
   /** Conversation ID to link back to discovery context */
   conversationId?: string | null;
+  /** Fetches current topics for duplicate checking */
+  listTopics: (projectSlug: string) => Promise<{ topics: Topic[] }>;
+  /** Creates a new topic */
+  createTopic: (projectSlug: string, request: CreateTopicRequest) => Promise<CreateTopicResponse>;
   /** Called after successful topic creation */
   onCreated?: (topic: CreateTopicResponse) => void;
   /** Called when the user clicks "View in Topics" */
@@ -30,6 +33,8 @@ export function TopicConfirmationCard({
   initialJustification = "",
   isBuilding = false,
   conversationId = null,
+  listTopics,
+  createTopic,
   onCreated,
   onNavigateToTopics,
   onDeepenNow,
@@ -52,7 +57,7 @@ export function TopicConfirmationCard({
     let cancelled = false;
     setCardState("checking");
 
-    projectsApi.topics(projectSlug)
+    listTopics(projectSlug)
       .then((data) => {
         if (cancelled) return;
         const normalizedInput = initialLabel.trim().toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
@@ -82,7 +87,7 @@ export function TopicConfirmationCard({
       setError(null);
 
       try {
-        const result = await projectsApi.createTopic(projectSlug, {
+        const result = await createTopic(projectSlug, {
           label: label.trim(),
           justification: justification.trim() || undefined,
           conversationId,
@@ -118,7 +123,7 @@ export function TopicConfirmationCard({
         setSaving(false);
       }
     },
-    [label, justification, conversationId, projectSlug, saving, onCreated, onDeepenNow],
+    [label, justification, conversationId, projectSlug, saving, createTopic, onCreated, onDeepenNow],
   );
 
   // ── "Already exists" state ──

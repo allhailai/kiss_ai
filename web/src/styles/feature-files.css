@@ -109,3 +109,13 @@
   grid-row: 4;
   min-height: 0;
 }
+
+.ai-assist-trigger {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--color-secondary);
+  color: white;
+  font-weight: 800;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
