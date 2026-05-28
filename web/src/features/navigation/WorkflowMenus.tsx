@@ -124,9 +124,12 @@ export function SimplifiedNavigator({
               onClick={() => {
                 if (navTarget) {
                   onOpenView(navTarget);
-                  if (!isChatSection) {
+                  if (!isChatSection && isActiveSection) {
+                    // Already on this section — toggle expand/collapse
                     toggleSection(section.id);
                   }
+                  // When navigating from a different section, the useEffect
+                  // auto-expands the active section, so no toggle needed.
                 } else {
                   toggleSection(section.id);
                 }
