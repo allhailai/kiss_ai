@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import type { ChatMessage, ChatMessageArtifactProposal, ChatMessageArtifactRename, ChatMessageFileEdit, ChatMessageFileRename, ChatMessageTopicProposal, EditProposal } from "../../contracts/api";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 
@@ -12,6 +12,7 @@ export function ChatThread({
   emptyTitle,
   emptyDescription,
   editProposals = [],
+  footer,
   messages,
   onCancelEdit = () => undefined,
   onCreateArtifact,
@@ -39,6 +40,7 @@ export function ChatThread({
   emptyTitle: string;
   emptyDescription: string;
   editProposals?: EditProposal[];
+  footer?: ReactNode;
   messages: ChatMessage[];
   onCancelEdit?: () => void;
   onCreateArtifact?: (proposal: ChatMessageArtifactProposal) => void;
@@ -131,6 +133,7 @@ export function ChatThread({
             </div>
           </article>
         ) : null}
+        {footer}
       </div>
       {showJumpToLatest && onJumpToLatest ? (
         <button className="chat-jump-latest" onClick={onJumpToLatest} type="button">

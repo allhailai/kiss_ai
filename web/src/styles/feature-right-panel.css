@@ -400,6 +400,12 @@
   width: 100%;
 }
 
+/* Edit proposal card rendered inline in the thread area */
+.agent-edit-proposal.agent-edit-proposal-in-thread {
+  margin: 0;
+  max-height: none;
+}
+
 /* ── Agent Bottom Panel (resizable) ── */
 
 .agent-bottom-panel {
@@ -539,8 +545,8 @@
 }
 
 .right-panel-surface .chat-composer-actions {
-  display: grid;
-  grid-template-columns: max-content auto minmax(0, 1fr) auto auto;
+  display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: start;
   gap: 6px;
@@ -559,8 +565,11 @@
 }
 
 .right-panel-surface .chat-model-popover {
+  position: fixed;
   right: auto;
-  left: 0;
+  left: auto;
+  bottom: auto;
+  top: auto;
   width: min(300px, calc(100vw - 32px));
 }
 

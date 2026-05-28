@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import type { RebuildModel } from "../contracts/api";
 import { groupModelsByTier, modelDisplayName, modelTierLabels } from "../domain/modelLabels";
 
@@ -19,6 +19,8 @@ export function CompactModelPicker({
   const [activeModelIndex, setActiveModelIndex] = useState(0);
   const activeModelOptionRef = useRef<HTMLButtonElement | null>(null);
   const modelBlurTimeoutRef = useRef<number | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const [popoverStyle, setPopoverStyle] = useState<CSSProperties | undefined>(undefined);
   const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
   const tieredModels = useMemo(() => groupModelsByTier(models), [models]);
   const modelOptions = useMemo(() => tieredModels.flatMap((group) => group.models), [tieredModels]);
@@ -32,6 +34,26 @@ export function CompactModelPicker({
     const selectedIndex = modelOptionIndexes.get(selectedModelId) ?? -1;
     setActiveModelIndex(selectedIndex >= 0 ? selectedIndex : 0);
   }, [modelOptionIndexes, modelPickerOpen, selectedModelId]);
+
+  // Compute popover position for fixed-position mode (right panel)
+  useEffect(() => {
+    if (!modelPickerOpen || !triggerRef.current) {
+      setPopoverStyle(undefined);
+      return;
+    }
+    const rect = triggerRef.current.getBoundingClientRect();
+    // Check if we're inside a container that uses position:fixed for the popover
+    // by checking if the picker's closest `.right-panel-surface` ancestor exists
+    const isFixedMode = triggerRef.current.closest(".right-panel-surface") !== null;
+    if (!isFixedMode) {
+      setPopoverStyle(undefined);
+      return;
+    }
+    setPopoverStyle({
+      left: rect.left,
+      bottom: window.innerHeight - rect.top + 8,
+    });
+  }, [modelPickerOpen]);
 
   useEffect(() => {
     if (!modelPickerOpen) return;
@@ -102,6 +124,7 @@ export function CompactModelPicker({
         className="chat-model-trigger"
         disabled={disabled || !models.length}
         onClick={() => setModelPickerOpen((open) => !open)}
+        ref={triggerRef}
         type="button"
       >
         <span className="chat-model-trigger-label">{selectedModel ? modelDisplayName(selectedModel) : "Model"}</span>
@@ -110,7 +133,7 @@ export function CompactModelPicker({
         </span>
       </button>
       {modelPickerOpen ? (
-        <div className="chat-model-popover" role="listbox" aria-label="Select model">
+        <div className="chat-model-popover" role="listbox" aria-label="Select model" style={popoverStyle}>
           {models.length ? (
             tieredModels.map(({ tier, models: tierModels }) => {
               return (

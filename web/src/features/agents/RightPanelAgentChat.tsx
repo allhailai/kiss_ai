@@ -466,6 +466,65 @@ export function RightPanelAgentChat({
           emptyDescription="Ask the side-panel agent about this project."
           emptyTitle={chat.loading ? "Loading conversation..." : "Start AI chat"}
           editProposals={chat.activeConversation?.editProposals ?? []}
+          footer={activeProposal ? (
+            <section className="agent-edit-proposal agent-edit-proposal-in-thread" aria-label={proposalReadOnly ? "Edit Proposal Details" : "Proposed Changes"}>
+              <div className="agent-edit-proposal-header">
+                <div>
+                  <span className="agent-context-label">{proposalReadOnly ? "Proposal Details" : "Proposed Changes"}</span>
+                  <p>{activeProposal.notice || "Review which conceptual changes should be applied."}</p>
+                </div>
+                <strong>{proposalStatusLabel(activeProposal.status)}</strong>
+              </div>
+              {activeProposal.conceptualDiffs.length ? (
+                <>
+                  {proposalReadOnly ? (
+                    <div className="agent-edit-proposal-actions">
+                      <button disabled={controlsDisabled} onClick={() => setSelectedProposalId(null)} type="button">
+                        Hide
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="agent-edit-proposal-actions">
+                      <button disabled={controlsDisabled} onClick={() => setAllProposalDiffs(activeProposal, "accepted")} type="button">
+                        Accept all
+                      </button>
+                      <button disabled={controlsDisabled} onClick={() => setAllProposalDiffs(activeProposal, "rejected")} type="button">
+                        Reject all
+                      </button>
+                    </div>
+                  )}
+                  <div className="agent-edit-proposal-files">
+                    {proposalDiffGroups(activeProposal).map((group) => (
+                      <div className="agent-edit-proposal-file" key={group.filePath}>
+                        <code title={group.filePath}>{group.filePath}</code>
+                        {group.conceptualDiffs.map((diff) => {
+                          return (
+                            <ConceptualDiffReviewItem
+                              controlsDisabled={controlsDisabled}
+                              diff={diff}
+                              key={diff.id}
+                              onStatusChange={(status) => setProposalDiffStatus(activeProposal, diff.id, status)}
+                              readOnly={proposalReadOnly}
+                            />
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                  {proposalReadOnly ? null : (
+                    <button
+                      className="agent-edit-proposal-apply"
+                      disabled={controlsDisabled || !canApplyProposal(activeProposal)}
+                      onClick={() => applyProposal(activeProposal)}
+                      type="button"
+                    >
+                      {activeProposal.status === "applying" || chat.sending ? "Applying..." : "Apply Proposal"}
+                    </button>
+                  )}
+                </>
+              ) : null}
+            </section>
+          ) : undefined}
           messages={chat.activeConversation?.messages ?? []}
           onApplyFileEdit={onApplyFileEdit}
           onApplyFileRename={onApplyFileRename}
@@ -578,65 +637,7 @@ export function RightPanelAgentChat({
               </div>
             </div>
           ) : null}
-          {activeProposal ? (
-            <section className="agent-edit-proposal" aria-label={proposalReadOnly ? "Edit Proposal Details" : "Proposed Changes"}>
-              <div className="agent-edit-proposal-header">
-                <div>
-                  <span className="agent-context-label">{proposalReadOnly ? "Proposal Details" : "Proposed Changes"}</span>
-                  <p>{activeProposal.notice || "Review which conceptual changes should be applied."}</p>
-                </div>
-                <strong>{proposalStatusLabel(activeProposal.status)}</strong>
-              </div>
-              {activeProposal.conceptualDiffs.length ? (
-                <>
-                  {proposalReadOnly ? (
-                    <div className="agent-edit-proposal-actions">
-                      <button disabled={controlsDisabled} onClick={() => setSelectedProposalId(null)} type="button">
-                        Hide
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="agent-edit-proposal-actions">
-                      <button disabled={controlsDisabled} onClick={() => setAllProposalDiffs(activeProposal, "accepted")} type="button">
-                        Accept all
-                      </button>
-                      <button disabled={controlsDisabled} onClick={() => setAllProposalDiffs(activeProposal, "rejected")} type="button">
-                        Reject all
-                      </button>
-                    </div>
-                  )}
-                  <div className="agent-edit-proposal-files">
-                    {proposalDiffGroups(activeProposal).map((group) => (
-                      <div className="agent-edit-proposal-file" key={group.filePath}>
-                        <code title={group.filePath}>{group.filePath}</code>
-                        {group.conceptualDiffs.map((diff) => {
-                          return (
-                            <ConceptualDiffReviewItem
-                              controlsDisabled={controlsDisabled}
-                              diff={diff}
-                              key={diff.id}
-                              onStatusChange={(status) => setProposalDiffStatus(activeProposal, diff.id, status)}
-                              readOnly={proposalReadOnly}
-                            />
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                  {proposalReadOnly ? null : (
-                    <button
-                      className="agent-edit-proposal-apply"
-                      disabled={controlsDisabled || !canApplyProposal(activeProposal)}
-                      onClick={() => applyProposal(activeProposal)}
-                      type="button"
-                    >
-                      {activeProposal.status === "applying" || chat.sending ? "Applying..." : "Apply Proposal"}
-                    </button>
-                  )}
-                </>
-              ) : null}
-            </section>
-          ) : null}
+
           {contextFiles.length ? (
             <div className="agent-file-context" aria-label="Source context files">
               <div className="agent-context-header">
