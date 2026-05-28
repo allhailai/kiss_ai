@@ -22,7 +22,6 @@ export function isAiManagedPath(path: string) {
   return (
     path === questionsFilePath ||
     path.startsWith(projectPathPrefixes.sources) ||
-    path.startsWith(projectPathPrefixes.output) ||
     path.startsWith(projectPathPrefixes.build) ||
     path.startsWith(projectPathPrefixes.changeLogs)
   );

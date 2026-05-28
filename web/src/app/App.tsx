@@ -122,6 +122,11 @@ export function App() {
     }
   }, [project.selectedProjectSlug, rebuildWorkspace.refreshRebuild, rightPanelSurface.rightPanel?.kind]);
 
+  useEffect(() => {
+    const projectName = rebuildWorkspace.status?.projectName ?? project.selectedProject?.name;
+    document.title = projectName ? `kiss: ${projectName}` : "kiss";
+  }, [project.selectedProject?.name, rebuildWorkspace.status?.projectName]);
+
   // Auto-open build panel when navigating from a legacy /rebuild URL
   useEffect(() => {
     if (route.context.panel === "build-project" && !rightPanelSurface.rightPanel) {

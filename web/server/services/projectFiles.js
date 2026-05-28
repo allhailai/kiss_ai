@@ -207,7 +207,7 @@ export function createProjectFileService({
     }
 
     if (normalized.startsWith("outputs_ai/")) {
-      return { path: normalized, kind: "output", editable: false, annotation: true };
+      return { path: normalized, kind: "output", editable: true, annotation: true };
     }
 
     if (normalized.startsWith("inputs_human/")) {
