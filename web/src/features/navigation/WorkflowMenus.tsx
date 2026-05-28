@@ -78,7 +78,15 @@ export function SimplifiedNavigator({
     [outputFiles],
   );
 
+  const headerClickRef = useRef(false);
+
   useEffect(() => {
+    if (headerClickRef.current) {
+      // Navigation was triggered by a section header click — it handles
+      // its own expand/collapse, so skip auto-expand.
+      headerClickRef.current = false;
+      return;
+    }
     setExpandedSections((current) => {
       if (current.has(activeSection)) return current;
 
@@ -123,13 +131,11 @@ export function SimplifiedNavigator({
               className="nav-section-trigger"
               onClick={() => {
                 if (navTarget) {
-                  onOpenView(navTarget);
-                  if (!isChatSection && isActiveSection) {
-                    // Already on this section — toggle expand/collapse
+                  if (!isChatSection) {
+                    headerClickRef.current = true;
                     toggleSection(section.id);
                   }
-                  // When navigating from a different section, the useEffect
-                  // auto-expands the active section, so no toggle needed.
+                  onOpenView(navTarget);
                 } else {
                   toggleSection(section.id);
                 }
