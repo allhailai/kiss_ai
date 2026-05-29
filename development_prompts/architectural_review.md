@@ -14,29 +14,47 @@ The review covers the entire `_kiss_ai` project:
 
 ```
 _kiss_ai/
-  framework/commands/    Agent prompt files (do_build.md, do_deepen.md, etc.)
-  framework/templates/   Project templates
+  .cursor/rules/             Cursor agent rule files (.mdc)
+  development_prompts/       Prompts for development workflows (e.g., this file)
+  docs/                      User-facing documentation and guides
+  examples/                  Example research projects
+    clinical_patient_engagement/
+    simple_research_project/
+  framework/
+    commands/                Agent prompt files (see §4.2 for list)
+    templates/
+      project_template/      Template for new research projects
+  scripts/                   Project-level scripts (install-mac.sh, restart.sh)
   web/
-    server/              Node.js Express API server
-      agentRuntimes/     Cursor SDK wrappers
-      routes/            API route handlers
-      services/          Business logic services
-      contracts/         Server-side schemas
-      adapters/          External service adapters
-      utils/             Server utilities
-    src/                 React frontend
-      app/               App shell, workspace orchestration, hooks
-      contracts/         Shared API types (api.ts)
-      data/              API transport helpers
-      domain/            Pure helpers (no React, no IO)
-      editor/            CodeMirror wrapper and extensions
-      features/          Workflow components (agents, chat, rebuild, topics, questions, etc.)
-      navigation/        Route and view models
-      shared/            App-neutral reusable components
-      styles/            CSS per feature
-    scripts/             Build and boundary check scripts
-  docs/                  User-facing documentation
-  scripts/               Project-level scripts
+    server/
+      adapters/              External service adapters (listen.js)
+      agentRuntimes/         Cursor SDK wrappers (cursorSdk.js)
+      agentRuns.js           Agent run tracking and lifecycle management
+      contracts/             Server-side contracts (chatLimits.js)
+      index.js               Express app setup and middleware
+      routes/                API route handlers (see §1.3 for list)
+      services/              Business logic services (see §3.1 for inventory)
+      utils/                 Server utilities (sse.js)
+    src/                     React frontend
+      app/                   App shell, workspace orchestration
+        contexts/            React contexts (BuildContext, RouteContext, ToastContext)
+        hooks/               App-level hooks (20 hooks — see §3.1)
+      contracts/             Shared API types (api.ts, agents.ts)
+      data/                  API transport helpers (13 files)
+      domain/                Pure helpers — no React, no IO (19 files)
+      editor/                CodeMirror wrapper and extensions (8 files)
+      features/              Workflow components (14 feature directories)
+      navigation/            Route and view models (4 files)
+      shared/                App-neutral reusable components
+        buildLog/            Build log workspace component
+        chat/                Shared chat primitives (ChatComposer, ChatMessageBubble, ChatThread)
+        conceptualDiff/      Conceptual diff review item component
+        rightPanel/          Right panel mode switch component
+        CompactModelPicker.tsx
+        toast.ts
+      styles/                CSS per feature (24 files)
+    scripts/                 Build and boundary check scripts (check-boundaries.js)
+    LAB_NOTES.md             Hub runtime settings, repo boundaries, project-root assumptions
 ```
 
 ---
@@ -50,8 +68,9 @@ Read `web/scripts/check-boundaries.js` to understand the enforced rules, then ve
 Check for violations:
 
 - **Feature isolation:** No feature directory (`features/X/`) imports from another feature (`features/Y/`). Features should only share code through `domain/`, `shared/`, `contracts/`, or `app/`-level composition.
-- **Domain purity:** `domain/` modules must not import React, app components, feature components, editor modules, transport clients (`data/`), or Node.js APIs.
-- **Editor isolation:** `editor/` should not import `data/` clients or `app/` modules. App behavior arrives through callbacks.
+  Exception: features may import from `app/contexts/` to consume shared React Contexts (e.g., toast, build state, route context).
+- **Domain purity:** `domain/` modules must not import React, app components, feature components, editor modules, transport clients (`data/`), or Node.js APIs. They may import API contract types from `contracts/api.ts`.
+- **Editor isolation:** `editor/` should not import `data/` clients or `app/` modules. App behavior arrives through callbacks. Editor may import domain helpers and contract types.
 - **Navigation purity:** `navigation/` owns route/view policy and should not import UI workflow components.
 - **Shared neutrality:** `shared/` should not call APIs or import feature implementations.
 - **Contracts isolation:** `contracts/` should only import other contract modules.
@@ -66,6 +85,7 @@ Identify edges that are currently **allowed but risky**:
 - `app/` → `data/` (should be limited to workspace controllers/hooks)
 - `data/` → `navigation/` (should be avoided)
 - `domain/` → `navigation/` (should be avoided unless truly cross-cutting)
+- `shared/` → `contracts/` (acceptable for type-only imports, but verify no side effects)
 
 Are there any new uncontrolled edges that should be added to the boundary checker?
 
@@ -73,8 +93,22 @@ Are there any new uncontrolled edges that should be added to the boundary checke
 
 - Services should not directly handle HTTP (that's for routes).
 - Routes should be thin dispatchers to services.
-- Agent runtimes should be isolated — only `agentJobs.js` and `chatAgent.js` should call them.
-- Check for service functions that have grown to handle too many concerns (e.g., `agentJobs.js` is a known large file — report its line count and major concern clusters).
+- Agent runtimes should be isolated — only `agentJobs.js` and `chatAgent.js` should call into `agentRuntimes/cursorSdk.js`.
+- `agentRuns.js` lives at the server root level (not in `services/`). Verify this is deliberate and its responsibilities don't overlap with service modules.
+- Check for service functions that have grown to handle too many concerns. Known large services (line counts as of last audit):
+  - `agentJobs.js` — 1644 lines
+  - `chatAgent.js` — 1226 lines
+  - `projectFiles.js` — 1024 lines
+  - `artifactService.js` — 853 lines
+  - `webResearch.js` — 817 lines
+  - `conversations.js` — 534 lines
+  - `promptBuilders.js` — 463 lines
+  - `topicsService.js` — 433 lines
+  - `wikiTriage.js` — 368 lines
+
+Current route files:
+  - `projectRoutes.js` (376 lines) — is it still a thin dispatcher or has business logic leaked in?
+  - `chatRoutes.js`, `fileRoutes.js`, `artifactRoutes.js`, `rebuildRoutes.js`, `apiRoutes.js`, `systemRoutes.js`, `aiRoutes.js`
 
 ---
 
@@ -89,10 +123,17 @@ Identify files that are never imported by any other file:
 - A service is dead if no route or other service calls it.
 - A data transport helper is dead if no component or hook calls it.
 
+Pay special attention to:
+- `web/src/data/outputsApi.ts` — is this still used given the `features/outputs/` addition?
+- `web/server/services/cursorAgentRun.js` — small file (844 bytes), may be a dead wrapper.
+- `web/server/services/httpErrors.js` — is it imported?
+- `web/server/routes/aiRoutes.js` — only 18 lines, may be vestigial.
+
 ### 2.2 Unreferenced Exports
 
 Identify exported functions, types, or constants that are never imported anywhere. Focus on:
-- `contracts/api.ts` — types that no component or service uses
+- `contracts/api.ts` (758 lines) — types that no component or service uses
+- `contracts/agents.ts` — verify all exported types are consumed
 - `domain/` helpers that are exported but never called
 - `data/` transport functions that are never called
 - Server service functions that no route dispatches to
@@ -100,17 +141,33 @@ Identify exported functions, types, or constants that are never imported anywher
 ### 2.3 Dead Feature Remnants
 
 Check for features that were removed but left remnants:
-- `features/suggestions/` — was this fully removed or do orphan files remain?
-- Search for "suggestion" references in views, navigation, CSS, routes, and ARCHITECTURE.md
-- Check the styles directory for CSS files with no corresponding component
-- Check navigation/views.ts for view IDs that are never rendered
+- `features/suggestions/` — was fully removed. Verify the only remaining reference is the documented legacy bookmark redirect in `navigation/views.ts` (line 6–8). Search for "suggestion" references in views, navigation, CSS, routes, and ARCHITECTURE.md to confirm nothing else lingers.
+- Search the `styles/` directory for CSS files with no corresponding feature or component:
+  - `feature-ai-assist.css` — does a corresponding feature exist or is this orphan CSS?
+  - `feature-build-panel.css` — does this serve the `rebuild/` feature or is it separate?
+  - `feature-proposal-review.css` — which component(s) consume this?
+  - `feature-review.css` — which component(s) consume this?
+- Check `navigation/views.ts` for view IDs that are never rendered.
 
 ### 2.4 Dead CSS
 
-For each CSS file in `styles/`:
-- Verify the corresponding feature or component exists
-- Sample-check 3–5 class names to confirm they appear in a `.tsx` file
-- Report any CSS file that appears to have no active consumers
+For each CSS file in `styles/` (24 files currently):
+- Verify the corresponding feature or component exists.
+- Sample-check 3–5 class names to confirm they appear in a `.tsx` file.
+- Report any CSS file that appears to have no active consumers.
+
+Current CSS files to verify:
+```
+00-reset.css, 01-tokens.css, 99-responsive.css,
+app-shell.css, app-topbar.css,
+feature-agents.css, feature-ai-assist.css, feature-artifacts.css,
+feature-build-log.css, feature-build-panel.css, feature-chat.css,
+feature-dashboard.css, feature-design.css, feature-files.css,
+feature-navigation.css, feature-outputs.css, feature-project-picker.css,
+feature-proposal-review.css, feature-questions.css, feature-review.css,
+feature-right-panel.css, feature-sidebar.css, feature-toast.css,
+feature-topics.css
+```
 
 ---
 
@@ -118,14 +175,49 @@ For each CSS file in `styles/`:
 
 ### 3.1 Large Files
 
-Report all files over 500 lines, sorted by size:
-- `web/server/services/agentJobs.js`
-- `web/server/services/chatAgent.js`
-- `web/server/services/projectFiles.js`
-- `web/src/app/hooks/useProjectChat.ts`
-- `web/src/features/agents/RightPanelAgentChat.tsx`
-- `web/src/features/rebuild/RebuildWorkspace.tsx`
-- `web/src/contracts/api.ts`
+Report all files over 300 lines, sorted by size. As of last audit, the largest are:
+
+**Server services:**
+| File | Lines | Notes |
+|------|-------|-------|
+| `agentJobs.js` | 1644 | Rebuild, deepen, artifact build pipeline orchestration |
+| `chatAgent.js` | 1226 | Chat/proposal lifecycle |
+| `projectFiles.js` | 1024 | Project file management |
+| `artifactService.js` | 853 | Artifact spec CRUD, source resolution, prompt templates, auto-generation |
+| `webResearch.js` | 817 | Web research pipeline |
+| `conversations.js` | 534 | Conversation persistence |
+| `promptBuilders.js` | 463 | Prompt assembly patterns |
+| `topicsService.js` | 433 | Topic lifecycle |
+| `wikiTriage.js` | 368 | Wiki triage logic |
+
+**Frontend components:**
+| File | Lines | Notes |
+|------|-------|-------|
+| `editor/markdownTableExtension.ts` | 924 | Table editing extension |
+| `features/outputs/OutputSection.tsx` | 864 | Output section view |
+| `features/agents/RightPanelAgentChat.tsx` | 784 | Agent chat panel composition |
+| `contracts/api.ts` | 758 | Shared API contract hub |
+| `features/topics/TopicsWorkspace.tsx` | 759 | Topic management |
+| `features/navigation/WorkflowMenus.tsx` | 661 | Workflow menu structure |
+| `features/artifacts/ArtifactsView.tsx` | 600 | Artifact list + detail editor |
+| `features/navigation/FileTreeNav.tsx` | 542 | Navigation tree |
+| `features/questions/QuestionsWorkspace.tsx` | 517 | Question management |
+| `editor/annotationExtension.ts` | 452 | Annotation markers |
+| `app/hooks/useProjectChat.ts` | 396 | Chat orchestration hook |
+| `features/design/DesignWorkspace.tsx` | 391 | Design identity form |
+| `shared/chat/ChatMessageBubble.tsx` | 390 | Chat message rendering |
+| `app/useProjectWorkspace.ts` | 382 | Workspace orchestration |
+| `app/App.tsx` | 381 | App shell composition |
+| `features/rebuild/BuildProjectRightPanel.tsx` | 382 | Rebuild right panel |
+| `features/agents/TopicConfirmationCard.tsx` | 355 | Topic confirmation card |
+
+**Server infrastructure:**
+| File | Lines | Notes |
+|------|-------|-------|
+| `server/index.js` | 412 | Express app setup |
+| `server/agentRuns.js` | 356 | Agent run tracking |
+| `routes/projectRoutes.js` | 376 | Project API routes |
+| `routes/requestSchemas.js` | 284 | Request validation schemas |
 
 For each, identify:
 - How many distinct responsibilities it handles
@@ -143,9 +235,11 @@ Identify functions over 100 lines. For each:
 
 Look for duplicated logic across files:
 - Similar fetch/poll/stream patterns in different features
-- Similar prompt-building patterns in agentJobs.js
-- Copy-pasted event handling or state management
+- Similar prompt-building patterns in `agentJobs.js` and `promptBuilders.js`
+- Copy-pasted event handling or state management across hooks in `app/hooks/`
 - CSS patterns that could be shared tokens or utility classes
+- Overlapping conceptual diff rendering between `shared/conceptualDiff/`, `features/agents/`, and `shared/chat/`
+- Overlapping artifact handling between `features/artifacts/ArtifactsView.tsx`, `features/agents/ArtifactProposalCard.tsx`, and `data/artifactsApi.ts`
 
 ### 3.4 Over-Abstraction
 
@@ -154,6 +248,8 @@ Identify abstractions that add indirection without clear benefit:
 - Generic utilities that have only one caller
 - Service factories that produce a single implementation
 - Type aliases that obscure rather than clarify
+- `server/adapters/listen.js` — contains a single file; is this abstraction layer justified?
+- `server/contracts/chatLimits.js` — only 2 lines; should this be inlined?
 
 ---
 
@@ -164,24 +260,67 @@ Identify abstractions that add indirection without clear benefit:
 Compare `web/src/ARCHITECTURE.md` against the actual codebase:
 
 - **Module Map:** Does the directory listing match reality? Are there directories not documented?
-- **Feature List:** Does the `Current features:` list match `features/*/`? Are there extra or missing entries?
+- **Feature List:** Does the `Current features:` list match `features/*/`? Are there extra or missing entries? Current features directories are: `agents`, `artifacts`, `chat`, `dashboard`, `design`, `files`, `navigation`, `outputs`, `projectPicker`, `questions`, `rebuild`, `search`, `toast`, `topics`.
 - **Import Boundary Rules:** Do the stated rules match what `check-boundaries.js` actually enforces?
-- **Deferred Review Items:** Are the listed files still the right ones? Have any been resolved? Should new ones be added?
+- **Deferred Review Items:** Are the listed files still the right ones? Have any been resolved? Should new ones be added? Note especially:
+  - `features/outputs/OutputSection.tsx` (864 lines) — not listed but appears to be a deferred-quality candidate
+  - `editor/markdownTableExtension.ts` (924 lines) — not listed
+  - `server/services/artifactService.js` (853 lines) — listed, still relevant?
+  - `server/services/webResearch.js` (817 lines) — not listed
+  - `server/services/conversations.js` (534 lines) — not listed
 - **Conceptual Diff Protocol:** Is the described lifecycle still accurate?
-- **Quality Gate:** Does `npm run check` still run the stated checks?
+- **Quality Gate:** Does `npm run check` still run the stated checks? Current scripts section says: `tsc -p tsconfig.app.json --noEmit && check:server && check:boundaries && vitest --run`.
+- **App Layer Documentation:** Is the description of `app/ReviewWorkspace.tsx`, right panel behavior, and `useProjectWorkspace.ts` ownership still accurate?
+- **Shared Component Documentation:** Does the ARCHITECTURE.md describe the `shared/` subdirectories (`buildLog/`, `chat/`, `conceptualDiff/`, `rightPanel/`)?
 
 ### 4.2 Framework Command Docs
 
-For each file in `framework/commands/`:
+Current framework command files:
+- `do_assist.md`
+- `do_build.md`
+- `do_build_artifact.md`
+- `do_build_file.md`
+- `do_build_research.md`
+- `do_build_wiki_page.md`
+- `do_deepen.md`
+- `do_init_project.md`
+- `do_propose_output_artifacts.md`
+- `do_resolve_human_attention_item.md`
+
+For each:
 - Does its described schema match what the pipeline actually sends/expects?
 - Are there steps that reference removed features (e.g., `AI_SUGGESTION` markers)?
 - Do the phase numbers align with the pipeline in `agentJobs.js`?
+- Are there commands referenced by `agentJobs.js` or `chatAgent.js` that don't have a corresponding command file?
+- Are there command files that are never referenced by any server code?
 
-### 4.3 Other Documentation
+### 4.3 Framework README
+
+- `framework/README.md` — does it accurately describe the framework directory contents and command files?
+
+### 4.4 Cursor Rules
+
+Current `.cursor/rules/` files:
+- `karpathy-guidelines.mdc`
+- `kiss-ai-project-ownership.mdc`
+- `kiss-ai-web-architecture.mdc`
+
+- Are these still accurate and aligned with current architecture?
+- Do they reference removed features or stale file paths?
+
+### 4.5 Other Documentation
 
 - `README.md` — still accurate?
+- `START_HERE.md` — does it point to the right starting points?
 - `docs/` — do the how-to guides reflect current UI and behavior?
-- `LAB_NOTES.md` — still relevant or stale?
+  - `create-new-research-project.md`
+  - `documentation-map.md`
+  - `glossary.md`
+  - `how-to-create-a-project.md`
+  - `how-to-run-a-rebuild.md`
+  - `setup-mac.md`, `setup-windows.md`
+  - `troubleshooting.md`
+- `web/LAB_NOTES.md` — still relevant or stale?
 - `web_build_design_principle.md` — still aligned with implementation?
 - `migration.md` — still needed or historical artifact?
 - `feature_ideas.md` — should any completed items be removed?
@@ -192,7 +331,7 @@ For each file in `framework/commands/`:
 
 ### 5.1 Contract Drift
 
-Compare `web/src/contracts/api.ts` types against:
+Compare `web/src/contracts/api.ts` (758 lines) and `web/src/contracts/agents.ts` types against:
 - What the server actually sends (check route handlers and services)
 - What the frontend actually reads (check components and hooks)
 - Are there fields in the type that the server never sends?
@@ -200,31 +339,105 @@ Compare `web/src/contracts/api.ts` types against:
 
 ### 5.2 Schema Validation
 
-- Do server route handlers validate incoming request bodies against `requestSchemas.js`?
+- Do server route handlers validate incoming request bodies against `requestSchemas.js` (284 lines)?
 - Are there routes that accept arbitrary payloads without validation?
 - Does `requestSchemas.js` match the TypeScript contract types?
+- Are all route files using schema validation consistently? Check each route file:
+  - `projectRoutes.js` (376 lines — largest route file, highest risk)
+  - `chatRoutes.js`
+  - `fileRoutes.js`
+  - `artifactRoutes.js`
+  - `rebuildRoutes.js`
+  - `apiRoutes.js`
+  - `systemRoutes.js`
+  - `aiRoutes.js`
+
+### 5.3 Server Contract Modules
+
+- `server/contracts/chatLimits.js` — is this used? Does it match frontend expectations?
+- `server/search-allowed-paths.json` — is this used and up to date?
 
 ---
 
 ## Phase 6: Test Coverage Gaps
 
-### 6.1 Untested Services
+### 6.1 Server Services
 
-For each service in `server/services/`:
-- Does it have a corresponding `.test.js` file?
-- If yes, does the test cover the primary public functions?
-- Identify services with no test file at all.
+Services **with** test files (19):
+`agentJobs`, `buildScope`, `chatAgent`, `chatContext`, `conceptualDiffMemory`, `conceptualDiffs`, `conversations`, `designIdentity`, `gitDiffPrompt`, `harnessState`, `kissAiUpdate`, `outputRename`, `projectFiles`, `projects`, `questionsService`, `sourceMapping`, `systemSettings`, `topicsService`, `webResearch`
 
-### 6.2 Critical Path Coverage
+Services **without** test files (13):
+`artifactService`, `buildLogs`, `contentLedger`, `cursorAgentRun`, `cursorModels`, `fetchAndDigestPhases`, `httpErrors`, `projectAgentLock`, `projectUiState`, `promptBuilders`, `questionAiAssist`, `serverValidation`, `wikiTriage`
+
+Also untested:
+- `server/agentRuns.js` has `agentRuns.test.js` — verify coverage is meaningful.
+- `server/index.js` — no tests (acceptable for app setup, but verify middleware config is covered elsewhere).
+
+For each tested service, spot-check whether the tests cover the primary public functions or just trivial cases.
+
+### 6.2 Frontend Tests
+
+Current frontend test files (14):
+- `app/chatFileEdits.test.ts`
+- `data/chatApi.test.ts`, `data/filesApi.test.ts`, `data/rebuildApi.test.ts`, `data/request.test.ts`
+- `domain/conversation.test.ts`, `domain/designIdentity.test.ts`, `domain/diffs.test.ts`, `domain/files.test.ts`, `domain/formatters.test.ts`, `domain/humanAttention.test.ts`, `domain/links.test.ts`, `domain/rebuild.test.ts`
+- `navigation/routes.test.ts`
+
+Notable untested frontend modules:
+- `data/artifactsApi.ts`, `data/outputsApi.ts`, `data/projectsApi.ts`, `data/systemApi.ts`
+- `domain/modelLabels.ts`, `domain/projectPaths.ts`, `domain/errors.ts`
+- All `app/hooks/` (20 hooks, 0 tests)
+- No feature component tests
+
+### 6.3 Critical Path Coverage
 
 The most critical paths to test are:
-- Build pipeline phases (agentJobs.js)
-- Question lifecycle (questionsService.js)
-- Topic deepen lifecycle (topicsService.js)
-- Chat/proposal lifecycle (chatAgent.js)
-- Web research pipeline (webResearch.js)
+- Build pipeline phases (`agentJobs.js`) — has tests, verify depth
+- Artifact build pipeline (`artifactService.js`) — **no tests**
+- Question lifecycle (`questionsService.js`) — has tests
+- Topic deepen lifecycle (`topicsService.js`) — has tests
+- Chat/proposal lifecycle (`chatAgent.js`) — has tests, verify depth
+- Web research pipeline (`webResearch.js`) — has tests
+- Output rename pipeline (`outputRename.js`) — has tests
+- Wiki triage (`wikiTriage.js`) — **no tests**
+- Content ledger (`contentLedger.js`) — **no tests**
+- Prompt builders (`promptBuilders.js`) — **no tests**
 
 Are these adequately tested or are they relying on integration-by-deployment?
+
+### 6.4 Route and Schema Tests
+
+- `apiRoutes.test.js` (517 lines) and `requestSchemas.test.js` (191 lines) exist. Do they cover all routes and schemas?
+- Are there routes added since these tests were written that lack coverage?
+
+---
+
+## Phase 7: New Component Audit
+
+### 7.1 Recent Additions
+
+The following components and services appear to be recent additions. Verify they follow established patterns:
+
+- `features/outputs/OutputSection.tsx` (864 lines) + `OutputSectionPage.tsx` — follows feature isolation rules?
+- `features/agents/ArtifactProposalCard.tsx` — follows feature isolation?
+- `features/agents/TopicConfirmationCard.tsx` — follows feature isolation?
+- `server/services/artifactService.js` (853 lines) — follows service patterns?
+- `server/services/wikiTriage.js` — follows service patterns?
+- `server/services/outputRename.js` — follows service patterns?
+- `server/services/contentLedger.js` — follows service patterns?
+- `server/services/fetchAndDigestPhases.js` — follows service patterns?
+- `server/routes/artifactRoutes.js` — routes through to services correctly?
+- `data/artifactsApi.ts` — follows transport helper patterns?
+- `data/outputsApi.ts` — follows transport helper patterns?
+- `shared/buildLog/BuildLogWorkspace.tsx` — belongs in `shared/` or should it be a feature?
+
+### 7.2 Feature-to-Style Alignment
+
+For each feature directory, verify there's a corresponding CSS file in `styles/`:
+- `features/outputs/` → `styles/feature-outputs.css` ✓ (verify)
+- `features/artifacts/` → `styles/feature-artifacts.css` ✓ (verify)
+
+Are there CSS files that map to non-existent features, or features with no CSS?
 
 ---
 
@@ -238,7 +451,9 @@ Produce a structured report with these sections:
 4. **ARCHITECTURE.md Updates** — Specific text changes needed to bring the doc in line with reality
 5. **Dead Code Removal List** — Files and exports safe to delete
 6. **Deferred Items Update** — Updates to the deferred review items list
-7. **Recommended Follow-Up Tasks** — Prioritized list of cleanup work
+7. **Test Coverage Priorities** — Most impactful untested modules to address first
+8. **Documentation Updates** — Specific docs that need refreshing
+9. **Recommended Follow-Up Tasks** — Prioritized list of cleanup work
 
 For each finding, include:
 - **File(s):** exact path(s)
