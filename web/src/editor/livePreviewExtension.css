@@ -69,3 +69,54 @@
   text-decoration: line-through;
   text-decoration-color: var(--color-secondary);
 }
+
+/* ---------------------------------------------------------------------------
+   Inline code — monospace with subtle background.
+   Backticks are hidden; only the code content shows.
+   --------------------------------------------------------------------------- */
+
+.markdown-editor-shell .cm-live-inline-code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-secondary) 10%, transparent);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  color: var(--color-primary);
+}
+
+/* ---------------------------------------------------------------------------
+   Blockquote — left border + padding, applied per-line.
+   The ">" marker is hidden; the line gets the visual indicator instead.
+   --------------------------------------------------------------------------- */
+
+.markdown-editor-shell .cm-live-blockquote-line {
+  border-left: 3px solid color-mix(in srgb, var(--color-secondary) 40%, var(--color-border));
+  padding-left: 16px !important;
+  color: var(--color-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   List marker — styled bullet / number.
+   The marker text (-, *, 1.) is kept visible but styled.
+   --------------------------------------------------------------------------- */
+
+.markdown-editor-shell .cm-live-list-bullet {
+  color: var(--color-secondary);
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------------
+   Horizontal rule — replaces ---, ***, ___ with a styled divider.
+   --------------------------------------------------------------------------- */
+
+.markdown-editor-shell .cm-live-hr {
+  height: 1px;
+  margin: 12px 0;
+  border: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-border) 80%, var(--color-secondary)),
+    transparent
+  );
+}

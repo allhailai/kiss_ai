@@ -1,6 +1,6 @@
 import { syntaxTree } from "@codemirror/language";
 import { type EditorState, type Extension } from "@codemirror/state";
-import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { parseMarkdownTableBlock } from "./markdownTableExtension";
 
 /**
@@ -54,8 +54,32 @@ const headingMarkDecorations = [
 const boldMarkDecoration = Decoration.mark({ class: "cm-live-bold" });
 const italicMarkDecoration = Decoration.mark({ class: "cm-live-italic" });
 const strikethroughMarkDecoration = Decoration.mark({ class: "cm-live-strikethrough" });
+const inlineCodeMarkDecoration = Decoration.mark({ class: "cm-live-inline-code" });
+const blockquoteLineDecoration = Decoration.line({ class: "cm-live-blockquote-line" });
+const listBulletDecoration = Decoration.mark({ class: "cm-live-list-bullet" });
 
 const replaceDecoration = Decoration.replace({});
+
+// ---------------------------------------------------------------------------
+// Horizontal rule widget
+// ---------------------------------------------------------------------------
+
+class HorizontalRuleWidget extends WidgetType {
+  eq() {
+    return true;
+  }
+
+  toDOM() {
+    const wrapper = document.createElement("div");
+    wrapper.className = "cm-live-hr";
+    return wrapper;
+  }
+}
+
+const horizontalRuleDecoration = Decoration.replace({
+  widget: new HorizontalRuleWidget(),
+  block: true,
+});
 
 // ---------------------------------------------------------------------------
 // Cursor-line detection
@@ -263,6 +287,108 @@ function buildDecorations(view: EditorView, editable: boolean): DecorationSet {
               }
             } while (cursor.nextSibling());
           }
+
+          return false;
+        }
+
+        // ---------------------------------------------------------------
+        // Inline Code: InlineCode
+        // ---------------------------------------------------------------
+        if (node.name === "InlineCode") {
+          const line = state.doc.lineAt(node.from);
+          if (cursorLines.has(line.number) || tableLines.has(line.number)) return false;
+
+          // Mark the whole range with code styling
+          entries.push({
+            from: node.from,
+            to: node.to,
+            decoration: inlineCodeMarkDecoration,
+          });
+
+          // Hide the CodeMark children (backticks)
+          const cursor = node.node.cursor();
+          if (cursor.firstChild()) {
+            do {
+              if (cursor.name === "CodeMark") {
+                entries.push({
+                  from: cursor.from,
+                  to: cursor.to,
+                  decoration: replaceDecoration,
+                });
+              }
+            } while (cursor.nextSibling());
+          }
+
+          return false;
+        }
+
+        // ---------------------------------------------------------------
+        // Blockquote: hide QuoteMark (>) and style the line
+        // ---------------------------------------------------------------
+        if (node.name === "Blockquote") {
+          // Process each line within the blockquote
+          const cursor = node.node.cursor();
+          if (cursor.firstChild()) {
+            do {
+              if (cursor.name === "QuoteMark") {
+                const quoteLine = state.doc.lineAt(cursor.from);
+                if (cursorLines.has(quoteLine.number) || tableLines.has(quoteLine.number)) continue;
+
+                // Add blockquote line styling
+                entries.push({
+                  from: quoteLine.from,
+                  to: quoteLine.from,
+                  decoration: blockquoteLineDecoration,
+                });
+
+                // Hide the ">" marker and trailing space
+                let replaceEnd = cursor.to;
+                const afterMark = state.doc.sliceString(cursor.to, cursor.to + 1);
+                if (afterMark === " ") {
+                  replaceEnd = cursor.to + 1;
+                }
+                entries.push({
+                  from: cursor.from,
+                  to: replaceEnd,
+                  decoration: replaceDecoration,
+                });
+              }
+            } while (cursor.nextSibling());
+          }
+
+          // Continue descending — blockquotes contain paragraphs, headings,
+          // etc. that should also get live-preview treatment.
+          return;
+        }
+
+        // ---------------------------------------------------------------
+        // List items: style the bullet/number marker
+        // ---------------------------------------------------------------
+        if (node.name === "ListMark") {
+          const line = state.doc.lineAt(node.from);
+          if (cursorLines.has(line.number) || tableLines.has(line.number)) return;
+
+          entries.push({
+            from: node.from,
+            to: node.to,
+            decoration: listBulletDecoration,
+          });
+
+          return;
+        }
+
+        // ---------------------------------------------------------------
+        // Horizontal rule: replace --- / *** / ___ with styled <hr>
+        // ---------------------------------------------------------------
+        if (node.name === "HorizontalRule") {
+          const line = state.doc.lineAt(node.from);
+          if (cursorLines.has(line.number) || tableLines.has(line.number)) return false;
+
+          entries.push({
+            from: node.from,
+            to: node.to,
+            decoration: horizontalRuleDecoration,
+          });
 
           return false;
         }
