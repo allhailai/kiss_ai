@@ -140,7 +140,6 @@ function ChatMessageBubbleComponent({
         <strong>{message.role === "assistant" ? "Agent" : message.role === "system" ? "System" : "You"}</strong>
         <div className="chat-message-actions">
           <span>{formatChatDateTime(message.updatedAt ?? message.createdAt)}</span>
-          <CopyMessageButton content={message.content} />
           {canEdit ? (
             <button
               aria-label="Edit message"
@@ -384,6 +383,9 @@ function ChatMessageBubbleComponent({
         </div>
       ) : null}
       {message.status === "streaming" ? <span className="agent-event-status">Streaming</span> : null}
+      <div className="chat-message-footer-actions">
+        <CopyMessageButton content={message.content} />
+      </div>
     </article>
   );
 }
