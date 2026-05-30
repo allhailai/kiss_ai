@@ -1,6 +1,6 @@
 import { syntaxTree } from "@codemirror/language";
 import { type EditorState, type Extension } from "@codemirror/state";
-import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { parseMarkdownTableBlock } from "./markdownTableExtension";
 
 /**
@@ -59,27 +59,7 @@ const blockquoteLineDecoration = Decoration.line({ class: "cm-live-blockquote-li
 const listBulletDecoration = Decoration.mark({ class: "cm-live-list-bullet" });
 
 const replaceDecoration = Decoration.replace({});
-
-// ---------------------------------------------------------------------------
-// Horizontal rule widget
-// ---------------------------------------------------------------------------
-
-class HorizontalRuleWidget extends WidgetType {
-  eq() {
-    return true;
-  }
-
-  toDOM() {
-    const wrapper = document.createElement("div");
-    wrapper.className = "cm-live-hr";
-    return wrapper;
-  }
-}
-
-const horizontalRuleDecoration = Decoration.replace({
-  widget: new HorizontalRuleWidget(),
-  block: true,
-});
+const horizontalRuleLineDecoration = Decoration.line({ class: "cm-live-hr-line" });
 
 // ---------------------------------------------------------------------------
 // Cursor-line detection
@@ -384,10 +364,18 @@ function buildDecorations(view: EditorView, editable: boolean): DecorationSet {
           const line = state.doc.lineAt(node.from);
           if (cursorLines.has(line.number) || tableLines.has(line.number)) return false;
 
+          // Style the line as a horizontal rule
+          entries.push({
+            from: line.from,
+            to: line.from,
+            decoration: horizontalRuleLineDecoration,
+          });
+
+          // Hide the --- / *** / ___ text
           entries.push({
             from: node.from,
             to: node.to,
-            decoration: horizontalRuleDecoration,
+            decoration: replaceDecoration,
           });
 
           return false;

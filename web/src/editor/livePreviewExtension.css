@@ -106,13 +106,19 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Horizontal rule — replaces ---, ***, ___ with a styled divider.
+   Horizontal rule — hides --- text, draws a gradient line via ::after.
+   Uses Decoration.line (allowed in ViewPlugin) instead of block widget.
    --------------------------------------------------------------------------- */
 
-.markdown-editor-shell .cm-live-hr {
+.markdown-editor-shell .cm-live-hr-line {
+  position: relative;
+}
+
+.markdown-editor-shell .cm-live-hr-line::after {
+  content: "";
+  display: block;
   height: 1px;
-  margin: 12px 0;
-  border: none;
+  margin: 8px 0;
   background: linear-gradient(
     90deg,
     transparent,
