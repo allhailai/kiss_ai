@@ -32,6 +32,7 @@ export function ProjectPicker({
   onCreateProject,
   onSelect,
   settingsSlot,
+  logoutSlot,
   updateCheckerSlot,
 }: {
   creatingProject: boolean;
@@ -41,6 +42,7 @@ export function ProjectPicker({
   onCreateProject: (name: string, slug?: string) => Promise<void>;
   onSelect: (projectSlug: string) => void;
   settingsSlot?: React.ReactNode;
+  logoutSlot?: React.ReactNode;
   updateCheckerSlot?: React.ReactNode;
 }) {
   const [projectName, setProjectName] = useState("");
@@ -90,6 +92,7 @@ export function ProjectPicker({
         <div className="project-picker-update">
           {settingsSlot}
           {updateCheckerSlot}
+          {logoutSlot}
         </div>
       </div>
 

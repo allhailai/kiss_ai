@@ -28,6 +28,7 @@ import { MainContentArea } from "./MainContentArea";
 import { RightPanelOrchestrator } from "./RightPanelOrchestrator";
 import { AppSidebar } from "./AppSidebar";
 import { LoginPage } from "./LoginPage";
+import { LogoutButton } from "./LogoutButton";
 import { authApi } from "../data/authApi";
 import { request } from "../data/request";
 import type { VersionResponse } from "../contracts/api";
@@ -377,6 +378,7 @@ export function App() {
             projects={project.projects}
             projectsRoot={project.projectsRoot}
             settingsSlot={<SettingsModal />}
+            logoutSlot={<LogoutButton />}
             updateCheckerSlot={<UpdateCheckerModal />}
           />
         </main>

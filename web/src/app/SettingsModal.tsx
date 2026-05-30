@@ -15,8 +15,6 @@ export function SettingsModal() {
   const [cursorApiKey, setCursorApiKey] = useState("");
   const [showUserAdmin, setShowUserAdmin] = useState(false);
   const [isServerAdmin, setIsServerAdmin] = useState(false);
-  const [isServerMode, setIsServerMode] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
 
   // Check if we're in server mode and current user is admin
   useEffect(() => {
@@ -24,7 +22,6 @@ export function SettingsModal() {
       try {
         const version = await request<VersionResponse>("/api/version");
         if (version.mode === "server") {
-          setIsServerMode(true);
           try {
             const me = await authApi.me();
             setIsServerAdmin(me.is_admin);
@@ -145,38 +142,6 @@ export function SettingsModal() {
                   }}
                 >
                   Manage Users
-                </button>
-              </div>
-            ) : null}
-
-            {isServerMode ? (
-              <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--color-border)" }}>
-                <button
-                  disabled={loggingOut}
-                  id="logout-button"
-                  onClick={async () => {
-                    setLoggingOut(true);
-                    try {
-                      await authApi.logout();
-                    } catch {
-                      // Cookie may already be cleared
-                    }
-                    window.dispatchEvent(new Event("kiss-ai-auth-required"));
-                  }}
-                  type="button"
-                  style={{
-                    fontSize: "0.8125rem",
-                    fontWeight: 600,
-                    padding: "0.5rem 1rem",
-                    border: "1px solid var(--color-danger, #dc3545)",
-                    borderRadius: "6px",
-                    background: "transparent",
-                    color: "var(--color-danger, #dc3545)",
-                    cursor: loggingOut ? "default" : "pointer",
-                    opacity: loggingOut ? 0.6 : 1,
-                  }}
-                >
-                  {loggingOut ? "Logging out…" : "Log Out"}
                 </button>
               </div>
             ) : null}

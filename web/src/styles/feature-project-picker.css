@@ -367,3 +367,70 @@
   color: var(--color-primary);
   margin-top: 0;
 }
+
+/* ── Logout button ────────────────────────────────────────────────────── */
+
+.logout-button {
+  min-height: 34px;
+  white-space: nowrap;
+  padding: 8px 12px;
+  border: 1px solid var(--color-danger, #dc3545);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-danger, #dc3545);
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    background 180ms ease,
+    color 180ms ease;
+}
+
+.logout-button:hover {
+  background: var(--color-danger, #dc3545);
+  color: white;
+}
+
+.logout-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.logout-confirm-text {
+  color: var(--color-primary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.logout-confirm-yes {
+  min-height: 34px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-danger, #dc3545);
+  border-radius: 10px;
+  background: var(--color-danger, #dc3545);
+  color: white;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.logout-confirm-yes:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.logout-confirm-no {
+  min-height: 34px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-secondary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.logout-confirm-no:hover {
+  background: var(--color-background);
+}
+
