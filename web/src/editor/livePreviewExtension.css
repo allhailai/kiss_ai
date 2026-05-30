@@ -1,0 +1,71 @@
+/* ==========================================================================
+   Live Preview Extension — Obsidian-style heading / inline formatting styles
+   ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   Headings — progressive size scale.
+   Applied to the full heading line content when syntax markers are hidden.
+   Sizes are relative to the editor's base font (1rem Georgia).
+   --------------------------------------------------------------------------- */
+
+.markdown-editor-shell .cm-live-heading-1 {
+  font-size: 2em;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--color-primary);
+}
+
+.markdown-editor-shell .cm-live-heading-2 {
+  font-size: 1.6em;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--color-primary);
+}
+
+.markdown-editor-shell .cm-live-heading-3 {
+  font-size: 1.3em;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-primary);
+}
+
+.markdown-editor-shell .cm-live-heading-4 {
+  font-size: 1.1em;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--color-primary);
+}
+
+.markdown-editor-shell .cm-live-heading-5 {
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--color-primary);
+}
+
+.markdown-editor-shell .cm-live-heading-6 {
+  font-size: 0.9em;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--color-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   Inline emphasis — bold, italic, strikethrough.
+   Applied to the content range (markers are hidden via Decoration.replace).
+   --------------------------------------------------------------------------- */
+
+.markdown-editor-shell .cm-live-bold {
+  font-weight: bold;
+}
+
+.markdown-editor-shell .cm-live-italic {
+  font-style: italic;
+}
+
+.markdown-editor-shell .cm-live-strikethrough {
+  text-decoration: line-through;
+  text-decoration-color: var(--color-secondary);
+}

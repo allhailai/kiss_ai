@@ -7,6 +7,8 @@ import type { FileDiff, ProjectFile } from "../contracts/api";
 import { buildLineDiff } from "../domain/diffs";
 import { buildAnnotationExtension } from "./annotationExtension";
 import { buildEditorDiffExtension } from "./diffExtension";
+import { buildLivePreviewExtension } from "./livePreviewExtension";
+import "./livePreviewExtension.css";
 import { buildMarkdownTableExtension } from "./markdownTableExtension";
 import { buildTableCellDisplayRenderer, buildWikiLinkExtension, renderMarkdownTableCellText } from "./wikiLinkExtension";
 
@@ -132,6 +134,7 @@ export function MarkdownEditor({
           overflow: "auto",
         },
       }),
+      buildLivePreviewExtension({ editable }),
       buildMarkdownTableExtension({ editable, renderCellText: renderMarkdownTableCellText, renderCellDisplay: buildTableCellDisplayRenderer({ getFiles, selectedPath, getOnOpenFile }), onNotice: stableOnNotice }),
       buildEditorDiffExtension({ getUnsavedDiff, getSavedDiff }),
       buildWikiLinkExtension({ getFiles, selectedPath, getOnOpenFile }),
