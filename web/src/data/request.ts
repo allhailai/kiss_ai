@@ -18,6 +18,12 @@ export async function request<T>(url: string, options?: RequestInit): Promise<T>
 
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => ({}))) as { code?: unknown; error?: unknown };
+
+    // Global 401 handler: notify the app that authentication is required
+    if (response.status === 401) {
+      window.dispatchEvent(new CustomEvent("kiss-ai-auth-required"));
+    }
+
     throw new ApiClientError(typeof errorBody.error === "string" ? errorBody.error : `Request failed: ${response.status}`, {
       code: typeof errorBody.code === "string" ? errorBody.code : undefined,
       status: response.status,

@@ -9,8 +9,10 @@ export function registerApiRoutes(app, deps) {
   app.use("/api/projects/:projectSlug", deps.attachProject);
 
   registerSystemRoutes(app, {
+    authMiddleware: deps.authMiddleware,
     checkKissAiUpdate: deps.checkKissAiUpdate,
     httpError: deps.httpError,
+    KISS_AI_MODE: deps.KISS_AI_MODE,
     readKeybindings: deps.readKeybindings,
     saveCursorApiKey: deps.saveCursorApiKey,
     systemSettings: deps.systemSettings,

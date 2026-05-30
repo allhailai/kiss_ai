@@ -2,14 +2,18 @@ import express from "express";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createRebuildStore } from "./agentRuns.js";
 import { runCursorAgent, runCursorAgentText } from "./agentRuntimes/cursorSdk.js";
 import { listen } from "./adapters/listen.js";
+import { createAuthMiddleware } from "./middleware/requireAuth.js";
 import { registerApiRoutes } from "./routes/apiRoutes.js";
 import { registerArtifactRoutes } from "./routes/artifactRoutes.js";
+import { registerAuthRoutes } from "./routes/authRoutes.js";
 import { createAgentJobService } from "./services/agentJobs.js";
+import { createAuthService } from "./services/auth.js";
 import { createBuildLogService } from "./services/buildLogs.js";
 import { getOutputStatus } from "./services/contentLedger.js";
 import { createChatAgentService } from "./services/chatAgent.js";
@@ -37,6 +41,37 @@ const JSON_BODY_LIMIT_BYTES = Math.ceil(MAX_UPLOAD_BYTES * 1.5);
 const MAX_SEARCH_RESULTS = 25;
 const REBUILD_STATE_DIR = path.join(WEB_ROOT, ".runtime", "rebuild");
 const FRAMEWORK_ROOT = path.resolve(process.env.KISS_AI_FRAMEWORK_ROOT ?? path.join(PROJECTS_ROOT, "_kiss_ai", "framework"));
+
+// ── Resolve operating mode (frozen for process lifetime) ──
+function resolveKissAiMode() {
+  const envMode = process.env.KISS_AI_MODE?.trim().toLowerCase();
+  if (envMode === "server" || envMode === "standalone") {
+    console.log(`kiss_ai mode: ${envMode} (source: environment variable)`);
+    return envMode;
+  }
+  if (envMode) {
+    console.warn(`[kiss_ai warning] Invalid KISS_AI_MODE "${envMode}", falling back to standalone.`);
+  }
+
+  try {
+    const settingsPath = path.join(PROJECTS_ROOT, ".kiss_ai_settings.json");
+    const raw = readFileSync(settingsPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    const fileMode = parsed?.mode?.trim().toLowerCase();
+    if (fileMode === "server" || fileMode === "standalone") {
+      console.log(`kiss_ai mode: ${fileMode} (source: .kiss_ai_settings.json)`);
+      return fileMode;
+    }
+    if (fileMode) {
+      console.warn(`[kiss_ai warning] Invalid mode "${fileMode}" in .kiss_ai_settings.json, falling back to standalone.`);
+    }
+  } catch { /* missing or malformed settings file */ }
+
+  console.log("kiss_ai mode: standalone (source: default)");
+  return "standalone";
+}
+
+const KISS_AI_MODE = resolveKissAiMode();
 const warnedCursorKeyMessages = new Set();
 const reservedProjectDirectories = new Set(["_kiss_ai", ".obsidian", "_archive", "_templates"]);
 const projectSlugPattern = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
@@ -92,7 +127,54 @@ const treeRoots = new Map([
 const app = express();
 app.use(express.json({ limit: JSON_BODY_LIMIT_BYTES }));
 
+// ── Read session_expiry_days from settings ──
+function readSessionExpiryDays() {
+  try {
+    const settingsPath = path.join(PROJECTS_ROOT, ".kiss_ai_settings.json");
+    const raw = readFileSync(settingsPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    const days = Number(parsed?.session_expiry_days);
+    if (days > 0) return days;
+  } catch { /* missing or malformed */ }
+  return 3;
+}
+
+const SESSION_EXPIRY_DAYS = readSessionExpiryDays();
+
+// ── Auth infrastructure (server mode only) ──
+let authService = null;
+let authMiddleware = null;
+
+if (KISS_AI_MODE === "server") {
+  app.set("trust proxy", 1);
+
+  authService = createAuthService({ projectsRoot: PROJECTS_ROOT, httpError, sessionExpiryDays: SESSION_EXPIRY_DAYS });
+  authMiddleware = createAuthMiddleware({ authService, sessionExpiryDays: SESSION_EXPIRY_DAYS });
+
+  // Cookie parser + security headers (before any routes)
+  app.use(authMiddleware.cookieParser);
+  app.use(authMiddleware.securityHeaders);
+
+  // Initialize auth file (first boot requires KISS_AI_ADMIN_PASSWORD)
+  try {
+    const adminPassword = process.env.KISS_AI_ADMIN_PASSWORD?.trim() || null;
+    const result = await authService.initialize(adminPassword);
+    if (result.initialized) {
+      console.log("kiss_ai auth: Admin user created (first boot).");
+    } else {
+      console.log("kiss_ai auth: Auth file loaded.");
+    }
+  } catch (error) {
+    console.error(`\n[kiss_ai FATAL] ${error.message}\n`);
+    process.exit(1);
+  }
+
+  // Register auth routes (login, logout, me, user management)
+  registerAuthRoutes(app, { authService, authMiddleware, httpError });
+}
+
 // ── Server version info (captured at startup) ──
+// Registered before requireAuth so the frontend can detect mode without a session.
 const SERVER_STARTED_AT = new Date().toISOString();
 let SERVER_GIT_HASH = "unknown";
 try {
@@ -101,8 +183,15 @@ try {
 } catch { /* git may not be available */ }
 
 app.get("/api/version", (_req, res) => {
-  res.json({ gitHash: SERVER_GIT_HASH, startedAt: SERVER_STARTED_AT });
+  res.json({ gitHash: SERVER_GIT_HASH, startedAt: SERVER_STARTED_AT, mode: KISS_AI_MODE });
 });
+
+if (KISS_AI_MODE === "server") {
+  // Protect all /api/* routes (except auth routes and /api/version registered above)
+  app.use("/api", authMiddleware.requireAuth);
+}
+
+
 
 const rebuildStore = createRebuildStore({ stateDir: REBUILD_STATE_DIR, projectSlugPattern });
 const {
@@ -341,6 +430,8 @@ async function readKeybindings() {
 
 registerApiRoutes(app, {
   assistQuestion,
+  authMiddleware,
+  KISS_AI_MODE,
   PROJECTS_ROOT,
   attachProject,
   buildLogTabState,
@@ -409,4 +500,17 @@ registerArtifactRoutes(app, { httpError, startArtifactBuild });
 
 app.use(apiErrorHandler);
 
-listen(app, { port: PORT, projectsRoot: PROJECTS_ROOT, resolveCursorApiKey });
+// ── SPA serving (server mode only) ──
+// In server mode, Express serves the built SPA from dist/.
+// In standalone/dev mode, the Vite dev server handles this.
+if (KISS_AI_MODE === "server") {
+  const distDir = path.join(WEB_ROOT, "dist");
+  app.use(express.static(distDir));
+
+  // SPA fallback: any non-API route returns index.html
+  app.get("/{*splat}", (_req, res) => {
+    res.sendFile(path.join(distDir, "index.html"));
+  });
+}
+
+listen(app, { port: PORT, projectsRoot: PROJECTS_ROOT, resolveCursorApiKey, mode: KISS_AI_MODE });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { hashDraftContent, resolveChatFileEditApplication } from "./chatFileEdits";
 import { filesApi } from "../data/filesApi";
 import { buildThemeStyle } from "./theme";
@@ -16,7 +16,7 @@ import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
 import { makeEditableTargetForFile, useAgentFileContext } from "./hooks/useAgentFileContext";
 import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
-import type { ChatMessageFileEdit, ChatMessageFileRename, ChatMessageArtifactRename } from "../contracts/api";
+import type { AuthUser, ChatMessageFileEdit, ChatMessageFileRename, ChatMessageArtifactRename } from "../contracts/api";
 import { chatApi } from "../data/chatApi";
 import { artifactsApi } from "../data/artifactsApi";
 import { BuildProvider, type BuildContextValue } from "./contexts/BuildContext";
@@ -27,6 +27,83 @@ import { SettingsModal } from "./SettingsModal";
 import { MainContentArea } from "./MainContentArea";
 import { RightPanelOrchestrator } from "./RightPanelOrchestrator";
 import { AppSidebar } from "./AppSidebar";
+import { LoginPage } from "./LoginPage";
+import { authApi } from "../data/authApi";
+import { request } from "../data/request";
+import type { VersionResponse } from "../contracts/api";
+
+// ── Auth gate: wraps App in login check for server mode ──
+
+type AuthState = "loading" | "authenticated" | "unauthenticated" | "standalone";
+
+export function AppWithAuth() {
+  const [authState, setAuthState] = useState<AuthState>("loading");
+  const [, setCurrentUser] = useState<AuthUser | null>(null);
+
+  const checkAuth = useCallback(async () => {
+    try {
+      // Check mode from version endpoint (always accessible)
+      const version = await request<VersionResponse>("/api/version");
+      if (version.mode !== "server") {
+        setAuthState("standalone");
+        return;
+      }
+
+      // Server mode — check auth status
+      try {
+        const user = await authApi.me();
+        setCurrentUser(user);
+        setAuthState("authenticated");
+      } catch {
+        setAuthState("unauthenticated");
+      }
+    } catch {
+      // Can't reach server — assume standalone (dev mode, server starting up)
+      setAuthState("standalone");
+    }
+  }, []);
+
+  useEffect(() => {
+    void checkAuth();
+  }, [checkAuth]);
+
+  // Listen for global 401 events (session expired)
+  useEffect(() => {
+    const handleAuthRequired = () => {
+      if (authState === "authenticated") {
+        setAuthState("unauthenticated");
+        setCurrentUser(null);
+      }
+    };
+
+    window.addEventListener("kiss-ai-auth-required", handleAuthRequired);
+    return () => window.removeEventListener("kiss-ai-auth-required", handleAuthRequired);
+  }, [authState]);
+
+  if (authState === "loading") {
+    return (
+      <div className="login-page">
+        <div className="login-card" style={{ textAlign: "center", padding: "3rem 2rem" }}>
+          <p style={{ color: "var(--color-secondary)", margin: 0 }}>Loading…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authState === "unauthenticated") {
+    return (
+      <LoginPage
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          setAuthState("authenticated");
+        }}
+      />
+    );
+  }
+
+  // standalone or authenticated — render the full app
+  return <App />;
+}
 
 const aiFileAssistPrompt =
   "Review the saved annotations in this file. Interpret the Git diff as user guidance, then propose edits that integrate those annotations cleanly throughout the document while preserving the document's intent, structure, and voice.";

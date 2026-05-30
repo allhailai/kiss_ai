@@ -90,6 +90,7 @@ describe("API routes", () => {
     const app = express();
     app.use(express.json());
     registerSystemRoutes(app, {
+      authMiddleware: null,
       checkKissAiUpdate: async () => ({
         status: "update_available",
         updateAvailable: true,
@@ -106,6 +107,8 @@ describe("API routes", () => {
         dependencyInstall: { ran: false, output: "" },
       }),
       httpError,
+      KISS_AI_MODE: "standalone",
+      readKeybindings: async () => ({}),
       saveCursorApiKey: async () => ({}),
       systemSettings: async () => ({ cursorApiKeyAvailable: false, cursorApiKeySource: null, cursorApiKeyWarnings: [] }),
     });
@@ -126,6 +129,7 @@ describe("API routes", () => {
     const app = express();
     app.use(express.json());
     registerSystemRoutes(app, {
+      authMiddleware: null,
       checkKissAiUpdate: async () => ({}),
       updateAndRestart: async () => ({
         status: "updated",
@@ -136,6 +140,8 @@ describe("API routes", () => {
       }),
       updateKissAi: async () => ({}),
       httpError,
+      KISS_AI_MODE: "standalone",
+      readKeybindings: async () => ({}),
       saveCursorApiKey: async () => ({}),
       systemSettings: async () => ({ cursorApiKeyAvailable: false, cursorApiKeySource: null, cursorApiKeyWarnings: [] }),
     });
@@ -157,6 +163,7 @@ describe("API routes", () => {
     const app = express();
     app.use(express.json());
     registerSystemRoutes(app, {
+      authMiddleware: null,
       checkKissAiUpdate: async () => ({
         status: "up_to_date",
         updateAvailable: false,
@@ -165,6 +172,8 @@ describe("API routes", () => {
         upstream: "target/master",
       }),
       httpError,
+      KISS_AI_MODE: "standalone",
+      readKeybindings: async () => ({}),
       saveCursorApiKey: async () => ({}),
       systemSettings: async () => ({ cursorApiKeyAvailable: false, cursorApiKeySource: null, cursorApiKeyWarnings: [] }),
       updateAndRestart: async () => ({}),
@@ -189,8 +198,11 @@ describe("API routes", () => {
     const app = express();
     app.use(express.json());
     registerSystemRoutes(app, {
+      authMiddleware: null,
       checkKissAiUpdate: async () => ({}),
       httpError,
+      KISS_AI_MODE: "standalone",
+      readKeybindings: async () => ({}),
       saveCursorApiKey: async () => ({}),
       systemSettings: async () => ({
         cursorApiKeyAvailable: true,
@@ -220,8 +232,11 @@ describe("API routes", () => {
     const app = express();
     app.use(express.json());
     registerSystemRoutes(app, {
+      authMiddleware: null,
       checkKissAiUpdate: async () => ({}),
       httpError,
+      KISS_AI_MODE: "standalone",
+      readKeybindings: async () => ({}),
       saveCursorApiKey: async (cursorApiKey) => ({
         ok: true,
         message: `saved ${cursorApiKey.length}`,
