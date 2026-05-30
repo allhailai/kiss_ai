@@ -253,6 +253,44 @@
   outline: none;
 }
 
+.chat-message-copy-button {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-icon-ink);
+  opacity: 0;
+  transition:
+    opacity 0.12s ease;
+}
+
+.chat-message:hover .chat-message-copy-button,
+.chat-message:focus-within .chat-message-copy-button {
+  opacity: 1;
+}
+
+.chat-message-copy-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.chat-message-copy-button:hover,
+.chat-message-copy-button:focus-visible {
+  background: transparent;
+  color: var(--color-icon-ink);
+  opacity: 1;
+  outline: none;
+}
+
+.chat-message-copy-button[aria-label="Copied"] {
+  opacity: 1;
+  color: var(--color-success);
+}
+
 .chat-message-content {
   min-width: 0;
   display: grid;

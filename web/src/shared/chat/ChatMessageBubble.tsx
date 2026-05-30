@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useCallback, useState } from "react";
 import type { ChatMessage, ChatMessageArtifactProposal, ChatMessageArtifactRename, ChatMessageFileEdit, ChatMessageFileRename, ChatMessageTopicProposal, EditProposal } from "../../contracts/api";
 import { formatChatDateTime, renderMarkdownMessageContent } from "./chatRendering";
 
@@ -140,6 +140,7 @@ function ChatMessageBubbleComponent({
         <strong>{message.role === "assistant" ? "Agent" : message.role === "system" ? "System" : "You"}</strong>
         <div className="chat-message-actions">
           <span>{formatChatDateTime(message.updatedAt ?? message.createdAt)}</span>
+          <CopyMessageButton content={message.content} />
           {canEdit ? (
             <button
               aria-label="Edit message"
@@ -384,6 +385,38 @@ function ChatMessageBubbleComponent({
       ) : null}
       {message.status === "streaming" ? <span className="agent-event-status">Streaming</span> : null}
     </article>
+  );
+}
+
+function CopyMessageButton({ content }: { content: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [content]);
+
+  return (
+    <button
+      aria-label={copied ? "Copied" : "Copy message"}
+      className="chat-message-copy-button"
+      onClick={handleCopy}
+      title={copied ? "Copied!" : "Copy message"}
+      type="button"
+    >
+      {copied ? (
+        <svg aria-hidden="true" viewBox="0 0 16 16">
+          <path d="M13.5 4.5 6.5 11.5 2.5 7.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ) : (
+        <svg aria-hidden="true" viewBox="0 0 16 16">
+          <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+          <path d="M10.5 5.5V3.5a1.5 1.5 0 0 0-1.5-1.5H3.5A1.5 1.5 0 0 0 2 3.5V9a1.5 1.5 0 0 0 1.5 1.5h2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+        </svg>
+      )}
+    </button>
   );
 }
 
