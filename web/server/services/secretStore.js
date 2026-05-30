@@ -2,11 +2,25 @@
  * Platform-agnostic secret store abstraction.
  *
  * On macOS, delegates to the system `security` CLI (Keychain).
- * On Linux, delegates to `secret-tool` (libsecret / D-Bus Secret Service).
+ * On Linux, delegates to `secret-tool` (libsecret / D-Bus Secret Service)
+ * when available. Falls back to unsupported on headless servers.
  * On unsupported platforms, read returns null and write throws.
  */
 
+import { execFileSync } from "node:child_process";
 import { spawn } from "node:child_process";
+
+/**
+ * Check whether a command-line tool is installed and on PATH.
+ */
+function isCommandAvailable(command) {
+  try {
+    execFileSync("which", [command], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Run a command and pipe `stdinData` to its stdin, resolving with stdout.
@@ -37,7 +51,7 @@ function execWithStdin(command, args, stdinData) {
   });
 }
 
-export function createSecretStore({ execFileText, platform = process.platform, userName = process.env.USER ?? "" }) {
+export function createSecretStore({ execFileText, isCommandAvailable: probe = isCommandAvailable, platform = process.platform, userName = process.env.USER ?? "" }) {
   async function readDarwin(serviceName) {
     try {
       const value = await execFileText("security", [
@@ -107,7 +121,7 @@ export function createSecretStore({ execFileText, platform = process.platform, u
     };
   }
 
-  if (platform === "linux") {
+  if (platform === "linux" && probe("secret-tool")) {
     return {
       read: readLinux,
       write: writeLinux,
@@ -125,3 +139,4 @@ export function createSecretStore({ execFileText, platform = process.platform, u
     supported: false,
   };
 }
+

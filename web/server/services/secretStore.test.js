@@ -82,7 +82,7 @@ describe("secretStore", () => {
   describe("Linux", () => {
     it("reads a secret from secret-tool", async () => {
       const exec = createMockExecFileText("linux-secret");
-      const store = createSecretStore({ execFileText: exec, platform: "linux", userName: "testuser" });
+      const store = createSecretStore({ execFileText: exec, isCommandAvailable: () => true, platform: "linux", userName: "testuser" });
 
       const value = await store.read("cursor_api_key");
 
@@ -97,30 +97,60 @@ describe("secretStore", () => {
 
     it("returns null when the secret-tool item is missing", async () => {
       const exec = createMockExecFileText("", true);
-      const store = createSecretStore({ execFileText: exec, platform: "linux", userName: "testuser" });
+      const store = createSecretStore({ execFileText: exec, isCommandAvailable: () => true, platform: "linux", userName: "testuser" });
 
       expect(await store.read("cursor_api_key")).toBeNull();
     });
 
     it("returns null when secret-tool returns an empty string", async () => {
       const exec = createMockExecFileText("");
-      const store = createSecretStore({ execFileText: exec, platform: "linux", userName: "testuser" });
+      const store = createSecretStore({ execFileText: exec, isCommandAvailable: () => true, platform: "linux", userName: "testuser" });
 
       expect(await store.read("cursor_api_key")).toBeNull();
     });
 
     it("returns the correct source label", () => {
       const exec = createMockExecFileText();
-      const store = createSecretStore({ execFileText: exec, platform: "linux" });
+      const store = createSecretStore({ execFileText: exec, isCommandAvailable: () => true, platform: "linux" });
 
       expect(store.sourceLabel("cursor_api_key")).toBe("Linux secret-tool item cursor_api_key");
     });
 
     it("reports as supported", () => {
       const exec = createMockExecFileText();
-      const store = createSecretStore({ execFileText: exec, platform: "linux" });
+      const store = createSecretStore({ execFileText: exec, isCommandAvailable: () => true, platform: "linux" });
 
       expect(store.supported).toBe(true);
+    });
+  });
+
+  describe("Linux without secret-tool", () => {
+    it("returns null on read", async () => {
+      const exec = createMockExecFileText();
+      const store = createSecretStore({ execFileText: exec, isCommandAvailable: () => false, platform: "linux" });
+
+      expect(await store.read("cursor_api_key")).toBeNull();
+    });
+
+    it("throws on write", async () => {
+      const exec = createMockExecFileText();
+      const store = createSecretStore({ execFileText: exec, isCommandAvailable: () => false, platform: "linux" });
+
+      await expect(store.write("cursor_api_key", "value")).rejects.toThrow(/not supported on platform/);
+    });
+
+    it("reports as not supported", () => {
+      const exec = createMockExecFileText();
+      const store = createSecretStore({ execFileText: exec, isCommandAvailable: () => false, platform: "linux" });
+
+      expect(store.supported).toBe(false);
+    });
+
+    it("returns a generic source label", () => {
+      const exec = createMockExecFileText();
+      const store = createSecretStore({ execFileText: exec, isCommandAvailable: () => false, platform: "linux" });
+
+      expect(store.sourceLabel("cursor_api_key")).toBe("OS credential store item cursor_api_key");
     });
   });
 
