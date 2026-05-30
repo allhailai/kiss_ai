@@ -222,6 +222,46 @@ export function renderMarkdownTableCellText(cell: string) {
 }
 
 /**
+ * Appends text with inline markdown formatting (bold, italic, code) to a
+ * container element. Text that doesn't match any formatting pattern is
+ * appended as plain text nodes.
+ */
+function appendFormattedText(text: string, container: HTMLElement) {
+  // Bold first (greedy over single *), then italic, then inline code
+  const formattingPattern = /\*\*(.+?)\*\*|\*([^*\n]+)\*|`([^`\n]+)`/g;
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(formattingPattern)) {
+    const matchStart = match.index ?? 0;
+
+    if (matchStart > lastIndex) {
+      container.appendChild(document.createTextNode(text.slice(lastIndex, matchStart)));
+    }
+
+    if (match[1] !== undefined) {
+      const strong = document.createElement("strong");
+      strong.textContent = match[1];
+      container.appendChild(strong);
+    } else if (match[2] !== undefined) {
+      const em = document.createElement("em");
+      em.textContent = match[2];
+      container.appendChild(em);
+    } else if (match[3] !== undefined) {
+      const code = document.createElement("code");
+      code.className = "cm-table-inline-code";
+      code.textContent = match[3];
+      container.appendChild(code);
+    }
+
+    lastIndex = matchStart + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    container.appendChild(document.createTextNode(text.slice(lastIndex)));
+  }
+}
+
+/**
  * Builds a renderCellDisplay callback for the markdown table extension.
  * Parses cell text for wiki links and markdown links, and creates clickable
  * DOM elements using the same resolution logic as the inline link extension.
@@ -247,9 +287,9 @@ export function buildTableCellDisplayRenderer({
     for (const match of cell.matchAll(combinedPattern)) {
       const matchStart = match.index ?? 0;
 
-      // Append any plain text before this match
+      // Append any plain text before this match (with formatting)
       if (matchStart > lastIndex) {
-        container.appendChild(document.createTextNode(cell.slice(lastIndex, matchStart)));
+        appendFormattedText(cell.slice(lastIndex, matchStart), container);
       }
 
       if (match[1] !== undefined) {
@@ -287,9 +327,9 @@ export function buildTableCellDisplayRenderer({
       lastIndex = matchStart + match[0].length;
     }
 
-    // Append any remaining text after the last match
+    // Append any remaining text after the last match (with formatting)
     if (lastIndex < cell.length) {
-      container.appendChild(document.createTextNode(cell.slice(lastIndex)));
+      appendFormattedText(cell.slice(lastIndex), container);
     }
   };
 }

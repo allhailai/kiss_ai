@@ -100,3 +100,11 @@
   font-size: 0.7rem;
   font-weight: 800;
 }
+
+.markdown-editor-shell .cm-table-inline-code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-secondary) 10%, transparent);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
