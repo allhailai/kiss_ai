@@ -2,12 +2,10 @@ const settingsSuccessMessage = "Success! API key has been saved and works.";
 const settingsFailureMessage = "Failed! Please try again. If this issue persists, contact AllHail.AI";
 
 export function createSystemSettingsService({
-  execFileText,
   httpError,
   listCursorModels,
-  platform = process.platform,
   resolveCursorApiKey,
-  userName = process.env.USER ?? "",
+  secretStore,
 }) {
   async function systemSettings() {
     const cursorApiKey = await resolveCursorApiKey();
@@ -20,12 +18,12 @@ export function createSystemSettingsService({
   }
 
   async function saveCursorApiKey(apiKey) {
-    if (platform !== "darwin") {
-      throw httpError("Saving Cursor API keys is only supported on macOS right now.", 501, "cursor_api_key_platform_unsupported");
+    if (!secretStore.supported) {
+      throw httpError("Saving Cursor API keys is not supported on this platform. Use the CURSOR_API_KEY environment variable or web/.env instead.", 501, "cursor_api_key_platform_unsupported");
     }
 
     try {
-      await execFileText("security", ["add-generic-password", "-U", "-a", userName, "-s", "cursor_api_key", "-w", apiKey]);
+      await secretStore.write("cursor_api_key", apiKey);
     } catch {
       throw httpError(settingsFailureMessage, 500, "cursor_api_key_save_failed");
     }
@@ -47,3 +45,4 @@ export function createSystemSettingsService({
     systemSettings,
   };
 }
+

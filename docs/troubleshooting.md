@@ -26,6 +26,7 @@ AI builds need a Cursor API key available to the web app backend.
 Check one of these is set:
 
 - macOS Keychain item `cursor_api_key`
+- Linux `secret-tool` item `cursor_api_key` (requires `libsecret-tools` or equivalent)
 - `_kiss_ai/web/.env` with `CURSOR_API_KEY="cursor_..."`
 - process environment variable `CURSOR_API_KEY`
 

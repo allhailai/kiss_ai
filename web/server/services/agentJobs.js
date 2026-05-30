@@ -419,7 +419,7 @@ export function createAgentJobService({
       runKind: "rebuild",
       startMessage: "Starting knowledge build (research → fetch → digest → wiki → questions → recording).",
       noApiKeyMessage:
-        "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Knowledge builds are unavailable from the UI.",
+        "No Cursor API key found in CURSOR_API_KEY, web/.env, or OS credential store. Knowledge builds are unavailable from the UI.",
       noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
       jobName: "Knowledge build",
       prompt: createResearchPrompt(project),
@@ -441,7 +441,7 @@ export function createAgentJobService({
       attentionContext: context,
       startMessage: "Starting review-note resolution.",
       noApiKeyMessage:
-        "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Human-attention resolution is unavailable from the UI.",
+        "No Cursor API key found in CURSOR_API_KEY, web/.env, or OS credential store. Human-attention resolution is unavailable from the UI.",
       noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
       jobName: "Human-attention resolution",
       prompt,
@@ -455,7 +455,7 @@ export function createAgentJobService({
       runKind: "full_rebuild",
       startMessage: "Starting full knowledge rebuild (all wiki pages will be regenerated).",
       noApiKeyMessage:
-        "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Rebuilds are unavailable from the UI.",
+        "No Cursor API key found in CURSOR_API_KEY, web/.env, or OS credential store. Rebuilds are unavailable from the UI.",
       noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
       jobName: "Full rebuild",
       prompt: createResearchPrompt(project),
@@ -1575,7 +1575,7 @@ export function createAgentJobService({
       runKind: "artifact_batch_build",
       startMessage: `Building ${artifactSlugs.length} ${pluralLabel}.`,
       noApiKeyMessage:
-        "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Artifact builds are unavailable from the UI.",
+        "No Cursor API key found in CURSOR_API_KEY, web/.env, or OS credential store. Artifact builds are unavailable from the UI.",
       noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
       jobName: `Build ${artifactSlugs.length} ${pluralLabel}`,
       prompt: `Building ${artifactSlugs.length} artifacts sequentially.`,
@@ -1613,7 +1613,7 @@ export function createAgentJobService({
       runKind: "artifact_build",
       startMessage: `Building artifact: ${artifactSlug}`,
       noApiKeyMessage:
-        "No Cursor API key found in CURSOR_API_KEY, web/.env, or macOS Keychain item cursor_api_key. Artifact builds are unavailable from the UI.",
+        "No Cursor API key found in CURSOR_API_KEY, web/.env, or OS credential store. Artifact builds are unavailable from the UI.",
       noModelsMessage: "No Cursor models remain after excluding MAX mode models. Add a non-MAX model to your account catalog or relax filters.",
       jobName: `Artifact: ${artifactSlug}`,
       prompt,

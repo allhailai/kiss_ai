@@ -25,7 +25,7 @@ The `_kiss_ai` repo tracks hub and framework code. Each managed project remains 
 ## Runtime Settings
 
 - `KISS_AI_PROJECTS_ROOT` can override the projects root. By default, `_kiss_ai/web` resolves the projects root as two levels above the web app.
-- `CURSOR_API_KEY` enables UI-triggered Cursor agent runs. The server also checks `web/.env` and macOS Keychain item `cursor_api_key`.
+- `CURSOR_API_KEY` enables UI-triggered Cursor agent runs. The server also checks `web/.env` and the OS credential store (macOS Keychain or Linux `secret-tool`) for an item named `cursor_api_key`.
 - `KISS_AI_UI_PORT` controls the Express API port. The Vite dev proxy expects the same API port.
 - `CURSOR_MODEL` optionally controls the Cursor SDK model selection.
 

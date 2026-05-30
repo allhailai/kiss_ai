@@ -28,6 +28,7 @@ import { createQuestionAiAssistService } from "./services/questionAiAssist.js";
 import { createProjectFileService } from "./services/projectFiles.js";
 import { createProjectService } from "./services/projects.js";
 import { createProjectUiStateService } from "./services/projectUiState.js";
+import { createSecretStore } from "./services/secretStore.js";
 import { createSystemSettingsService } from "./services/systemSettings.js";
 
 // ── Process-level safety net ──
@@ -328,17 +329,20 @@ const { attachProject, createProjectFromTemplate, discoverProjects } = createPro
   readProjectHarness,
 });
 
+const secretStore = createSecretStore({ execFileText });
+
 const { listCursorModels, pickRebuildModelId, resolveCursorApiKey } = createCursorModelService({
   WEB_ROOT,
   httpError,
+  secretStore,
   warnedCursorKeyMessages,
 });
 
 const { saveCursorApiKey, systemSettings } = createSystemSettingsService({
-  execFileText,
   httpError,
   listCursorModels,
   resolveCursorApiKey,
+  secretStore,
 });
 
 const { lintDesignIdentity, parseDesignIdentity } = createDesignIdentityService();

@@ -1,22 +1,8 @@
 import { Cursor } from "@cursor/sdk";
-import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-export function createCursorModelService({ WEB_ROOT, httpError, warnedCursorKeyMessages }) {
-  function execFileText(command, args, options = {}) {
-    return new Promise((resolve, reject) => {
-      execFile(command, args, options, (error, stdout, stderr) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve(String(stdout || stderr).trim());
-      });
-    });
-  }
-
+export function createCursorModelService({ WEB_ROOT, httpError, secretStore, warnedCursorKeyMessages }) {
   function parseEnvValue(rawValue) {
     const value = rawValue.trim();
     if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
@@ -43,24 +29,6 @@ export function createCursorModelService({ WEB_ROOT, httpError, warnedCursorKeyM
     }
   }
 
-  async function readKeychainCursorApiKey() {
-    if (process.platform !== "darwin") return null;
-
-    try {
-      const value = await execFileText("security", [
-        "find-generic-password",
-        "-a",
-        process.env.USER ?? "",
-        "-s",
-        "cursor_api_key",
-        "-w",
-      ]);
-      return value || null;
-    } catch {
-      return null;
-    }
-  }
-
   function warnAboutCursorKeySources(warnings) {
     for (const warning of warnings) {
       if (warnedCursorKeyMessages.has(warning)) continue;
@@ -70,10 +38,12 @@ export function createCursorModelService({ WEB_ROOT, httpError, warnedCursorKeyM
     }
   }
 
+  const secretStoreLabel = secretStore.sourceLabel("cursor_api_key");
+
   async function resolveCursorApiKey() {
     const processEnvKey = process.env.CURSOR_API_KEY?.trim() || null;
     const dotEnvKey = await readDotEnvCursorApiKey();
-    const keychainKey = await readKeychainCursorApiKey();
+    const secretStoreKey = await secretStore.read("cursor_api_key");
     const warnings = [];
 
     if (processEnvKey && dotEnvKey) {
@@ -85,9 +55,9 @@ export function createCursorModelService({ WEB_ROOT, httpError, warnedCursorKeyM
     const envKey = processEnvKey || dotEnvKey;
     const envSource = processEnvKey ? "CURSOR_API_KEY environment variable" : dotEnvKey ? "web/.env" : null;
 
-    if (envKey && keychainKey) {
+    if (envKey && secretStoreKey) {
       warnings.push(
-        `Cursor API key is present in both ${envSource} and macOS Keychain item cursor_api_key. Using ${envSource}.`,
+        `Cursor API key is present in both ${envSource} and ${secretStoreLabel}. Using ${envSource}.`,
       );
     }
 
@@ -102,11 +72,11 @@ export function createCursorModelService({ WEB_ROOT, httpError, warnedCursorKeyM
       };
     }
 
-    if (keychainKey) {
+    if (secretStoreKey) {
       return {
-        apiKey: keychainKey,
+        apiKey: secretStoreKey,
         available: true,
-        source: "macOS Keychain item cursor_api_key",
+        source: secretStoreLabel,
         warnings,
       };
     }
