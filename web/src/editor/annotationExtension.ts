@@ -310,11 +310,13 @@ export const insertFeedbackEffect = StateEffect.define<{ line: number }>();
 export function buildAnnotationExtension({
   editable,
   isAiManaged,
+  annotationEnabled = false,
   onEditComment,
   onDeleteComment,
 }: {
   editable: boolean;
   isAiManaged: boolean;
+  annotationEnabled?: boolean;
   onEditComment?: (lineFrom: number, lineTo: number, newText: string) => void;
   onDeleteComment?: (lineFrom: number, lineTo: number) => void;
 }): Extension[] {
@@ -369,7 +371,7 @@ export function buildAnnotationExtension({
   extensions.push(annotationField);
 
   // Comment gutter — [+] button to add comments (on AI-managed files with annotation enabled)
-  if (editable && isAiManaged) {
+  if (editable && (isAiManaged || annotationEnabled)) {
     const commentGutter = gutter({
       class: "cm-feedback-gutter",
       lineMarker(view, line) {

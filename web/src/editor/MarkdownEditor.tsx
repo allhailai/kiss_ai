@@ -138,11 +138,12 @@ export function MarkdownEditor({
       ...buildAnnotationExtension({
         editable: editable || allowAnnotationEdits,
         isAiManaged,
+        annotationEnabled: annotation,
         onEditComment: stableHandleEditComment,
         onDeleteComment: stableHandleDeleteComment,
       }),
     ],
-    [allowAnnotationEdits, editable, getFiles, getOnOpenFile, getSavedDiff, getUnsavedDiff, isAiManaged, selectedPath, stableHandleDeleteComment, stableHandleEditComment, stableOnNotice],
+    [allowAnnotationEdits, annotation, editable, getFiles, getOnOpenFile, getSavedDiff, getUnsavedDiff, isAiManaged, selectedPath, stableHandleDeleteComment, stableHandleEditComment, stableOnNotice],
   );
 
   return (
@@ -154,7 +155,7 @@ export function MarkdownEditor({
           highlightActiveLine: editable,
           highlightActiveLineGutter: false,
         }}
-        editable={editable}
+        editable={editable || allowAnnotationEdits}
         extensions={extensions}
         height="100%"
         key={selectedPath}
