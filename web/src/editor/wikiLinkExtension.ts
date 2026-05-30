@@ -122,11 +122,31 @@ export function buildWikiLinkExtension({
         for (const match of line.text.matchAll(wikiLinkPattern)) {
           const matchIndex = match.index ?? 0;
           const rawTarget = match[1] ?? "";
+          let linkTo = line.from + matchIndex + match[0].length;
+          let resolution: WikiLinkResolution = resolveWikiLinkWithIndex(rawTarget, linkIndex);
+          let label = wikiLinkLabel(rawTarget);
+
+          // Handle hybrid Obsidian-style links: [[wiki-link]](url)
+          // When a wiki link is immediately followed by (url), consume
+          // the whole construct and use the external URL for navigation.
+          const afterMatch = line.text.slice(matchIndex + match[0].length);
+          const urlSuffix = afterMatch.match(/^\(([^)\n]+)\)/);
+          if (urlSuffix) {
+            linkTo += urlSuffix[0].length;
+            const href = urlSuffix[1] ?? "";
+            if (/^(https?:|mailto:)/i.test(href)) {
+              resolution = { status: "external", href };
+            }
+            // Use the full raw target as label so humanizeSourceLabel
+            // can match source paths (e.g. sources/web_research/...).
+            label = rawTarget;
+          }
+
           lineLinks.push({
             from: line.from + matchIndex,
-            to: line.from + matchIndex + match[0].length,
-            label: wikiLinkLabel(rawTarget),
-            resolution: resolveWikiLinkWithIndex(rawTarget, linkIndex),
+            to: linkTo,
+            label,
+            resolution,
           });
         }
 
@@ -195,7 +215,10 @@ export function buildWikiLinkExtension({
 }
 
 export function renderMarkdownTableCellText(cell: string) {
-  return cell.replace(/\[([^\]\n]+)\]\(([^)\n]+)\)/g, "$1").replace(/\[\[([^\]\n]+)\]\]/g, (_match, rawTarget: string) => wikiLinkLabel(rawTarget));
+  return cell
+    .replace(/\[\[([^\]\n]+)\]\]\([^)\n]+\)/g, (_match, rawTarget: string) => wikiLinkLabel(rawTarget))
+    .replace(/\[([^\]\n]+)\]\(([^)\n]+)\)/g, "$1")
+    .replace(/\[\[([^\]\n]+)\]\]/g, (_match, rawTarget: string) => wikiLinkLabel(rawTarget));
 }
 
 /**
@@ -230,11 +253,27 @@ export function buildTableCellDisplayRenderer({
       }
 
       if (match[1] !== undefined) {
-        // Wiki link: [[target]]
+        // Wiki link: [[target]] — possibly hybrid [[target]](url)
         const rawTarget = match[1];
-        const label = wikiLinkLabel(rawTarget);
-        const resolution = resolveWikiLinkWithIndex(rawTarget, linkIndex);
+        let label = wikiLinkLabel(rawTarget);
+        let resolution: WikiLinkResolution = resolveWikiLinkWithIndex(rawTarget, linkIndex);
+        let consumedLength = match[0].length;
+
+        // Check for hybrid format: [[wiki-link]](url)
+        const afterMatch = cell.slice(matchStart + match[0].length);
+        const urlSuffix = afterMatch.match(/^\(([^)\n]+)\)/);
+        if (urlSuffix) {
+          consumedLength += urlSuffix[0].length;
+          const href = urlSuffix[1] ?? "";
+          if (/^(https?:|mailto:)/i.test(href)) {
+            resolution = { status: "external", href };
+          }
+          label = rawTarget;
+        }
+
         container.appendChild(createLinkElement(label, resolution, onOpenFile));
+        lastIndex = matchStart + consumedLength;
+        continue;
       } else if (match[2] !== undefined && match[3] !== undefined) {
         // Markdown link: [label](target)
         const label = match[2];
