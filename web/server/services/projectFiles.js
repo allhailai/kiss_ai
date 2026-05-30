@@ -206,6 +206,10 @@ export function createProjectFileService({
       return { path: normalized, kind: "ai", editable: false, annotation: true };
     }
 
+    if (normalized.startsWith("outputs_ai/wiki/")) {
+      return { path: normalized, kind: "output", editable: false, annotation: true };
+    }
+
     if (normalized.startsWith("outputs_ai/")) {
       return { path: normalized, kind: "output", editable: true, annotation: true };
     }
@@ -331,12 +335,21 @@ export function createProjectFileService({
         if (!entry.name.endsWith(".md")) continue;
 
         const stat = await fs.stat(absolute);
+        let fileEditable = editable;
+        let fileKind = kind;
+        let fileAnnotation = annotation;
+        try {
+          const meta = classifyPath(projectRoot, relative);
+          fileEditable = meta.editable;
+          fileKind = meta.kind;
+          fileAnnotation = meta.annotation;
+        } catch { /* fall back to tree-root defaults */ }
         files.push({
           path: relative,
           name: relative.replace(`${root.relative}/`, ""),
-          kind,
-          editable,
-          annotation,
+          kind: fileKind,
+          editable: fileEditable,
+          annotation: fileAnnotation,
           chatContextReadable: isChatContextReadablePath(relative),
           modifiedAt: stat.mtime.toISOString(),
           previewable: true,
