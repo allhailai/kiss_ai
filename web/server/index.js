@@ -30,6 +30,20 @@ import { createProjectService } from "./services/projects.js";
 import { createProjectUiStateService } from "./services/projectUiState.js";
 import { createSystemSettingsService } from "./services/systemSettings.js";
 
+// ── Process-level safety net ──
+// Prevent stray SDK rejections (e.g. Cursor LocalIgnoreService.init → ConnectError)
+// from crashing the entire server. Build-pipeline errors should degrade gracefully,
+// not terminate the Node process.
+process.on("unhandledRejection", (reason) => {
+  console.error("[kiss_ai UNHANDLED REJECTION] The server caught an unhandled promise rejection and will continue running.", reason);
+});
+process.on("uncaughtException", (error) => {
+  // Log but do NOT re-throw — keep the server alive.
+  // Only truly fatal errors (OOM, stack overflow) should kill the process,
+  // and those bypass this handler anyway.
+  console.error("[kiss_ai UNCAUGHT EXCEPTION] The server caught an uncaught exception and will continue running.", error);
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(__dirname, "..");
 const HUB_ROOT = path.resolve(WEB_ROOT, "..");

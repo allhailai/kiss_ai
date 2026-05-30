@@ -388,18 +388,21 @@ export function createAgentJobService({
       await appendRunLog(project.slug, `Using Cursor API key from ${cursorApiKey.source}.`);
       await appendRunLog(project.slug, `Using Cursor model: ${modelId}.`);
 
-      runAgentJob({ project, apiKey: cursorApiKey.apiKey, modelId, prompt, jobName, runKind, releaseProjectAgent, signal: activeAbortControllers.get(project.slug)?.signal, jobContext }).catch((error) => {
-        void (async () => {
+      runAgentJob({ project, apiKey: cursorApiKey.apiKey, modelId, prompt, jobName, runKind, releaseProjectAgent, signal: activeAbortControllers.get(project.slug)?.signal, jobContext }).catch(async (error) => {
+        try {
+          const message = error instanceof Error ? error.message : `Unknown ${jobName.toLowerCase()} error.`;
           const current = await getRebuildState(project.slug);
           await setRebuildState(project.slug, {
             ...current,
             running: false,
             status: "error",
             finishedAt: new Date().toISOString(),
-            message: error instanceof Error ? error.message : `Unknown ${jobName.toLowerCase()} error.`,
+            message,
           });
-          await appendRunLog(project.slug, (await getRebuildState(project.slug)).message);
-        })();
+          await appendRunLog(project.slug, message);
+        } catch (cleanupError) {
+          console.error(`[kiss_ai] Failed to record ${jobName} error state:`, cleanupError);
+        }
       });
 
       return await getRebuildState(project.slug);
@@ -1621,8 +1624,29 @@ export function createAgentJobService({
   async function cancelAgentJob(projectSlug) {
     const controller = activeAbortControllers.get(projectSlug);
     if (!controller) {
-      // No running job — return current state
-      return await getRebuildState(projectSlug);
+      // No live abort controller — if state is stuck on running (orphaned from a crash),
+      // force-clear it so the user can retry without restarting the server.
+      const state = await getRebuildState(projectSlug);
+      if (state.running) {
+        const finishedAt = new Date().toISOString();
+        const cleared = await setRebuildState(projectSlug, {
+          ...state,
+          running: false,
+          status: "interrupted",
+          finishedAt,
+          message: "Cleared orphaned running state (no active process found).",
+          activeAssistantMessageId: null,
+        });
+        await appendRunEvent(projectSlug, {
+          type: "error",
+          title: "Run interrupted (orphan cleared)",
+          text: "The previous run was stuck. State has been reset so you can retry.",
+          status: "interrupted",
+          runtime: "server",
+        });
+        return cleared;
+      }
+      return state;
     }
 
     controller.abort();
