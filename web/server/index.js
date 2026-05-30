@@ -343,6 +343,7 @@ const { saveCursorApiKey, systemSettings } = createSystemSettingsService({
   listCursorModels,
   resolveCursorApiKey,
   secretStore,
+  WEB_ROOT,
 });
 
 const { lintDesignIdentity, parseDesignIdentity } = createDesignIdentityService();

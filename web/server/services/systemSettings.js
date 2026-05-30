@@ -1,3 +1,6 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+
 const settingsSuccessMessage = "Success! API key has been saved and works.";
 const settingsFailureMessage = "Failed! Please try again. If this issue persists, contact AllHail.AI";
 
@@ -6,6 +9,7 @@ export function createSystemSettingsService({
   listCursorModels,
   resolveCursorApiKey,
   secretStore,
+  WEB_ROOT,
 }) {
   async function systemSettings() {
     const cursorApiKey = await resolveCursorApiKey();
@@ -17,13 +21,48 @@ export function createSystemSettingsService({
     };
   }
 
-  async function saveCursorApiKey(apiKey) {
-    if (!secretStore.supported) {
-      throw httpError("Saving Cursor API keys is not supported on this platform. Use the CURSOR_API_KEY environment variable or web/.env instead.", 501, "cursor_api_key_platform_unsupported");
-    }
+  /**
+   * Write the Cursor API key to `web/.env` as a fallback when the OS
+   * credential store is unavailable (headless Linux, Docker, etc.).
+   * Preserves existing env vars and updates CURSOR_API_KEY in place.
+   */
+  async function writeDotEnvCursorApiKey(apiKey) {
+    const envPath = path.join(WEB_ROOT, ".env");
+    const entry = `CURSOR_API_KEY="${apiKey}"`;
+    let content = "";
 
     try {
-      await secretStore.write("cursor_api_key", apiKey);
+      content = await fs.readFile(envPath, "utf8");
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+
+    if (content) {
+      const lines = content.split("\n");
+      const index = lines.findIndex(
+        (line) => line.trim().startsWith("CURSOR_API_KEY=") && !line.trim().startsWith("#"),
+      );
+
+      if (index !== -1) {
+        lines[index] = entry;
+        content = lines.join("\n");
+      } else {
+        content = content.trimEnd() + "\n" + entry + "\n";
+      }
+    } else {
+      content = entry + "\n";
+    }
+
+    await fs.writeFile(envPath, content, "utf8");
+  }
+
+  async function saveCursorApiKey(apiKey) {
+    try {
+      if (secretStore.supported) {
+        await secretStore.write("cursor_api_key", apiKey);
+      } else {
+        await writeDotEnvCursorApiKey(apiKey);
+      }
     } catch {
       throw httpError(settingsFailureMessage, 500, "cursor_api_key_save_failed");
     }
@@ -45,4 +84,5 @@ export function createSystemSettingsService({
     systemSettings,
   };
 }
+
 

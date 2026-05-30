@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { httpError } from "./httpErrors.js";
 import { createSystemSettingsService } from "./systemSettings.js";
 
@@ -31,6 +33,7 @@ describe("systemSettings service", () => {
         warnings: [],
       }),
       secretStore: createMockSecretStore(),
+      WEB_ROOT: "/tmp/test-web",
     });
 
     await expect(service.systemSettings()).resolves.toEqual({
@@ -51,6 +54,7 @@ describe("systemSettings service", () => {
         warnings: [],
       }),
       secretStore: createMockSecretStore(),
+      WEB_ROOT: "/tmp/test-web",
     });
 
     await expect(service.systemSettings()).resolves.toMatchObject({
@@ -66,6 +70,7 @@ describe("systemSettings service", () => {
       listCursorModels: async () => [{ id: "model-a" }],
       resolveCursorApiKey: async () => ({ available: false, source: null, warnings: [] }),
       secretStore,
+      WEB_ROOT: "/tmp/test-web",
     });
 
     await expect(service.saveCursorApiKey("cursor-secret")).resolves.toEqual({
@@ -85,6 +90,7 @@ describe("systemSettings service", () => {
       },
       resolveCursorApiKey: async () => ({ available: false, source: null, warnings: [] }),
       secretStore: createMockSecretStore(),
+      WEB_ROOT: "/tmp/test-web",
     });
 
     await expect(service.saveCursorApiKey("bad-key")).rejects.toMatchObject({
@@ -99,6 +105,7 @@ describe("systemSettings service", () => {
       listCursorModels: async () => [{ id: "model-a" }],
       resolveCursorApiKey: async () => ({ available: false, source: null, warnings: [] }),
       secretStore: createMockSecretStore({ writeFail: true }),
+      WEB_ROOT: "/tmp/test-web",
     });
 
     await expect(service.saveCursorApiKey("cursor-secret")).rejects.toMatchObject({
@@ -106,17 +113,54 @@ describe("systemSettings service", () => {
     });
   });
 
-  it("rejects saving Cursor API keys on unsupported platforms", async () => {
-    const service = createSystemSettingsService({
-      httpError,
-      listCursorModels: async () => [],
-      resolveCursorApiKey: async () => ({ available: false, source: null, warnings: [] }),
-      secretStore: createMockSecretStore({ supported: false }),
-    });
+  it("falls back to writing web/.env when secret store is unsupported", async () => {
+    const tmpDir = path.join(import.meta.dirname, "__test_tmp_dotenv_" + Date.now());
+    await fs.mkdir(tmpDir, { recursive: true });
 
-    await expect(service.saveCursorApiKey("cursor-secret")).rejects.toMatchObject({
-      code: "cursor_api_key_platform_unsupported",
-      statusCode: 501,
-    });
+    try {
+      const service = createSystemSettingsService({
+        httpError,
+        listCursorModels: async () => [{ id: "model-a" }],
+        resolveCursorApiKey: async () => ({ available: false, source: null, warnings: [] }),
+        secretStore: createMockSecretStore({ supported: false }),
+        WEB_ROOT: tmpDir,
+      });
+
+      await expect(service.saveCursorApiKey("cursor-secret")).resolves.toEqual({
+        ok: true,
+        message: "Success! API key has been saved and works.",
+      });
+
+      const envContent = await fs.readFile(path.join(tmpDir, ".env"), "utf8");
+      expect(envContent).toBe('CURSOR_API_KEY="cursor-secret"\n');
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("updates an existing CURSOR_API_KEY line in web/.env", async () => {
+    const tmpDir = path.join(import.meta.dirname, "__test_tmp_dotenv_" + Date.now());
+    await fs.mkdir(tmpDir, { recursive: true });
+    await fs.writeFile(path.join(tmpDir, ".env"), 'OTHER_VAR="hello"\nCURSOR_API_KEY="old-key"\nANOTHER="world"\n');
+
+    try {
+      const service = createSystemSettingsService({
+        httpError,
+        listCursorModels: async () => [{ id: "model-a" }],
+        resolveCursorApiKey: async () => ({ available: false, source: null, warnings: [] }),
+        secretStore: createMockSecretStore({ supported: false }),
+        WEB_ROOT: tmpDir,
+      });
+
+      await service.saveCursorApiKey("new-key");
+
+      const envContent = await fs.readFile(path.join(tmpDir, ".env"), "utf8");
+      expect(envContent).toContain('CURSOR_API_KEY="new-key"');
+      expect(envContent).toContain('OTHER_VAR="hello"');
+      expect(envContent).toContain('ANOTHER="world"');
+      expect(envContent).not.toContain("old-key");
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
   });
 });
