@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { artifactsApi } from "../../data/artifactsApi";
+import { downloadProjectFile, triggerDownload } from "../../data/downloadFile";
 import { useRouteContext } from "../../app/contexts/RouteContext";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
 import { groupModelsByTier, modelDisplayName, modelTierLabels } from "../../domain/modelLabels";
@@ -310,6 +311,26 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
               type="button"
             >
               {saving ? "Saving…" : "Save"}
+            </button>
+          ) : null}
+          {isBuilt ? (
+            <button
+              className="artifacts-action-btn"
+              onClick={() => triggerDownload(artifactsApi.previewUrl(projectSlug, selectedSlug), `${selectedSlug}.html`)}
+              title="Download the built HTML file"
+              type="button"
+            >
+              ↓ HTML
+            </button>
+          ) : null}
+          {selectedSpec ? (
+            <button
+              className="artifacts-action-btn"
+              onClick={() => downloadProjectFile(projectSlug, `artifacts/artifact_specs/${selectedSlug}.artifact.md`)}
+              title="Download the artifact spec"
+              type="button"
+            >
+              ↓ Spec
             </button>
           ) : null}
           <button

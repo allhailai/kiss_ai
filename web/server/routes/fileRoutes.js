@@ -145,6 +145,24 @@ export function registerFileRoutes(app, {
     }
   });
 
+  app.get("/api/projects/:projectSlug/file/download", async (request, response, next) => {
+    try {
+      const query = parseRequestQuery(filePathQuerySchema, request.query, httpError);
+      const file = await readTextFile(request.project.path, query.path);
+
+      const basename = query.path.split("/").pop() || "download.txt";
+      const ext = basename.split(".").pop()?.toLowerCase() || "";
+      const contentTypes = { md: "text/markdown", html: "text/html", json: "application/json", css: "text/css", js: "text/javascript" };
+      const contentType = contentTypes[ext] || "text/plain";
+
+      response.setHeader("Content-Type", `${contentType}; charset=utf-8`);
+      response.setHeader("Content-Disposition", `attachment; filename="${basename}"`);
+      response.send(file.content);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get("/api/projects/:projectSlug/file/diff", async (request, response, next) => {
     try {
       const query = parseRequestQuery(filePathQuerySchema, request.query, httpError);

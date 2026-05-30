@@ -120,7 +120,7 @@ const treeRoots = new Map([
   ["human", { root: "inputs_human", kind: "human", editable: false, annotation: false }],
   ["sources", { root: "sources", kind: "ai", editable: false, annotation: true }],
   ["inputs-ai", { root: "inputs_ai", kind: "ai", editable: false, annotation: true }],
-  ["outputs", { root: "outputs_ai", kind: "output", editable: false, annotation: true }],
+  ["outputs", { root: "outputs_ai", kind: "output", editable: true, annotation: true }],
   ["logs", { root: "change_logs", kind: "log", editable: false, annotation: false }],
 ]);
 

@@ -1,4 +1,5 @@
 import type { FileContent, FileDiff, ProjectFile } from "../../contracts/api";
+import { downloadProjectFile } from "../../data/downloadFile";
 import { countDeletedLines, countDiffRangeLines } from "../../domain/diffs";
 import { humanizeFilePath } from "../../domain/files";
 import { isAiManagedPath } from "../../domain/projectPaths";
@@ -133,6 +134,14 @@ function EditorPane({
               AI File Assist
             </button>
           ) : null}
+          <button
+            className="editor-secondary-button"
+            onClick={() => downloadProjectFile(projectSlug, selected.path)}
+            title="Download this file"
+            type="button"
+          >
+            ↓ Download
+          </button>
           {hasSavedDiff ? (
             <button className="editor-secondary-button" disabled={!canWrite} onClick={onRevert} type="button">
               Revert to Committed State

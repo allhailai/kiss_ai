@@ -149,7 +149,7 @@ export function useAgentFileContext({
       editable: selected.editable,
       annotation: selected.annotation,
     } : null);
-    if (!resolvedFile?.editable) return;
+    if (!resolvedFile?.editable && !resolvedFile?.annotation) return;
     const editableFile = editableSelectionFromProjectFile(resolvedFile);
     setAiEditableFiles((current) => {
       if (current.some((candidate) => candidate.path === editableFile.path)) return current;
