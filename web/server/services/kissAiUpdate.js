@@ -37,6 +37,15 @@ export function createKissAiUpdateService({ HUB_ROOT, WEB_ROOT, PORT, execFileTe
     const status = normalizeCommandOutput(await git(["status", "--porcelain"]));
     if (!status) return;
 
+    // Ignore package-lock.json — it regenerates differently across npm versions
+    // and platforms. The update flow runs `npm install` after pulling, which
+    // reconciles the lockfile automatically.
+    const significantChanges = status
+      .split("\n")
+      .filter((line) => !line.trimStart().endsWith("web/package-lock.json"))
+      .filter(Boolean);
+    if (!significantChanges.length) return;
+
     throw httpError(
       "_kiss_ai has local file changes. Ask a maintainer to save or clear those changes before getting the latest version.",
       409,

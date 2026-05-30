@@ -134,6 +134,28 @@ describe("kissAiUpdate service", () => {
     });
   });
 
+  it("allows update checks when only package-lock.json is modified", async () => {
+    const updateService = createKissAiUpdateService({
+      HUB_ROOT: "/repo/_kiss_ai",
+      WEB_ROOT: "/repo/_kiss_ai/web",
+      PORT: 8787,
+      execFileText: createExecFileText({
+        "git rev-parse --is-inside-work-tree": "true",
+        "git status --porcelain": " M web/package-lock.json",
+        "git rev-parse --abbrev-ref --symbolic-full-name @{u}": "target/master",
+        "git fetch --prune target": "",
+        "git rev-parse --short HEAD": "aaa111",
+        "git rev-parse --short target/master": "aaa111",
+      }),
+      httpError,
+    });
+
+    await expect(updateService.checkKissAiUpdate()).resolves.toMatchObject({
+      status: "up_to_date",
+      updateAvailable: false,
+    });
+  });
+
   it("updateAndRestart returns restarting:false when already up to date", async () => {
     const updateService = createKissAiUpdateService({
       HUB_ROOT: "/repo/_kiss_ai",
