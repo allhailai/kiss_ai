@@ -14,10 +14,12 @@ export function registerApiRoutes(app, deps) {
     httpError: deps.httpError,
     KISS_AI_MODE: deps.KISS_AI_MODE,
     readKeybindings: deps.readKeybindings,
+    readProjectsViewPreference: deps.readProjectsViewPreference,
     saveCursorApiKey: deps.saveCursorApiKey,
     systemSettings: deps.systemSettings,
     updateAndRestart: deps.updateAndRestart,
     updateKissAi: deps.updateKissAi,
+    writeProjectsViewPreference: deps.writeProjectsViewPreference,
   });
 
   registerProjectRoutes(app, {

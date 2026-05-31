@@ -1,12 +1,32 @@
 import { parseRequestBody, saveCursorApiKeyBodySchema } from "./requestSchemas.js";
 
-export function registerSystemRoutes(app, { authMiddleware, checkKissAiUpdate, httpError, KISS_AI_MODE, readKeybindings, saveCursorApiKey, systemSettings, updateAndRestart, updateKissAi }) {
+export function registerSystemRoutes(app, { authMiddleware, checkKissAiUpdate, httpError, KISS_AI_MODE, readKeybindings, readProjectsViewPreference, saveCursorApiKey, systemSettings, updateAndRestart, updateKissAi, writeProjectsViewPreference }) {
   // In server mode, system mutation routes require admin. In standalone, no-op passthrough.
   const adminOnly = KISS_AI_MODE === "server" && authMiddleware ? authMiddleware.requireAdmin : (_req, _res, next) => next();
 
   app.get("/api/system/keybindings", async (_request, response, next) => {
     try {
       response.json(await readKeybindings());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/system/projects-view", async (_request, response, next) => {
+    try {
+      response.json(await readProjectsViewPreference());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/system/projects-view", async (request, response, next) => {
+    try {
+      const view = request.body?.view;
+      if (view !== "cards" && view !== "table") {
+        throw httpError("Invalid view. Must be 'cards' or 'table'.", 400, "invalid_projects_view");
+      }
+      response.json(await writeProjectsViewPreference(view));
     } catch (error) {
       next(error);
     }

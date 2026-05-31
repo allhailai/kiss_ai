@@ -434,3 +434,114 @@
   background: var(--color-background);
 }
 
+/* ── View toggle (cards / table) ─────────────────────────────────────── */
+
+.project-view-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-background) 60%, white);
+}
+
+.project-view-toggle button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-secondary);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.project-view-toggle button:hover {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
+}
+
+.project-view-toggle button.active {
+  background: var(--color-accent);
+  color: white;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+/* ── Project table view ──────────────────────────────────────────────── */
+
+.project-table-wrapper {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow: 0 8px 18px rgba(23, 32, 42, 0.05);
+}
+
+.project-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.project-table thead {
+  background: color-mix(in srgb, var(--color-background) 60%, white);
+}
+
+.project-table th {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.project-table tbody tr {
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.project-table tbody tr:not(:last-child) td {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
+}
+
+.project-table tbody tr:hover,
+.project-table tbody tr:focus-visible {
+  background: color-mix(in srgb, var(--color-accent) 6%, white);
+  outline: none;
+}
+
+.project-table td {
+  padding: 10px 14px;
+  color: var(--color-primary);
+  font-size: 0.82rem;
+  vertical-align: middle;
+}
+
+.project-table-name {
+  font-weight: 700;
+}
+
+.project-table-status .eyebrow {
+  display: inline-block;
+}
+
+.project-table-date {
+  white-space: nowrap;
+}
+
+.project-table-date strong {
+  font-size: inherit;
+  font-weight: 700;
+}
+
+.project-table-date span {
+  color: var(--color-secondary);
+}
+

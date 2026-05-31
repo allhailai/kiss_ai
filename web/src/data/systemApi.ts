@@ -11,6 +11,12 @@ import { request } from "./request";
 
 export const systemApi = {
   keybindings: () => request<Keybindings>("/api/system/keybindings"),
+  projectsView: () => request<{ view: "cards" | "table" }>("/api/system/projects-view"),
+  setProjectsView: (view: "cards" | "table") =>
+    request<{ view: "cards" | "table" }>("/api/system/projects-view", {
+      method: "PUT",
+      body: JSON.stringify({ view }),
+    }),
   systemSettings: () => request<SystemSettingsResponse>("/api/system/settings"),
   saveCursorApiKey: (body: SaveCursorApiKeyRequest) =>
     request<SaveCursorApiKeyResponse>("/api/system/settings/cursor-api-key", {
