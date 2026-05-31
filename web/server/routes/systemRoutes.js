@@ -1,6 +1,6 @@
 import { parseRequestBody, saveCursorApiKeyBodySchema } from "./requestSchemas.js";
 
-export function registerSystemRoutes(app, { authMiddleware, checkKissAiUpdate, httpError, KISS_AI_MODE, readKeybindings, readProjectsViewPreference, saveCursorApiKey, systemSettings, updateAndRestart, updateKissAi, writeProjectsViewPreference }) {
+export function registerSystemRoutes(app, { authMiddleware, checkKissAiUpdate, httpError, KISS_AI_MODE, readKeybindings, readPinnedProjects, readProjectsViewPreference, saveCursorApiKey, systemSettings, updateAndRestart, updateKissAi, writePinnedProjects, writeProjectsViewPreference }) {
   // In server mode, system mutation routes require admin. In standalone, no-op passthrough.
   const adminOnly = KISS_AI_MODE === "server" && authMiddleware ? authMiddleware.requireAdmin : (_req, _res, next) => next();
 
@@ -27,6 +27,26 @@ export function registerSystemRoutes(app, { authMiddleware, checkKissAiUpdate, h
         throw httpError("Invalid view. Must be 'cards' or 'table'.", 400, "invalid_projects_view");
       }
       response.json(await writeProjectsViewPreference(view));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/system/pinned-projects", async (_request, response, next) => {
+    try {
+      response.json(await readPinnedProjects());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/system/pinned-projects", async (request, response, next) => {
+    try {
+      const pinned = request.body?.pinned;
+      if (!Array.isArray(pinned)) {
+        throw httpError("Invalid pinned list. Must be an array of project slugs.", 400, "invalid_pinned_projects");
+      }
+      response.json(await writePinnedProjects(pinned));
     } catch (error) {
       next(error);
     }

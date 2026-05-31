@@ -17,6 +17,12 @@ export const systemApi = {
       method: "PUT",
       body: JSON.stringify({ view }),
     }),
+  pinnedProjects: () => request<{ pinned: string[] }>("/api/system/pinned-projects"),
+  setPinnedProjects: (pinned: string[]) =>
+    request<{ pinned: string[] }>("/api/system/pinned-projects", {
+      method: "PUT",
+      body: JSON.stringify({ pinned }),
+    }),
   systemSettings: () => request<SystemSettingsResponse>("/api/system/settings"),
   saveCursorApiKey: (body: SaveCursorApiKeyRequest) =>
     request<SaveCursorApiKeyResponse>("/api/system/settings/cursor-api-key", {

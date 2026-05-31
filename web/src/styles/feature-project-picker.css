@@ -300,6 +300,60 @@
   box-shadow: 0 12px 24px rgba(23, 32, 42, 0.08);
 }
 
+.project-card-pinned {
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 3%, var(--color-surface));
+}
+
+.project-card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ── Pin button ──────────────────────────────────────────────────────── */
+
+.project-pin-button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: color-mix(in srgb, var(--color-secondary) 40%, transparent);
+  cursor: pointer;
+  transition: color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.project-pin-button:hover {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.project-pin-button.pinned {
+  color: var(--color-accent);
+  transform: rotate(-45deg);
+}
+
+.project-pin-button.pinned:hover {
+  color: var(--color-danger-strong, #dc3545);
+  background: color-mix(in srgb, var(--color-danger-strong, #dc3545) 8%, transparent);
+}
+
+/* ── Table pin column ────────────────────────────────────────────────── */
+
+.project-table-pin-col {
+  width: 32px;
+}
+
+.project-table-pin-cell {
+  width: 32px;
+  text-align: center;
+}
+
 .project-card strong {
   font-size: 1rem;
   margin-top: 5px;

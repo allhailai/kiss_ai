@@ -473,6 +473,32 @@ async function writeProjectsViewPreference(view) {
   return { view: settings.projects_view };
 }
 
+async function readPinnedProjects() {
+  const settingsPath = path.join(PROJECTS_ROOT, ".kiss_ai_settings.json");
+  try {
+    const raw = await fs.readFile(settingsPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    const pinned = parsed?.pinned_projects;
+    return { pinned: Array.isArray(pinned) ? pinned : [] };
+  } catch {
+    return { pinned: [] };
+  }
+}
+
+async function writePinnedProjects(pinned) {
+  const settingsPath = path.join(PROJECTS_ROOT, ".kiss_ai_settings.json");
+  let settings = {};
+
+  try {
+    const raw = await fs.readFile(settingsPath, "utf-8");
+    settings = JSON.parse(raw);
+  } catch { /* missing or malformed — start fresh */ }
+
+  settings.pinned_projects = Array.isArray(pinned) ? pinned.filter((s) => typeof s === "string") : [];
+  await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+  return { pinned: settings.pinned_projects };
+}
+
 registerApiRoutes(app, {
   assistQuestion,
   authMiddleware,
@@ -507,6 +533,7 @@ registerApiRoutes(app, {
   readConversation,
   readProjectJson,
   readKeybindings,
+  readPinnedProjects,
   readProjectsViewPreference,
   readProjectUiState,
   readTextFile,
@@ -539,6 +566,7 @@ registerApiRoutes(app, {
   updateMessageFileRenameStatus,
   uploadHumanInputFiles,
   writeTextFile,
+  writePinnedProjects,
   writeProjectsViewPreference,
   writeProjectUiState,
 });

@@ -37,6 +37,26 @@ function DateCell({ timestamp }: { timestamp: string | null }) {
   );
 }
 
+function PinButton({ pinned, onToggle }: { pinned: boolean; onToggle: () => void }) {
+  return (
+    <button
+      aria-label={pinned ? "Unpin project" : "Pin project"}
+      className={`project-pin-button${pinned ? " pinned" : ""}`}
+      onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      title={pinned ? "Unpin" : "Pin to top"}
+      type="button"
+    >
+      {/* Pin icon */}
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path
+          d="M9.828 1.172a1 1 0 0 1 1.414 0l3.586 3.586a1 1 0 0 1 0 1.414l-2.293 2.293-.707.707-1 1L9.414 11.586l-3-3L7.828 7.172l1-1 .707-.707 2.293-2.293ZM6.414 8.586l-3 3L2 13.5l1.914-1.414 3-3Z"
+          fill="currentColor"
+        />
+      </svg>
+    </button>
+  );
+}
+
 function ViewToggle({ view, onChange }: { view: ViewMode; onChange: (v: ViewMode) => void }) {
   return (
     <div className="project-view-toggle" role="radiogroup" aria-label="View mode">
@@ -49,7 +69,6 @@ function ViewToggle({ view, onChange }: { view: ViewMode; onChange: (v: ViewMode
         title="Card view"
         type="button"
       >
-        {/* Grid icon (4 squares) */}
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor"/>
           <rect x="9" y="1" width="6" height="6" rx="1" fill="currentColor"/>
@@ -66,7 +85,6 @@ function ViewToggle({ view, onChange }: { view: ViewMode; onChange: (v: ViewMode
         title="Table view"
         type="button"
       >
-        {/* List icon (3 horizontal lines) */}
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <rect x="1" y="2" width="14" height="2.5" rx="1" fill="currentColor"/>
           <rect x="1" y="6.75" width="14" height="2.5" rx="1" fill="currentColor"/>
@@ -77,18 +95,38 @@ function ViewToggle({ view, onChange }: { view: ViewMode; onChange: (v: ViewMode
   );
 }
 
-function ProjectTable({ projects, onSelect }: { projects: ProjectSummary[]; onSelect: (slug: string) => void }) {
-  const sorted = [...projects].sort((a, b) => {
+/** Sort projects: pinned first (preserving pin order), then by modifiedAt descending. */
+function sortProjects(projects: ProjectSummary[], pinnedSlugs: Set<string>): ProjectSummary[] {
+  return [...projects].sort((a, b) => {
+    const aPinned = pinnedSlugs.has(a.slug);
+    const bPinned = pinnedSlugs.has(b.slug);
+    if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
     const aTime = a.modifiedAt ? new Date(a.modifiedAt).getTime() : 0;
     const bTime = b.modifiedAt ? new Date(b.modifiedAt).getTime() : 0;
     return bTime - aTime;
   });
+}
+
+function ProjectTable({
+  projects,
+  pinnedSlugs,
+  onSelect,
+  onTogglePin,
+}: {
+  projects: ProjectSummary[];
+  pinnedSlugs: Set<string>;
+  onSelect: (slug: string) => void;
+  onTogglePin: (slug: string) => void;
+}) {
+  const sorted = sortProjects(projects, pinnedSlugs);
 
   return (
     <div className="project-table-wrapper">
       <table className="project-table">
         <thead>
           <tr>
+            <th className="project-table-pin-col" aria-label="Pin" />
             <th>Name</th>
             <th>Status</th>
             <th>Created</th>
@@ -99,6 +137,9 @@ function ProjectTable({ projects, onSelect }: { projects: ProjectSummary[]; onSe
         <tbody>
           {sorted.map((project) => (
             <tr key={project.slug} onClick={() => onSelect(project.slug)} tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") onSelect(project.slug); }}>
+              <td className="project-table-pin-cell">
+                <PinButton pinned={pinnedSlugs.has(project.slug)} onToggle={() => onTogglePin(project.slug)} />
+              </td>
               <td className="project-table-name">{project.name}</td>
               <td className="project-table-status"><span className="eyebrow">{project.setupStatus}</span></td>
               <DateCell timestamp={project.createdAt} />
@@ -137,6 +178,7 @@ export function ProjectPicker({
   const [createError, setCreateError] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
   const [viewLoaded, setViewLoaded] = useState(false);
+  const [pinnedSlugs, setPinnedSlugs] = useState<Set<string>>(new Set());
   const selectedSlug = slugifyProjectName(projectName);
   const slugIsValid = !selectedSlug || /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(selectedSlug);
   const projectNameIsTaken = Boolean(selectedSlug && projects.some((project) => project.slug === selectedSlug));
@@ -145,17 +187,32 @@ export function ProjectPicker({
   const canCreate = Boolean(projectName.trim() && selectedSlug && slugIsValid && !projectNameIsTaken && !creatingProject);
 
   useEffect(() => {
-    systemApi.projectsView()
-      .then(({ view }) => {
-        setViewMode(view);
-        setViewLoaded(true);
-      })
-      .catch(() => setViewLoaded(true));
+    Promise.all([
+      systemApi.projectsView(),
+      systemApi.pinnedProjects(),
+    ]).then(([viewResult, pinnedResult]) => {
+      setViewMode(viewResult.view);
+      setPinnedSlugs(new Set(pinnedResult.pinned));
+      setViewLoaded(true);
+    }).catch(() => setViewLoaded(true));
   }, []);
 
   const handleViewChange = (newView: ViewMode) => {
     setViewMode(newView);
     void systemApi.setProjectsView(newView);
+  };
+
+  const handleTogglePin = (slug: string) => {
+    setPinnedSlugs((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) {
+        next.delete(slug);
+      } else {
+        next.add(slug);
+      }
+      void systemApi.setPinnedProjects([...next]);
+      return next;
+    });
   };
 
   const submitProject = async (event: FormEvent<HTMLFormElement>) => {
@@ -185,6 +242,8 @@ export function ProjectPicker({
       setCreateError(errorMessage(submitError, "Could not create the project."));
     }
   };
+
+  const sortedProjects = sortProjects(projects, pinnedSlugs);
 
   return (
     <section className="project-picker">
@@ -250,9 +309,12 @@ export function ProjectPicker({
 
       {viewMode === "cards" ? (
         <div className="project-card-grid">
-          {projects.map((project) => (
-            <button className="project-card" key={project.slug} onClick={() => onSelect(project.slug)} type="button">
-              <span className="eyebrow">{project.setupStatus}</span>
+          {sortedProjects.map((project) => (
+            <button className={`project-card${pinnedSlugs.has(project.slug) ? " project-card-pinned" : ""}`} key={project.slug} onClick={() => onSelect(project.slug)} type="button">
+              <div className="project-card-top-row">
+                <span className="eyebrow">{project.setupStatus}</span>
+                <PinButton pinned={pinnedSlugs.has(project.slug)} onToggle={() => handleTogglePin(project.slug)} />
+              </div>
               <strong>{project.name}</strong>
               <table className="project-card-dates">
                 <tbody>
@@ -265,7 +327,7 @@ export function ProjectPicker({
           ))}
         </div>
       ) : (
-        <ProjectTable projects={projects} onSelect={onSelect} />
+        <ProjectTable projects={projects} pinnedSlugs={pinnedSlugs} onSelect={onSelect} onTogglePin={handleTogglePin} />
       )}
     </section>
   );
