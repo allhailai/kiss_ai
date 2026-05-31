@@ -103,12 +103,30 @@ export function buildWikiLinkExtension({
     // Collect all link decorations across all visible ranges first
     const allLinks: Array<{ from: number; to: number; label: string; resolution: WikiLinkResolution }> = [];
 
+    // Determine which lines have cursors — links on those lines stay as
+    // raw markdown so the user can edit them.
+    const cursorLines = new Set<number>();
+    for (const range of view.state.selection.ranges) {
+      const startLine = view.state.doc.lineAt(range.from).number;
+      const endLine = view.state.doc.lineAt(range.to).number;
+      for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
+        cursorLines.add(lineNum);
+      }
+    }
+
     for (const { from, to } of view.visibleRanges) {
       let position = from;
 
       while (position <= to) {
         const line = view.state.doc.lineAt(position);
         const table = parseMarkdownTableBlock(view.state.doc, line.number);
+
+        // Skip cursor lines — show raw markdown for editing
+        if (cursorLines.has(line.number)) {
+          if (line.to >= to) break;
+          position = line.to + 1;
+          continue;
+        }
 
         if (table) {
           position = table.to + 1;
@@ -203,7 +221,7 @@ export function buildWikiLinkExtension({
       }
 
       update(update: ViewUpdate) {
-        if (update.docChanged || update.viewportChanged) {
+        if (update.docChanged || update.viewportChanged || update.selectionSet) {
           this.decorations = buildDecorations(update.view);
         }
       }
