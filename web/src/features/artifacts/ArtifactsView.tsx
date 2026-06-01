@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { artifactsApi } from "../../data/artifactsApi";
+import { rebuildApi } from "../../data/rebuildApi";
 import { downloadProjectFile, triggerDownload } from "../../data/downloadFile";
 import { useRouteContext } from "../../app/contexts/RouteContext";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
@@ -22,7 +23,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const buildStartedAtRef = useRef<number>(0);
   const popoutRef = useRef<Window | null>(null);
   const noopOpenFile = useCallback(() => {}, []);
 
@@ -110,10 +111,9 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
     lastContentHashRef.current = selectedFileContent.contentHash;
   }, [projectSlug, selectedSlug, selectedFileContent?.contentHash, selectedFileContent?.path]);
 
-  // Clean up poll and popout ref on unmount
+  // Clean up popout ref on unmount
   useEffect(() => {
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
       popoutRef.current = null;
     };
   }, []);
@@ -167,35 +167,52 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
         flash("Build started — agent is generating HTML…");
       }
 
-      // Capture build start time BEFORE the API call so we can distinguish
-      // the new build from a previous one in the polling check.
-      const buildStartedAt = new Date().toISOString();
-
       await artifactsApi.build(projectSlug, selectedSlug, String(selectedSpec?.frontmatter.modelId ?? ""));
 
-      // Poll for build completion every 5 seconds (with 5-minute safety timeout)
-      if (pollRef.current) clearInterval(pollRef.current);
-      const slugAtBuildTime = selectedSlug;
-      let pollCount = 0;
-      const maxPolls = 60; // 5 minutes at 5-second intervals
-      pollRef.current = setInterval(async () => {
-        pollCount++;
-        const updatedList = await refreshList();
-        const updated = updatedList.find((a) => a.slug === slugAtBuildTime);
+      // Record build start time AFTER the API has accepted the build.
+      // Used by the polling effect to guard against race conditions where
+      // we poll before the server has started the agent.
+      buildStartedAtRef.current = Date.now();
 
-        // The server deletes the old build dir before starting a new one.
-        // Wait for a NEW build (lastBuilt >= our start time) to appear.
-        const isNewBuild = updated?.status === "built" && updated.lastBuilt && updated.lastBuilt >= buildStartedAt;
+      // Build completion is detected by the rebuildState polling effect below.
+      // Switch to preview tab so the user sees the loading state.
+      setActiveTab("preview");
+    } catch (error) {
+      setBuilding(false);
+      flash(error instanceof Error ? error.message : "Build failed");
+    }
+  }
 
-        if (isNewBuild || pollCount >= maxPolls) {
-          if (pollRef.current) {
-            clearInterval(pollRef.current);
-            pollRef.current = null;
-          }
+  // Poll rebuildState to detect when the artifact build finishes.
+  // This fires as soon as the server-side agent job completes, unlike the old
+  // manifest-polling approach which waited for the LLM to write the manifest file.
+  useEffect(() => {
+    if (!building) return;
+
+    let cancelled = false;
+
+    async function pollRebuildState() {
+      try {
+        const state = await rebuildApi.rebuildState(projectSlug);
+        if (cancelled) return;
+
+        const isArtifactBuild = state.runKind === "artifact_build" || state.runKind === "artifact_batch_build";
+
+        if (!state.running && isArtifactBuild) {
+          // Guard against race condition: if we poll before the server has
+          // actually started the agent job, state.running may still be false
+          // from the previous (idle) state. Skip if too little time has elapsed.
+          const msSinceBuildStart = Date.now() - buildStartedAtRef.current;
+          if (msSinceBuildStart < 6000) return;
+
+          // Build genuinely finished — update UI
           setBuilding(false);
-          if (isNewBuild) {
+
+          const isSuccess = state.status === "finished" || state.status === "finished_with_attention";
+          if (isSuccess) {
+            // Refresh the artifact list so isBuilt / lastBuilt update
+            await refreshList();
             setPreviewKey((k) => k + 1);
-            setActiveTab("preview");
             // Auto-refresh popped-out preview window
             try {
               if (popoutRef.current && !popoutRef.current.closed) {
@@ -204,15 +221,36 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
             } catch { /* cross-origin or closed — ignore */ }
             flash("Build complete ✓");
           } else {
-            flash("Build timed out — check the build log.");
+            // error, interrupted, blocked, etc.
+            await refreshList();
+            flash(state.message || "Build failed — check the build log.");
           }
+        } else if (!state.running && !isArtifactBuild) {
+          // A different job type finished (or idle from before our build).
+          // Guard with the same timing check.
+          const msSinceBuildStart = Date.now() - buildStartedAtRef.current;
+          if (msSinceBuildStart < 6000) return;
+          // The artifact build may have already completed and another job
+          // started in the meantime. Refresh and clear building state.
+          setBuilding(false);
+          await refreshList();
+          flash("Build complete ✓");
         }
-      }, 5000);
-    } catch (error) {
-      setBuilding(false);
-      flash(error instanceof Error ? error.message : "Build failed");
+      } catch {
+        // polling error — ignore
+      }
     }
-  }
+
+    // Poll every 3 seconds
+    const interval = setInterval(pollRebuildState, 3000);
+    // Also do an initial check
+    void pollRebuildState();
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [building, projectSlug, refreshList]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleDelete() {
     if (!selectedSlug) return;
