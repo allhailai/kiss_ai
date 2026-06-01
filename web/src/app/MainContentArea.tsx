@@ -3,13 +3,12 @@ import type { DesignWorkspaceController, FileWorkspaceController, RebuildWorkspa
 import type { View } from "../navigation/views";
 import { useRouteContext } from "./contexts/RouteContext";
 import { useToastContext } from "./contexts/ToastContext";
-import { Dashboard } from "../features/dashboard/Dashboard";
+
 import { DesignWorkspace } from "../features/design/DesignWorkspace";
 import { FileWorkspace } from "../features/files/FileWorkspace";
 import { ArtifactsView } from "../features/artifacts/ArtifactsView";
 import { OutputSectionPage } from "../features/outputs/OutputSectionPage";
-import { ProjectChatConversationHistory } from "../features/chat/ProjectChatConversationHistory";
-import { ReviewWorkspace } from "./ReviewWorkspace";
+import { AIWorkspace } from "./AIWorkspace";
 
 const fileWorkspaceByView: Partial<Record<View, { title?: string; explainer?: string }>> = {
   requirements: {
@@ -26,8 +25,6 @@ const fileWorkspaceByView: Partial<Record<View, { title?: string; explainer?: st
 const reportsFileWorkspaceConfig = {
   explainer: "Reports are user-curated outputs. Edit directly or use the chat agent.",
 };
-
-const reviewViews = new Set<View>(["review", "questions", "topics"]);
 
 export function MainContentArea({
   designWorkspace,
@@ -54,20 +51,17 @@ export function MainContentArea({
 
   return (
     <section className="workspace">
-      {route.view === "dashboard" ? (
-        <Dashboard
-          status={rebuildWorkspace.status}
-          design={designWorkspace.design}
-          rebuild={rebuildWorkspace.rebuild}
-          buildLog={rebuildWorkspace.buildLog}
-          onOpenDesign={() => route.navigateTo("design")}
-          onSelectLog={(tabId, path, sectionId) => void rebuildWorkspace.refreshBuildLog(tabId, path, sectionId)}
+      {route.view === "ai" ? (
+        <AIWorkspace
+          context={route.context}
+          models={rebuildWorkspace.models}
+          onModelChange={rebuildWorkspace.setSelectedModelId}
+          onNavigateToFile={onOpenFile}
+          projectChat={projectChat}
+          projectSlug={projectSlug}
+          selectProjectChatConversation={selectProjectChatConversation}
+          selectedModelId={rebuildWorkspace.selectedModelId}
         />
-      ) : null}
-      {route.view === "chat" ? (
-        <div className="chat-history-workspace">
-          <ProjectChatConversationHistory chat={projectChat} onSelectConversation={selectProjectChatConversation} />
-        </div>
       ) : null}
       {fileWorkspaceConfig ? (
         <FileWorkspace
@@ -99,15 +93,6 @@ export function MainContentArea({
           onDraft={fileWorkspace.setDraft}
           onRevert={() => void fileWorkspace.revertSelected()}
           onSave={() => void fileWorkspace.saveSelected()}
-        />
-      ) : null}
-      {reviewViews.has(route.view) ? (
-        <ReviewWorkspace
-          models={rebuildWorkspace.models}
-          onModelChange={rebuildWorkspace.setSelectedModelId}
-          onNavigateToFile={onOpenFile}
-          projectSlug={projectSlug}
-          selectedModelId={rebuildWorkspace.selectedModelId}
         />
       ) : null}
       {route.view === "reports" && route.filePath ? (
@@ -158,4 +143,3 @@ export function MainContentArea({
     </section>
   );
 }
-

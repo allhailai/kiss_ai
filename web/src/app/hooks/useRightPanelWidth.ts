@@ -27,7 +27,7 @@ function maxUsablePanelWidthPx() {
 
 function defaultWidthFor(view: View, panelKind: RightPanelKind | null) {
   if (panelKind === "build-project") return buildProjectDefaultPanelWidth;
-  return view === "chat" && panelKind ? projectChatDefaultPanelWidth : defaultPanelWidth;
+  return view === "ai" && panelKind ? projectChatDefaultPanelWidth : defaultPanelWidth;
 }
 
 function panelWidthToPx(value: string) {

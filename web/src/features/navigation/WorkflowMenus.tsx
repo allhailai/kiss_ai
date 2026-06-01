@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  reviewNavLeaf,
-  chatNavLeaf,
-  requirementNavLeaves,
+  defineNavTarget,
   sectionForView,
   simplifiedNavSections,
   type SimplifiedNavSectionId,
@@ -20,8 +18,6 @@ const defaultExpandedSections = new Set<SimplifiedNavSectionId>(
 export function SimplifiedNavigator({
   currentView,
   humanInputEmptyDirectories,
-  reviewBadgeCount,
-  hasBlockingQuestions,
   projectFiles,
   projectSlug,
   loading,
@@ -39,8 +35,6 @@ export function SimplifiedNavigator({
 }: {
   currentView: View;
   humanInputEmptyDirectories?: string[];
-  reviewBadgeCount?: number;
-  hasBlockingQuestions?: boolean;
   projectFiles: ProjectFile[];
   projectSlug: string;
   loading: boolean;
@@ -56,7 +50,7 @@ export function SimplifiedNavigator({
   onOpenView: (view: View, path?: string | null) => void;
   onOpenFile: (path: string) => void;
 }) {
-  const activeSection = sectionForView(currentView);
+  const activeSection = sectionForView(currentView, selectedPath);
   const [expandedSections, setExpandedSections] = useState<Set<SimplifiedNavSectionId>>(
     () => new Set(defaultExpandedSections),
   );
@@ -110,46 +104,54 @@ export function SimplifiedNavigator({
     });
   }
 
-  // Sections where clicking the header should navigate to a list view (not just toggle)
-  const navigableSections: Partial<Record<SimplifiedNavSectionId, View>> = {
-    chat: "chat",
-    reports: "reports",
-    artifacts: "artifacts",
+  // Sections where clicking the header should navigate to a view (not just toggle)
+  // "ai" navigates to the AI hub, "define" navigates directly to project.md,
+  // "reports" and "artifacts" navigate to their list views.
+  const navigableSections: Partial<Record<SimplifiedNavSectionId, { view: View; path?: string }>> = {
+    ai: { view: "ai" },
+    define: { view: defineNavTarget.view, path: defineNavTarget.path },
+    reports: { view: "reports" },
+    artifacts: { view: "artifacts" },
   };
+
+  // Sections that are direct-navigation only (no expand/collapse body)
+  const directNavSections = new Set<SimplifiedNavSectionId>(["ai", "define"]);
 
   return (
     <nav className="simple-nav" aria-label="Project workflow">
       {simplifiedNavSections.map((section) => {
         const isExpanded = expandedSections.has(section.id);
         const isActiveSection = activeSection === section.id;
-        const isChatSection = section.id === "chat";
+        const isDirectNav = directNavSections.has(section.id);
+        const isAiSection = section.id === "ai";
         const navTarget = navigableSections[section.id];
 
         return (
-          <section className={isActiveSection ? "nav-section active" : "nav-section"} key={section.id}>
+          <section className={`nav-section${isActiveSection ? " active" : ""}${isAiSection ? " nav-section-ai" : ""}`} key={section.id}>
             <button
-              className="nav-section-trigger"
+              className={`nav-section-trigger${isAiSection ? " nav-section-trigger-ai" : ""}`}
               onClick={() => {
                 if (navTarget) {
-                  if (!isChatSection) {
+                  if (!isDirectNav) {
                     headerClickRef.current = true;
                     toggleSection(section.id);
                   }
-                  onOpenView(navTarget);
+                  onOpenView(navTarget.view, navTarget.path);
                 } else {
                   toggleSection(section.id);
                 }
               }}
               type="button"
-              aria-expanded={isChatSection ? undefined : isExpanded}
+              aria-expanded={isDirectNav ? undefined : isExpanded}
             >
               <span className="nav-section-label">
+                {isAiSection ? <span className="nav-ai-icon" aria-hidden="true">✦</span> : null}
                 <strong>{section.label}</strong>
               </span>
-              {isChatSection ? null : <b aria-hidden="true">{isExpanded ? "-" : "+"}</b>}
+              {isDirectNav ? null : <b aria-hidden="true">{isExpanded ? "-" : "+"}</b>}
             </button>
 
-            {!isChatSection && isExpanded ? <div className="nav-section-body">{renderSectionBody(section.id)}</div> : null}
+            {!isDirectNav && isExpanded ? <div className="nav-section-body">{renderSectionBody(section.id)}</div> : null}
           </section>
         );
       })}
@@ -157,38 +159,6 @@ export function SimplifiedNavigator({
   );
 
   function renderSectionBody(sectionId: SimplifiedNavSectionId) {
-    if (sectionId === "define") {
-      const isReviewActive = currentView === "review" || currentView === "questions" || currentView === "topics";
-      return (
-        <>
-          <div className="simple-nav-children">
-            {requirementNavLeaves.map((leaf) => (
-              <button
-                className={selectedPath === leaf.path ? "simple-nav-item simple-nav-child active" : "simple-nav-item simple-nav-child"}
-                key={leaf.id}
-                onClick={() => onOpenView(leaf.view, leaf.path)}
-                type="button"
-              >
-                <DefineNavLabel label={leaf.label} />
-              </button>
-            ))}
-            <button
-              className={isReviewActive ? "simple-nav-item simple-nav-child nav-questions-btn active" : "simple-nav-item simple-nav-child nav-questions-btn"}
-              onClick={() => onOpenView(reviewNavLeaf.view)}
-              type="button"
-            >
-              <DefineNavLabel label={reviewNavLeaf.label} />
-              {(reviewBadgeCount ?? 0) > 0 ? (
-                <b className={hasBlockingQuestions ? "nav-badge nav-badge-blocking" : "nav-badge nav-badge-open"}>
-                  {reviewBadgeCount}
-                </b>
-              ) : null}
-            </button>
-          </div>
-        </>
-      );
-    }
-
     if (sectionId === "source-data") {
       return (
         <>
@@ -648,14 +618,3 @@ function FileTreeBlock({
   );
 }
 
-function DefineNavLabel({ label }: { label: string }) {
-  const [prefix, emphasized] = label.split(/:\s+/, 2);
-
-  if (!emphasized) return <span>{label}</span>;
-
-  return (
-    <span>
-      {prefix}: <strong>{emphasized}</strong>
-    </span>
-  );
-}

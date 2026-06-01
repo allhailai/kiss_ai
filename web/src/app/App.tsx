@@ -283,8 +283,7 @@ export function App() {
             projectName={rebuildWorkspace.status?.projectName ?? project.selectedProject.name}
             projectSlug={project.selectedProjectSlug}
             onOpenFile={openProjectFileWithAgentContext}
-            onOpenDashboard={() => route.navigateTo("dashboard")}
-            onOpenProjectHome={() => route.navigateTo("dashboard")}
+            onOpenProjectHome={() => route.navigateTo("ai")}
             onSwitchProject={project.clearSelectedProject}
           />
           <RightPanelToggle active={isAgentPanelOpen} label="AI" onToggle={toggleAgentPanel} />

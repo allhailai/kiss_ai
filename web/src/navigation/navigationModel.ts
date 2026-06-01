@@ -1,7 +1,7 @@
 import type { View } from "./views";
-import { projectFilePath, designIdentityFilePath } from "../domain/projectPaths";
+import { projectFilePath } from "../domain/projectPaths";
 
-export type SimplifiedNavSectionId = "chat" | "define" | "source-data" | "wiki" | "reports" | "artifacts";
+export type SimplifiedNavSectionId = "ai" | "define" | "source-data" | "wiki" | "reports" | "artifacts";
 
 export type SimplifiedNavLeaf = {
   id: string;
@@ -16,35 +16,28 @@ export type SimplifiedNavSection = {
 };
 
 export const simplifiedNavSections: SimplifiedNavSection[] = [
-  { id: "chat", label: "Chat" },
-  { id: "define", label: "1) Define the project" },
+  { id: "ai", label: "AI" },
+  { id: "define", label: "1) Project Definition" },
   { id: "source-data", label: "2) Source data view" },
   { id: "wiki", label: "3) Wiki" },
   { id: "reports", label: "4) Reports" },
   { id: "artifacts", label: "5) Artifacts" },
 ];
 
-export const requirementNavLeaves: SimplifiedNavLeaf[] = [
-  { id: "project", label: "Define: Project Brief", view: "requirements", path: projectFilePath },
-];
-
-export const reviewNavLeaf: SimplifiedNavLeaf = {
-  id: "ai-review",
-  label: "AI Review",
-  view: "review",
+/** The define section now directly opens project.md — no expandable children. */
+export const defineNavTarget: { view: View; path: string } = {
+  view: "requirements",
+  path: projectFilePath,
 };
 
-export const chatNavLeaf: SimplifiedNavLeaf = {
-  id: "chat",
-  label: "Chat",
-  view: "chat",
-};
-
-export function sectionForView(view: View): SimplifiedNavSectionId {
-  if (view === "chat") return "chat";
-  if (view === "requirements" || view === "design" || view === "review" || view === "questions" || view === "topics" || view === "dashboard") return "define";
+export function sectionForView(view: View, filePath?: string | null): SimplifiedNavSectionId {
+  if (view === "ai") return "ai";
+  if (view === "requirements" || view === "design") return "define";
   if (view === "inputs") return "source-data";
-  if (view === "outputs") return "wiki";
+  if (view === "outputs") {
+    if (filePath?.startsWith("outputs_ai/reports/")) return "reports";
+    return "wiki";
+  }
   if (view === "reports") return "reports";
   if (view === "artifacts") return "artifacts";
   return "define";

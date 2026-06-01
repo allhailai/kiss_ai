@@ -44,7 +44,7 @@ export function useAgentChatPanel({
 
   const toggleAgentPanel = () => {
     if (isAgentPanelOpen) {
-      if (view === "chat") setChatPanelDismissed(true);
+      if (view === "ai") setChatPanelDismissed(true);
       rightPanelSurface.closePanel();
       return;
     }
@@ -53,14 +53,14 @@ export function useAgentChatPanel({
   };
 
   const closeAgentPanel = () => {
-    if (view === "chat" && rightPanelSurface.rightPanel) {
+    if (view === "ai" && rightPanelSurface.rightPanel) {
       setChatPanelDismissed(true);
     }
     rightPanelSurface.closePanel();
   };
 
   useEffect(() => {
-    if (!projectSlug || view !== "chat") {
+    if (!projectSlug || view !== "ai") {
       projectChatVisitKeyRef.current = null;
       if (chatPanelDismissed) setChatPanelDismissed(false);
       return;

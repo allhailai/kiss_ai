@@ -1,4 +1,13 @@
-import { defaultRoute, fileBackedViews, type RouteState, type View, viewIds } from "./views";
+import { defaultRoute, fileBackedViews, legacyAiViews, type RouteState, type View, viewIds } from "./views";
+
+/** Map legacy URL slugs to the AI tab they should open. */
+const legacyViewToAiTab: Record<string, string> = {
+  chat: "conversations",
+  review: "conversations",
+  questions: "questions",
+  topics: "topics",
+  suggestions: "conversations",
+};
 
 export function parseRouteHash(hash: string): RouteState {
   const [routePart, queryPart = ""] = hash.replace(/^#\/?/, "").split("?");
@@ -18,10 +27,17 @@ export function parseRouteHash(hash: string): RouteState {
   const filePathParts = isProjectRoute ? remainingParts : [secondSegment, thirdSegment, ...remainingParts].filter(Boolean);
 
   if (!viewCandidate || !viewIds.has(viewCandidate as View)) {
-    // Legacy /rebuild route: redirect to dashboard with build panel context
+    // Legacy /rebuild route: redirect to default view with build panel context
     if (viewCandidate === "rebuild") {
       return { ...defaultRoute, projectSlug, context: { ...context, panel: "build-project" } };
     }
+
+    // Legacy AI-related routes (chat, review, questions, topics, suggestions) → redirect to "ai" view
+    if (legacyAiViews.has(viewCandidate ?? "")) {
+      const tab = legacyViewToAiTab[viewCandidate!] ?? "conversations";
+      return { projectSlug, view: "ai", filePath: null, context: { ...context, tab } };
+    }
+
     return { ...defaultRoute, projectSlug, context };
   }
 

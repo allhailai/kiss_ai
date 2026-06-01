@@ -9,14 +9,12 @@ export function GlobalFileSearch({
   projectName,
   projectSlug,
   onOpenFile,
-  onOpenDashboard,
   onOpenProjectHome,
   onSwitchProject,
 }: {
   projectName: string;
   projectSlug: string;
   onOpenFile: (path: string) => void;
-  onOpenDashboard: () => void;
   onOpenProjectHome: () => void;
   onSwitchProject: () => void;
 }) {
@@ -203,32 +201,6 @@ export function GlobalFileSearch({
             <span>{buildPhaseLabel || "Working…"}</span>
           </button>
         ) : null}
-        <button
-          aria-label="Open technical dashboard"
-          className="technical-dashboard-button"
-          onClick={onOpenDashboard}
-          title="Technical dashboard"
-          type="button"
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path
-              d="M19.4 13.5c.1-.5.1-1 .1-1.5s0-1-.1-1.5l2-1.5-2-3.5-2.4 1a8.1 8.1 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A8.1 8.1 0 0 0 7 6.5l-2.4-1-2 3.5 2 1.5c-.1.5-.1 1-.1 1.5s0 1 .1 1.5l-2 1.5 2 3.5 2.4-1a8.1 8.1 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a8.1 8.1 0 0 0 2.6-1.5l2.4 1 2-3.5-2-1.5Z"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.8"
-            />
-            <circle
-              cx="12"
-              cy="12"
-              fill="none"
-              r="3.1"
-              stroke="currentColor"
-              strokeWidth="1.8"
-            />
-          </svg>
-        </button>
       </div>
     </header>
   );
