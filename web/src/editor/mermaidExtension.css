@@ -1,0 +1,103 @@
+/* ==========================================================================
+   Mermaid Extension — Inline diagram rendering styles
+   ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   Wrapper — container for the rendered diagram or placeholder.
+   --------------------------------------------------------------------------- */
+
+.markdown-editor-shell .cm-mermaid-wrapper {
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+  padding: 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-surface) 50%, white);
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+/* ---------------------------------------------------------------------------
+   Rendered diagram — centered SVG.
+   --------------------------------------------------------------------------- */
+
+.markdown-editor-shell .cm-mermaid-diagram {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 40px;
+}
+
+.markdown-editor-shell .cm-mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Loading placeholder — subtle pulsing text.
+   --------------------------------------------------------------------------- */
+
+.markdown-editor-shell .cm-mermaid-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-secondary);
+  animation: cm-mermaid-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes cm-mermaid-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* ---------------------------------------------------------------------------
+   Error state — red-tinted container with error message.
+   --------------------------------------------------------------------------- */
+
+.markdown-editor-shell .cm-mermaid-error {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #e53e3e 8%, white);
+  border: 1px solid color-mix(in srgb, #e53e3e 25%, var(--color-border));
+}
+
+.markdown-editor-shell .cm-mermaid-error-label {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #e53e3e;
+}
+
+.markdown-editor-shell .cm-mermaid-error-message {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, #e53e3e 70%, var(--color-primary));
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---------------------------------------------------------------------------
+   Hidden source lines — same pattern as markdownTableExtension.
+   --------------------------------------------------------------------------- */
+
+.markdown-editor-shell .cm-mermaid-hidden-line {
+  height: 0;
+  line-height: 0;
+  overflow: hidden;
+}
+
+.markdown-editor-shell .cm-mermaid-hidden-source {
+  display: none;
+}

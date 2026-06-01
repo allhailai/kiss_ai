@@ -10,6 +10,8 @@ import { buildEditorDiffExtension } from "./diffExtension";
 import { buildLivePreviewExtension } from "./livePreviewExtension";
 import "./livePreviewExtension.css";
 import { buildMarkdownTableExtension } from "./markdownTableExtension";
+import { buildMermaidExtension } from "./mermaidExtension";
+import "./mermaidExtension.css";
 import { buildTableCellDisplayRenderer, buildWikiLinkExtension, renderMarkdownTableCellText } from "./wikiLinkExtension";
 
 export function MarkdownEditor({
@@ -135,6 +137,7 @@ export function MarkdownEditor({
         },
       }),
       buildLivePreviewExtension({ editable }),
+      buildMermaidExtension({ editable }),
       buildMarkdownTableExtension({ editable, renderCellText: renderMarkdownTableCellText, renderCellDisplay: buildTableCellDisplayRenderer({ getFiles, selectedPath, getOnOpenFile }), onNotice: stableOnNotice }),
       buildEditorDiffExtension({ getUnsavedDiff, getSavedDiff }),
       buildWikiLinkExtension({ getFiles, selectedPath, getOnOpenFile }),
