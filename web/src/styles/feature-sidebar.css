@@ -15,30 +15,32 @@
 
 .sidebar-close-button {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 10px;
+  right: 10px;
   z-index: 60;
-  min-width: 38px;
-  height: 34px;
   display: grid;
   place-items: center;
-  padding: 0 12px;
+  min-width: 0;
+  height: 22px;
+  padding: 0 8px;
   border: 1px solid var(--color-border);
   border-radius: 999px;
-  background: var(--color-surface);
+  background: color-mix(in srgb, var(--color-background) 78%, white);
   color: var(--color-secondary);
-  font-size: 1rem;
+  font-size: 0.64rem;
   font-weight: 900;
   line-height: 1;
-  box-shadow: 0 4px 12px rgb(15 23 42 / 10%);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
 .sidebar-close-button:hover,
 .sidebar-close-button:focus-visible {
-  border-color: color-mix(in srgb, var(--color-accent) 44%, var(--color-border));
-  color: var(--color-primary);
-  outline: 2px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
-  outline-offset: 2px;
+  border-color: color-mix(in srgb, var(--color-secondary) 44%, var(--color-border));
+  background: var(--color-secondary);
+  color: white;
+  outline: none;
 }
 
 /* ── Sidebar Open Button ("Nav") — visible when sidebar is collapsed ── */

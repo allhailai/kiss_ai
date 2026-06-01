@@ -395,6 +395,12 @@ export function RightPanelAgentChat({
             aria-label="Select chat conversation"
             className="agent-conversation-title-trigger"
             onClick={() => setHistoryOpen((open) => !open)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && historyOpen) {
+                event.preventDefault();
+                setHistoryOpen(false);
+              }
+            }}
             ref={titleTriggerRef}
             type="button"
           >
