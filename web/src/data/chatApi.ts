@@ -3,7 +3,7 @@ import type {
   Conversation,
   ConversationsResponse,
   EditChatMessageRequest,
-  GenerateEditProposalRequest,
+
   SendChatMessageRequest,
   UpdateConversationRequest,
   UpdateEditProposalRequest,
@@ -37,11 +37,7 @@ export const chatApi = {
         body: JSON.stringify(body),
       },
     ),
-  generateEditProposal: (projectSlug: string, conversationId: string, body: GenerateEditProposalRequest) =>
-    request<Conversation>(`${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/edit-proposals`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+
   updateEditProposal: (projectSlug: string, conversationId: string, proposalId: string, body: UpdateEditProposalRequest) =>
     request<Conversation>(
       `${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/edit-proposals/${encodeURIComponent(proposalId)}`,

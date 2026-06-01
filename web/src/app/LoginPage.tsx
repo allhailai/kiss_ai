@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { api } from "../data/apiClient";
+import { authApi } from "../data/authApi";
 import type { AuthUser } from "../contracts/api";
 
 type LoginPageProps = {
@@ -21,7 +21,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
     setLoading(true);
 
     try {
-      const result = await api.login({ username: trimmedUsername, password });
+      const result = await authApi.login({ username: trimmedUsername, password });
       onLoginSuccess(result.user);
     } catch (err) {
       if (err instanceof Error && err.message.includes("Too many login attempts")) {

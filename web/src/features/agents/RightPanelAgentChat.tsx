@@ -17,9 +17,10 @@ import { artifactsApi } from "../../data/artifactsApi";
 import { labeledFileDisplayName, parseArtifactSpecPath, projectFileDisplayName, uniqueByPathPreserveFirst } from "../../domain/files";
 import { ChatComposer } from "../../shared/chat/ChatComposer";
 import { ChatThread } from "../../shared/chat/ChatThread";
-import { formatChatDateTime } from "../../shared/chat/chatRendering";
 import { ArtifactProposalCard } from "./ArtifactProposalCard";
-import { ConceptualDiffReviewItem } from "../../shared/conceptualDiff/ConceptualDiffReviewItem";
+import { AgentConversationHeader } from "./AgentConversationHeader";
+import { AgentEditProposalPanel } from "./AgentEditProposalPanel";
+import { latestAttentionEditProposal, canApplyProposal } from "./agentChatHelpers";
 
 type ArtifactSession =
   | { phase: "idle" }
@@ -57,38 +58,7 @@ type VisibleEditableTarget = {
   isCurrent: boolean;
 };
 
-function latestAttentionEditProposal(conversation: Conversation | null): EditProposal | null {
-  return [...(conversation?.editProposals ?? [])].reverse().find((proposal) => proposal.status !== "applied") ?? null;
-}
 
-function proposalDiffGroups(proposal: EditProposal) {
-  const groups = new Map<string, typeof proposal.conceptualDiffs>();
-  proposal.conceptualDiffs.forEach((diff) => {
-    const list = groups.get(diff.filePath) ?? [];
-    list.push(diff);
-    groups.set(diff.filePath, list);
-  });
-  return [...groups.entries()].map(([filePath, conceptualDiffs]) => ({ filePath, conceptualDiffs }));
-}
-
-function proposalStatusLabel(status: EditProposal["status"]) {
-  switch (status) {
-    case "applied":
-      return "Applied";
-    case "applying":
-      return "Applying";
-    case "failed":
-      return "Needs review";
-    case "partial":
-      return "Partially applied";
-    case "proposed":
-      return "Ready to review";
-  }
-}
-
-function canApplyProposal(proposal: EditProposal) {
-  return ["proposed", "partial", "failed"].includes(proposal.status) && proposal.conceptualDiffs.some((diff) => diff.status === "accepted");
-}
 
 export function RightPanelAgentChat({
   aiEditableFiles,
@@ -387,76 +357,19 @@ export function RightPanelAgentChat({
 
   return (
     <div className="right-panel-agent-chat">
-      <div className="agent-conversation-header">
-        <div className="agent-conversation-title">
-          <button
-            aria-expanded={historyOpen}
-            aria-haspopup="listbox"
-            aria-label="Select chat conversation"
-            className="agent-conversation-title-trigger"
-            onClick={() => setHistoryOpen((open) => !open)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape" && historyOpen) {
-                event.preventDefault();
-                setHistoryOpen(false);
-              }
-            }}
-            ref={titleTriggerRef}
-            type="button"
-          >
-            <strong>{chat.activeConversation?.title || "New AI Chat"}</strong>
-            <span aria-hidden="true" className="agent-conversation-title-chevron">
-              ▾
-            </span>
-          </button>
-          {historyOpen ? (
-            <section
-              aria-label="Saved chat conversations"
-              className="agent-history-popover"
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  setHistoryOpen(false);
-                  titleTriggerRef.current?.focus();
-                }
-              }}
-            >
-              <input
-                aria-label="Filter conversations"
-                className="agent-history-filter"
-                onChange={(event) => chat.setConversationFilter(event.currentTarget.value)}
-                placeholder="Search conversations"
-                type="search"
-                value={chat.conversationFilter}
-              />
-              <div className="agent-history-list" role="listbox">
-                {chat.filteredConversations.length ? (
-                  chat.filteredConversations.map((conversation) => (
-                    <button
-                      aria-selected={chat.activeConversation?.id === conversation.id}
-                      className={chat.activeConversation?.id === conversation.id ? "agent-history-item active" : "agent-history-item"}
-                      disabled={controlsDisabled}
-                      key={conversation.id}
-                      onClick={() => selectConversation(conversation.id)}
-                      role="option"
-                      type="button"
-                    >
-                      <strong>{conversation.title}</strong>
-                      <span>{conversation.summary || "No summary yet."}</span>
-                      <small>
-                        {formatChatDateTime(conversation.updatedAt)} · {conversation.messageCount} message
-                        {conversation.messageCount === 1 ? "" : "s"}
-                      </small>
-                    </button>
-                  ))
-                ) : (
-                  <p className="agent-history-empty">No conversations match this filter.</p>
-                )}
-              </div>
-            </section>
-          ) : null}
-        </div>
-      </div>
+      <AgentConversationHeader
+        activeConversationId={chat.activeConversation?.id}
+        activeTitle={chat.activeConversation?.title || "New AI Chat"}
+        controlsDisabled={controlsDisabled}
+        conversationFilter={chat.conversationFilter}
+        filteredConversations={chat.filteredConversations}
+        onFilterChange={chat.setConversationFilter}
+        onNewConversation={startNewConversation}
+        onSelectConversation={(id) => {
+          if (controlsDisabled) return;
+          void chat.openConversation(id);
+        }}
+      />
       <div className="right-panel-agent-thread">
         <ChatThread
           createdArtifactTitles={createdArtifactTitles}
@@ -466,63 +379,16 @@ export function RightPanelAgentChat({
           emptyTitle={chat.loading ? "Loading conversation..." : "Start AI chat"}
           editProposals={chat.activeConversation?.editProposals ?? []}
           footer={activeProposal ? (
-            <section className="agent-edit-proposal agent-edit-proposal-in-thread" aria-label={proposalReadOnly ? "Edit Proposal Details" : "Proposed Changes"}>
-              <div className="agent-edit-proposal-header">
-                <div>
-                  <span className="agent-context-label">{proposalReadOnly ? "Proposal Details" : "Proposed Changes"}</span>
-                  <p>{activeProposal.notice || "Review which conceptual changes should be applied."}</p>
-                </div>
-                <strong>{proposalStatusLabel(activeProposal.status)}</strong>
-              </div>
-              {activeProposal.conceptualDiffs.length ? (
-                <>
-                  {proposalReadOnly ? (
-                    <div className="agent-edit-proposal-actions">
-                      <button disabled={controlsDisabled} onClick={() => setSelectedProposalId(null)} type="button">
-                        Hide
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="agent-edit-proposal-actions">
-                      <button disabled={controlsDisabled} onClick={() => setAllProposalDiffs(activeProposal, "accepted")} type="button">
-                        Accept all
-                      </button>
-                      <button disabled={controlsDisabled} onClick={() => setAllProposalDiffs(activeProposal, "rejected")} type="button">
-                        Reject all
-                      </button>
-                    </div>
-                  )}
-                  <div className="agent-edit-proposal-files">
-                    {proposalDiffGroups(activeProposal).map((group) => (
-                      <div className="agent-edit-proposal-file" key={group.filePath}>
-                        <code title={group.filePath}>{group.filePath}</code>
-                        {group.conceptualDiffs.map((diff) => {
-                          return (
-                            <ConceptualDiffReviewItem
-                              controlsDisabled={controlsDisabled}
-                              diff={diff}
-                              key={diff.id}
-                              onStatusChange={(status) => setProposalDiffStatus(activeProposal, diff.id, status)}
-                              readOnly={proposalReadOnly}
-                            />
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                  {proposalReadOnly ? null : (
-                    <button
-                      className="agent-edit-proposal-apply"
-                      disabled={controlsDisabled || !canApplyProposal(activeProposal)}
-                      onClick={() => applyProposal(activeProposal)}
-                      type="button"
-                    >
-                      {activeProposal.status === "applying" || chat.sending ? "Applying..." : "Apply Proposal"}
-                    </button>
-                  )}
-                </>
-              ) : null}
-            </section>
+            <AgentEditProposalPanel
+              activeProposal={activeProposal}
+              controlsDisabled={controlsDisabled}
+              onApply={applyProposal}
+              onHide={() => setSelectedProposalId(null)}
+              onSetAllDiffs={setAllProposalDiffs}
+              onSetDiffStatus={setProposalDiffStatus}
+              proposalReadOnly={proposalReadOnly}
+              sending={chat.sending}
+            />
           ) : undefined}
           messages={chat.activeConversation?.messages ?? []}
           onApplyFileEdit={onApplyFileEdit}

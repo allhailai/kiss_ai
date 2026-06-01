@@ -406,135 +406,13 @@ describe("chat message lifecycle", () => {
 });
 
 describe("edit proposal lifecycle", () => {
-  it("returns exact empty-guidance message when no messages or real scoped diffs exist", async () => {
-    const { project, service } = createChatAgentHarness({
-      gitFileDiffText: async () => ({ diff: "", diffError: "git diff unavailable" }),
-      runCursorAgent: async () => {
-        throw new Error("agent should not run without guidance");
-      },
-    });
 
-    const next = await service.generateEditProposal(project, "conv_1", {
-      modelId: "model-a",
-      fileContext: {
-        ai_editable_files: [{ path: "human_goal_requirements.md" }],
-        context_files: [],
-      },
-    });
 
-    expect(next.messages.at(-1)?.content).toBe(
-      [
-        "What changes do you want to make to the editable files?",
-        "I need guidance.",
-        "No edits were found in the file nor messages provided for guidance.",
-      ].join("\n"),
-    );
-  });
 
-  it("stores a failed proposal when proposal output is malformed", async () => {
-    const { project, service } = createChatAgentHarness({
-      conversation: createConversationFixture({ messages: [{ id: "msg_1", role: "user", content: "Please revise this.", createdAt: "2026-05-11T00:00:00.000Z", status: "complete" }] }),
-      runCursorAgent: async ({ onEvent }) => {
-        await onEvent({ type: "assistant_delta", text: "not json" });
-        return { status: "finished" };
-      },
-    });
 
-    const next = await service.generateEditProposal(project, "conv_1", {
-      modelId: "model-a",
-      fileContext: {
-        ai_editable_files: [{ path: "human_goal_requirements.md" }],
-        context_files: [],
-      },
-    });
 
-    expect(next.editProposals.at(-1)).toMatchObject({
-      status: "failed",
-      conceptualDiffs: [],
-      notice: "No proposed changes were generated.",
-    });
-  });
 
-  it("adds proposal guidance as a user message before running the proposal prompt", async () => {
-    let capturedPrompt = "";
-    const { project, service } = createChatAgentHarness({
-      runCursorAgent: async ({ onEvent, prompt }) => {
-        capturedPrompt = prompt;
-        await onEvent({
-          type: "assistant_delta",
-          text: `<edit_proposal_json>${JSON.stringify({ conceptualDiffs: [{ filePath: "human_goal_requirements.md", title: "Clarify goal", summary: "Clarify the goal." }] })}</edit_proposal_json>`,
-        });
-        return { status: "finished" };
-      },
-    });
 
-    const next = await service.generateEditProposal(project, "conv_1", {
-      modelId: "model-a",
-      content: "Make the goal more specific.",
-      fileContext: {
-        ai_editable_files: [{ path: "human_goal_requirements.md" }],
-        context_files: [],
-      },
-    });
-
-    expect(next.messages).toEqual([
-      expect.objectContaining({
-        role: "user",
-        content: "Make the goal more specific.",
-        context: {
-          ai_editable_files: [{ path: "human_goal_requirements.md" }],
-          context_files: [],
-        },
-      }),
-    ]);
-    expect(capturedPrompt).toContain("Make the goal more specific.");
-    expect(next.editProposals.at(-1)).toMatchObject({
-      sourceMessageId: next.messages[0].id,
-      status: "proposed",
-    });
-  });
-
-  it("includes relevant rejection memory in edit proposal prompts", async () => {
-    const projectPath = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-chat-memory-"));
-    await fs.writeFile(path.join(projectPath, ".conceptual-diff-memory.json"), `${JSON.stringify(updateConceptualDiffRejectionMemory(emptyConceptualDiffMemory(), {
-      conceptualDiffs: [
-        {
-          id: "diff_rejected",
-          filePath: "human_goal_requirements.md",
-          title: "Rejected audience",
-          summary: "Do not expand the audience.",
-          status: "rejected",
-          intent: { objective: "Expand the audience." },
-        },
-      ],
-      flow: "ai_file_assist",
-    }), null, 2)}\n`, "utf8");
-    let capturedPrompt = "";
-    const { project, service } = createChatAgentHarness({
-      projectPath,
-      runCursorAgent: async ({ onEvent, prompt }) => {
-        capturedPrompt = prompt;
-        await onEvent({
-          type: "assistant_delta",
-          text: `<edit_proposal_json>${JSON.stringify({ conceptualDiffs: [{ filePath: "human_goal_requirements.md", title: "Clarify goal", summary: "Clarify the goal." }] })}</edit_proposal_json>`,
-        });
-        return { status: "finished" };
-      },
-    });
-
-    await service.generateEditProposal(project, "conv_1", {
-      modelId: "model-a",
-      content: "Make the goal more specific.",
-      fileContext: {
-        ai_editable_files: [{ path: "human_goal_requirements.md" }],
-        context_files: [],
-      },
-    });
-
-    expect(capturedPrompt).toContain("conceptual_diff_rejection_memory");
-    expect(capturedPrompt).toContain("Rejected audience");
-    expect(capturedPrompt).toContain("soft suppression");
-  });
 
   it("persists rejected AI File Assist conceptual diffs to shared memory", async () => {
     const projectPath = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-chat-memory-"));
@@ -672,42 +550,5 @@ describe("edit proposal lifecycle", () => {
     expect(next.editProposals[0].appliedAt).toBeUndefined();
   });
 
-  it("blocks overlapping project agent runs with the shared project lock", async () => {
-    const agentStarted = createDeferred();
-    const finishAgent = createDeferred();
-    const { project, service } = createChatAgentHarness({
-      conversation: createConversationFixture({ messages: [{ id: "msg_1", role: "user", content: "Please revise this.", createdAt: "2026-05-11T00:00:00.000Z", status: "complete" }] }),
-      runCursorAgent: async ({ onEvent }) => {
-        agentStarted.resolve();
-        await finishAgent.promise;
-        await onEvent({
-          type: "assistant_delta",
-          text: `<edit_proposal_json>${JSON.stringify({ conceptualDiffs: [{ filePath: "human_goal_requirements.md", title: "Allowed", summary: "Allowed summary." }] })}</edit_proposal_json>`,
-        });
-        return { status: "finished" };
-      },
-    });
 
-    const firstRun = service.generateEditProposal(project, "conv_1", {
-      modelId: "model-a",
-      fileContext: {
-        ai_editable_files: [{ path: "human_goal_requirements.md" }],
-        context_files: [],
-      },
-    });
-    await agentStarted.promise;
-
-    await expect(
-      service.generateEditProposal(project, "conv_1", {
-        modelId: "model-a",
-        fileContext: {
-          ai_editable_files: [{ path: "human_goal_requirements.md" }],
-          context_files: [],
-        },
-      }),
-    ).rejects.toMatchObject({ code: "project_agent_already_running", statusCode: 409 });
-
-    finishAgent.resolve();
-    await firstRun;
-  });
 });

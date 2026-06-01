@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { FileContent, FileDiff } from "../../contracts/api";
-import { api } from "../../data/apiClient";
+import { filesApi } from "../../data/filesApi";
 import { errorMessage } from "../../domain/errors";
 import { isDesignIdentityPath } from "../../domain/projectPaths";
 
@@ -39,8 +39,8 @@ export function useSelectedFile({
   }, []);
 
   const loadSelectedFile = useCallback(async (projectSlug: string, path: string, requestId: number) => {
-    const file = await api.file(projectSlug, path);
-    const diff = await api.fileDiff(projectSlug, path);
+    const file = await filesApi.file(projectSlug, path);
+    const diff = await filesApi.fileDiff(projectSlug, path);
     if (fileRequestIdRef.current !== requestId) return null;
 
     setSelected(file);
@@ -85,8 +85,8 @@ export function useSelectedFile({
     setSaving(true);
     setNotice("");
     try {
-      const saved = await api.saveFile(projectSlug, selected.path, draft, selected.contentHash);
-      const diff = await api.fileDiff(projectSlug, saved.path);
+      const saved = await filesApi.saveFile(projectSlug, selected.path, draft, selected.contentHash);
+      const diff = await filesApi.fileDiff(projectSlug, saved.path);
       if (fileRequestIdRef.current !== requestId) return null;
 
       setSelected(saved);
@@ -107,6 +107,24 @@ export function useSelectedFile({
       setNotice(`Saved ${saved.path}.`);
       return saved;
     } catch (error) {
+      // If the file changed on disk (e.g. from a chat Apply or rebuild), our closure's
+      // hash is stale. Rather than retrying with the old draft (which would overwrite
+      // changes from Apply), silently refresh the file to sync state with disk.
+      const isStaleHash = error instanceof Error && "code" in error && (error as { code: unknown }).code === "file_changed";
+      if (isStaleHash && fileRequestIdRef.current === requestId) {
+        try {
+          const fresh = await filesApi.file(projectSlug, selected.path);
+          const diff = await filesApi.fileDiff(projectSlug, fresh.path);
+          if (fileRequestIdRef.current === requestId) {
+            setSelected(fresh);
+            setSelectedDiff(diff);
+            setDraft(fresh.content);
+          }
+        } catch {
+          // Best-effort refresh — don't surface a second error.
+        }
+        return null;
+      }
       if (fileRequestIdRef.current === requestId) {
         setNotice(errorMessage(error, "Could not save the selected file."));
       }
@@ -152,8 +170,8 @@ export function useSelectedFile({
     setReverting(true);
     setNotice("");
     try {
-      const reverted = await api.revertFile(projectSlug, selected.path);
-      const diff = await api.fileDiff(projectSlug, reverted.path);
+      const reverted = await filesApi.revertFile(projectSlug, selected.path);
+      const diff = await filesApi.fileDiff(projectSlug, reverted.path);
       if (fileRequestIdRef.current !== requestId) return;
 
       setSelected(reverted);

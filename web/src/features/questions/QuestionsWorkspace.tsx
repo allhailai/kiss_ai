@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BuildQuestion, RebuildModel } from "../../contracts/api";
-import { api } from "../../data/apiClient";
+import { projectsApi } from "../../data/projectsApi";
 import { formatLocalDateTime } from "../../domain/formatters";
 import { renderMarkdownMessageContent } from "../../shared/chat/chatRendering";
 import { CompactModelPicker } from "../../shared/CompactModelPicker";
@@ -73,7 +73,7 @@ function QuestionCard({
     setAiConfidence(null);
     setAiConfidenceReason(null);
     try {
-      const result = await api.questionAiAssist(projectSlug, {
+      const result = await projectsApi.questionAiAssist(projectSlug, {
         modelId: selectedModelId,
         questionText: question.text,
         questionContext: question.context,

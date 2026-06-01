@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { ChatConversationEvent, Conversation } from "../../contracts/api";
-import { api } from "../../data/apiClient";
+import { chatApi } from "../../data/chatApi";
 import { hasSettledAssistantReply } from "../../domain/conversation";
 
 function applyStreamingDelta(conversation: Conversation, messageId: string, delta: string, updatedAt: string): Conversation {
@@ -74,7 +74,7 @@ export function useConversationStream({
     let pollTimeoutId: number | null = null;
     const pollConversation = async () => {
       try {
-        const conversation = await api.conversation(projectSlug, conversationId);
+        const conversation = await chatApi.conversation(projectSlug, conversationId);
         if (closed) return;
 
         setActiveConversation(conversation);
@@ -130,7 +130,7 @@ export function useConversationStream({
     let pollTimeoutId: number | null = null;
     const pollConversation = async () => {
       try {
-        const conversation = await api.conversation(projectSlug, conversationId);
+        const conversation = await chatApi.conversation(projectSlug, conversationId);
         if (closed) return;
 
         setActiveConversation(conversation);
@@ -147,7 +147,7 @@ export function useConversationStream({
       }
     };
 
-    const eventSource = api.openConversationEventSource(projectSlug, conversationId);
+    const eventSource = chatApi.openConversationEventSource(projectSlug, conversationId);
     const flushDeltas = () => {
       deltaFrameRef.current = null;
       const deltas = pendingDeltasRef.current;

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { type BuildLogState, type DesignState, type ProjectFile, type ProjectStatus, type RebuildState } from "../../contracts/api";
-import { api } from "../../data/apiClient";
+import { filesApi } from "../../data/filesApi";
+import { projectsApi } from "../../data/projectsApi";
+import { rebuildApi } from "../../data/rebuildApi";
 import { uniqueFiles } from "../../domain/files";
 import { designProjectFile } from "../../domain/projectPaths";
 
@@ -37,7 +39,7 @@ export function useProjectDataLoaders({
 
   const refreshStatus = useCallback(async () => {
     const projectSlug = requireSelectedProjectSlug();
-    const next = await api.status(projectSlug);
+    const next = await projectsApi.status(projectSlug);
     if (selectedProjectSlugRef.current === projectSlug) {
       setStatus(next);
     }
@@ -46,7 +48,7 @@ export function useProjectDataLoaders({
   const refreshBuildLog = useCallback(
     async (tabId?: string | null, path?: string | null, sectionId?: string | null) => {
       const projectSlug = requireSelectedProjectSlug();
-      const next = await api.buildLog(projectSlug, tabId, path, sectionId);
+      const next = await projectsApi.buildLog(projectSlug, tabId, path, sectionId);
       if (selectedProjectSlugRef.current === projectSlug) {
         setBuildLog(next);
       }
@@ -56,7 +58,7 @@ export function useProjectDataLoaders({
 
   const refreshDesign = useCallback(async () => {
     const projectSlug = requireSelectedProjectSlug();
-    const next = await api.design(projectSlug);
+    const next = await projectsApi.design(projectSlug);
     if (selectedProjectSlugRef.current === projectSlug) {
       setDesign(next);
     }
@@ -64,7 +66,7 @@ export function useProjectDataLoaders({
 
   const refreshRebuild = useCallback(async () => {
     const projectSlug = requireSelectedProjectSlug();
-    const next = await api.rebuildState(projectSlug);
+    const next = await rebuildApi.rebuildState(projectSlug);
     if (selectedProjectSlugRef.current === projectSlug) {
       setRebuild(next);
     }
@@ -74,11 +76,11 @@ export function useProjectDataLoaders({
   const refreshProjectFiles = useCallback(async () => {
     const projectSlug = requireSelectedProjectSlug();
     const [requirements, human, sources, inputsAi, outputs] = await Promise.all([
-      api.tree(projectSlug, "requirements"),
-      api.tree(projectSlug, "human"),
-      api.tree(projectSlug, "sources"),
-      api.tree(projectSlug, "inputs-ai"),
-      api.tree(projectSlug, "outputs"),
+      filesApi.tree(projectSlug, "requirements"),
+      filesApi.tree(projectSlug, "human"),
+      filesApi.tree(projectSlug, "sources"),
+      filesApi.tree(projectSlug, "inputs-ai"),
+      filesApi.tree(projectSlug, "outputs"),
     ]);
 
     if (selectedProjectSlugRef.current === projectSlug) {

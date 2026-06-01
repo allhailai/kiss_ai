@@ -80,7 +80,7 @@
   width: 100%;
   min-height: 42px;
   border: 1px solid color-mix(in srgb, var(--color-secondary) 65%, var(--color-border));
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-secondary);
   color: white;
   box-shadow: 0 8px 20px color-mix(in srgb, var(--color-secondary) 18%, transparent);
@@ -265,7 +265,7 @@
   flex: 0 0 auto;
   padding: 5px 10px;
   border: 1px solid color-mix(in srgb, var(--color-warning) 55%, var(--color-border));
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-warning);
   color: white;
   font-size: 0.72rem;
@@ -320,7 +320,7 @@
   gap: 3px;
   padding: 2px 6px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, white 70%, var(--color-surface));
 }
 
@@ -552,7 +552,7 @@
   min-height: 32px;
   padding: 6px 13px;
   border: 1px solid color-mix(in srgb, var(--color-secondary) 58%, var(--color-border));
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-secondary);
   color: white;
   box-shadow: 0 8px 20px color-mix(in srgb, var(--color-secondary) 22%, transparent);
@@ -578,7 +578,7 @@
   min-height: 32px;
   padding: 6px 13px;
   border: 1px solid color-mix(in srgb, var(--color-danger) 58%, var(--color-border));
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-danger);
   color: white;
   box-shadow: 0 8px 20px color-mix(in srgb, var(--color-danger) 22%, transparent);

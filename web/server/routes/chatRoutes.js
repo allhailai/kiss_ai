@@ -9,7 +9,7 @@ import {
   fileEditStatusParamsSchema,
   fileRenameStatusParamsSchema,
   artifactRenameStatusParamsSchema,
-  generateEditProposalBodySchema,
+
   parseRequestBody,
   parseRequestParams,
   sendChatMessageBodySchema,
@@ -22,7 +22,7 @@ export function registerChatRoutes(app, {
   applyEditProposal,
   cancelChatAgent,
   editChatMessage,
-  generateEditProposal,
+
   httpError,
   listConversations,
   createConversation,
@@ -87,14 +87,7 @@ export function registerChatRoutes(app, {
     }
   });
 
-  app.post("/api/projects/:projectSlug/conversations/:conversationId/edit-proposals", async (request, response, next) => {
-    try {
-      const { conversationId } = parseRequestParams(conversationParamsSchema, request.params, httpError);
-      response.json(await generateEditProposal(request.project, conversationId, parseRequestBody(generateEditProposalBodySchema, request.body, httpError)));
-    } catch (error) {
-      next(error);
-    }
-  });
+
 
   app.patch("/api/projects/:projectSlug/conversations/:conversationId/edit-proposals/:proposalId", async (request, response, next) => {
     try {

@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { FileContent } from "../../contracts/api";
-import { api } from "../../data/apiClient";
+import { filesApi } from "../../data/filesApi";
 import { errorMessage } from "../../domain/errors";
 import { projectPathPrefixes } from "../../domain/projectPaths";
 
@@ -28,7 +28,7 @@ export function useHumanInputs({
       setInputMutationLoading(true);
       setNotice("");
       try {
-        const response = await api.uploadHumanInputs(requireSelectedProjectSlug(), files);
+        const response = await filesApi.uploadHumanInputs(requireSelectedProjectSlug(), files);
         await refreshProjectFiles();
         setNotice(
           `Uploaded ${response.files.length.toLocaleString()} file${response.files.length === 1 ? "" : "s"} to ${projectPathPrefixes.humanInput}.`,
@@ -48,7 +48,7 @@ export function useHumanInputs({
       setInputMutationLoading(true);
       setNotice("");
       try {
-        const response = await api.deleteHumanInput(requireSelectedProjectSlug(), path);
+        const response = await filesApi.deleteHumanInput(requireSelectedProjectSlug(), path);
         if (selected?.path === response.path) clearSelectedFile();
         await refreshProjectFiles();
         setNotice(`Deleted ${response.path}.`);
@@ -67,7 +67,7 @@ export function useHumanInputs({
       setInputMutationLoading(true);
       setNotice("");
       try {
-        const response = await api.createHumanInputFolder(requireSelectedProjectSlug(), name);
+        const response = await filesApi.createHumanInputFolder(requireSelectedProjectSlug(), name);
         await refreshProjectFiles();
         setNotice(`Created folder ${response.folder}.`);
       } catch (error) {
@@ -85,7 +85,7 @@ export function useHumanInputs({
       setInputMutationLoading(true);
       setNotice("");
       try {
-        const response = await api.createHumanInputTextFile(requireSelectedProjectSlug(), name, "", folder);
+        const response = await filesApi.createHumanInputTextFile(requireSelectedProjectSlug(), name, "", folder);
         await refreshProjectFiles();
         setNotice(`Created ${response.file.path}.`);
         if (onOpenFile) onOpenFile(response.file.path);
@@ -104,7 +104,7 @@ export function useHumanInputs({
       setInputMutationLoading(true);
       setNotice("");
       try {
-        const response = await api.deleteHumanInputFolder(requireSelectedProjectSlug(), folder);
+        const response = await filesApi.deleteHumanInputFolder(requireSelectedProjectSlug(), folder);
         await refreshProjectFiles();
         setNotice(`Deleted folder ${response.folder}.`);
       } catch (error) {
@@ -122,7 +122,7 @@ export function useHumanInputs({
       setInputMutationLoading(true);
       setNotice("");
       try {
-        const response = await api.moveHumanInputFile(requireSelectedProjectSlug(), sourcePath, targetFolder);
+        const response = await filesApi.moveHumanInputFile(requireSelectedProjectSlug(), sourcePath, targetFolder);
         await refreshProjectFiles();
         setNotice(`Moved to ${response.newPath}.`);
         if (onOpenFile) onOpenFile(response.newPath);

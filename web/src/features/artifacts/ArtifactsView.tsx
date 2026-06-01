@@ -23,7 +23,9 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
-  const buildStartedAtRef = useRef<number>(0);
+  // Tracks the server's `startedAt` for the build we initiated (or recovered).
+  // Used by the polling effect to guard against reacting to stale/old states.
+  const buildRunStartedAtRef = useRef<string | null>(null);
   const popoutRef = useRef<Window | null>(null);
   const noopOpenFile = useCallback(() => {}, []);
 
@@ -54,6 +56,27 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
       }
     }
   }, [selectedSlug, selectedArtifact?.status]);
+
+  // On mount or slug change, check server state to recover building state.
+  // This ensures the building spinner survives page refreshes and prevents
+  // duplicate builds by detecting an already-running artifact build.
+  const recoveryCheckedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedSlug || recoveryCheckedRef.current === selectedSlug) return;
+    recoveryCheckedRef.current = selectedSlug;
+
+    rebuildApi.rebuildState(projectSlug).then((state) => {
+      const isArtifactBuild = state.runKind === "artifact_build" || state.runKind === "artifact_batch_build";
+      if (state.running && isArtifactBuild) {
+        // An artifact build is currently running — resume building UI
+        buildRunStartedAtRef.current = state.startedAt;
+        setBuilding(true);
+        setActiveTab("preview");
+        flash("Resuming build — agent is generating HTML…");
+      }
+    }).catch(() => { /* ignore — recovery is best-effort */ });
+  }, [selectedSlug, projectSlug]);
+
   const tieredModels = useMemo(() => groupModelsByTier(models), [models]);
 
   const refreshList = useCallback(async () => {
@@ -167,12 +190,11 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
         flash("Build started — agent is generating HTML…");
       }
 
-      await artifactsApi.build(projectSlug, selectedSlug, String(selectedSpec?.frontmatter.modelId ?? ""));
+      const result = await artifactsApi.build(projectSlug, selectedSlug, String(selectedSpec?.frontmatter.modelId ?? ""));
 
-      // Record build start time AFTER the API has accepted the build.
-      // Used by the polling effect to guard against race conditions where
-      // we poll before the server has started the agent.
-      buildStartedAtRef.current = Date.now();
+      // If the server says it's already running (duplicate build prevention),
+      // or it just started, record the server's startedAt for the polling guard.
+      buildRunStartedAtRef.current = result.startedAt ?? new Date().toISOString();
 
       // Build completion is detected by the rebuildState polling effect below.
       // Switch to preview tab so the user sees the loading state.
@@ -184,57 +206,59 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   }
 
   // Poll rebuildState to detect when the artifact build finishes.
-  // This fires as soon as the server-side agent job completes, unlike the old
-  // manifest-polling approach which waited for the LLM to write the manifest file.
+  // Uses the server's `startedAt` to guard against reacting to stale states.
   useEffect(() => {
     if (!building) return;
 
     let cancelled = false;
+    const ourBuildStartedAt = buildRunStartedAtRef.current;
 
     async function pollRebuildState() {
       try {
         const state = await rebuildApi.rebuildState(projectSlug);
         if (cancelled) return;
 
+        // Still running — keep waiting
+        if (state.running) return;
+
+        // The server is idle. Is this the completion of OUR build?
         const isArtifactBuild = state.runKind === "artifact_build" || state.runKind === "artifact_batch_build";
 
-        if (!state.running && isArtifactBuild) {
-          // Guard against race condition: if we poll before the server has
-          // actually started the agent job, state.running may still be false
-          // from the previous (idle) state. Skip if too little time has elapsed.
-          const msSinceBuildStart = Date.now() - buildStartedAtRef.current;
-          if (msSinceBuildStart < 6000) return;
+        // Guard: if the server's startedAt doesn't match the build we initiated,
+        // this is a stale state from a previous (or different) run. The server
+        // may not have transitioned to running yet, so wait.
+        if (ourBuildStartedAt && state.startedAt !== ourBuildStartedAt) {
+          return;
+        }
 
-          // Build genuinely finished — update UI
-          setBuilding(false);
+        // Build genuinely finished — update UI
+        setBuilding(false);
+        buildRunStartedAtRef.current = null;
 
-          const isSuccess = state.status === "finished" || state.status === "finished_with_attention";
-          if (isSuccess) {
-            // Refresh the artifact list so isBuilt / lastBuilt update
-            await refreshList();
-            setPreviewKey((k) => k + 1);
-            // Auto-refresh popped-out preview window
-            try {
-              if (popoutRef.current && !popoutRef.current.closed) {
-                popoutRef.current.location.reload();
-              }
-            } catch { /* cross-origin or closed — ignore */ }
-            flash("Build complete ✓");
-          } else {
-            // error, interrupted, blocked, etc.
-            await refreshList();
-            flash(state.message || "Build failed — check the build log.");
-          }
-        } else if (!state.running && !isArtifactBuild) {
-          // A different job type finished (or idle from before our build).
-          // Guard with the same timing check.
-          const msSinceBuildStart = Date.now() - buildStartedAtRef.current;
-          if (msSinceBuildStart < 6000) return;
-          // The artifact build may have already completed and another job
-          // started in the meantime. Refresh and clear building state.
-          setBuilding(false);
+        if (!isArtifactBuild) {
+          // A non-artifact job displaced our build (e.g. a knowledge build started after).
+          // The artifact may or may not have completed. Refresh and let status speak.
           await refreshList();
+          flash("Build status updated.");
+          return;
+        }
+
+        const isSuccess = state.status === "finished" || state.status === "finished_with_attention";
+        if (isSuccess) {
+          // Refresh the artifact list so isBuilt / lastBuilt update
+          await refreshList();
+          setPreviewKey((k) => k + 1);
+          // Auto-refresh popped-out preview window
+          try {
+            if (popoutRef.current && !popoutRef.current.closed) {
+              popoutRef.current.location.reload();
+            }
+          } catch { /* cross-origin or closed — ignore */ }
           flash("Build complete ✓");
+        } else {
+          // error, interrupted, blocked, etc.
+          await refreshList();
+          flash(state.message || "Build failed — check the build log.");
         }
       } catch {
         // polling error — ignore
@@ -243,12 +267,13 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
 
     // Poll every 3 seconds
     const interval = setInterval(pollRebuildState, 3000);
-    // Also do an initial check
-    void pollRebuildState();
+    // Also do an initial check after a brief delay to let the server transition
+    const initialTimer = setTimeout(() => void pollRebuildState(), 1500);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
+      clearTimeout(initialTimer);
     };
   }, [building, projectSlug, refreshList]); // eslint-disable-line react-hooks/exhaustive-deps
 

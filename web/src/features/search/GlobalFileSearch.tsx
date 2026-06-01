@@ -1,7 +1,7 @@
 import { useEffect, useState, type KeyboardEvent } from "react";
 import type { ProjectFile } from "../../contracts/api";
 import { useBuildContext } from "../../app/contexts/BuildContext";
-import { api } from "../../data/apiClient";
+import { filesApi } from "../../data/filesApi";
 import { errorMessage } from "../../domain/errors";
 import { fileBasename, humanizePathSegment } from "../../domain/files";
 
@@ -43,7 +43,7 @@ export function GlobalFileSearch({
     setError("");
 
     const timeoutId = window.setTimeout(() => {
-      api
+      filesApi
         .searchFiles(projectSlug, trimmedQuery, controller.signal)
         .then((response) => {
           if (cancelled) return;

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api } from "../data/apiClient";
+import { systemApi } from "../data/systemApi";
 import type { SystemSettingsResponse, VersionResponse } from "../contracts/api";
 import { authApi } from "../data/authApi";
 import { request } from "../data/request";
@@ -44,7 +44,7 @@ export function SettingsModal() {
     setMessage("");
     setLoading(true);
     try {
-      setSettings(await api.systemSettings());
+      setSettings(await systemApi.systemSettings());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load settings.");
     } finally {
@@ -61,9 +61,9 @@ export function SettingsModal() {
     setMessage("");
     setSaving(true);
     try {
-      const result = await api.saveCursorApiKey({ cursorApiKey: nextCursorApiKey });
+      const result = await systemApi.saveCursorApiKey({ cursorApiKey: nextCursorApiKey });
       setMessage(result.message);
-      setSettings(await api.systemSettings());
+      setSettings(await systemApi.systemSettings());
       setCursorApiKey("");
     } catch {
       setError("Failed! Please try again. If this issue persists, contact AllHail.AI");

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { RebuildState } from "../../contracts/api";
-import { api } from "../../data/apiClient";
+import { rebuildApi } from "../../data/rebuildApi";
 import { errorMessage } from "../../domain/errors";
 import { isTerminalRebuildStatus } from "../../domain/rebuild";
 
@@ -67,7 +67,7 @@ export function useRebuildSync({
   useEffect(() => {
     if (!selectedProjectSlug || !rebuild?.running || typeof EventSource === "undefined") return;
 
-    const eventSource = api.openRebuildEventSource(selectedProjectSlug);
+    const eventSource = rebuildApi.openRebuildEventSource(selectedProjectSlug);
     const syncRebuild = (event: MessageEvent<string>) => {
       try {
         lastLiveEventAtRef.current = Date.now();

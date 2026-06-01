@@ -131,8 +131,10 @@ const serverRules = [
       !new Set([
         "agentJobs.js",
         "artifactService.js",
+        "auth.js",
         "buildLogs.js",
         "buildScope.js",
+        "chatAgent.js",
         "contentLedger.js",
         "conversations.js",
         "cursorModels.js",
@@ -143,8 +145,10 @@ const serverRules = [
         "projects.js",
         "promptBuilders.js",
         "questionsService.js",
+        "secretStore.js",
         "serverValidation.js",
         "sourceMapping.js",
+        "systemSettings.js",
         "topicsService.js",
         "webResearch.js",
         "wikiTriage.js",
@@ -154,7 +158,7 @@ const serverRules = [
   {
     from: "services",
     test: (specifier, filePath) =>
-      specifier === "node:child_process" && !new Set(["buildScope.js", "cursorModels.js", "designIdentity.js", "kissAiUpdate.js", "projectFiles.js", "serverValidation.js"]).has(path.basename(filePath)),
+      specifier === "node:child_process" && !new Set(["buildScope.js", "cursorModels.js", "designIdentity.js", "kissAiUpdate.js", "projectFiles.js", "secretStore.js", "serverValidation.js"]).has(path.basename(filePath)),
     message: "server services must keep process execution in approved service modules",
   },
   {

@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { RebuildModel, RebuildState, ResolveHumanAttentionRequest } from "../../contracts/api";
-import { api } from "../../data/apiClient";
+import { rebuildApi } from "../../data/rebuildApi";
 import { errorMessage } from "../../domain/errors";
 import { resolveEffectiveRebuildModelId } from "../../domain/rebuild";
 
@@ -20,7 +20,7 @@ export function useRebuildActions({
   const startRebuild = useCallback(async () => {
     setNotice("");
     try {
-      const next = await api.startRebuild(requireSelectedProjectSlug(), resolveEffectiveRebuildModelId(selectedRebuildModelId, rebuildModels));
+      const next = await rebuildApi.startRebuild(requireSelectedProjectSlug(), resolveEffectiveRebuildModelId(selectedRebuildModelId, rebuildModels));
       setRebuild(next);
 
       if (next.status === "blocked") {
@@ -35,7 +35,7 @@ export function useRebuildActions({
     async (request: Omit<ResolveHumanAttentionRequest, "modelId">) => {
       setNotice("");
       try {
-        const next = await api.resolveHumanAttention(requireSelectedProjectSlug(), {
+        const next = await rebuildApi.resolveHumanAttention(requireSelectedProjectSlug(), {
           ...request,
           modelId: resolveEffectiveRebuildModelId(selectedRebuildModelId, rebuildModels),
         });
@@ -54,7 +54,7 @@ export function useRebuildActions({
   const cancelRebuild = useCallback(async () => {
     setNotice("");
     try {
-      const next = await api.cancelRebuild(requireSelectedProjectSlug());
+      const next = await rebuildApi.cancelRebuild(requireSelectedProjectSlug());
       setRebuild(next);
       setNotice("Build cancelled.");
     } catch (error) {

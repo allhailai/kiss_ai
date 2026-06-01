@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
-import { hashDraftContent, resolveChatFileEditApplication } from "./chatFileEdits";
-import { filesApi } from "../data/filesApi";
 import { buildThemeStyle } from "./theme";
 import { useProjectWorkspace } from "./useProjectWorkspace";
 import { RightPanelToggle } from "./RightPanelToggle";
@@ -10,16 +8,14 @@ import { useLeftNavWidth } from "./hooks/useLeftNavWidth";
 import { useAgentChatPanel } from "./hooks/useAgentChatPanel";
 import { useKeybindings } from "./hooks/useKeybindings";
 import { useProjectChat } from "./hooks/useProjectChat";
+import { useChatActions } from "./hooks/useChatActions";
 
 import { ProjectPicker } from "../features/projectPicker/ProjectPicker";
 import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
-import { makeEditableTargetForFile, useAgentFileContext } from "./hooks/useAgentFileContext";
+import { useAgentFileContext } from "./hooks/useAgentFileContext";
 import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
-import type { AuthUser, ChatMessageFileEdit, ChatMessageFileRename, ChatMessageArtifactRename, ChatMessageTopicProposal } from "../contracts/api";
-import { chatApi } from "../data/chatApi";
-import { topicsApi } from "../data/topicsApi";
-import { artifactsApi } from "../data/artifactsApi";
+import type { AuthUser } from "../contracts/api";
 import { BuildProvider, type BuildContextValue } from "./contexts/BuildContext";
 import { RouteProvider } from "./contexts/RouteContext";
 import { ToastProvider } from "./contexts/ToastContext";
@@ -107,16 +103,12 @@ export function AppWithAuth() {
   return <App />;
 }
 
-const aiFileAssistPrompt =
-  "Review the saved annotations in this file. Interpret the Git diff as user guidance, then propose edits that integrate those annotations cleanly throughout the document while preserving the document's intent, structure, and voice.";
-
 export function App() {
   const workspace = useProjectWorkspace();
   const { designWorkspace, fileWorkspace, project, rebuildWorkspace, route, toastWorkspace } = workspace;
   const rightPanelSurface = useRightPanelSurface();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const leftNavWidth = useLeftNavWidth({ projectSlug: project.selectedProjectSlug ?? "", collapsed: sidebarCollapsed });
-  const [agentDraftSeed, setAgentDraftSeed] = useState<{ id: string; draft: string } | null>(null);
   const themeStyle = useMemo(() => buildThemeStyle(designWorkspace.design), [designWorkspace.design]);
   const rightPanelWidth = useRightPanelWidth({
     panelKind: rightPanelSurface.rightPanel?.kind ?? null,
@@ -135,21 +127,24 @@ export function App() {
     () => readAgentChatConversationId(project.selectedProjectSlug),
     [project.selectedProjectSlug],
   );
-  const refreshAfterAiFileAssistApply = async () => {
-    await fileWorkspace.refreshProjectFiles();
-    await fileWorkspace.refreshSelectedFile();
-    await rebuildWorkspace.refreshStatus();
-  };
+
   const projectChat = useProjectChat({
     preferredConversationId: preferredAgentChatConversationId,
     projectSlug: project.selectedProjectSlug,
     selectedModelId: rebuildWorkspace.selectedModelId,
     projectFiles: fileWorkspace.projectFiles,
-    onAgentComplete: refreshAfterAiFileAssistApply,
+    onAgentComplete: async () => {
+      await fileWorkspace.refreshProjectFiles();
+      await fileWorkspace.refreshSelectedFile();
+      await rebuildWorkspace.refreshStatus();
+    },
     onNotice: toastWorkspace.setNotice,
-    onProposalApplied: refreshAfterAiFileAssistApply,
+    onProposalApplied: async () => {
+      await fileWorkspace.refreshProjectFiles();
+      await fileWorkspace.refreshSelectedFile();
+      await rebuildWorkspace.refreshStatus();
+    },
   });
-
 
   const { closeAgentPanel, isAgentPanelOpen, openAgentChatPanel, selectProjectChatConversation, toggleAgentPanel } = useAgentChatPanel({
     projectChat,
@@ -172,6 +167,16 @@ export function App() {
     setAiEditableFiles: projectChat.setAiEditableFiles,
     setContextFiles: projectChat.setContextFiles,
   });
+  const chatActions = useChatActions({
+    fileWorkspace,
+    openAgentChatPanel,
+    projectChat,
+    projectSlug: project.selectedProjectSlug,
+    rebuildWorkspace,
+    route,
+    toastWorkspace,
+  });
+
   const openProjectFileWithAgentContext = (path: string) => {
     agentFileContext.openProjectFileWithAgentContext(path, isAgentPanelOpen);
   };
@@ -214,183 +219,8 @@ export function App() {
       route.navigateTo(route.view, undefined, {});
     }
   }, [route.context.panel]);
-
-  const applyChatFileEdit = async (edit: ChatMessageFileEdit, editIndex: number, messageId: string): Promise<boolean> => {
-    const decision = await resolveChatFileEditApplication({ draft: fileWorkspace.draft, edit, selected: fileWorkspace.selected });
-
-    if (decision.kind === "open-file") {
-      route.openProjectFile(decision.path);
-      toastWorkspace.setNotice(decision.message);
-      return false;
-    }
-
-    if (decision.kind === "notice") {
-      toastWorkspace.setNotice(decision.message);
-      return false;
-    }
-
-    if (decision.kind === "create") {
-      // Write the file — try creating first (hash of empty string for new files),
-      // and fall back to reading the fresh hash for existing files.
-      try {
-        const emptyHash = await hashDraftContent("");
-        try {
-          await filesApi.saveFile(project.selectedProjectSlug!, decision.path, decision.content, emptyHash);
-        } catch {
-          // File likely already exists — read its current hash and update instead.
-          const fresh = await filesApi.file(project.selectedProjectSlug!, decision.path);
-          await filesApi.saveFile(project.selectedProjectSlug!, decision.path, decision.content, fresh.contentHash);
-        }
-        toastWorkspace.setNotice(`Applied and saved ${decision.path}.`);
-        await fileWorkspace.refreshProjectFiles();
-        // Navigate to the file
-        route.openProjectFile(decision.path);
-        await rebuildWorkspace.refreshStatus();
-      } catch (err) {
-        toastWorkspace.setNotice(err instanceof Error ? err.message : `Failed to save ${decision.path}.`);
-        return false;
-      }
-    } else {
-      // Write the proposed content directly via the file API.
-      // We MUST read the file's current hash from disk immediately before saving, because:
-      //  1. fileWorkspace.selected is React state and may be stale (closure capture)
-      //  2. A previous Apply in the same batch may have changed the file
-      //  3. An auto-save timer from the annotation editor may have raced us
-      try {
-        const fresh = await filesApi.file(project.selectedProjectSlug!, edit.path);
-        const saved = await filesApi.saveFile(project.selectedProjectSlug!, edit.path, decision.content, fresh.contentHash);
-
-        fileWorkspace.setDraft(saved.content);
-        toastWorkspace.setNotice(`Applied and saved ${edit.path}.`);
-
-        // Refresh project files and the current file so left nav + editor update
-        await fileWorkspace.refreshProjectFiles();
-        await fileWorkspace.refreshSelectedFile();
-        await rebuildWorkspace.refreshStatus();
-      } catch (err) {
-        console.error("[kiss_ai:apply] Apply failed for", edit.path, err);
-        toastWorkspace.setNotice(`Could not apply edit to ${edit.path}. Try refreshing the file and asking chat to regenerate.`);
-        return false;
-      }
-    }
-
-    // Persist the "applied" status server-side so it survives refresh
-    const conversationId = projectChat.activeConversation?.id;
-    if (conversationId && project.selectedProjectSlug) {
-      try {
-        const updated = await chatApi.markFileEditApplied(project.selectedProjectSlug, conversationId, messageId, editIndex);
-        projectChat.setActiveConversation(updated);
-      } catch {
-        // Non-critical — the edit was still applied to the file, just the status badge won't persist
-        console.warn("[kiss_ai] Could not persist file edit applied status.");
-      }
-    }
-
-    return true;
-  };
-
-  const applyChatFileRename = async (rename: ChatMessageFileRename, renameIndex: number, messageId: string): Promise<boolean> => {
-    if (!project.selectedProjectSlug) return false;
-
-    // Capture before async calls — React closures may be stale after awaits
-    const wasViewingFrom = fileWorkspace.selected?.path === rename.from;
-
-    try {
-      await filesApi.renameOutputFile(project.selectedProjectSlug, rename.from, rename.to);
-      toastWorkspace.setNotice(`Renamed ${rename.from.split("/").pop()} to ${rename.to.split("/").pop()}.`);
-      await fileWorkspace.refreshProjectFiles();
-      await rebuildWorkspace.refreshStatus();
-      // If the renamed file was the currently viewed file, navigate to its new path
-      if (wasViewingFrom) {
-        route.openProjectFile(rename.to);
-      }
-    } catch (err) {
-      toastWorkspace.setNotice(err instanceof Error ? err.message : `Failed to rename ${rename.from}.`);
-      return false;
-    }
-
-    // Persist the "applied" status server-side
-    const conversationId = projectChat.activeConversation?.id;
-    if (conversationId) {
-      try {
-        const updated = await chatApi.markFileRenameApplied(project.selectedProjectSlug, conversationId, messageId, renameIndex);
-        projectChat.setActiveConversation(updated);
-      } catch {
-        console.warn("[kiss_ai] Could not persist file rename applied status.");
-      }
-    }
-
-    return true;
-  };
-
-  const applyChatArtifactRename = async (rename: ChatMessageArtifactRename, renameIndex: number, messageId: string): Promise<boolean> => {
-    if (!project.selectedProjectSlug) return false;
-
-    try {
-      await artifactsApi.rename(project.selectedProjectSlug, rename.from, rename.to);
-      toastWorkspace.setNotice(`Renamed artifact ${rename.from} to ${rename.to}.`);
-      await fileWorkspace.refreshProjectFiles();
-      await rebuildWorkspace.refreshStatus();
-    } catch (err) {
-      toastWorkspace.setNotice(err instanceof Error ? err.message : `Failed to rename artifact ${rename.from}.`);
-      return false;
-    }
-
-    // Persist the "applied" status server-side
-    const conversationId = projectChat.activeConversation?.id;
-    if (conversationId) {
-      try {
-        const updated = await chatApi.markArtifactRenameApplied(project.selectedProjectSlug, conversationId, messageId, renameIndex);
-        projectChat.setActiveConversation(updated);
-      } catch {
-        console.warn("[kiss_ai] Could not persist artifact rename applied status.");
-      }
-    }
-
-    return true;
-  };
-
-  const handleCreateTopic = async (proposal: ChatMessageTopicProposal): Promise<void> => {
-    if (!project.selectedProjectSlug) return;
-
-    try {
-      const result = await topicsApi.create(
-        project.selectedProjectSlug,
-        proposal.label,
-        proposal.justification,
-        projectChat.activeConversation?.id,
-      );
-
-      if (!result.created) {
-        if (result.duplicates.length > 0) {
-          toastWorkspace.setNotice(`Topic "${proposal.label}" may already exist. Similar: ${result.duplicates.map((d) => d.label).join(", ")}`);
-        } else {
-          toastWorkspace.setNotice(result.error || `Could not create topic "${proposal.label}".`);
-        }
-        return;
-      }
-
-      toastWorkspace.setNotice(`Created topic: ${proposal.label}.`);
-      await rebuildWorkspace.refreshStatus();
-    } catch (err) {
-      toastWorkspace.setNotice(err instanceof Error ? err.message : `Failed to create topic "${proposal.label}".`);
-    }
-  };
   const startRebuildWithRequirementsCheck = () => {
     void rebuildWorkspace.startRebuild();
-  };
-  const assistCurrentFile = async () => {
-    const selected = fileWorkspace.selected;
-    if (!selected?.editable || projectChat.loading || projectChat.sending || projectChat.proposalUpdating) return;
-
-    const savedFile = fileWorkspace.hasUnsavedChanges ? await fileWorkspace.saveSelected() : selected;
-    if (!savedFile) return;
-
-    const editableTarget = makeEditableTargetForFile(savedFile, savedFile.content);
-    projectChat.startDraftConversation({ ai_editable_files: [editableTarget], context_files: [] });
-    openAgentChatPanel();
-    setAgentDraftSeed({ id: `${savedFile.path}:${Date.now()}`, draft: aiFileAssistPrompt });
-    toastWorkspace.setNotice(`Prepared AI File Assist for ${savedFile.path}.`);
   };
   const buildContextValue: BuildContextValue = useMemo(
     () => ({
@@ -474,7 +304,7 @@ export function App() {
           <MainContentArea
             designWorkspace={designWorkspace}
             fileWorkspace={fileWorkspace}
-            onAiFileAssist={() => void assistCurrentFile()}
+            onAiFileAssist={() => void chatActions.assistCurrentFile()}
             onOpenFile={openProjectFileWithAgentContext}
             projectChat={projectChat}
             projectSlug={project.selectedProjectSlug}
@@ -485,14 +315,14 @@ export function App() {
           {rightPanelSurface.rightPanel ? (
             <RightPanelOrchestrator
               agentFileContext={agentFileContext}
-              applyChatFileEdit={applyChatFileEdit}
-              applyChatFileRename={applyChatFileRename}
-              applyChatArtifactRename={applyChatArtifactRename}
+              applyChatFileEdit={chatActions.applyChatFileEdit}
+              applyChatFileRename={chatActions.applyChatFileRename}
+              applyChatArtifactRename={chatActions.applyChatArtifactRename}
               closeRightPanel={closeRightPanel}
-              draftSeed={agentDraftSeed}
+              draftSeed={chatActions.agentDraftSeed}
               fileWorkspaceProjectFiles={fileWorkspace.projectFiles}
-              onCreateTopic={handleCreateTopic}
-              onRefreshAfterMutation={refreshAfterAiFileAssistApply}
+              onCreateTopic={chatActions.handleCreateTopic}
+              onRefreshAfterMutation={chatActions.refreshAfterMutation}
               projectChat={projectChat}
               projectSlug={project.selectedProjectSlug}
               rebuildWorkspace={rebuildWorkspace}

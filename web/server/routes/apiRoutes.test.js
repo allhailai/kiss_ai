@@ -503,7 +503,7 @@ describe("API routes", () => {
       applyEditProposal: async () => ({}),
       createConversation: async () => ({}),
       editChatMessage: async () => ({}),
-      generateEditProposal: async () => ({}),
+
       httpError,
       listConversations: async () => ({ conversations: [] }),
       readConversation: async () => ({ id: "conv_1", messages: [], projectSlug: "demo", version: 1 }),

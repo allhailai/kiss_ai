@@ -366,7 +366,7 @@ const {
   projectPath,
 });
 
-const { applyEditProposal, cancelChatAgent, editChatMessage, generateEditProposal, sendChatMessage, updateEditProposal } = createChatAgentService({
+const { applyEditProposal, cancelChatAgent, editChatMessage, sendChatMessage, updateEditProposal } = createChatAgentService({
   appendMessage: appendConversationMessage,
   displayProjectName,
   editUserMessage,
@@ -545,7 +545,7 @@ registerApiRoutes(app, {
   applyEditProposal,
   cancelChatAgent,
   editChatMessage,
-  generateEditProposal,
+
   sendChatMessage,
   startFullRebuild,
   cancelAgentJob,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "../data/apiClient";
+import { projectsApi } from "../data/projectsApi";
 import {
   type BuildLogState,
   type DesignState,
@@ -70,7 +70,7 @@ export function useProjectWorkspace() {
   const refreshProjects = useCallback(async () => {
     setProjectsError("");
     try {
-      const response = await api.projects();
+      const response = await projectsApi.projects();
       setProjectsRoot(response.projectsRoot);
       setProjects(response.projects);
     } catch (error) {
@@ -157,7 +157,7 @@ export function useProjectWorkspace() {
     if (!route.projectSlug) return;
 
     const hash = buildRouteHash(route.projectSlug, route.view, route.filePath, route.context);
-    void api.updateProjectUiState(route.projectSlug, { lastRoute: { hash } }).catch((error: unknown) => {
+    void projectsApi.updateProjectUiState(route.projectSlug, { lastRoute: { hash } }).catch((error: unknown) => {
       console.warn("[kiss_ai UI warning] Could not persist project route.", error);
     });
   }, []);
@@ -215,7 +215,7 @@ export function useProjectWorkspace() {
         let nextHash = firstProjectHash;
 
         try {
-          const projectUiState = await api.projectUiState(projectSlug);
+          const projectUiState = await projectsApi.projectUiState(projectSlug);
           const savedHash = projectUiState.lastRoute?.hash;
           if (savedHash && parseRouteHash(savedHash).projectSlug === projectSlug) {
             nextHash = savedHash;
@@ -248,7 +248,7 @@ export function useProjectWorkspace() {
       setCreatingProject(true);
       setNotice("");
       try {
-        const project = await api.createProject({ name, slug });
+        const project = await projectsApi.createProject({ name, slug });
         await refreshProjects();
         setNotice(`Created ${project.name}.`);
         selectProject(project.slug);

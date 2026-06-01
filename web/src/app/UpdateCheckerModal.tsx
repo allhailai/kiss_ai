@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api } from "../data/apiClient";
+import { systemApi } from "../data/systemApi";
 import { errorMessage } from "../domain/errors";
 import type { KissAiUpdateCheckResponse } from "../contracts/api";
 
@@ -11,7 +11,7 @@ function useServerReadyPoller(enabled: boolean) {
 
     intervalRef.current = setInterval(async () => {
       try {
-        await api.systemSettings();
+        await systemApi.systemSettings();
         // Server is back — reload the page.
         window.location.reload();
       } catch {
@@ -43,7 +43,7 @@ export function UpdateCheckerModal() {
     setError("");
     setLoading(true);
     try {
-      setUpdateCheck(await api.checkKissAiUpdate());
+      setUpdateCheck(await systemApi.checkKissAiUpdate());
     } catch (err) {
       setError(errorMessage(err, "Could not check for the latest KISS AI version."));
     } finally {
@@ -57,7 +57,7 @@ export function UpdateCheckerModal() {
     setError("");
     setUpdating(true);
     try {
-      const result = await api.updateAndRestartKissAi();
+      const result = await systemApi.updateAndRestartKissAi();
 
       if (result.restarting) {
         setRestarting(true);

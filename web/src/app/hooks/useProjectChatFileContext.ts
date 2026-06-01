@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import type { AgentContextFile, ChatContextFile, Conversation, ConversationSummary, ProjectFile } from "../../contracts/api";
-import { api } from "../../data/apiClient";
+import { chatApi } from "../../data/chatApi";
 import { errorMessage } from "../../domain/errors";
 import { uniqueByPathPreserveFirst } from "../../domain/files";
 
@@ -71,7 +71,7 @@ export function useProjectChatFileContext({
         ai_editable_files: uniqueByPathPreserveFirst(fileContext.ai_editable_files),
         context_files: uniqueByPathPreserveFirst(fileContext.context_files),
       };
-      const updated = await api.updateConversation(projectSlug, conversationId, { fileContext: nextContext });
+      const updated = await chatApi.updateConversation(projectSlug, conversationId, { fileContext: nextContext });
       setActiveConversation(updated);
       await refreshConversations();
       return updated;

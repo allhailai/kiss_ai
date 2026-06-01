@@ -48,7 +48,7 @@ export function registerApiRoutes(app, deps) {
     cancelChatAgent: deps.cancelChatAgent,
     createConversation: deps.createConversation,
     editChatMessage: deps.editChatMessage,
-    generateEditProposal: deps.generateEditProposal,
+
     httpError: deps.httpError,
     listConversations: deps.listConversations,
     readConversation: deps.readConversation,

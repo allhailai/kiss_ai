@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import type { AgentContextFile, ChatContextFile, ChatMessage, Conversation, ConversationSummary, ProjectFile } from "../../contracts/api";
-import { api } from "../../data/apiClient";
+import { chatApi } from "../../data/chatApi";
 import { hasSettledAssistantReply } from "../../domain/conversation";
 import { errorMessage } from "../../domain/errors";
 import { useConversationStream } from "./useConversationStream";
@@ -59,7 +59,7 @@ export function useProjectChat({
 
   const refreshConversations = useCallback(async () => {
     if (!projectSlug) return [];
-    const response = await api.conversations(projectSlug);
+    const response = await chatApi.conversations(projectSlug);
     setConversations(response.conversations);
     return response.conversations;
   }, [projectSlug]);
@@ -96,7 +96,7 @@ export function useProjectChat({
     onNotice("");
     try {
       fileContext.clearPendingConversationFileContext();
-      const conversation = await api.conversation(projectSlug, conversationId);
+      const conversation = await chatApi.conversation(projectSlug, conversationId);
       setActiveConversation(conversation);
       fileContext.applyConversationFileContext(conversationFileContextFromConversation(conversation));
       cancelEditingMessage();
@@ -114,7 +114,7 @@ export function useProjectChat({
     onNotice("");
     try {
       fileContext.clearPendingConversationFileContext();
-      const conversation = await api.createConversation(projectSlug, { modelId: selectedModelId });
+      const conversation = await chatApi.createConversation(projectSlug, { modelId: selectedModelId });
       setActiveConversation(conversation);
       fileContext.applyConversationFileContext(conversationFileContextFromConversation(conversation));
       cancelEditingMessage();
@@ -129,7 +129,7 @@ export function useProjectChat({
   const ensureConversation = async () => {
     if (activeConversation) return activeConversation;
     if (!projectSlug) throw new Error("Select a project first.");
-    const conversation = await api.createConversation(projectSlug, { modelId: selectedModelId });
+    const conversation = await chatApi.createConversation(projectSlug, { modelId: selectedModelId });
     setActiveConversation(conversation);
     return conversation;
   };
@@ -166,7 +166,7 @@ export function useProjectChat({
         conversation = await fileContext.persistConversationFileContext(conversation.id, currentFileContext);
       }
       if (options.content === undefined) setMessageDraft("");
-      const next = await api.sendChatMessage(projectSlug, conversation.id, {
+      const next = await chatApi.sendChatMessage(projectSlug, conversation.id, {
         modelId: selectedModelId,
         content,
         context,
@@ -196,7 +196,7 @@ export function useProjectChat({
     setSending(true);
     onNotice("");
     try {
-      const next = await api.editChatMessage(projectSlug, activeConversation.id, message.id, {
+      const next = await chatApi.editChatMessage(projectSlug, activeConversation.id, message.id, {
         modelId: selectedModelId || undefined,
         content,
       });
@@ -219,39 +219,14 @@ export function useProjectChat({
 
   // --- Edit proposals ---
 
-  const generateEditProposal = async (proposalFileContext: ConversationFileContextState, content = "") => {
-    if (!projectSlug || loading || sending || proposalUpdating) return false;
-    setSending(true);
-    onNotice("");
-    try {
-      let conversation = await ensureConversation();
-      const nextContext = fileContext.applyConversationFileContext(proposalFileContext);
-      fileContext.clearPendingConversationFileContext();
-      conversation = await fileContext.persistConversationFileContext(conversation.id, nextContext);
-      const next = await api.generateEditProposal(projectSlug, conversation.id, {
-        modelId: selectedModelId,
-        content: content.trim() || undefined,
-        fileContext: nextContext,
-      });
-      setActiveConversation(next);
-      await refreshConversations();
-      const latestProposal = next.editProposals.at(-1);
-      if (latestProposal?.notice) onNotice(latestProposal.notice);
-      return true;
-    } catch (error) {
-      onNotice(errorMessage(error, "Could not generate proposed changes."));
-      return false;
-    } finally {
-      setSending(false);
-    }
-  };
+
 
   const updateEditProposal = async (proposalId: string, conceptualDiffs: Array<{ id: string; status: "accepted" | "rejected" }>) => {
     if (!projectSlug || !activeConversation || loading || sending || proposalUpdating) return false;
     setProposalUpdating(true);
     onNotice("");
     try {
-      const next = await api.updateEditProposal(projectSlug, activeConversation.id, proposalId, { conceptualDiffs });
+      const next = await chatApi.updateEditProposal(projectSlug, activeConversation.id, proposalId, { conceptualDiffs });
       setActiveConversation(next);
       await refreshConversations();
       return true;
@@ -268,7 +243,7 @@ export function useProjectChat({
     setSending(true);
     onNotice("");
     try {
-      const next = await api.applyEditProposal(projectSlug, activeConversation.id, proposalId, {
+      const next = await chatApi.applyEditProposal(projectSlug, activeConversation.id, proposalId, {
         modelId: selectedModelId,
       });
       setActiveConversation(next);
@@ -288,7 +263,7 @@ export function useProjectChat({
   const cancelAgent = async () => {
     if (!projectSlug) return;
     try {
-      await api.cancelChatAgent(projectSlug);
+      await chatApi.cancelChatAgent(projectSlug);
     } catch {
       // Cancellation is best-effort
     }
@@ -319,13 +294,13 @@ export function useProjectChat({
         const conversationId = preferredConversationId ?? nextConversations[0]?.id;
         if (conversationId) {
           try {
-            const conversation = await api.conversation(projectSlug, conversationId);
+            const conversation = await chatApi.conversation(projectSlug, conversationId);
             setActiveConversation(conversation);
             fileContext.applyConversationFileContext(conversationFileContextFromConversation(conversation));
             if (hasSettledAssistantReply(conversation)) setSending(false);
           } catch {
             if (conversationId !== nextConversations[0]?.id && nextConversations[0]) {
-              const conversation = await api.conversation(projectSlug, nextConversations[0].id);
+              const conversation = await chatApi.conversation(projectSlug, nextConversations[0].id);
               setActiveConversation(conversation);
               fileContext.applyConversationFileContext(conversationFileContextFromConversation(conversation));
               if (hasSettledAssistantReply(conversation)) setSending(false);
@@ -368,7 +343,7 @@ export function useProjectChat({
     filteredConversations,
     handleComposerChange,
     handleThreadScroll: scroll.handleThreadScroll,
-    generateEditProposal,
+
     loading,
     messageDraft,
     setMessageDraft,

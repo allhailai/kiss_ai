@@ -103,13 +103,8 @@ export const editChatMessageBodySchema = z.object({
   content: maxUtf8Bytes(MAX_USER_MESSAGE_BYTES, "Chat message is too large.").transform((value) => value.trim()).pipe(z.string().min(1)),
 });
 
-export const generateEditProposalBodySchema = z.object({
-  modelId: z.string().trim().min(1).max(160),
-  content: maxUtf8Bytes(MAX_USER_MESSAGE_BYTES, "Chat message is too large.").transform((value) => value.trim()).pipe(z.string().min(1)).optional(),
-  fileContext: conversationFileContextSchema.refine((value) => (value.ai_editable_files?.length ?? 0) > 0, {
-    message: "At least one AI Editable file is required.",
-  }),
-});
+
+
 
 export const updateEditProposalBodySchema = z.object({
   conceptualDiffs: z.array(

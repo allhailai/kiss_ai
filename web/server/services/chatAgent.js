@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { MAX_STORED_MESSAGE_BYTES, MAX_USER_MESSAGE_BYTES } from "../contracts/chatLimits.js";
 import {
   activeRejectionRecords,
@@ -21,11 +23,7 @@ const maxPromptHistoryMessages = 40;
 const maxContextFiles = 20;
 const maxAiEditableFiles = 10;
 const conceptualDiffMemoryPath = ".conceptual-diff-memory.json";
-const noProposalGuidanceMessage = [
-  "What changes do you want to make to the editable files?",
-  "I need guidance.",
-  "No edits were found in the file nor messages provided for guidance.",
-].join("\n");
+
 
 function nowIso() {
   return new Date().toISOString();
@@ -78,24 +76,7 @@ function requireEditRequest(body, httpError) {
   };
 }
 
-function userMessageFromProposalRequest(body) {
-  const content = String(body?.content ?? "").trim();
-  if (!content) return null;
-  return {
-    id: createMessageId(),
-    role: "user",
-    content,
-    createdAt: nowIso(),
-    modelId: null,
-    status: "complete",
-    context: body.fileContext
-      ? {
-          ai_editable_files: body.fileContext.ai_editable_files ?? [],
-          context_files: body.fileContext.context_files ?? [],
-        }
-      : undefined,
-  };
-}
+
 
 function conversationSummaryText(conversation) {
   return conversation.summary ? `Conversation summary: ${conversation.summary}` : "Conversation summary: not generated yet.";
@@ -291,15 +272,15 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     "You are the project chat assistant for a local kiss_ai research project.",
     "",
     "Rules:",
+    "- CRITICAL: You are read-only. Do NOT use tools to write, create, edit, or modify any files on disk. Do NOT run commands that modify the filesystem. All file changes must be proposed exclusively via <file_edit> tags in your text response. The web UI will apply your proposals to the user's editor draft — you must never write files yourself.",
     "- Answer the user's latest message using this conversation and supplied project context first.",
     "- Treat a new conversation as fresh context; do not assume access to previous conversations.",
     "- Treat currentFileContext as read-only context for the file the user is viewing. It does not grant edit permission.",
     "- Context entries with contentSource=unsaved_draft reflect the user's current unsaved editor draft and should be treated as newer than saved file content.",
-    "- You may propose or prepare updates for files listed in ai_editable_files; base proposals on the provided content field, do not directly edit files, run modifying commands, write logs, or create artifacts.",
+    "- You may propose updates for files listed in ai_editable_files using <file_edit> tags. Base proposals on the provided content field.",
     "- Treat context_files as read-only sources to consider. Do not treat them as editable targets unless the same path also appears in ai_editable_files.",
     "- When the user asks for file changes, propose edits only for ai_editable_files — EXCEPT for new report creation: you may create new reports under outputs_ai/reports/ via file_edit tags even when they are not in ai_editable_files (see Report Creation guidance).",
     "- For each proposed file edit, include a tagged block: <file_edit><path>relative/path.md</path><summary>short summary</summary><proposedContent>full replacement file content</proposedContent></file_edit>.",
-    "- The web UI may apply tagged file_edit proposals to the unsaved editor draft. Never write files directly.",
     "- User-selected context_files are the only ad hoc file contents included beyond the standard requirement files in the project payload.",
     "- If needed context is missing from currentFileContext, ai_editable_files, context_files, or the standard requirement files, say what is missing.",
     "- Stay inside the current project. User-selected source context files are limited to human_*.md, inputs_human/, inputs_ai/, and outputs_ai/.",
@@ -335,7 +316,7 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     "- When an artifact spec file (artifacts/artifact_specs/*.artifact.md) is listed in ai_editable_files, you are in artifact editing mode.",
     "- IMPORTANT: Distinguish between questions and edit requests:",
     "  - If the user is ASKING A QUESTION about the artifact (e.g., 'what does this section cover?', 'why did you include X?', 'how will this look?'), answer the question using the spec and project context. Do NOT modify the spec.",
-    "  - If the user WANTS A CHANGE (e.g., 'add a section about Y', 'remove the intro', 'make it more concise', 'change the tone'), propose file_edit tags to update the artifact spec directly.",
+    "  - If the user WANTS A CHANGE (e.g., 'add a section about Y', 'remove the intro', 'make it more concise', 'change the tone'), propose file_edit tags to update the artifact spec.",
     "  - If you are UNCERTAIN whether the user wants a change or is asking a question, ask: 'Would you like me to update the spec, or are you just asking about it?'",
     "- When making edits: respond with a brief 1-2 sentence confirmation of what changed. Keep responses concise.",
     "- NEVER echo back the spec content, file_edit tag contents, or large portions of the spec in your response. The user can view the spec in the artifact view. Just confirm what changed.",
@@ -350,7 +331,7 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     "  1. Ask for the report name if not provided.",
     "  2. Include a file_edit tag with the new path (outputs_ai/reports/<slug>.md) and the full initial content. Do NOT ask the user to add editable files first.",
     "  3. Use project wiki pages and sources as the basis for report content. You have access to existingTopics and the wiki index for reference.",
-    "  4. Generate substantial, complete report content directly — do not produce stubs or ask the user to configure anything.",
+    "  4. Generate substantial, complete report content in the file_edit tag — do not produce stubs or ask the user to configure anything.",
     "- When a report file is listed in ai_editable_files, you can edit it via file_edit tags.",
     "- User edits to reports are treated as feedback and direction, not text that must be exactly preserved.",
     "  The user's modifications indicate areas that need polish, emphasis changes, or structural adjustments.",
@@ -445,75 +426,7 @@ function editableContentHashByPath(conversation) {
   return new Map((conversation.fileContext?.ai_editable_files ?? []).filter((file) => file?.path && file.contentHash).map((file) => [file.path, file.contentHash]));
 }
 
-async function createEditProposalPrompt({ project, conversation, readProjectJson, readTextFile, gitFileDiffText, gitFileDiffTexts }) {
-  const payload = await readScopedFilePayload({ project, readTextFile, gitFileDiffText, gitFileDiffTexts, conversation });
-  const authorizedEditablePaths = new Set(payload.authorizedAiEditableFiles.map((file) => file.path));
-  const hasUserMessages = conversation.messages.some((message) => message.role === "user" && String(message.content ?? "").trim());
-  const hasScopedDiffs = payload.gitDiffs.some((entry) => entry.diff.trim());
 
-  if (!payload.authorizedAiEditableFiles.length) {
-    return {
-      authorizedEditablePaths,
-      guidance: "Add at least one AI Editable file before proposing edits.",
-    };
-  }
-
-  if (!hasUserMessages && !hasScopedDiffs) {
-    return {
-      authorizedEditablePaths,
-      guidance: noProposalGuidanceMessage,
-    };
-  }
-
-  const rejectionMemory = normalizeConceptualDiffMemoryFile(await readProjectJson(project.path, conceptualDiffMemoryPath, emptyConceptualDiffMemory()));
-  const userInstruction = latestUserInstruction(conversation);
-  const promptPayload = {
-    project: {
-      slug: project.slug,
-      root: project.path,
-    },
-    conversation: {
-      id: conversation.id,
-      messages: currentConversationMessages(conversation),
-    },
-    ai_editable_files: payload.authorizedAiEditableFiles,
-    rejected_ai_editable_files: payload.rejectedAiEditableFiles,
-    context_files: payload.contextFileResults,
-    git_diffs: payload.gitDiffs,
-    conceptual_diff_rejection_memory: buildRejectionMemoryPromptContext(rejectionMemory, {
-      filePaths: authorizedEditablePaths,
-      flow: "ai_file_assist",
-      userInstruction,
-    }),
-  };
-
-  return {
-    authorizedEditablePaths,
-    prompt: [
-      "You are preparing Proposed Changes for a local kiss_ai research project.",
-      "",
-      "Rules:",
-      "- Read only. Do not edit files, write logs, run modifying commands, or create artifacts.",
-      "- Use only the current conversation messages, selected context files, selected AI Editable files, and scoped git diffs in the payload.",
-      "- Propose changes only for paths listed in ai_editable_files.",
-      "- Each proposed change must be conceptual, concise, and high-level; do not provide patches or replacement content.",
-      "- Include enough structured intent for a later apply agent to preserve the user's meaning.",
-      "- Choose the narrowest target.scope that satisfies the user's intent: local, section, multi_section, or document.",
-      "- Use document scope only when guidance, annotations, or Git diffs imply a broad file-wide pass.",
-      "- Use target anchors or section names when they are supported by the file content.",
-      "- Do not invent evidence. Leave evidence arrays empty or omit them when unsupported by the payload.",
-      "- Treat conceptual_diff_rejection_memory as soft suppression guidance for prior rejected conceptual diffs.",
-      "- Do not re-propose exact rejected concepts unless fresh evidence or explicit user guidance justifies reconsideration.",
-      "- If reconsidering a rejected concept, include memory.reconsidersRejectedId and memory.reconsiderReason on that conceptual diff.",
-      "- Group proposals per file using filePath.",
-      "- Return only JSON wrapped in <edit_proposal_json> tags.",
-      "- JSON shape: {\"conceptualDiffs\":[{\"filePath\":\"relative/path.md\",\"title\":\"short title\",\"summary\":\"terse conceptual change\",\"target\":{\"scope\":\"local|section|multi_section|document\",\"sections\":[\"section name\"],\"anchors\":[\"nearby phrase\"]},\"intent\":{\"objective\":\"what should be true after applying\",\"rationale\":\"why this change is needed\",\"mustPreserve\":[\"constraint\"],\"avoid\":[\"negative constraint\"]},\"evidence\":{\"userGuidance\":[\"user signal\"],\"gitDiffSignals\":[\"diff signal\"],\"contextSignals\":[\"context signal\"]},\"applyNotes\":{\"expectedChangeShape\":\"how broad the edit should be\",\"nonGoals\":[\"do not do this\"],\"riskLevel\":\"low|medium|high\"},\"memory\":{\"reconsidersRejectedId\":\"rejection id when reconsidering\",\"reconsiderReason\":\"fresh evidence or user override reason\"}}]}",
-      "",
-      "Payload:",
-      JSON.stringify(promptPayload, null, 2),
-    ].join("\n"),
-  };
-}
 
 async function createApplyProposalPrompt({ project, conversation, proposal, readTextFile, gitFileDiffText, gitFileDiffTexts }) {
   const payload = await readScopedFilePayload({ project, readTextFile, gitFileDiffText, gitFileDiffTexts, conversation });
@@ -754,6 +667,24 @@ export function createChatAgentService({
           readTextFile,
         });
 
+        // Snapshot editable files before the agent run so we can restore them
+        // after. The Cursor SDK agent has full filesystem write access and may
+        // modify files directly despite prompt instructions not to. By reverting
+        // any direct writes, we ensure only <file_edit> tags (applied via the UI)
+        // can change files.
+        const fileSnapshots = new Map();
+        if (authorizedEditablePaths.size > 0) {
+          for (const relPath of authorizedEditablePaths) {
+            const absPath = path.resolve(project.path, relPath);
+            try {
+              fileSnapshots.set(absPath, await fs.readFile(absPath, "utf8"));
+            } catch {
+              // File doesn't exist yet — record null so we can delete if agent creates it.
+              fileSnapshots.set(absPath, null);
+            }
+          }
+        }
+
         await runCursorAgent({
           project,
           apiKey: cursorApiKey.apiKey,
@@ -776,6 +707,23 @@ export function createChatAgentService({
             });
           },
         });
+
+        // Restore snapshotted files — revert any direct writes the agent made.
+        for (const [absPath, originalContent] of fileSnapshots) {
+          try {
+            if (originalContent === null) {
+              // File didn't exist before — remove if the agent created it.
+              await fs.unlink(absPath).catch(() => {});
+            } else {
+              const current = await fs.readFile(absPath, "utf8").catch(() => null);
+              if (current !== originalContent) {
+                await fs.writeFile(absPath, originalContent, "utf8");
+              }
+            }
+          } catch {
+            // Best-effort restore — don't fail the entire response.
+          }
+        }
 
         const assistantText = assistantTextChunks.join("");
         const fileEdits = extractFileEditProposals(assistantText, conversationWithUser, authorizedEditablePaths);
@@ -959,88 +907,7 @@ export function createChatAgentService({
     }
   }
 
-  async function generateEditProposal(project, conversationId, body) {
-    const requestedModelId = String(body?.modelId ?? "").trim();
-    if (!requestedModelId) throw httpError("Edit proposals require a model.");
 
-    const { cursorApiKey, modelId, releaseProjectAgent } = await prepareAgentRun(project, requestedModelId, "edit_proposal");
-    try {
-      const conversation = await readConversation(project, conversationId);
-      const userMessage = userMessageFromProposalRequest(body);
-      const conversationWithUser = userMessage ? await appendMessage(project, conversationId, userMessage) : conversation;
-      const conversationWithContext = await writeConversation(project, {
-        ...conversationWithUser,
-        fileContext: body.fileContext ?? conversation.fileContext,
-        updatedAt: nowIso(),
-      });
-      const { authorizedEditablePaths, guidance, prompt } = await createEditProposalPrompt({
-        project,
-        conversation: conversationWithContext,
-        gitFileDiffText,
-        gitFileDiffTexts,
-        readProjectJson,
-        readTextFile,
-      });
-
-      if (guidance) {
-        const withGuidance = await appendMessage(project, conversationId, {
-          id: createMessageId(),
-          role: "assistant",
-          content: guidance,
-          createdAt: nowIso(),
-          modelId,
-          status: "complete",
-        });
-        notifyConversation(project.slug, conversationId, { type: "snapshot", conversation: withGuidance });
-        return withGuidance;
-      }
-
-      let assistantText = "";
-      const proposalController = new AbortController();
-      activeChatControllers.set(project.slug, proposalController);
-      try {
-        await runCursorAgent({
-          project,
-          apiKey: cursorApiKey.apiKey,
-          modelId,
-          prompt,
-          signal: proposalController.signal,
-          onEvent: async (event) => {
-            if (event.type === "assistant_delta" && event.text) assistantText += event.text;
-          },
-        });
-      } finally {
-        activeChatControllers.delete(project.slug);
-      }
-
-      const rejectionMemory = normalizeConceptualDiffMemoryFile(await readProjectJson(project.path, conceptualDiffMemoryPath, emptyConceptualDiffMemory()));
-      const activeRecords = activeRejectionRecords(rejectionMemory, { filePaths: authorizedEditablePaths, flow: "ai_file_assist" });
-      const conceptualDiffs = filterSuppressedConceptualDiffs(
-        annotateConceptualDiffsWithMemory(extractConceptualDiffs(assistantText, authorizedEditablePaths), activeRecords),
-        activeRecords,
-        { userInstruction: body.content ?? latestUserInstruction(conversationWithContext) },
-      );
-      const timestamp = nowIso();
-      const proposal = {
-        id: createProposalId(),
-        ...(userMessage?.id ? { sourceMessageId: userMessage.id } : {}),
-        status: conceptualDiffs.length ? "proposed" : "failed",
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        conceptualDiffs,
-        notice: proposalNotice(conceptualDiffs),
-      };
-      const nextConversation = await writeConversation(project, {
-        ...conversationWithContext,
-        editProposals: [...(conversationWithContext.editProposals ?? []), proposal],
-        updatedAt: timestamp,
-      });
-      notifyConversation(project.slug, conversationId, { type: "snapshot", conversation: nextConversation });
-      return nextConversation;
-    } finally {
-      releaseProjectAgent();
-    }
-  }
 
   async function updateEditProposal(project, conversationId, proposalId, body) {
     const conversation = await readConversation(project, conversationId);
@@ -1222,5 +1089,5 @@ export function createChatAgentService({
     return { ok: true, cancelled: true };
   }
 
-  return { applyEditProposal, cancelChatAgent, editChatMessage, generateEditProposal, sendChatMessage, updateEditProposal };
+  return { applyEditProposal, cancelChatAgent, editChatMessage, sendChatMessage, updateEditProposal };
 }

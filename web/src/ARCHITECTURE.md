@@ -34,8 +34,8 @@ Prefer changes that are easy for the next AI agent to verify:
 ```text
 src/
   app/        App shell, theme mapping, and workspace orchestration
-  contracts/  Shared API request/response shapes
-  data/       Backend API transport helpers
+  contracts/  Shared API request/response shapes (domain-split sub-modules)
+  data/       Backend API transport helpers (domain-specific modules)
   domain/     Pure helpers for files, links, diffs, design identity parsing, formatting
   editor/     CodeMirror React wrapper and editor extensions
   features/   User-facing workflow components
@@ -48,7 +48,7 @@ src/
 
 `main.tsx` imports the app shell from `app/App.tsx`.
 
-`app/App.tsx` composes the shell, sidebar, and active workflow. It should read like the map of the UI. Keep data loading, route application, saving, reverting, rebuild polling, and project selection in `app/useProjectWorkspace.ts`.
+`app/App.tsx` composes the shell, sidebar, and active workflow. It should read like the map of the UI. Business logic for chat file edits, renames, topic creation, and file assist is extracted into `app/hooks/useChatActions.ts`. Keep data loading, route application, saving, reverting, rebuild polling, and project selection in `app/useProjectWorkspace.ts`.
 
 Global hub actions that are not scoped to a research project should use `/api/system/*` routes. The current example is the dashboard **Get latest** action, which calls `data/systemApi.ts`, runs guarded server-side Git update logic in `server/services/kissAiUpdate.js`, and leaves project-local Git histories untouched.
 
@@ -79,7 +79,27 @@ Use `domain/` for deterministic helpers that can be understood and tested withou
 - `projectPaths.ts`: project path constants and path classification policy.
 
 
-Domain modules should not import React, components, hooks, CodeMirror widgets, app view types, or transport clients. They may import API contract types from `contracts/api.ts`.
+Domain modules should not import React, components, hooks, CodeMirror widgets, app view types, or transport clients. They may import API contract types from `contracts/api.ts` or its domain sub-modules.
+
+## Contracts Layer
+
+`contracts/api.ts` is a barrel that re-exports all types from domain-focused sub-modules. Downstream code can import from `contracts/api` for convenience, or directly from the sub-module for tighter coupling:
+
+- `contracts/rebuild.ts`: rebuild state, agent run events, build questions, attention items
+- `contracts/chat.ts`: chat messages, conversations, conceptual diffs, edit proposals
+- `contracts/topics.ts`: topics, topic state, disposition, create/response shapes
+- `contracts/artifacts.ts`: artifact specs and source files
+- `contracts/buildLog.ts`: build log tabs, files, and state
+- `contracts/project.ts`: project status, files, file content, design state
+- `contracts/auth.ts`: authentication types
+- `contracts/system.ts`: version, update, settings, keybindings
+- `contracts/agents.ts`: agent context file types (used by chat and rebuild)
+
+## Data Layer
+
+Transport helpers are domain-specific modules. There is no aggregated API client — each module exports its own namespace object:
+
+- `data/authApi.ts`, `data/chatApi.ts`, `data/filesApi.ts`, `data/projectsApi.ts`, `data/rebuildApi.ts`, `data/systemApi.ts`, `data/artifactsApi.ts`
 
 ## Editor Layer
 
@@ -109,7 +129,7 @@ workspace orchestration.
 
 Current features:
 
-- `agents/`
+- `agents/` (sub-components: `AgentConversationHeader`, `AgentEditProposalPanel`, `agentChatHelpers`)
 - `artifacts/`
 - `chat/`
 - `dashboard/`
@@ -121,11 +141,24 @@ Current features:
 - `rebuild/`
 - `search/`
 - `toast/`
-- `topics/` (composed via `app/ReviewWorkspace.tsx`)
+- `topics/` (sub-components: `TopicCard`, `topicHelpers`; composed via `app/ReviewWorkspace.tsx`)
+
+## Styles Layer
+
+`styles/01-tokens.css` defines the design token system:
+
+- **Colors**: semantic palette (primary, accent, surface, border, status)
+- **Spacing**: 4px-base scale (`--space-1` through `--space-12`)
+- **Typography**: font families, size scale, line heights, font weights
+- **Radius**: `--radius-sm` through `--radius-full`
+- **Shadows**: `--shadow-sm`, `--shadow-md`, `--shadow-lg`, `--shadow-inset`
+- **Transitions**: `--transition-fast`, `--transition-normal`, `--transition-slow`
+
+Feature CSS files should prefer token variables over hardcoded values for border-radius, spacing, and typography.
 
 ## Data And Live Updates
 
-Use `contracts/` for shared API shapes and `data/` for transport helpers. Server request validation lives in `server/routes/requestSchemas.js`; when adding or changing an API shape, update the contract type, transport helper, route schema, and focused tests together.
+Use `contracts/` for shared API shapes and `data/` for transport helpers. Server request validation lives in `server/routes/requestSchemas.js`; when adding or changing an API shape, update the contract type in the appropriate contract sub-module, transport helper, route schema, and focused tests together.
 
 Chat and rebuild workflows use a dual transport:
 
@@ -200,14 +233,9 @@ unless the helper is truly cross-cutting project policy.
 These areas are intentionally not split during routine cleanup because their
 blast radius is higher than a local edit:
 
-- `app/App.tsx`: shell composition, right-panel wiring, and workflow roots.
-- `features/agents/RightPanelAgentChat.tsx`: agent chat panel composition and
-  conceptual diff review wiring.
 - `features/rebuild/BuildProjectRightPanel.tsx`: rebuild right panel composition,
   human attention, and build controls.
 - `features/design/DesignWorkspace.tsx`: large design identity form surface.
-- `features/topics/TopicsWorkspace.tsx`: topic management, seed review, deepen
-  queue, and disposition controls.
 - `features/navigation/FileTreeNav.tsx`: navigation tree with inline edit,
   drag-drop, and folder management.
 - `features/navigation/WorkflowMenus.tsx`: workflow menu structure and inline
@@ -216,7 +244,6 @@ blast radius is higher than a local edit:
   assist, answer flow, and priority sorting.
 - `features/artifacts/ArtifactsView.tsx`: combined artifact list, detail
   editor, and build action surface.
-- `contracts/api.ts`: shared API contract hub.
 - `server/services/agentJobs.js`: rebuild, deepen, and artifact build
   pipeline orchestration.
 - `server/services/artifactService.js`: artifact spec CRUD, source

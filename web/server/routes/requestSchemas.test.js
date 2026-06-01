@@ -8,7 +8,7 @@ import {
   conversationParamsSchema,
   editProposalParamsSchema,
   filePathQuerySchema,
-  generateEditProposalBodySchema,
+
   parseRequestBody,
 
   parseRequestParams,
@@ -94,27 +94,6 @@ describe("request schemas", () => {
   });
 
   it("validates edit proposal requests", () => {
-    expect(
-      parseRequestBody(
-        generateEditProposalBodySchema,
-        {
-          modelId: "gpt-test",
-          content: "Please make the goal more concrete.",
-          fileContext: {
-            ai_editable_files: [{ path: "outputs_ai/wiki/page.md", draftState: "saved" }],
-            context_files: [{ path: "inputs_human/source.md" }],
-          },
-        },
-        httpError,
-      ),
-    ).toMatchObject({
-      modelId: "gpt-test",
-      content: "Please make the goal more concrete.",
-      fileContext: {
-        ai_editable_files: [{ path: "outputs_ai/wiki/page.md" }],
-      },
-    });
-
     expect(
       parseRequestBody(
         updateEditProposalBodySchema,

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { api } from "../../data/apiClient";
+import { systemApi } from "../../data/systemApi";
 import type { Keybindings } from "../../contracts/api";
 
 type ParsedShortcut = {
@@ -47,7 +47,7 @@ export function useKeybindings(actions: {
   useEffect(() => {
     let cancelled = false;
 
-    api.keybindings().then((bindings) => {
+    systemApi.keybindings().then((bindings) => {
       if (cancelled) return;
 
       keybindingsRef.current = bindings;
