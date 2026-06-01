@@ -59,7 +59,26 @@ Write the report file at the exact path specified in the prompt (e.g. `outputs_a
 - If sources conflict, cite both and explain the conflict.
 - If a data point cannot be confirmed from sources, label it as unverified.
 
-### Step 5: Quality Gate
+### Step 5: Visual Elements — Mermaid Diagrams
+
+When a concept, process, or data breakdown benefits from visual representation, use fenced Mermaid code blocks:
+
+````markdown
+```mermaid
+flowchart LR
+    A[Input] --> B[Process] --> C[Output]
+```
+````
+
+The viewer renders these inline as SVG diagrams. Use Mermaid for:
+- **Flowcharts** — decision trees, process flows, causal chains
+- **Pie charts** — allocation breakdowns, portfolio composition
+- **Sequence diagrams** — interaction timelines, protocol exchanges
+- **Mindmaps** — concept hierarchies, topic relationships
+
+Keep diagrams focused and labeled. Prefer Mermaid over text-based ASCII art. Do not use Mermaid for simple lists or tables — use standard markdown for those.
+
+### Step 6: Quality Gate
 
 Before finishing, verify:
 

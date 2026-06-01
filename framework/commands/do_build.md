@@ -147,6 +147,7 @@ When two sources conflict, favor the higher-ranked source and note the disagreem
     - **Big Idea Up Front (BLUF):** Begin with an executive summary that states the most important finding or conclusion from the gathered evidence. The reader should understand the key takeaway without reading further. Then within each section and subsection, lead with the section-level conclusion or key finding before expanding into supporting evidence and detail. The goal: a reader can stop at any depth and still have the most important information for that level.
     - Cite sources with links to source files or URLs for every factual claim.
     - Include specific data: numbers, dates, named entities, direct quotes where available.
+    - **Use Mermaid diagrams** for visual representation of processes, relationships, and data breakdowns. The viewer renders fenced ` ```mermaid ` code blocks inline as SVG. Prefer flowcharts for process flows, pie charts for allocation breakdowns, and sequence diagrams for interaction timelines. Keep diagrams focused and labeled.
     - Surface open questions near the end.
     - Mark sections with weak or no source support as `N/A — no source support yet`.
     - Be deep enough to stand alone — readers should understand the topic without opening other files.
