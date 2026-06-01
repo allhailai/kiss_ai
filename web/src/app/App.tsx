@@ -16,8 +16,9 @@ import { GlobalFileSearch } from "../features/search/GlobalFileSearch";
 import { ToastViewport } from "../features/toast/ToastViewport";
 import { makeEditableTargetForFile, useAgentFileContext } from "./hooks/useAgentFileContext";
 import { readAgentChatConversationId } from "./rightPanelSurfaceStorage";
-import type { AuthUser, ChatMessageFileEdit, ChatMessageFileRename, ChatMessageArtifactRename } from "../contracts/api";
+import type { AuthUser, ChatMessageFileEdit, ChatMessageFileRename, ChatMessageArtifactRename, ChatMessageTopicProposal } from "../contracts/api";
 import { chatApi } from "../data/chatApi";
+import { topicsApi } from "../data/topicsApi";
 import { artifactsApi } from "../data/artifactsApi";
 import { BuildProvider, type BuildContextValue } from "./contexts/BuildContext";
 import { RouteProvider } from "./contexts/RouteContext";
@@ -229,29 +230,48 @@ export function App() {
     }
 
     if (decision.kind === "create") {
-      // Write the new file directly to disk — the hash of "" is the expectedContentHash
-      // because the file doesn't exist yet (backend treats missing file as empty content)
+      // Write the file — try creating first (hash of empty string for new files),
+      // and fall back to reading the fresh hash for existing files.
       try {
         const emptyHash = await hashDraftContent("");
-        await filesApi.saveFile(project.selectedProjectSlug!, decision.path, decision.content, emptyHash);
-        toastWorkspace.setNotice(`Created and saved ${decision.path}.`);
+        try {
+          await filesApi.saveFile(project.selectedProjectSlug!, decision.path, decision.content, emptyHash);
+        } catch {
+          // File likely already exists — read its current hash and update instead.
+          const fresh = await filesApi.file(project.selectedProjectSlug!, decision.path);
+          await filesApi.saveFile(project.selectedProjectSlug!, decision.path, decision.content, fresh.contentHash);
+        }
+        toastWorkspace.setNotice(`Applied and saved ${decision.path}.`);
         await fileWorkspace.refreshProjectFiles();
-        // Navigate to the new file
+        // Navigate to the file
         route.openProjectFile(decision.path);
+        await rebuildWorkspace.refreshStatus();
       } catch (err) {
-        toastWorkspace.setNotice(err instanceof Error ? err.message : `Failed to create ${decision.path}.`);
+        toastWorkspace.setNotice(err instanceof Error ? err.message : `Failed to save ${decision.path}.`);
         return false;
       }
     } else {
-      fileWorkspace.setDraft(decision.content);
+      // Write the proposed content directly via the file API.
+      // We MUST read the file's current hash from disk immediately before saving, because:
+      //  1. fileWorkspace.selected is React state and may be stale (closure capture)
+      //  2. A previous Apply in the same batch may have changed the file
+      //  3. An auto-save timer from the annotation editor may have raced us
+      try {
+        const fresh = await filesApi.file(project.selectedProjectSlug!, edit.path);
+        const saved = await filesApi.saveFile(project.selectedProjectSlug!, edit.path, decision.content, fresh.contentHash);
 
-      // Auto-save all AI file edits — the user already reviewed the proposal by clicking Apply
-      await fileWorkspace.saveSelected();
-      toastWorkspace.setNotice(`Applied and saved ${edit.path}.`);
+        fileWorkspace.setDraft(saved.content);
+        toastWorkspace.setNotice(`Applied and saved ${edit.path}.`);
 
-      // Refresh project files and the current file so left nav + ArtifactsView update
-      await fileWorkspace.refreshProjectFiles();
-      await fileWorkspace.refreshSelectedFile();
+        // Refresh project files and the current file so left nav + editor update
+        await fileWorkspace.refreshProjectFiles();
+        await fileWorkspace.refreshSelectedFile();
+        await rebuildWorkspace.refreshStatus();
+      } catch (err) {
+        console.error("[kiss_ai:apply] Apply failed for", edit.path, err);
+        toastWorkspace.setNotice(`Could not apply edit to ${edit.path}. Try refreshing the file and asking chat to regenerate.`);
+        return false;
+      }
     }
 
     // Persist the "applied" status server-side so it survives refresh
@@ -272,11 +292,18 @@ export function App() {
   const applyChatFileRename = async (rename: ChatMessageFileRename, renameIndex: number, messageId: string): Promise<boolean> => {
     if (!project.selectedProjectSlug) return false;
 
+    // Capture before async calls — React closures may be stale after awaits
+    const wasViewingFrom = fileWorkspace.selected?.path === rename.from;
+
     try {
       await filesApi.renameOutputFile(project.selectedProjectSlug, rename.from, rename.to);
       toastWorkspace.setNotice(`Renamed ${rename.from.split("/").pop()} to ${rename.to.split("/").pop()}.`);
       await fileWorkspace.refreshProjectFiles();
       await rebuildWorkspace.refreshStatus();
+      // If the renamed file was the currently viewed file, navigate to its new path
+      if (wasViewingFrom) {
+        route.openProjectFile(rename.to);
+      }
     } catch (err) {
       toastWorkspace.setNotice(err instanceof Error ? err.message : `Failed to rename ${rename.from}.`);
       return false;
@@ -321,6 +348,33 @@ export function App() {
     }
 
     return true;
+  };
+
+  const handleCreateTopic = async (proposal: ChatMessageTopicProposal): Promise<void> => {
+    if (!project.selectedProjectSlug) return;
+
+    try {
+      const result = await topicsApi.create(
+        project.selectedProjectSlug,
+        proposal.label,
+        proposal.justification,
+        projectChat.activeConversation?.id,
+      );
+
+      if (!result.created) {
+        if (result.duplicates.length > 0) {
+          toastWorkspace.setNotice(`Topic "${proposal.label}" may already exist. Similar: ${result.duplicates.map((d) => d.label).join(", ")}`);
+        } else {
+          toastWorkspace.setNotice(result.error || `Could not create topic "${proposal.label}".`);
+        }
+        return;
+      }
+
+      toastWorkspace.setNotice(`Created topic: ${proposal.label}.`);
+      await rebuildWorkspace.refreshStatus();
+    } catch (err) {
+      toastWorkspace.setNotice(err instanceof Error ? err.message : `Failed to create topic "${proposal.label}".`);
+    }
   };
   const startRebuildWithRequirementsCheck = () => {
     void rebuildWorkspace.startRebuild();
@@ -437,6 +491,8 @@ export function App() {
               closeRightPanel={closeRightPanel}
               draftSeed={agentDraftSeed}
               fileWorkspaceProjectFiles={fileWorkspace.projectFiles}
+              onCreateTopic={handleCreateTopic}
+              onRefreshAfterMutation={refreshAfterAiFileAssistApply}
               projectChat={projectChat}
               projectSlug={project.selectedProjectSlug}
               rebuildWorkspace={rebuildWorkspace}

@@ -1,4 +1,4 @@
-import type { AgentContextFile, ChatContextFile, ChatMessageFileEdit, ChatMessageFileRename, ChatMessageArtifactRename, ProjectFile, RebuildModel, RebuildState } from "../contracts/api";
+import type { AgentContextFile, ChatContextFile, ChatMessageFileEdit, ChatMessageFileRename, ChatMessageArtifactRename, ChatMessageTopicProposal, ProjectFile, RebuildModel, RebuildState } from "../contracts/api";
 import type { ProjectChatController } from "./hooks/useProjectChat";
 import type { RightPanelKind, RightPanelState } from "./hooks/useRightPanelSurface";
 import { useRouteContext } from "./contexts/RouteContext";
@@ -18,6 +18,8 @@ export function RightPanelOrchestrator({
   closeRightPanel,
   draftSeed,
   fileWorkspaceProjectFiles,
+  onCreateTopic,
+  onRefreshAfterMutation,
   projectChat,
   projectSlug,
   rebuildWorkspace,
@@ -41,6 +43,8 @@ export function RightPanelOrchestrator({
   closeRightPanel: () => void;
   draftSeed: { id: string; draft: string } | null;
   fileWorkspaceProjectFiles: ProjectFile[];
+  onCreateTopic: (proposal: ChatMessageTopicProposal) => Promise<void>;
+  onRefreshAfterMutation: () => Promise<void>;
   projectChat: ProjectChatController;
   projectSlug: string;
   rebuildWorkspace: {
@@ -91,7 +95,9 @@ export function RightPanelOrchestrator({
             onApplyFileRename={applyChatFileRename}
             onApplyArtifactRename={applyChatArtifactRename}
             onContextFilesChange={projectChat.setContextFiles}
+            onCreateTopic={onCreateTopic}
             onModelChange={rebuildWorkspace.setSelectedModelId}
+            onRefreshAfterMutation={onRefreshAfterMutation}
             onModifyCurrentFile={() => agentFileContext.currentFile && agentFileContext.addEditableFile(agentFileContext.currentFile.path)}
             onNavigateToArtifact={(slug) => route.navigateTo("artifacts", slug)}
             onRebuildArtifact={(slug, _modelId) => {

@@ -6,6 +6,7 @@ import type {
   ChatMessageArtifactRename,
   ChatMessageFileEdit,
   ChatMessageFileRename,
+  ChatMessageTopicProposal,
   Conversation,
   ConversationSummary,
   EditProposal,
@@ -31,7 +32,7 @@ type RightPanelChatController = {
   conversationFilter: string;
   conversations: ConversationSummary[];
   filteredConversations: ConversationSummary[];
-  generateEditProposal: (fileContext: { ai_editable_files: AgentContextFile[]; context_files: ChatContextFile[] }, content?: string) => Promise<boolean>;
+
   handleThreadScroll: () => void;
   loading: boolean;
   messageDraft: string;
@@ -102,7 +103,9 @@ export function RightPanelAgentChat({
   onApplyFileRename,
   onApplyArtifactRename,
   onContextFilesChange,
+  onCreateTopic,
   onModelChange,
+  onRefreshAfterMutation,
   onModifyCurrentFile,
   onNavigateToArtifact,
   onRebuildArtifact,
@@ -123,7 +126,9 @@ export function RightPanelAgentChat({
   onApplyFileRename: (rename: ChatMessageFileRename, renameIndex: number, messageId: string) => Promise<boolean>;
   onApplyArtifactRename: (rename: ChatMessageArtifactRename, renameIndex: number, messageId: string) => Promise<boolean>;
   onContextFilesChange: Dispatch<SetStateAction<ChatContextFile[]>>;
+  onCreateTopic: (proposal: ChatMessageTopicProposal) => Promise<void>;
   onModelChange: (modelId: string) => void;
+  onRefreshAfterMutation: () => Promise<void>;
   onModifyCurrentFile: () => void;
   onNavigateToArtifact: (slug: string) => void;
   onRebuildArtifact: (slug: string, modelId: string) => void;
@@ -313,21 +318,7 @@ export function RightPanelAgentChat({
     }
   };
 
-  const proposeEdits = () => {
-    const content = draft.trim();
-    if (!content || !requestAiEditableFiles.length || controlsDisabled) return;
-    void chat
-      .generateEditProposal(
-        {
-          ai_editable_files: requestAiEditableFiles,
-          context_files: contextFiles,
-        },
-        content,
-      )
-      .then((proposed) => {
-        if (proposed) setDraft("");
-      });
-  };
+
 
   const setProposalDiffStatus = (proposal: EditProposal, diffId: string, status: "accepted" | "rejected") => {
     if (controlsDisabled) return;
@@ -368,6 +359,8 @@ export function RightPanelAgentChat({
     const specPath = `artifacts/artifact_specs/${slug}.artifact.md`;
     onAddContextFile(specPath);
     onNavigateToArtifact(slug);
+    // Refresh file tree and status so the new artifact spec appears in left nav
+    void onRefreshAfterMutation();
   };
 
   const exitEditingMode = () => {
@@ -390,7 +383,7 @@ export function RightPanelAgentChat({
   const composerPlaceholder = artifactSession.phase === "editing"
     ? "Describe changes to the artifact..."
     : "Ask the side-panel agent...";
-  const composerSubmitLabel = artifactSession.phase === "editing" ? "Update" : "Ask";
+  const composerSubmitLabel = artifactSession.phase === "editing" ? "Update" : "Send";
 
   return (
     <div className="right-panel-agent-chat">
@@ -530,6 +523,7 @@ export function RightPanelAgentChat({
           onApplyFileRename={onApplyFileRename}
           onApplyArtifactRename={onApplyArtifactRename}
           onCreateArtifact={handleCreateArtifact}
+          onCreateTopic={onCreateTopic}
           onJumpToLatest={() => chat.scrollToLatest()}
           onScroll={chat.handleThreadScroll}
           onViewEditProposal={(proposalId) => setSelectedProposalId((current) => (current === proposalId ? null : proposalId))}
@@ -763,11 +757,7 @@ export function RightPanelAgentChat({
               onClick: startNewConversation,
               title: "New AI Chat",
             }}
-            secondaryAction={requestAiEditableFiles.length && artifactSession.phase !== "editing" ? {
-              disabled: controlsDisabled || !draft.trim() || !selectedModelId,
-              label: "Propose edits",
-              onClick: proposeEdits,
-            } : undefined}
+
             selectedModelId={selectedModelId}
             showContextControls={false}
             stopAction={chat.sending ? {
