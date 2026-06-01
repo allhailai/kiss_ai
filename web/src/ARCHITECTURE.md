@@ -228,30 +228,53 @@ Allowed-but-watchful edges should stay rare and intentional. In particular, keep
 depending on route/view policy, and avoid `domain/` depending on `navigation/`
 unless the helper is truly cross-cutting project policy.
 
-## Deferred Architecture Review Items
+## Deferred Component Decomposition
 
-These areas are intentionally not split during routine cleanup because their
-blast radius is higher than a local edit:
+These components are architecturally compliant (correct boundaries, correct layer)
+but larger than ideal. They should be decomposed **opportunistically** — when the
+next substantive change touches one, split it as part of that work rather than as
+a standalone refactor.
 
-- `features/rebuild/BuildProjectRightPanel.tsx`: rebuild right panel composition,
-  human attention, and build controls.
-- `features/design/DesignWorkspace.tsx`: large design identity form surface.
-- `features/navigation/FileTreeNav.tsx`: navigation tree with inline edit,
-  drag-drop, and folder management.
-- `features/navigation/WorkflowMenus.tsx`: workflow menu structure and inline
-  status badges.
-- `features/questions/QuestionsWorkspace.tsx`: question management with AI
-  assist, answer flow, and priority sorting.
-- `features/artifacts/ArtifactsView.tsx`: combined artifact list, detail
-  editor, and build action surface.
-- `server/services/agentJobs.js`: rebuild, deepen, and artifact build
-  pipeline orchestration.
-- `server/services/artifactService.js`: artifact spec CRUD, source
-  resolution, prompt templates, and auto-generation.
+### When to split
 
-When one of these files needs significant change, first identify the stable
-sub-boundary being extracted, add or update focused tests, and keep the public
-controller shape compatible with existing callers.
+Split a component from this list when:
+
+- You are adding a new section, panel, or interaction mode to the component.
+- You are fixing a bug that requires understanding more than half the file.
+- The component crosses 800 lines after your change.
+
+Do **not** split proactively without a triggering change — the agent doing the
+split needs live context on what the component actually does.
+
+### How to split
+
+Follow the pattern established in the June 2026 architecture cleanup:
+
+1. Extract pure helper functions into a `<feature>Helpers.ts` sibling module.
+2. Extract the largest self-contained JSX region into a named component file.
+3. Keep the root component as orchestration — hooks, state, callbacks — composing
+   the extracted sub-components via props.
+4. Run `npm run check` after each extraction.
+5. Update this section to remove the resolved item.
+
+### Remaining components
+
+| Component | Lines | Suggested extraction |
+|-----------|-------|---------------------|
+| `features/navigation/WorkflowMenus.tsx` | ~660 | Menu config data → `workflowMenuConfig.ts`; section renderer → `WorkflowSectionMenu.tsx` |
+| `features/artifacts/ArtifactsView.tsx` | ~660 | Detail editor → `ArtifactDetailEditor.tsx`; list panel → `ArtifactListPanel.tsx` |
+| `features/navigation/FileTreeNav.tsx` | ~540 | Tree node → `FileTreeNode.tsx`; drag-drop → `useFileTreeDragDrop.ts` |
+| `features/questions/QuestionsWorkspace.tsx` | ~520 | Question card → `QuestionCard.tsx`; AI assist panel → `QuestionAiAssist.tsx` |
+| `features/design/DesignWorkspace.tsx` | ~390 | Near target size — split only if adding sections |
+| `features/rebuild/BuildProjectRightPanel.tsx` | ~380 | Near target size — split only if adding sections |
+
+### Server-side deferred items
+
+These are outside the front-end `src/` tree and should be addressed in a separate
+server-focused review:
+
+- `server/services/agentJobs.js`: rebuild, deepen, and artifact build pipeline orchestration.
+- `server/services/artifactService.js`: artifact spec CRUD, source resolution, prompt templates, and auto-generation.
 
 ## Adding A New Workflow
 
