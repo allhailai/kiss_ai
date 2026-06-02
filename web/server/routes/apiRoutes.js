@@ -66,6 +66,8 @@ export function registerApiRoutes(app, deps) {
     createHumanInputTextFile: deps.createHumanInputTextFile,
     deleteHumanInputFile: deps.deleteHumanInputFile,
     deleteHumanInputFolder: deps.deleteHumanInputFolder,
+    deleteProjectFile: deps.deleteProjectFile,
+    deleteProjectFolder: deps.deleteProjectFolder,
     gitFileDiff: deps.gitFileDiff,
     humanFiles: deps.humanFiles,
     httpError: deps.httpError,

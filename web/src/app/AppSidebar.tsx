@@ -47,6 +47,8 @@ export function AppSidebar({
     createHumanInputTextFile: (name: string, folder?: string) => Promise<void>;
     deleteHumanInputFile: (path: string) => Promise<void>;
     deleteHumanInputFolder: (folder: string) => Promise<void>;
+    deleteProjectFile: (path: string) => Promise<void>;
+    deleteProjectFolder: (folder: string) => Promise<void>;
     moveHumanInputFile: (sourcePath: string, targetFolder: string) => Promise<void>;
     uploadHumanInputFiles: (files: File[]) => Promise<void>;
   };
@@ -148,6 +150,8 @@ export function AppSidebar({
           onCreateTextFile={(name, folder) => void fileWorkspace.createHumanInputTextFile(name, folder)}
           onDeleteFolder={(folder) => void fileWorkspace.deleteHumanInputFolder(folder)}
           onDeleteHumanInputFile={(path) => void fileWorkspace.deleteHumanInputFile(path)}
+          onDeleteProjectFile={(path) => void fileWorkspace.deleteProjectFile(path)}
+          onDeleteProjectFolder={(folder) => void fileWorkspace.deleteProjectFolder(folder)}
           onMoveFile={(sourcePath, targetFolder) => void fileWorkspace.moveHumanInputFile(sourcePath, targetFolder)}
           onUploadFiles={fileWorkspace.uploadHumanInputFiles}
           onOpenFile={onOpenFile}

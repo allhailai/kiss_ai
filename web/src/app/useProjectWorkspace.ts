@@ -193,7 +193,7 @@ export function useProjectWorkspace() {
     [navigateTo, projectFiles, setNotice],
   );
 
-  const { createHumanInputFolder, createHumanInputTextFile, deleteHumanInputFile, deleteHumanInputFolder, moveHumanInputFile, uploadHumanInputFiles } = useHumanInputs({
+  const { createHumanInputFolder, createHumanInputTextFile, deleteHumanInputFile, deleteHumanInputFolder, deleteProjectFile, deleteProjectFolder, moveHumanInputFile, uploadHumanInputFiles } = useHumanInputs({
     clearSelectedFile,
     refreshProjectFiles,
     requireSelectedProjectSlug,
@@ -327,6 +327,8 @@ export function useProjectWorkspace() {
     createHumanInputTextFile,
     deleteHumanInputFile,
     deleteHumanInputFolder,
+    deleteProjectFile,
+    deleteProjectFolder,
     moveHumanInputFile,
     draft,
     fileLoading,

@@ -109,6 +109,7 @@ export function FileTreeNav({
       onDragOver={onMoveFile ? (event) => {
         event.preventDefault();
         if (!draggingPathRef.current) return;
+        event.stopPropagation();
         event.dataTransfer.dropEffect = "move";
         setDragOverTarget("__root__");
       } : undefined}
@@ -212,16 +213,16 @@ function FileTreeNodeRow({
           onDragEnter={setDragOverTarget && draggingPathRef
             ? (event: DragEvent<HTMLDivElement>) => {
                 event.preventDefault();
-                event.stopPropagation();
                 if (!draggingPathRef.current) return;
+                event.stopPropagation();
                 dragDepthRef.current += 1;
                 setDragOverTarget(node.key);
               }
             : undefined}
           onDragLeave={setDragOverTarget && draggingPathRef
             ? (event: DragEvent<HTMLDivElement>) => {
-                event.stopPropagation();
                 if (!draggingPathRef.current) return;
+                event.stopPropagation();
                 dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
                 if (dragDepthRef.current === 0) setDragOverTarget(null);
               }
@@ -230,8 +231,10 @@ function FileTreeNodeRow({
             ? (event: DragEvent<HTMLDivElement>) => {
                 // Always prevent default to stop browser from navigating to dropped OS files.
                 event.preventDefault();
-                event.stopPropagation();
+                // Only stop propagation for internal file-move drags.
+                // OS file drags must bubble to the outer upload zone.
                 if (!draggingPathRef.current) return;
+                event.stopPropagation();
                 event.dataTransfer.dropEffect = "move";
               }
             : undefined}
@@ -277,7 +280,7 @@ function FileTreeNodeRow({
                       className="file-tree-dir-action-button file-tree-dir-confirm-yes"
                       onClick={(event) => {
                         event.stopPropagation();
-                        onDeleteFolder(node.name);
+                        onDeleteFolder(node.fullPath);
                       }}
                       title="Yes, delete this folder"
                       type="button"
