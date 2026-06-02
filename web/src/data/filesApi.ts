@@ -79,6 +79,16 @@ export const filesApi = {
       method: "POST",
       body: JSON.stringify({ sourcePath, targetFolder } satisfies MoveHumanInputFileRequest),
     }),
+  deleteProjectFile: (projectSlug: string, path: string) =>
+    request<DeleteHumanInputResponse>(`${projectBase(projectSlug)}/project-file`, {
+      method: "DELETE",
+      body: JSON.stringify({ path }),
+    }),
+  deleteProjectFolder: (projectSlug: string, folder: string) =>
+    request<DeleteHumanInputFolderResponse>(`${projectBase(projectSlug)}/project-folder`, {
+      method: "DELETE",
+      body: JSON.stringify({ folder }),
+    }),
   searchFiles: searchProjectFiles,
   file: (projectSlug: string, path: string) => request<FileContent>(`${projectBase(projectSlug)}/file?${filePathQuery(path)}`),
   fileDiff: (projectSlug: string, path: string) => request<FileDiff>(`${projectBase(projectSlug)}/file/diff?${filePathQuery(path)}`),

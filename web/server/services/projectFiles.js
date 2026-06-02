@@ -3,6 +3,32 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { renameOutput } from "./outputRename.js";
 
+function cleanPdfText(raw) {
+  // Collapse runs of blank lines to double-newline (paragraph breaks)
+  let text = raw.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n");
+
+  // Detect all-caps lines as headings (at least 4 chars, mostly uppercase)
+  const lines = text.split("\n");
+  const cleaned = lines.map((line) => {
+    const trimmed = line.trim();
+    if (
+      trimmed.length >= 4 &&
+      trimmed === trimmed.toUpperCase() &&
+      /[A-Z]/.test(trimmed) &&
+      !/^\d+$/.test(trimmed)
+    ) {
+      // Title-case it and make it a heading
+      const titleCased = trimmed
+        .toLowerCase()
+        .replace(/\b[a-z]/g, (c) => c.toUpperCase());
+      return `\n## ${titleCased}\n`;
+    }
+    return line;
+  });
+
+  return cleaned.join("\n").trim();
+}
+
 export function createProjectFileService({
   WEB_ROOT,
   MAX_FILE_BYTES,
@@ -38,6 +64,11 @@ export function createProjectFileService({
 
   function isPreviewablePath(relativePath) {
     return previewableExtensions.has(path.extname(relativePath).toLowerCase());
+  }
+
+  /** Returns true for `.pdf.md` companion files created by PDF extraction. */
+  function isPdfExtractionFile(relativePath) {
+    return relativePath.toLowerCase().endsWith(".pdf.md");
   }
 
   function isHiddenProjectPath(relativePath) {
@@ -260,6 +291,23 @@ export function createProjectFileService({
     const { absolute } = await resolveProjectFileTarget(projectRoot, meta.path);
     const stat = await fs.stat(absolute);
 
+    // For PDF files in inputs_human/, serve the extracted .pdf.md companion if it exists.
+    if (meta.path.startsWith("inputs_human/") && meta.path.toLowerCase().endsWith(".pdf")) {
+      const mdPath = `${meta.path}.md`;
+      try {
+        const mdTarget = await resolveProjectFileTarget(projectRoot, mdPath);
+        const mdContent = await fs.readFile(mdTarget.absolute, "utf8");
+        return {
+          ...meta,
+          editable: false,
+          content: mdContent,
+          contentHash: hashText(mdContent),
+        };
+      } catch {
+        // No extraction file — fall through to normal previewable check.
+      }
+    }
+
     if (meta.previewable === false) {
       throw httpError("This file type is saved in the project but cannot be previewed in the lab UI.", 415, "file_not_previewable");
     }
@@ -386,6 +434,8 @@ export function createProjectFileService({
         }
 
         if (isHiddenProjectPath(relative)) continue;
+        // Hide .pdf.md extraction companion files — they are internal to the agent.
+        if (isPdfExtractionFile(relative)) continue;
 
         const meta = classifyPath(projectRoot, relative);
         const stat = await fs.stat(absolute);
@@ -397,6 +447,16 @@ export function createProjectFileService({
       await walk(root.absolute);
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
+    }
+
+    // Mark PDF files as previewable when a .pdf.md extraction companion exists.
+    for (const file of files) {
+      if (file.previewable === false && file.path.toLowerCase().endsWith(".pdf")) {
+        const mdCompanion = path.join(projectRoot, `${file.path}.md`);
+        if (await fileExists(mdCompanion)) {
+          file.previewable = true;
+        }
+      }
     }
 
     // Collect immediate empty subdirectories so newly created folders are visible in the tree.
@@ -467,7 +527,66 @@ export function createProjectFileService({
 
       const meta = classifyPath(projectRoot, relative);
       const stat = await fs.stat(absolute);
-      uploaded.push(projectFileItem("inputs_human", relative, meta, stat));
+      const fileItem = projectFileItem("inputs_human", relative, meta, stat);
+
+      if (name.toLowerCase().endsWith(".pdf")) {
+        try {
+          const mod = await import("pdf-parse");
+          const PDFParse = mod.PDFParse;
+          const parser = new PDFParse({ data: new Uint8Array(buffer) });
+          const result = await parser.getText();
+          const content = cleanPdfText(result.text);
+          await parser.destroy();
+
+          const mdName = `${name}.md`;
+          const mdTarget = projectPath(projectRoot, `inputs_human/${mdName}`);
+          const { absolute: mdAbsolute } = await resolveProjectFileTarget(projectRoot, mdTarget.relative, { allowMissing: true });
+
+          const mdHeader = [
+            `# ${name.replace(/\.[^/.]+$/, "")}`,
+            "",
+            `- File: inputs_human/${name}`,
+            `- Type: PDF Extraction`,
+            `- Extracted: ${new Date().toISOString().slice(0, 10)}`,
+            "",
+            "---",
+            "",
+            content,
+          ].join("\n");
+
+          await fs.writeFile(mdAbsolute, mdHeader, "utf8");
+
+          // Don't add .pdf.md to the response — it's hidden from the UI.
+          // Mark the PDF itself as previewable since extracted content is available.
+          fileItem.previewable = true;
+        } catch (error) {
+          console.error(`[pdf extraction error] Failed to extract ${name}:`, error);
+
+          const mdName = `${name}.md`;
+          const mdTarget = projectPath(projectRoot, `inputs_human/${mdName}`);
+          const { absolute: mdAbsolute } = await resolveProjectFileTarget(projectRoot, mdTarget.relative, { allowMissing: true });
+
+          const mdFailureContent = [
+            `# PDF Extraction Failed`,
+            "",
+            `- File: inputs_human/${name}`,
+            `- Status: **Extraction Failed**`,
+            `- Error: ${error?.message || "Unknown error"}`,
+            "",
+            "---",
+            "",
+            "The system was unable to extract text from this PDF file. It may be corrupt, password-protected, or contain only scanned images without OCR text.",
+          ].join("\n");
+
+          await fs.writeFile(mdAbsolute, mdFailureContent, "utf8");
+
+          // Don't add .pdf.md to the response — it's hidden from the UI.
+          // Still mark PDF previewable since we wrote an error explanation .pdf.md.
+          fileItem.previewable = true;
+        }
+      }
+
+      uploaded.push(fileItem);
     }
 
     invalidateSearchCache(projectRoot);
@@ -597,9 +716,89 @@ export function createProjectFileService({
     }
 
     await fs.unlink(absolute);
+
+    // Also remove .pdf.md extraction companion if it exists.
+    if (meta.path.toLowerCase().endsWith(".pdf")) {
+      const companionPath = path.join(projectRoot, `${meta.path}.md`);
+      try { await fs.unlink(companionPath); } catch { /* ignore */ }
+    }
+
     invalidateSearchCache(projectRoot);
 
     return { path: meta.path };
+  }
+
+  /** Allowed directory prefixes for general file/folder deletion from the sidebar. */
+  const deletableDirectoryPrefixes = ["inputs_human/", "sources/", "inputs_ai/", "outputs_ai/"];
+
+  function isDeletablePath(normalizedPath) {
+    return deletableDirectoryPrefixes.some((prefix) => normalizedPath.startsWith(prefix));
+  }
+
+  async function deleteProjectFile(projectRoot, relativePath) {
+    const meta = classifyPath(projectRoot, relativePath);
+
+    if (!isDeletablePath(meta.path)) {
+      throw httpError("This file cannot be deleted from the lab UI.", 403, "delete_not_allowed");
+    }
+
+    if (isHiddenProjectPath(meta.path)) {
+      throw httpError("Hidden project files cannot be managed in the lab UI.", 403, "hidden_file");
+    }
+
+    const { absolute } = await resolveProjectFileTarget(projectRoot, meta.path);
+    const stat = await fs.stat(absolute);
+
+    if (!stat.isFile()) {
+      throw httpError("Only files can be deleted.", 400, "delete_not_file");
+    }
+
+    await fs.unlink(absolute);
+
+    // Also remove .pdf.md extraction companion if it exists.
+    if (meta.path.toLowerCase().endsWith(".pdf")) {
+      const companionPath = path.join(projectRoot, `${meta.path}.md`);
+      try { await fs.unlink(companionPath); } catch { /* ignore */ }
+    }
+
+    // Prune parent directories that may now be empty.
+    const rootAbsolute = path.join(projectRoot, meta.path.split("/")[0]);
+    await pruneEmptyDirectories(rootAbsolute, path.dirname(absolute));
+
+    invalidateSearchCache(projectRoot);
+    return { path: meta.path };
+  }
+
+  async function deleteProjectFolder(projectRoot, relativePath) {
+    const normalized = String(relativePath ?? "").replace(/\/+$/, "").trim();
+
+    if (!normalized) {
+      throw httpError("A folder path is required.", 400, "delete_folder_empty");
+    }
+
+    if (hasTraversalSegment(normalized)) {
+      throw httpError("Path escapes the project root.", 403, "path_escape");
+    }
+
+    if (!isDeletablePath(normalized)) {
+      throw httpError("This folder cannot be deleted from the lab UI.", 403, "delete_not_allowed");
+    }
+
+    const target = await resolveProjectDirectory(projectRoot, normalized, { allowMissing: false });
+    const stat = await fs.stat(target.absolute);
+
+    if (!stat.isDirectory()) {
+      throw httpError(`${normalized} is not a folder.`, 400, "delete_not_folder");
+    }
+
+    await fs.rm(target.absolute, { recursive: true, force: true });
+
+    // Prune parent directories that may now be empty (for nested folders).
+    const rootAbsolute = path.join(projectRoot, normalized.split("/")[0]);
+    await pruneEmptyDirectories(rootAbsolute, path.dirname(target.absolute));
+
+    invalidateSearchCache(projectRoot);
+    return { folder: normalized };
   }
 
   async function moveHumanInputFile(projectRoot, sourcePath, targetFolder) {
@@ -1014,6 +1213,8 @@ export function createProjectFileService({
     createHumanInputTextFile,
     deleteHumanInputFile,
     deleteHumanInputFolder,
+    deleteProjectFile,
+    deleteProjectFolder,
     fileExists,
     moveHumanInputFile,
     gitFileDiff,

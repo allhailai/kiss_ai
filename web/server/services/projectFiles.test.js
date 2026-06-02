@@ -1,4 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("pdf-parse", () => {
+  return {
+    PDFParse: class {
+      constructor() {}
+      async getText() {
+        return { text: "PDF Content Here\nALL CAPS HEADING" };
+      }
+      async destroy() {}
+    }
+  };
+});
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -188,13 +200,41 @@ describe("projectFiles path safety", () => {
     expect(upload.files).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ path: "inputs_human/source.md", chatContextReadable: true, previewable: true }),
-        expect.objectContaining({ path: "inputs_human/reference.pdf", chatContextReadable: false, previewable: false }),
+        expect.objectContaining({ path: "inputs_human/reference.pdf", previewable: true }),
       ]),
     );
+    // .pdf.md extraction companion should NOT appear in the response
+    expect(upload.files.find(f => f.path.endsWith(".pdf.md"))).toBeUndefined();
     await expect(service.searchFiles(projectRoot, "source")).resolves.toEqual([
       expect.objectContaining({ path: "inputs_human/source.md", chatContextReadable: true }),
     ]);
     await expect(service.deleteHumanInputFile(projectRoot, "inputs_human/source.md")).resolves.toEqual({ path: "inputs_human/source.md" });
     await expect(fs.access(path.join(projectRoot, "inputs_human", "source.md"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("extracts PDF text to markdown on upload", async () => {
+    const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-project-"));
+    const webRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kiss-ai-web-"));
+    const service = createService(webRoot);
+
+    const upload = await service.uploadHumanInputFiles(projectRoot, [
+      {
+        name: "test.pdf",
+        contentBase64: Buffer.from("dummy pdf content", "utf8").toString("base64"),
+      },
+    ]);
+
+    // Only the .pdf file should appear in the response — .pdf.md is hidden
+    expect(upload.files).toHaveLength(1);
+    expect(upload.files[0]).toEqual(
+      expect.objectContaining({ path: "inputs_human/test.pdf", previewable: true }),
+    );
+    expect(upload.files.find(f => f.path.endsWith(".pdf.md"))).toBeUndefined();
+
+    // Reading the PDF path should serve the extracted markdown content
+    const pdfRead = await service.readTextFile(projectRoot, "inputs_human/test.pdf");
+    expect(pdfRead.content).toContain("# test");
+    expect(pdfRead.content).toContain("- Type: PDF Extraction");
+    expect(pdfRead.content).toContain("## All Caps Heading");
   });
 });

@@ -20,6 +20,8 @@ export function registerFileRoutes(app, {
   createHumanInputTextFile,
   deleteHumanInputFile,
   deleteHumanInputFolder,
+  deleteProjectFile,
+  deleteProjectFolder,
   gitFileDiff,
   humanFiles,
   httpError,
@@ -128,6 +130,24 @@ export function registerFileRoutes(app, {
     try {
       const body = parseRequestBody(deleteHumanInputFolderBodySchema, request.body, httpError);
       response.json(await deleteHumanInputFolder(request.project.path, body.folder));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/projects/:projectSlug/project-file", async (request, response, next) => {
+    try {
+      const body = parseRequestBody(filePathBodySchema, request.body, httpError);
+      response.json(await deleteProjectFile(request.project.path, body.path));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/projects/:projectSlug/project-folder", async (request, response, next) => {
+    try {
+      const body = parseRequestBody(deleteHumanInputFolderBodySchema, request.body, httpError);
+      response.json(await deleteProjectFolder(request.project.path, body.folder));
     } catch (error) {
       next(error);
     }

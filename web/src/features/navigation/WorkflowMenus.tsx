@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   defineNavTarget,
   sectionForView,
@@ -28,6 +28,8 @@ export function SimplifiedNavigator({
   onCreateTextFile,
   onDeleteFolder,
   onDeleteHumanInputFile,
+  onDeleteProjectFile,
+  onDeleteProjectFolder,
   onMoveFile,
   onUploadFiles,
   onOpenView,
@@ -45,6 +47,8 @@ export function SimplifiedNavigator({
   onCreateTextFile?: (name: string, folder?: string) => void;
   onDeleteFolder?: (folder: string) => void;
   onDeleteHumanInputFile?: (path: string) => void;
+  onDeleteProjectFile?: (path: string) => void;
+  onDeleteProjectFolder?: (folder: string) => void;
   onMoveFile?: (sourcePath: string, targetFolder: string) => void;
   onUploadFiles?: (files: File[]) => Promise<void>;
   onOpenView: (view: View, path?: string | null) => void;
@@ -175,7 +179,7 @@ export function SimplifiedNavigator({
           </button>
 
           {onCreateFolder ? (
-            <HumanInputActions onCreateFolder={onCreateFolder} onCreateTextFile={onCreateTextFile} />
+            <HumanInputActions onCreateFolder={onCreateFolder} onCreateTextFile={onCreateTextFile} onUploadFiles={onUploadFiles} />
           ) : null}
 
           <FileTreeBlock
@@ -207,6 +211,8 @@ export function SimplifiedNavigator({
             emptyLabel="No source files yet. Run a build to gather sources."
             files={sourceFiles}
             loading={loading && currentView === "inputs"}
+            onDeleteFile={onDeleteProjectFile}
+            onDeleteFolder={onDeleteProjectFolder}
             onOpenFile={onOpenFile}
             selectedPath={selectedPath}
           />
@@ -232,6 +238,8 @@ export function SimplifiedNavigator({
             emptyLabel="No wiki pages yet. Run a knowledge build first."
             files={wikiFiles}
             loading={loading && currentView === "outputs"}
+            onDeleteFile={onDeleteProjectFile}
+            onDeleteFolder={onDeleteProjectFolder}
             onOpenFile={onOpenFile}
             selectedPath={selectedPath}
           />
@@ -245,6 +253,8 @@ export function SimplifiedNavigator({
           emptyLabel="No reports yet. Create one with the chat agent."
           files={reportFiles}
           loading={loading && currentView === "reports"}
+          onDeleteFile={onDeleteProjectFile}
+          onDeleteFolder={onDeleteProjectFolder}
           onOpenFile={onOpenFile}
           selectedPath={selectedPath}
         />
@@ -422,13 +432,17 @@ function ArtifactNavSection({
 function HumanInputActions({
   onCreateFolder,
   onCreateTextFile,
+  onUploadFiles,
 }: {
   onCreateFolder: (name: string) => void;
   onCreateTextFile?: (name: string, folder?: string) => void;
+  onUploadFiles?: (files: File[]) => Promise<void>;
 }) {
   const [activeForm, setActiveForm] = useState<"folder" | "file" | null>(null);
   const [newName, setNewName] = useState("");
+  const [uploading, setUploading] = useState(false);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (activeForm && nameInputRef.current) {
@@ -458,6 +472,22 @@ function HumanInputActions({
     });
   }
 
+  async function handleFileInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = event.target.files;
+    if (!files || files.length === 0 || !onUploadFiles) return;
+
+    setUploading(true);
+    try {
+      await onUploadFiles(Array.from(files));
+    } catch {
+      // Parent handler owns user-facing error notice.
+    } finally {
+      setUploading(false);
+      // Reset the input so the same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
   return (
     <div className="human-input-actions">
       <div className="human-input-action-row">
@@ -485,6 +515,30 @@ function HumanInputActions({
           </button>
         ) : null}
       </div>
+
+      {onUploadFiles ? (
+        <div className="human-input-action-row">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="human-input-file-input-hidden"
+            onChange={handleFileInputChange}
+            tabIndex={-1}
+            aria-hidden="true"
+          />
+          <button
+            className="human-input-action-button human-input-upload-button"
+            onClick={() => fileInputRef.current?.click()}
+            type="button"
+            title="Upload files from your computer"
+            disabled={uploading}
+          >
+            <span className="human-input-action-icon" aria-hidden="true">📎</span>
+            <span>{uploading ? "Uploading…" : "Upload files"}</span>
+          </button>
+        </div>
+      ) : null}
 
       {activeForm ? (
         <form
@@ -590,7 +644,7 @@ function FileTreeBlock({
 
   return (
     <div
-      className={`file-tree-upload-zone${dragActive ? " drag-active" : ""}`}
+      className={`file-tree-upload-zone${dragActive ? " drag-active" : ""}${uploading ? " uploading" : ""}`}
       onDragEnter={(event) => {
         event.preventDefault();
         dragDepthRef.current += 1;
@@ -614,6 +668,11 @@ function FileTreeBlock({
       }}
     >
       {content}
+      {(dragActive || uploading) && hasContent ? (
+        <p className="file-tree-upload-overlay">
+          {uploading ? "Uploading…" : "Drop files here"}
+        </p>
+      ) : null}
     </div>
   );
 }

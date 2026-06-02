@@ -28,6 +28,8 @@ export type FileWorkspaceController = {
   createHumanInputTextFile: (name: string, folder?: string) => Promise<void>;
   deleteHumanInputFile: (path: string) => Promise<void>;
   deleteHumanInputFolder: (folder: string) => Promise<void>;
+  deleteProjectFile: (path: string) => Promise<void>;
+  deleteProjectFolder: (folder: string) => Promise<void>;
   moveHumanInputFile: (sourcePath: string, targetFolder: string) => Promise<void>;
   draft: string;
   fileLoading: boolean;

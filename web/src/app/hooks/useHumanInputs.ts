@@ -104,7 +104,7 @@ export function useHumanInputs({
       setInputMutationLoading(true);
       setNotice("");
       try {
-        const response = await filesApi.deleteHumanInputFolder(requireSelectedProjectSlug(), folder);
+        const response = await filesApi.deleteHumanInputFolder(requireSelectedProjectSlug(), folder.replace(/^inputs_human\//, ""));
         await refreshProjectFiles();
         setNotice(`Deleted folder ${response.folder}.`);
       } catch (error) {
@@ -136,5 +136,42 @@ export function useHumanInputs({
     [onOpenFile, refreshProjectFiles, requireSelectedProjectSlug, setInputMutationLoading, setNotice],
   );
 
-  return { createHumanInputFolder, createHumanInputTextFile, deleteHumanInputFile, deleteHumanInputFolder, moveHumanInputFile, uploadHumanInputFiles };
+  const deleteProjectFile = useCallback(
+    async (path: string) => {
+      setInputMutationLoading(true);
+      setNotice("");
+      try {
+        const response = await filesApi.deleteProjectFile(requireSelectedProjectSlug(), path);
+        if (selected?.path === response.path) clearSelectedFile();
+        await refreshProjectFiles();
+        setNotice(`Deleted ${response.path}.`);
+      } catch (error) {
+        setNotice(errorMessage(error, "Could not delete the file."));
+        throw error;
+      } finally {
+        setInputMutationLoading(false);
+      }
+    },
+    [clearSelectedFile, refreshProjectFiles, requireSelectedProjectSlug, selected?.path, setInputMutationLoading, setNotice],
+  );
+
+  const deleteProjectFolder = useCallback(
+    async (folder: string) => {
+      setInputMutationLoading(true);
+      setNotice("");
+      try {
+        const response = await filesApi.deleteProjectFolder(requireSelectedProjectSlug(), folder);
+        await refreshProjectFiles();
+        setNotice(`Deleted folder ${response.folder}.`);
+      } catch (error) {
+        setNotice(errorMessage(error, "Could not delete the folder."));
+        throw error;
+      } finally {
+        setInputMutationLoading(false);
+      }
+    },
+    [refreshProjectFiles, requireSelectedProjectSlug, setInputMutationLoading, setNotice],
+  );
+
+  return { createHumanInputFolder, createHumanInputTextFile, deleteHumanInputFile, deleteHumanInputFolder, deleteProjectFile, deleteProjectFolder, moveHumanInputFile, uploadHumanInputFiles };
 }
