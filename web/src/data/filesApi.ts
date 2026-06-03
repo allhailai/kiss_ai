@@ -6,6 +6,7 @@ import type {
   DeleteHumanInputFolderRequest,
   DeleteHumanInputFolderResponse,
   DeleteHumanInputResponse,
+  FileChangeStatus,
   FileContent,
   FileDiff,
   FileSearchResponse,
@@ -106,5 +107,10 @@ export const filesApi = {
     request<{ oldPath: string; newPath: string }>(`${projectBase(projectSlug)}/file/rename`, {
       method: "POST",
       body: JSON.stringify({ fromPath, toPath }),
+    }),
+  recordFileChange: (projectSlug: string, path: string, status: FileChangeStatus) =>
+    request<{ ok: boolean }>(`${projectBase(projectSlug)}/file/record-change`, {
+      method: "POST",
+      body: JSON.stringify({ path, status }),
     }),
 };

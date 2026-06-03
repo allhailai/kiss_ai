@@ -37,6 +37,5 @@ export function stateLabel(state: TopicState): string {
 }
 
 export function isActiveTopic(topic: { state: TopicState; disposition: string | null }): boolean {
-  const activeState = topic.state === "shallow" || topic.state === "deep" || topic.state === "saturated" || topic.state === "split_candidate";
-  return activeState && !topic.disposition;
+  return topic.state === "shallow" || topic.state === "deep" || topic.state === "saturated" || topic.state === "split_candidate";
 }

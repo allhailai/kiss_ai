@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { Topic, TopicDisposition } from "../../contracts/api";
+import type { Topic } from "../../contracts/api";
 import { formatLocalDateTime } from "../../domain/formatters";
 import { isActiveTopic, stateLabel } from "./topicHelpers";
 
@@ -9,7 +9,6 @@ export function TopicCard({
   isBuilding,
   onToggleQueue,
   onResolve,
-  onDisposition,
   onNavigateToFile,
 }: {
   topic: Topic;
@@ -17,16 +16,12 @@ export function TopicCard({
   isBuilding: boolean;
   onToggleQueue: (topicId: string) => void;
   onResolve: (topicId: string, action: "accept" | "dismiss" | "deprecate") => void;
-  onDisposition: (topicId: string, disposition: TopicDisposition) => void;
   onNavigateToFile: (path: string) => void;
 }) {
   const [saving, setSaving] = useState(false);
   const isSeed = topic.state === "seed";
   const isActive = isActiveTopic(topic);
   const isDeprecated = topic.state === "deprecated";
-  const isParked = topic.disposition === "parked";
-  const isSettled = topic.disposition === "settled";
-  const hasDisposition = isParked || isSettled;
   const hasBeenDeepened = (topic.discovery?.deepening_count ?? 0) > 0;
   const isRunningDeepen = isBuilding && !!topic.queued_for_deepen;
 
@@ -43,19 +38,6 @@ export function TopicCard({
     [saving, onResolve, topic.id],
   );
 
-  const handleDisposition = useCallback(
-    async (disposition: TopicDisposition) => {
-      if (saving) return;
-      setSaving(true);
-      try {
-        onDisposition(topic.id, disposition);
-      } finally {
-        setSaving(false);
-      }
-    },
-    [saving, onDisposition, topic.id],
-  );
-
   const dependencyLabels = topic.depends_on
     .map((depId) => {
       const dep = allTopics.find((t) => t.id === depId);
@@ -65,7 +47,6 @@ export function TopicCard({
   const cardClassName = [
     "topic-card",
     `topic-card-${topic.state}`,
-    hasDisposition ? `topic-card-disposition-${topic.disposition}` : "",
     topic.queued_for_deepen ? "topic-card-queued" : "",
   ].filter(Boolean).join(" ");
 
@@ -78,11 +59,6 @@ export function TopicCard({
         <span className={`topic-confidence-pill topic-confidence-${topic.confidence}`}>
           {topic.confidence}
         </span>
-        {hasDisposition ? (
-          <span className={`topic-disposition-pill topic-disposition-${topic.disposition}`}>
-            {isParked ? "Parked" : "Settled"}
-          </span>
-        ) : null}
       </header>
 
       <p className="topic-card-label">{topic.label}</p>
@@ -299,24 +275,6 @@ export function TopicCard({
             </button>
           ) : null}
           <button
-            className="topic-park-button"
-            disabled={saving}
-            onClick={() => void handleDisposition("parked")}
-            title="Defer — revisit this topic later"
-            type="button"
-          >
-            Park
-          </button>
-          <button
-            className="topic-settle-button"
-            disabled={saving}
-            onClick={() => void handleDisposition("settled")}
-            title="Good enough — don't go deeper on this topic"
-            type="button"
-          >
-            Settle
-          </button>
-          <button
             className="topic-deprecate-button"
             disabled={saving}
             onClick={() => void handleResolve("deprecate")}
@@ -327,22 +285,7 @@ export function TopicCard({
         </div>
       ) : null}
 
-      {hasDisposition && !isDeprecated ? (
-        <div className="topic-card-disposition-info">
-          <span className="topic-card-disposition-note">
-            {isParked ? "Parked" : "Settled"}{topic.disposition_at ? ` · ${formatLocalDateTime(topic.disposition_at, "")}` : ""}
-            {topic.disposition_note ? ` — ${topic.disposition_note}` : ""}
-          </span>
-          <button
-            className="topic-resume-button"
-            disabled={saving}
-            onClick={() => void handleDisposition(null)}
-            type="button"
-          >
-            Resume
-          </button>
-        </div>
-      ) : null}
+
 
       {isDeprecated && topic.deprecation ? (
         <span className="topic-card-deprecated-note">

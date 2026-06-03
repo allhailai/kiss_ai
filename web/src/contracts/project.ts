@@ -97,9 +97,12 @@ export type FileDiff = {
   deletions: Array<{ afterLine: number; count: number }>;
 };
 
+export type FileChangeStatus = "new" | "edited";
+
 export type TreeResponse = {
   files: ProjectFile[];
   emptyDirectories?: string[];
+  fileChanges?: Record<string, FileChangeStatus>;
 };
 
 export type UploadHumanInputsResponse = {

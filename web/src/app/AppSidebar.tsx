@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
-import type { ProjectFile, ProjectStatus } from "../contracts/api";
+import type { FileChangeStatus, ProjectFile, ProjectStatus } from "../contracts/api";
 import { useRouteContext } from "./contexts/RouteContext";
 import { SimplifiedNavigator } from "../features/navigation/WorkflowMenus";
 
@@ -39,6 +39,7 @@ export function AppSidebar({
 }: {
   collapsed: boolean;
   fileWorkspace: {
+    fileChanges: Record<string, FileChangeStatus>;
     humanInputEmptyDirectories: string[];
     loading: boolean;
     projectFiles: ProjectFile[];
@@ -140,6 +141,7 @@ export function AppSidebar({
         </button>
         <SimplifiedNavigator
           currentView={route.view}
+          fileChanges={fileWorkspace.fileChanges}
           humanInputEmptyDirectories={fileWorkspace.humanInputEmptyDirectories}
           loading={fileWorkspace.loading}
           projectFiles={fileWorkspace.projectFiles}

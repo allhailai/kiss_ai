@@ -174,6 +174,10 @@ export const filePathBodySchema = z.object({
   path: z.string().trim().min(1).max(1_000),
 });
 
+export const recordFileChangeBodySchema = filePathBodySchema.extend({
+  status: z.enum(["new", "edited"]),
+});
+
 export const writeFileBodySchema = filePathBodySchema.extend({
   content: maxUtf8Bytes(MAX_WRITE_FILE_BYTES, "File content is too large."),
   expectedContentHash: z.string().trim().min(1).max(160),

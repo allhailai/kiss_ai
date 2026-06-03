@@ -71,6 +71,8 @@ export function useChatActions({
           }
           toastWorkspace.setNotice(`Applied and saved ${decision.path}.`);
           await fileWorkspace.refreshProjectFiles();
+          // Record the file change for sidebar badge
+          filesApi.recordFileChange(projectSlug!, decision.path, "new").catch(() => {});
           // Navigate to the file
           route.openProjectFile(decision.path);
           await rebuildWorkspace.refreshStatus();
@@ -90,6 +92,9 @@ export function useChatActions({
 
           fileWorkspace.setDraft(saved.content);
           toastWorkspace.setNotice(`Applied and saved ${edit.path}.`);
+
+          // Record the file change for sidebar badge
+          filesApi.recordFileChange(projectSlug!, edit.path, "edited").catch(() => {});
 
           // Refresh project files and the current file so left nav + editor update
           await fileWorkspace.refreshProjectFiles();

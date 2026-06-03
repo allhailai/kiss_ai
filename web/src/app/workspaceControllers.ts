@@ -1,4 +1,4 @@
-import type { BuildLogState, DesignState, FileContent, FileDiff, ProjectFile, ProjectStatus, ProjectSummary, RebuildModel, RebuildState } from "../contracts/api";
+import type { BuildLogState, DesignState, FileChangeStatus, FileContent, FileDiff, ProjectFile, ProjectStatus, ProjectSummary, RebuildModel, RebuildState } from "../contracts/api";
 import type { View } from "../navigation/views";
 import type { Toast } from "../shared/toast";
 
@@ -32,6 +32,7 @@ export type FileWorkspaceController = {
   deleteProjectFolder: (folder: string) => Promise<void>;
   moveHumanInputFile: (sourcePath: string, targetFolder: string) => Promise<void>;
   draft: string;
+  fileChanges: Record<string, FileChangeStatus>;
   fileLoading: boolean;
   hasUnsavedChanges: boolean;
   humanInputEmptyDirectories: string[];

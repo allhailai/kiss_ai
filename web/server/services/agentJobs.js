@@ -8,7 +8,7 @@ import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensu
 import { runFetchPhase, runDigestPhase } from "./fetchAndDigestPhases.js";
 import { getDeepenQueue, clearDeepenQueue, readTopics, writeTopics } from "./topicsService.js";
 import { computeWikiTriage, updateWikiPageTracker, resetWikiPageTracker, regenerateWikiIndex } from "./wikiTriage.js";
-import { validateFileExistence, readManifest, writeManifest, prependBuildLogEntry, gitSnapshot } from "./serverValidation.js";
+import { validateFileExistence, readManifest, writeManifest, prependBuildLogEntry, gitSnapshot, recordBuildFileChanges } from "./serverValidation.js";
 import { readLedger, buildSnapshot, diffSnapshot, writeLedger, recordKnowledgeBuild, recordOutputBuild } from "./contentLedger.js";
 
 export function createAgentJobService({
@@ -966,6 +966,11 @@ export function createAgentJobService({
         metadata: { phase: "3c.3", commitHash: gitResult.commitHash },
       });
 
+      // Record file changes for sidebar badges
+      if (gitResult.success && gitResult.commitHash !== "no-changes") {
+        await recordBuildFileChanges(project.path);
+      }
+
       // Post-build: update deepen state
       if (deepenQueue.length > 0) {
         const topicsData = await readTopics(project.path);
@@ -1317,6 +1322,11 @@ export function createAgentJobService({
       const gitResult = await gitSnapshot(project.path,
         `kiss_ai output build: ${project.name} (${new Date().toISOString().slice(0, 10)})`,
       );
+
+      // Record file changes for sidebar badges
+      if (gitResult.success && gitResult.commitHash !== "no-changes") {
+        await recordBuildFileChanges(project.path);
+      }
 
       const current = await getRebuildState(project.slug);
       await setRebuildState(project.slug, {

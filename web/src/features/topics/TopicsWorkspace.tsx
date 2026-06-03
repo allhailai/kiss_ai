@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Topic, TopicDisposition } from "../../contracts/api";
+import type { Topic } from "../../contracts/api";
 import { useBuildContext } from "../../app/contexts/BuildContext";
 import { TopicConfirmationCard } from "../../shared/TopicConfirmationCard";
 import { projectsApi } from "../../data/projectsApi";
@@ -83,28 +83,13 @@ export function TopicsWorkspace({
     [projectSlug, fetchTopics],
   );
 
-  const handleDisposition = useCallback(
-    async (topicId: string, disposition: TopicDisposition) => {
-      try {
-        const response = await fetch(
-          `/api/projects/${encodeURIComponent(projectSlug)}/topics/${encodeURIComponent(topicId)}/disposition`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ disposition }),
-          },
-        );
-        if (!response.ok) throw new Error("Failed to update disposition");
-        await fetchTopics();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to update disposition");
-      }
-    },
-    [projectSlug, fetchTopics],
-  );
+
 
   const handleToggleQueue = useCallback(
     async (topicId: string) => {
+      const topic = topics.find((t) => t.id === topicId);
+      const wasQueued = topic?.queued_for_deepen;
+
       try {
         const response = await fetch(
           `/api/projects/${encodeURIComponent(projectSlug)}/topics/${encodeURIComponent(topicId)}/queue-deepen`,
@@ -118,11 +103,16 @@ export function TopicsWorkspace({
           throw new Error(body?.message || "Failed to toggle deepen queue");
         }
         await fetchTopics();
+
+        // If we just queued (not dequeued), automatically kick off the build
+        if (!wasQueued) {
+          build.startRebuild();
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to toggle deepen queue");
       }
     },
-    [projectSlug, fetchTopics],
+    [projectSlug, fetchTopics, topics, build],
   );
 
   const handleRunDeepen = useCallback(
@@ -187,18 +177,18 @@ export function TopicsWorkspace({
 
   const needsReviewCount = topics.filter((t) => t.state === "seed").length;
   const activeCount = topics.filter((t) => isActiveTopic(t)).length;
-  const shallowCount = topics.filter((t) => t.state === "shallow" && !t.disposition).length;
-  const deepCount = topics.filter((t) => t.state === "deep" && !t.disposition).length;
+  const shallowCount = topics.filter((t) => t.state === "shallow").length;
+  const deepCount = topics.filter((t) => t.state === "deep").length;
   const inProgressCount = topics.filter((t) => t.queued_for_deepen).length;
-  const archivedCount = topics.filter((t) => t.disposition === "parked" || t.disposition === "settled" || t.state === "deprecated").length;
+  const archivedCount = topics.filter((t) => t.state === "deprecated").length;
 
   const filteredTopics = topics.filter((t) => {
     if (filter === "needs_review") return t.state === "seed";
     if (filter === "active") return isActiveTopic(t);
-    if (filter === "shallow") return t.state === "shallow" && !t.disposition;
-    if (filter === "deep") return t.state === "deep" && !t.disposition;
+    if (filter === "shallow") return t.state === "shallow";
+    if (filter === "deep") return t.state === "deep";
     if (filter === "in_progress") return t.queued_for_deepen;
-    if (filter === "archived") return t.disposition === "parked" || t.disposition === "settled" || t.state === "deprecated";
+    if (filter === "archived") return t.state === "deprecated";
     return true;
   });
 
@@ -211,17 +201,12 @@ export function TopicsWorkspace({
       return bTime - aTime;
     }
 
-    // Default sort: seeds first, then active by depth, then parked/settled, then deprecated
+    // Default sort: seeds first, then active by depth, then deprecated
     const stateOrder: Record<string, number> = { seed: 0, shallow: 1, deep: 2, saturated: 3, split_candidate: 4, deprecated: 6 };
     const sa = stateOrder[a.state] ?? 5;
     const sb = stateOrder[b.state] ?? 5;
 
-    // Disposition topics sort after active, before deprecated
-    const dispositionPenalty = (t: Topic) => t.disposition ? 0.5 : 0;
-    const adjustedSa = sa + dispositionPenalty(a);
-    const adjustedSb = sb + dispositionPenalty(b);
-
-    if (adjustedSa !== adjustedSb) return adjustedSa - adjustedSb;
+    if (sa !== sb) return sa - sb;
     if (a.confidence !== b.confidence) return a.confidence === "high" ? -1 : 1;
     return a.label.localeCompare(b.label);
   });
@@ -358,7 +343,6 @@ export function TopicsWorkspace({
               isBuilding={isBuilding}
               key={t.id}
               onToggleQueue={handleToggleQueue}
-              onDisposition={handleDisposition}
               onNavigateToFile={onNavigateToFile}
               onResolve={handleResolve}
               topic={t}

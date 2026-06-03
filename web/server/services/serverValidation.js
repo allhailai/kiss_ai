@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { scanMarkersInDirectory } from "./buildScope.js";
+import { recordFileChanges } from "./fileChanges.js";
 
 const MIN_CONTENT_BYTES = 50;
 
@@ -147,5 +148,40 @@ export async function gitSnapshot(projectPath, commitMessage) {
       return { success: true, commitHash: "no-changes" };
     }
     return { success: false, error: error.message || "unknown git error" };
+  }
+}
+
+/**
+ * After a successful git snapshot, detect which files were added or modified
+ * using `git diff --name-status HEAD~1 HEAD` and record them in the file
+ * changes tracker so the sidebar can show "new" / "edited" badges.
+ */
+export async function recordBuildFileChanges(projectPath) {
+  try {
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const exec = promisify(execFile);
+
+    const { stdout } = await exec("git", ["diff", "--name-status", "HEAD~1", "HEAD"], { cwd: projectPath });
+    const entries = [];
+
+    for (const line of stdout.split("\n").filter(Boolean)) {
+      const [flag, ...rest] = line.split("\t");
+      const filePath = rest.at(-1); // for renames, last element is the new name
+      if (!filePath) continue;
+
+      if (flag === "A") {
+        entries.push({ path: filePath, status: "new" });
+      } else if (flag === "M" || flag === "R" || flag.startsWith("R")) {
+        entries.push({ path: filePath, status: "edited" });
+      }
+    }
+
+    if (entries.length > 0) {
+      await recordFileChanges(projectPath, entries);
+    }
+  } catch (error) {
+    // Non-fatal — badges are a convenience, not critical
+    console.warn("[kiss_ai] Could not record build file changes:", error.message);
   }
 }

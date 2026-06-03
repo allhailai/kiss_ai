@@ -260,8 +260,8 @@
   width: 100%;
   min-width: 0;
   display: grid;
-  grid-template-columns: 0.75rem minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: 0.75rem minmax(0, 1fr) auto;
+  align-items: center;
   gap: 3px;
   padding: 2px 4px 2px calc(4px + (var(--tree-depth, 0) * 5px));
   border: 1px solid transparent;
@@ -293,8 +293,8 @@
   flex: 1 1 auto;
   min-width: 0;
   display: grid;
-  grid-template-columns: 0.75rem minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: 0.75rem minmax(0, 1fr) auto;
+  align-items: center;
   gap: 3px;
   padding: 1px 0;
   background: transparent;
@@ -304,7 +304,7 @@
 }
 
 .file-tree-file.not-previewable .file-tree-open-button {
-  grid-template-columns: 0.75rem minmax(0, 1fr) auto;
+  grid-template-columns: 0.75rem minmax(0, 1fr) auto auto;
 }
 
 .file-tree-delete-button {
@@ -327,7 +327,7 @@
 
 
 .file-tree-file.not-previewable {
-  grid-template-columns: 0.75rem minmax(0, 1fr) auto;
+  grid-template-columns: 0.75rem minmax(0, 1fr) auto auto;
   color: var(--color-secondary);
 }
 
@@ -346,6 +346,30 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow-wrap: anywhere;
+}
+
+/* ─── File change badges (new / edited) ──────────────────────── */
+.file-tree-badge {
+  display: inline-block;
+  flex-shrink: 0;
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 8px;
+  margin-left: 0.4em;
+  line-height: 1.5;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.file-tree-badge-new {
+  background: hsl(150, 55%, 22%);
+  color: hsl(150, 75%, 68%);
+}
+.file-tree-badge-edited {
+  background: hsl(48, 95%, 55%);
+  color: #000;
 }
 
 .file-tree-toggle {
