@@ -45,9 +45,7 @@ export function useRouteDrivenData({
 
 
 
-        if (nextView === "dashboard") {
-          await Promise.all([refreshDesign(), refreshBuildLog()]);
-        } else if (nextView === "design") {
+        if (nextView === "design") {
           if (!isCurrentRouteRequest()) return;
           await refreshDesign();
           if (!isCurrentRouteRequest()) return;
