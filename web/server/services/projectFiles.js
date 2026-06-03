@@ -520,6 +520,13 @@ export function createProjectFileService({
         throw httpError(`Uploaded file ${name} is too large.`, 413, "upload_too_large");
       }
 
+      // ── Zip extraction ─────────────────────────────────────────────
+      if (name.toLowerCase().endsWith(".zip")) {
+        const extractedFiles = await extractZipToHumanInputs(projectRoot, name, buffer);
+        uploaded.push(...extractedFiles);
+        continue;
+      }
+
       const target = projectPath(projectRoot, `inputs_human/${name}`);
       await fs.mkdir(path.dirname(target.absolute), { recursive: true });
       const { absolute, relative } = await resolveProjectFileTarget(projectRoot, target.relative, { allowMissing: true });
@@ -530,60 +537,7 @@ export function createProjectFileService({
       const fileItem = projectFileItem("inputs_human", relative, meta, stat);
 
       if (name.toLowerCase().endsWith(".pdf")) {
-        try {
-          const mod = await import("pdf-parse");
-          const PDFParse = mod.PDFParse;
-          const parser = new PDFParse({ data: new Uint8Array(buffer) });
-          const result = await parser.getText();
-          const content = cleanPdfText(result.text);
-          await parser.destroy();
-
-          const mdName = `${name}.md`;
-          const mdTarget = projectPath(projectRoot, `inputs_human/${mdName}`);
-          const { absolute: mdAbsolute } = await resolveProjectFileTarget(projectRoot, mdTarget.relative, { allowMissing: true });
-
-          const mdHeader = [
-            `# ${name.replace(/\.[^/.]+$/, "")}`,
-            "",
-            `- File: inputs_human/${name}`,
-            `- Type: PDF Extraction`,
-            `- Extracted: ${new Date().toISOString().slice(0, 10)}`,
-            "",
-            "---",
-            "",
-            content,
-          ].join("\n");
-
-          await fs.writeFile(mdAbsolute, mdHeader, "utf8");
-
-          // Don't add .pdf.md to the response — it's hidden from the UI.
-          // Mark the PDF itself as previewable since extracted content is available.
-          fileItem.previewable = true;
-        } catch (error) {
-          console.error(`[pdf extraction error] Failed to extract ${name}:`, error);
-
-          const mdName = `${name}.md`;
-          const mdTarget = projectPath(projectRoot, `inputs_human/${mdName}`);
-          const { absolute: mdAbsolute } = await resolveProjectFileTarget(projectRoot, mdTarget.relative, { allowMissing: true });
-
-          const mdFailureContent = [
-            `# PDF Extraction Failed`,
-            "",
-            `- File: inputs_human/${name}`,
-            `- Status: **Extraction Failed**`,
-            `- Error: ${error?.message || "Unknown error"}`,
-            "",
-            "---",
-            "",
-            "The system was unable to extract text from this PDF file. It may be corrupt, password-protected, or contain only scanned images without OCR text.",
-          ].join("\n");
-
-          await fs.writeFile(mdAbsolute, mdFailureContent, "utf8");
-
-          // Don't add .pdf.md to the response — it's hidden from the UI.
-          // Still mark PDF previewable since we wrote an error explanation .pdf.md.
-          fileItem.previewable = true;
-        }
+        await extractPdfCompanion(projectRoot, name, buffer, fileItem);
       }
 
       uploaded.push(fileItem);
@@ -591,6 +545,140 @@ export function createProjectFileService({
 
     invalidateSearchCache(projectRoot);
     return { files: uploaded };
+  }
+
+  /**
+   * Extract a .zip buffer into inputs_human/<folderName>/ and return
+   * the list of extracted project file items.
+   */
+  async function extractZipToHumanInputs(projectRoot, zipName, buffer) {
+    const AdmZip = (await import("adm-zip")).default;
+    const zip = new AdmZip(buffer);
+    const entries = zip.getEntries();
+
+    // Folder name = zip filename without .zip extension
+    const folderName = zipName.replace(/\.zip$/i, "");
+    const safeFolderName = folderName.replace(/[<>:"|?*\x00-\x1f]/g, "_");
+    const folderRelative = `inputs_human/${safeFolderName}`;
+    const folderTarget = projectPath(projectRoot, folderRelative);
+    await fs.mkdir(folderTarget.absolute, { recursive: true });
+
+    const extracted = [];
+
+    for (const entry of entries) {
+      // Skip directories (they're created implicitly via mkdir)
+      if (entry.isDirectory) continue;
+
+      // Normalize the entry path (strip leading slashes, handle backslashes)
+      const entryPath = entry.entryName.replace(/\\/g, "/").replace(/^\/+/, "");
+
+      // Skip hidden/system files
+      if (entryPath.startsWith("__MACOSX/") || entryPath.startsWith(".")) continue;
+      if (path.basename(entryPath).startsWith(".")) continue;
+
+      // Security: reject path traversal
+      if (hasTraversalSegment(entryPath)) continue;
+
+      // Get just the filename (flatten any nested directory structure within the zip)
+      const segments = entryPath.split("/").filter(Boolean);
+      const entryFileName = segments.at(-1);
+      if (!entryFileName) continue;
+
+      const safeEntryName = entryFileName.replace(/[\x00-\x1f<>:"|?*]/g, "_");
+
+      // Build the subpath preserving internal zip folder structure
+      const subPath = segments.length > 1
+        ? segments.slice(0, -1).map((s) => s.replace(/[\x00-\x1f<>:"|?*]/g, "_")).join("/") + "/" + safeEntryName
+        : safeEntryName;
+
+      const fileRelative = `${folderRelative}/${subPath}`;
+      const fileTarget = projectPath(projectRoot, fileRelative);
+
+      // Ensure the entry resolves inside the project root
+      if (!isPathInsideRoot(projectRoot, fileTarget.absolute)) continue;
+
+      const entryBuffer = entry.getData();
+      if (!entryBuffer || entryBuffer.length === 0) continue;
+
+      // Write the file
+      await fs.mkdir(path.dirname(fileTarget.absolute), { recursive: true });
+      const { absolute, relative } = await resolveProjectFileTarget(projectRoot, fileTarget.relative, { allowMissing: true });
+      await fs.writeFile(absolute, entryBuffer);
+
+      const meta = classifyPath(projectRoot, relative);
+      const stat = await fs.stat(absolute);
+      const fileItem = projectFileItem("inputs_human", relative, meta, stat);
+
+      // Extract PDFs inside the zip too
+      if (safeEntryName.toLowerCase().endsWith(".pdf")) {
+        await extractPdfCompanion(projectRoot, `${safeFolderName}/${subPath}`, entryBuffer, fileItem);
+      }
+
+      extracted.push(fileItem);
+    }
+
+    return extracted;
+  }
+
+  /**
+   * Create a .pdf.md companion file for a PDF, writing either extracted
+   * text or a failure explanation.
+   */
+  async function extractPdfCompanion(projectRoot, relativeName, buffer, fileItem) {
+    try {
+      const mod = await import("pdf-parse");
+      const PDFParse = mod.PDFParse;
+      const parser = new PDFParse({ data: new Uint8Array(buffer) });
+      const result = await parser.getText();
+      const content = cleanPdfText(result.text);
+      await parser.destroy();
+
+      const mdName = `${relativeName}.md`;
+      const mdTarget = projectPath(projectRoot, `inputs_human/${mdName}`);
+      const { absolute: mdAbsolute } = await resolveProjectFileTarget(projectRoot, mdTarget.relative, { allowMissing: true });
+
+      const mdHeader = [
+        `# ${relativeName.replace(/\\.[^/.]+$/, "").split("/").pop()}`,
+        "",
+        `- File: inputs_human/${relativeName}`,
+        `- Type: PDF Extraction`,
+        `- Extracted: ${new Date().toISOString().slice(0, 10)}`,
+        "",
+        "---",
+        "",
+        content,
+      ].join("\n");
+
+      await fs.mkdir(path.dirname(mdAbsolute), { recursive: true });
+      await fs.writeFile(mdAbsolute, mdHeader, "utf8");
+
+      // Mark the PDF itself as previewable since extracted content is available.
+      fileItem.previewable = true;
+    } catch (error) {
+      console.error(`[pdf extraction error] Failed to extract ${relativeName}:`, error);
+
+      const mdName = `${relativeName}.md`;
+      const mdTarget = projectPath(projectRoot, `inputs_human/${mdName}`);
+      const { absolute: mdAbsolute } = await resolveProjectFileTarget(projectRoot, mdTarget.relative, { allowMissing: true });
+
+      const mdFailureContent = [
+        `# PDF Extraction Failed`,
+        "",
+        `- File: inputs_human/${relativeName}`,
+        `- Status: **Extraction Failed**`,
+        `- Error: ${error?.message || "Unknown error"}`,
+        "",
+        "---",
+        "",
+        "The system was unable to extract text from this PDF file. It may be corrupt, password-protected, or contain only scanned images without OCR text.",
+      ].join("\n");
+
+      await fs.mkdir(path.dirname(mdAbsolute), { recursive: true });
+      await fs.writeFile(mdAbsolute, mdFailureContent, "utf8");
+
+      // Still mark PDF previewable since we wrote an error explanation .pdf.md.
+      fileItem.previewable = true;
+    }
   }
 
   async function createHumanInputTextFile(projectRoot, rawName, content = "", folder = "") {

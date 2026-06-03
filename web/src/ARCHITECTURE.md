@@ -261,7 +261,7 @@ Follow the pattern established in the June 2026 architecture cleanup:
 
 | Component | Lines | Suggested extraction |
 |-----------|-------|---------------------|
-| `features/navigation/WorkflowMenus.tsx` | ~660 | Menu config data → `workflowMenuConfig.ts`; section renderer → `WorkflowSectionMenu.tsx` |
+| `features/navigation/WorkflowSectionMenu.tsx` | ~660 | Helper components → separate files if adding new section types |
 | `features/artifacts/ArtifactsView.tsx` | ~660 | Detail editor → `ArtifactDetailEditor.tsx`; list panel → `ArtifactListPanel.tsx` |
 | `features/navigation/FileTreeNav.tsx` | ~540 | Tree node → `FileTreeNode.tsx`; drag-drop → `useFileTreeDragDrop.ts` |
 | `features/questions/QuestionsWorkspace.tsx` | ~520 | Question card → `QuestionCard.tsx`; AI assist panel → `QuestionAiAssist.tsx` |
