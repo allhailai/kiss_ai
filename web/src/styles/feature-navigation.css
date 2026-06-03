@@ -195,6 +195,11 @@
   background: transparent;
 }
 
+.nav-subsection {
+  display: grid;
+  gap: 3px;
+}
+
 .simple-nav-item.active,
 .simple-nav-item:hover {
   border-color: var(--color-accent);

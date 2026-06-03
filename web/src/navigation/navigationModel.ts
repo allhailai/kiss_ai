@@ -1,14 +1,7 @@
 import type { View } from "./views";
 import { projectFilePath } from "../domain/projectPaths";
 
-export type SimplifiedNavSectionId = "ai" | "define" | "source-data" | "wiki" | "reports" | "artifacts";
-
-export type SimplifiedNavLeaf = {
-  id: string;
-  label: string;
-  view: View;
-  path?: string;
-};
+export type SimplifiedNavSectionId = "ai" | "knowledgebase" | "outputs";
 
 export type SimplifiedNavSection = {
   id: SimplifiedNavSectionId;
@@ -17,11 +10,8 @@ export type SimplifiedNavSection = {
 
 export const simplifiedNavSections: SimplifiedNavSection[] = [
   { id: "ai", label: "AI" },
-  { id: "define", label: "1) Project Definition" },
-  { id: "source-data", label: "2) Source data view" },
-  { id: "wiki", label: "3) Wiki" },
-  { id: "reports", label: "4) Reports" },
-  { id: "artifacts", label: "5) Artifacts" },
+  { id: "knowledgebase", label: "AI Knowledgebase" },
+  { id: "outputs", label: "Outputs" },
 ];
 
 /** The define section now directly opens project.md — no expandable children. */
@@ -32,13 +22,10 @@ export const defineNavTarget: { view: View; path: string } = {
 
 export function sectionForView(view: View, filePath?: string | null): SimplifiedNavSectionId {
   if (view === "ai") return "ai";
-  if (view === "requirements" || view === "design") return "define";
-  if (view === "inputs") return "source-data";
-  if (view === "outputs") {
-    if (filePath?.startsWith("outputs_ai/reports/")) return "reports";
-    return "wiki";
-  }
-  if (view === "reports") return "reports";
-  if (view === "artifacts") return "artifacts";
-  return "define";
+  if (view === "requirements" || view === "design") return "knowledgebase";
+  if (view === "inputs") return "knowledgebase";
+  if (view === "outputs") return filePath?.startsWith("outputs_ai/reports/") ? "outputs" : "knowledgebase";
+  if (view === "reports") return "outputs";
+  if (view === "artifacts") return "outputs";
+  return "knowledgebase";
 }
