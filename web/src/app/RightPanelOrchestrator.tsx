@@ -72,7 +72,7 @@ export function RightPanelOrchestrator({
           models={rebuildWorkspace.models}
           onCancel={rebuildWorkspace.cancelRebuild}
           onModelChange={rebuildWorkspace.setSelectedModelId}
-          onOpenQuestions={() => route.navigateTo("questions")}
+          onOpenQuestions={() => route.navigateTo("ai")}
           onSelectPanel={selectRightPanelKind}
           onStart={startRebuild}
           rebuild={rebuildWorkspace.rebuild}

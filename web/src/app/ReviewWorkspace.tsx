@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { BuildQuestion, RebuildModel, Topic } from "../contracts/api";
-import type { ReviewTab } from "../navigation/views";
+type ReviewTab = "attention" | "questions" | "topics";
 import { QuestionsWorkspace } from "../features/questions/QuestionsWorkspace";
 import { TopicsWorkspace } from "../features/topics/TopicsWorkspace";
 
