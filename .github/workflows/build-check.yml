@@ -1,0 +1,50 @@
+name: Build Check
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "web/**"
+      - ".github/workflows/build-check.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/build-check.yml"
+
+jobs:
+  build:
+    name: TypeScript & Build Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check (client)
+        run: tsc -p tsconfig.app.json --noEmit
+
+      - name: TypeScript check (server)
+        run: tsc -p tsconfig.server.json --noEmit
+
+      - name: Check module boundaries
+        run: npm run check:boundaries
+
+      - name: Run tests
+        run: npx vitest --run
+
+      - name: Build
+        run: npm run build
