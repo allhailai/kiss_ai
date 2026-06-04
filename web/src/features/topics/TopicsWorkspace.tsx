@@ -8,10 +8,14 @@ import { type TopicsFilter, isActiveTopic, parseFilterFromHash, setFilterInHash 
 
 export function TopicsWorkspace({
   onNavigateToFile,
+  onAddTopicToChat,
   projectSlug,
+  refreshKey = 0,
 }: {
   onNavigateToFile: (path: string) => void;
+  onAddTopicToChat: (topicId: string, label: string) => void;
   projectSlug: string;
+  refreshKey?: number;
 }) {
   const build = useBuildContext();
   const { isBuilding, openBuildPanel } = build;
@@ -54,6 +58,15 @@ export function TopicsWorkspace({
     void fetchTopics();
   }, [fetchTopics]);
 
+  // Re-fetch when refreshKey changes (e.g. after agent edits topic details)
+  const prevRefreshKey = useRef(refreshKey);
+  useEffect(() => {
+    if (prevRefreshKey.current !== refreshKey) {
+      void fetchTopics();
+    }
+    prevRefreshKey.current = refreshKey;
+  }, [refreshKey, fetchTopics]);
+
   // Auto-refresh when a build finishes (isBuilding transitions true → false)
   const prevIsBuilding = useRef(isBuilding);
   useEffect(() => {
@@ -82,7 +95,6 @@ export function TopicsWorkspace({
     },
     [projectSlug, fetchTopics],
   );
-
 
 
   const handleToggleQueue = useCallback(
@@ -345,6 +357,7 @@ export function TopicsWorkspace({
               onToggleQueue={handleToggleQueue}
               onNavigateToFile={onNavigateToFile}
               onResolve={handleResolve}
+              onAddToChatContext={onAddTopicToChat}
               topic={t}
             />
           ))}

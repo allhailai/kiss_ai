@@ -6,6 +6,7 @@ export type Topic = {
   id: string;
   label: string;
   state: TopicState;
+  details: string | null;
   confidence: TopicConfidence;
   depth: number;
   parent: string | null;
@@ -36,7 +37,10 @@ export type Topic = {
   } | null;
   metrics: {
     source_count: number;
+    source_types?: string[];
     cross_references: number;
+    data_point_count?: number;
+    has_contrarian_evidence?: boolean;
     word_count: number;
     last_updated: string | null;
   };
@@ -57,14 +61,15 @@ export type Topic = {
     sources_added: number;
     sources_total?: number;
     unfetched?: string[];
-    word_count_before: number;
-    word_count_after: number;
+    word_count_before?: number;
+    word_count_after?: number;
     state_before: TopicState;
     state_after: TopicState;
-    enriched_files: string[];
+    enriched_files?: string[];
     enriched_file_details?: string[];
     seed_topics_added?: number;
     coverage_gaps_remaining?: string[];
+    source_types?: string[];
   }>;
 };
 

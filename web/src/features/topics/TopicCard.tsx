@@ -10,6 +10,7 @@ export function TopicCard({
   onToggleQueue,
   onResolve,
   onNavigateToFile,
+  onAddToChatContext,
 }: {
   topic: Topic;
   allTopics: Topic[];
@@ -17,6 +18,7 @@ export function TopicCard({
   onToggleQueue: (topicId: string) => void;
   onResolve: (topicId: string, action: "accept" | "dismiss" | "deprecate") => void;
   onNavigateToFile: (path: string) => void;
+  onAddToChatContext: (topicId: string, label: string) => void;
 }) {
   const [saving, setSaving] = useState(false);
   const isSeed = topic.state === "seed";
@@ -37,6 +39,8 @@ export function TopicCard({
     },
     [saving, onResolve, topic.id],
   );
+
+
 
   const dependencyLabels = topic.depends_on
     .map((depId) => {
@@ -63,15 +67,23 @@ export function TopicCard({
 
       <p className="topic-card-label">{topic.label}</p>
 
-      {topic.justification?.goal_support ? (
-        <p className="topic-card-justification">
-          <strong>Why: </strong>{topic.justification.goal_support}
-        </p>
+      {topic.details ? (
+        <div className="topic-card-details">
+          <strong className="topic-card-details-label">Details</strong>
+          <p className="topic-card-details-text">{topic.details}</p>
+        </div>
       ) : null}
 
       <div className="topic-card-metrics">
         <span>Sources: {topic.metrics?.source_count ?? 0}</span>
+        {topic.metrics?.source_types && topic.metrics.source_types.length > 0 ? (
+          <span>Types: {topic.metrics.source_types.join(", ")}</span>
+        ) : null}
+        <span>Data points: {topic.metrics?.data_point_count ?? 0}</span>
         <span>Cross-refs: {topic.metrics?.cross_references ?? 0}</span>
+        {topic.metrics?.has_contrarian_evidence ? (
+          <span className="topic-metric-contrarian">Contrarian ✓</span>
+        ) : null}
         {topic.metrics?.last_updated ? (
           <span>Updated: {formatLocalDateTime(topic.metrics.last_updated, "—")}</span>
         ) : null}
@@ -123,12 +135,15 @@ export function TopicCard({
           {(topic.deepen_log?.length ?? 0) > 0 ? (
             <>
               {topic.deepen_log.slice().reverse().map((entry, idx) => {
-                const wordDelta = entry.word_count_after - entry.word_count_before;
-                const wordPct = entry.word_count_before > 0
-                  ? Math.round((wordDelta / entry.word_count_before) * 100)
+                const wordBefore = entry.word_count_before ?? 0;
+                const wordAfter = entry.word_count_after ?? 0;
+                const wordDelta = wordAfter - wordBefore;
+                const wordPct = wordBefore > 0
+                  ? Math.round((wordDelta / wordBefore) * 100)
                   : 0;
                 const stateChanged = entry.state_before !== entry.state_after;
                 const isLatest = idx === 0;
+                const hasWordData = entry.word_count_after != null;
 
                 return (
                   <details
@@ -139,7 +154,9 @@ export function TopicCard({
                     <summary className="topic-deepen-entry-summary">
                       <span className="topic-deepen-entry-date">{formatLocalDateTime(entry.deepened_at, "")}</span>
                       <span className="topic-deepen-entry-stats">
-                        +{entry.sources_added} sources · {entry.word_count_after.toLocaleString()} words
+                        +{entry.sources_added ?? 0} sources
+                        {hasWordData ? ` · ${wordAfter.toLocaleString()} words` : ""}
+                        {entry.sources_total != null ? ` · ${entry.sources_total} total` : ""}
                         {stateChanged ? ` · ${stateLabel(entry.state_before)} → ${stateLabel(entry.state_after)}` : ""}
                       </span>
                     </summary>
@@ -147,18 +164,26 @@ export function TopicCard({
                       <div className="topic-deepen-entry-row">
                         <span className="topic-deepen-entry-label">Sources</span>
                         <span>
-                          {entry.sources_added} new
+                          {entry.sources_added ?? 0} new
                           {entry.sources_total != null ? ` (${entry.sources_total} total)` : ""}
                           {entry.unfetched && entry.unfetched.length > 0 ? ` · ${entry.unfetched.length} unfetched` : ""}
                         </span>
                       </div>
-                      <div className="topic-deepen-entry-row">
-                        <span className="topic-deepen-entry-label">Wiki</span>
-                        <span>
-                          {entry.word_count_after.toLocaleString()} words (was {entry.word_count_before.toLocaleString()})
-                          {wordPct !== 0 ? ` — ${wordPct > 0 ? "+" : ""}${wordPct}%` : ""}
-                        </span>
-                      </div>
+                      {hasWordData ? (
+                        <div className="topic-deepen-entry-row">
+                          <span className="topic-deepen-entry-label">Wiki</span>
+                          <span>
+                            {wordAfter.toLocaleString()} words (was {wordBefore.toLocaleString()})
+                            {wordPct !== 0 ? ` — ${wordPct > 0 ? "+" : ""}${wordPct}%` : ""}
+                          </span>
+                        </div>
+                      ) : null}
+                      {entry.source_types && entry.source_types.length > 0 ? (
+                        <div className="topic-deepen-entry-row">
+                          <span className="topic-deepen-entry-label">Types</span>
+                          <span>{entry.source_types.join(", ")}</span>
+                        </div>
+                      ) : null}
                       {stateChanged ? (
                         <div className="topic-deepen-entry-row">
                           <span className="topic-deepen-entry-label">State</span>
@@ -171,7 +196,7 @@ export function TopicCard({
                         <div className="topic-deepen-entry-row topic-deepen-entry-row-block">
                           <span className="topic-deepen-entry-label">Outputs updated</span>
                           <ul className="topic-deepen-enriched-list">
-                            {entry.enriched_file_details.map((detail) => (
+                            {entry.enriched_file_details.map((detail: string) => (
                               <li key={detail}>{detail}</li>
                             ))}
                           </ul>
@@ -180,7 +205,7 @@ export function TopicCard({
                         <div className="topic-deepen-entry-row topic-deepen-entry-row-block">
                           <span className="topic-deepen-entry-label">Outputs updated</span>
                           <ul className="topic-deepen-enriched-list">
-                            {entry.enriched_files.map((f) => (
+                            {entry.enriched_files?.map((f: string) => (
                               <li key={f}>{f.split("/").pop()?.replace(/\.md$/, "").replace(/_/g, " ") ?? f}</li>
                             ))}
                           </ul>
@@ -190,7 +215,7 @@ export function TopicCard({
                         <div className="topic-deepen-entry-row topic-deepen-entry-row-block">
                           <span className="topic-deepen-entry-label">Gaps remaining</span>
                           <div className="topic-deepen-gaps">
-                            {entry.coverage_gaps_remaining.map((g) => (
+                            {entry.coverage_gaps_remaining.map((g: string) => (
                               <span className="topic-card-gap-tag" key={g}>{g}</span>
                             ))}
                           </div>
@@ -281,6 +306,13 @@ export function TopicCard({
             type="button"
           >
             Deprecate
+          </button>
+          <button
+            className="topic-add-to-chat-button"
+            onClick={() => onAddToChatContext(topic.id, topic.label)}
+            type="button"
+          >
+            + Chat Context
           </button>
         </div>
       ) : null}

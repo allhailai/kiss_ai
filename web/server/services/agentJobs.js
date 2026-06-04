@@ -6,7 +6,7 @@ import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
 import { createPromptBuilders } from "./promptBuilders.js";
 import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs, findDirectedOutputsWithoutArtifacts } from "./artifactService.js";
 import { runFetchPhase, runDigestPhase } from "./fetchAndDigestPhases.js";
-import { getDeepenQueue, clearDeepenQueue, readTopics, writeTopics } from "./topicsService.js";
+import { getDeepenQueue, clearDeepenQueue, readTopics, writeTopics, reconcileTopicSources } from "./topicsService.js";
 import { computeWikiTriage, updateWikiPageTracker, resetWikiPageTracker, regenerateWikiIndex } from "./wikiTriage.js";
 import { validateFileExistence, readManifest, writeManifest, prependBuildLogEntry, gitSnapshot, recordBuildFileChanges } from "./serverValidation.js";
 import { readLedger, buildSnapshot, diffSnapshot, writeLedger, recordKnowledgeBuild, recordOutputBuild } from "./contentLedger.js";
@@ -605,6 +605,9 @@ export function createAgentJobService({
           ];
           for (const t of deepenQueue) {
             deepenLines.push(`- ${t.label} (${t.id})`);
+            if (t.details) {
+              deepenLines.push(`  User context: ${t.details}`);
+            }
             if (t.coverage_gaps?.length > 0) {
               deepenLines.push(`  Coverage gaps: ${t.coverage_gaps.map((g) => typeof g === "string" ? g : g.description).join("; ")}`);
             }
@@ -971,15 +974,60 @@ export function createAgentJobService({
         await recordBuildFileChanges(project.path);
       }
 
-      // Post-build: update deepen state
+      // Post-build: reconcile sources from research plan → topics.json
+      // This runs on every build to catch sources the agent missed,
+      // but is especially critical for deepen passes where the wiki page
+      // agent is explicitly told not to update topics.json.
+      try {
+        const reconciliation = await reconcileTopicSources(project.path);
+        if (reconciliation.newSourcesAdded > 0) {
+          await appendRunEvent(project.slug, {
+            type: "system",
+            title: `Source reconciliation: ${reconciliation.newSourcesAdded} new source(s) linked to ${reconciliation.reconciledTopics} topic(s)`,
+            text: reconciliation.details
+              .map((d) => `${d.topicLabel}: +${d.sourcesAdded} (${d.totalSources} total, types: ${d.sourceTypes.join(", ")})`)
+              .join("; "),
+            status: "sources_reconciled",
+            runtime: "server",
+          });
+        }
+      } catch (reconcileError) {
+        // Non-fatal — log and continue
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Source reconciliation skipped",
+          text: reconcileError instanceof Error ? reconcileError.message : "Unknown error",
+          status: "reconciliation_skipped",
+          runtime: "server",
+        });
+      }
+
+      // Post-build: update deepen state and write deepen_log entries
       if (deepenQueue.length > 0) {
         const topicsData = await readTopics(project.path);
+        const now = new Date().toISOString();
         for (const topic of topicsData.topics) {
           if (topic.queued_for_deepen) {
+            const stateBefore = topic.state;
+            const sourcesBefore = (topic.sources ?? []).length;
+
             topic.queued_for_deepen = false;
             topic.discovery = topic.discovery || {};
             topic.discovery.deepening_count = (topic.discovery.deepening_count || 0) + 1;
-            topic.discovery.last_deepened = new Date().toISOString();
+            topic.discovery.last_deepened = now;
+
+            // Write a deepen_log entry so the user can track what each deepen accomplished
+            if (!Array.isArray(topic.deepen_log)) {
+              topic.deepen_log = [];
+            }
+            topic.deepen_log.unshift({
+              deepened_at: now,
+              sources_added: (topic.sources ?? []).length - sourcesBefore,
+              sources_total: (topic.sources ?? []).length,
+              state_before: stateBefore,
+              state_after: topic.state,
+              source_types: topic.metrics?.source_types ?? [],
+            });
           }
         }
         await writeTopics(project.path, topicsData.topics, topicsData.clusters);
@@ -1084,6 +1132,7 @@ export function createAgentJobService({
         modelId,
         prompt: proposalPrompt,
         phaseName: "Propose Output Artifact Specs",
+        signal: undefined,
       });
 
       if (proposalResult.status === "finished") {
@@ -1197,6 +1246,7 @@ export function createAgentJobService({
           modelId,
           prompt: artifactPrompt,
           phaseName: `Artifact: ${spec.name}`,
+          signal: undefined,
         });
 
         completed++;
@@ -1393,6 +1443,7 @@ export function createAgentJobService({
         modelId,
         prompt,
         phaseName: "Artifact Build",
+        signal: undefined,
       });
 
       const buildCompletion = createAgentJobCompletionMessage(jobName);
@@ -1496,6 +1547,7 @@ export function createAgentJobService({
             modelId,
             prompt,
             phaseName: `Artifact: ${artifactName}`,
+            signal: undefined,
           });
 
           if (result.status === "finished") {

@@ -60,7 +60,8 @@ One marker type exists in AI-managed markdown files:
 4. Read `.build/questions.json` if it exists. Check for questions with `status: "answered"` that have not yet been applied. Collect these for processing in Phase 9. Treat open questions as context for the current build. If this file does not exist, there are no prior questions.
 5. Read `outputs_ai/wiki/_index.md` if it exists. This is a lightweight table of contents for the wiki — it lists every wiki page with its BLUF summary, source references, and last-updated date. Use it to understand the current state of the wiki without reading every page. If this file does not exist, this is a first build.
 6. Read `.build/scratchpad.md` if it exists. This is your working memory from the previous build — it contains key data points, cross-references, contradictions found, and open threads. Use it as context for the current build.
-7. Read `.build/topics.json` if it exists. This is the living topic taxonomy. Each topic has a `state` (seed/shallow/deep/saturated/split_candidate/deprecated), a `disposition` (null/parked/settled), sources, dependencies, and justification. Use it to understand the project's knowledge structure and determine which wiki pages need updating.
+7. Read `framework/topic_depth_definitions.md`. This defines what a topic is, how to scope topics correctly, and the multi-dimensional depth criteria for advancing topics through the state lifecycle. Internalize these definitions before evaluating or creating topics.
+8. Read `.build/topics.json` if it exists. This is the living topic taxonomy. Each topic has a `state` (seed/shallow/deep/saturated/split_candidate/deprecated), a `disposition` (null/parked/settled), sources, dependencies, and justification. Use it to understand the project's knowledge structure and determine which wiki pages need updating.
    - **Do not modify topics the user has `parked` or `settled`** — these are user-owned disposition decisions. Still update their `metrics` and `sources` if new evidence was found, but do not expand scope or change state.
    - **Do not re-add topics the user has `deprecated`** — these are intentional removals.
    - **If you discover new topics** from sources or evidence that don't exist in `topics.json`, add them with `state: "seed"`, `confidence: "low"`, and `origin: "agent_discovered"` so the user can review them.
@@ -217,6 +218,7 @@ Use `[[wiki links]]` for page names and source references so they are navigable 
       "id": "topic_slug",
       "label": "Human-readable topic name",
       "state": "seed|shallow|deep|saturated|split_candidate|deprecated",
+      "details": "User-provided context about what to focus on for this topic (human-only, do not modify)",
       "confidence": "high|low",
       "depth": 0,
       "parent": null,
@@ -242,7 +244,10 @@ Use `[[wiki links]]` for page names and source references so they are navigable 
       "deprecation": null,
       "metrics": {
         "source_count": 3,
+        "source_types": ["government", "academic", "trade_press"],
         "cross_references": 2,
+        "data_point_count": 5,
+        "has_contrarian_evidence": true,
         "word_count": 4500,
         "last_updated": "ISO"
       },
@@ -266,10 +271,25 @@ Use `[[wiki links]]` for page names and source references so they are navigable 
 ```
 
 Behavioral rules for updating topics:
-- **Existing non-deprecated, non-seed topics:** Update `sources`, `outputs`, `metrics`, `coverage_gaps`. Auto-advance `state` from `shallow` → `deep` if evidence is now substantial (3+ sources with specific data points, wiki page has 1000+ words of sourced content). Advance `deep` → `saturated` if all coverage gaps are addressed and the topic has 5+ sources.
+- **Existing non-deprecated, non-seed topics:** Update `sources`, `outputs`, `metrics`, `coverage_gaps`. Auto-advance `state` using the multi-dimensional depth criteria:
+  - `shallow` → `deep` — ALL of the following must hold:
+    1. **Source diversity:** 3+ sources spanning ≥2 distinct source types (e.g., government + trade press, academic + corporate filings). Count types from: primary_data, government, academic, corporate, trade_press, news, commentary.
+    2. **Evidence specificity:** Wiki page contains ≥3 concrete, cited data points — named statistics, quantified claims, dated events, regulatory citations, or direct quotes from primary sources.
+    3. **Coverage gap progress:** Majority of original coverage gaps addressed (≤1 remaining gap).
+    4. **Cross-referencing:** Wiki page explicitly connects findings to at least 1 dependency topic. Waived if the topic has no dependencies.
+    5. **Contrarian evidence:** The page acknowledges at least 1 counterargument, limitation, or alternative interpretation.
+  - `deep` → `saturated` — ALL of the following must hold:
+    1. **Zero open coverage gaps.**
+    2. **Source diversity:** 5+ sources spanning ≥3 distinct source types.
+    3. **Evidence completeness:** All major claims have primary-source or government/academic backing.
+    4. **Cross-referencing:** Connected to 2+ other topics — the wiki page references findings from multiple related topics.
+    5. **Contrarian completeness:** Key counterarguments and limitations are documented with source citations.
+    6. **Downstream coverage:** All directed outputs that depend on this topic have been updated with its findings.
+  - Update `metrics.source_types`, `metrics.data_point_count`, and `metrics.has_contrarian_evidence` alongside other metrics.
 - **Newly discovered topics:** Add as `state: "seed"`, `confidence: "low"`, `origin: "agent_discovered"`, with `justification.goal_support` explaining why this topic is relevant to the project.
 - **Deprecated topics:** Preserve as-is. Do not re-add, reactivate, or modify.
 - **Parked/settled topics:** Preserve `disposition`, `disposition_at`, `disposition_note`. Update `metrics` and `sources` if new evidence was found, but do not change `state` or expand scope.
+- **Topic details:** Each topic may have a `details` field containing user-provided context (e.g., what angle to prioritize, what the user cares about). Read this field when building wiki pages and use it to guide synthesis priorities. **Never modify the `details` field** — it is human-only.
 - **Do not delete `.build/topic_graph.json`** — the build pipeline handles legacy cleanup automatically.
 
 33. Create or update `.build/manifest.json` with:

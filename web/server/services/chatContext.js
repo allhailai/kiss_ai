@@ -1,5 +1,6 @@
 const maxContextFiles = 20;
 const maxAiEditableFiles = 10;
+const maxContextTopics = 20;
 
 function trimText(value, maxLength) {
   return String(value ?? "").trim().slice(0, maxLength);
@@ -19,6 +20,17 @@ export function normalizeContextFile(value) {
     path: filePath,
     label: trimText(source.label, 160) || undefined,
     kind: trimText(source.kind, 40) || undefined,
+  };
+}
+
+export function normalizeContextTopic(value) {
+  const source = value && typeof value === "object" ? value : {};
+  const topicId = trimText(source.topicId, 200);
+  if (!topicId) return null;
+
+  return {
+    topicId,
+    label: trimText(source.label, 300) || topicId,
   };
 }
 
@@ -57,13 +69,18 @@ export function normalizeChatContext(value, options = {}) {
     ? aiEditableFileSource.map((file) => normalizeAiEditableFile(file, options)).filter(Boolean).slice(0, maxAiEditableFiles)
     : [];
   const contextFiles = Array.isArray(contextFileSource) ? contextFileSource.map(normalizeContextFile).filter(Boolean).slice(0, maxContextFiles) : [];
+  const contextTopicSource = source.context_topics;
+  const contextTopics = Array.isArray(contextTopicSource)
+    ? contextTopicSource.map(normalizeContextTopic).filter(Boolean).slice(0, maxContextTopics)
+    : [];
 
-  if (!currentFile && !aiEditableFiles.length && !contextFiles.length) return undefined;
+  if (!currentFile && !aiEditableFiles.length && !contextFiles.length && !contextTopics.length) return undefined;
 
   return {
     ...(currentFile ? { currentFile } : {}),
     ...(aiEditableFiles.length ? { ai_editable_files: aiEditableFiles } : {}),
     ...(contextFiles.length ? { context_files: contextFiles } : {}),
+    ...(contextTopics.length ? { context_topics: contextTopics } : {}),
   };
 }
 

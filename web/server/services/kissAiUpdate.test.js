@@ -182,7 +182,9 @@ describe("kissAiUpdate service", () => {
 
   it("updateAndRestart spawns restart script and schedules exit when update is available", async () => {
     // Mock process.exit and setTimeout to prevent actual exit during test
+    // @ts-expect-error -- mock implementation doesn't need to return `never`
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {});
+    // @ts-expect-error -- mock returns number instead of Timeout
     const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout").mockImplementation(() => 0);
 
     // Mock child_process.spawn via the module — since the service uses spawn internally,

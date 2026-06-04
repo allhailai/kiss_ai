@@ -128,6 +128,8 @@ export function App() {
     [project.selectedProjectSlug],
   );
 
+  const [topicsRefreshKey, setTopicsRefreshKey] = useState(0);
+
   const projectChat = useProjectChat({
     preferredConversationId: preferredAgentChatConversationId,
     projectSlug: project.selectedProjectSlug,
@@ -137,6 +139,7 @@ export function App() {
       await fileWorkspace.refreshProjectFiles();
       await fileWorkspace.refreshSelectedFile();
       await rebuildWorkspace.refreshStatus();
+      setTopicsRefreshKey((k) => k + 1);
     },
     onNotice: toastWorkspace.setNotice,
     onProposalApplied: async () => {
@@ -176,6 +179,14 @@ export function App() {
     route,
     toastWorkspace,
   });
+
+  const addTopicToChat = useCallback((topicId: string, label: string) => {
+    projectChat.setContextTopics((current) => {
+      if (current.some((t) => t.topicId === topicId)) return current;
+      return [...current, { topicId, label }];
+    });
+    if (!isAgentPanelOpen) openAgentChatPanel();
+  }, [projectChat, isAgentPanelOpen, openAgentChatPanel]);
 
   const openProjectFileWithAgentContext = (path: string) => {
     agentFileContext.openProjectFileWithAgentContext(path, isAgentPanelOpen);
@@ -304,11 +315,13 @@ export function App() {
             designWorkspace={designWorkspace}
             fileWorkspace={fileWorkspace}
             onAiFileAssist={() => void chatActions.assistCurrentFile()}
+            onAddTopicToChat={addTopicToChat}
             onOpenFile={openProjectFileWithAgentContext}
             projectChat={projectChat}
             projectSlug={project.selectedProjectSlug}
             rebuildWorkspace={rebuildWorkspace}
             selectProjectChatConversation={selectProjectChatConversation}
+            topicsRefreshKey={topicsRefreshKey}
           />
 
           {rightPanelSurface.rightPanel ? (

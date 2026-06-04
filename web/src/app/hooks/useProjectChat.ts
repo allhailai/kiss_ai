@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
-import type { AgentContextFile, ChatContextFile, ChatMessage, Conversation, ConversationSummary, ProjectFile } from "../../contracts/api";
+import type { AgentContextFile, ChatContextFile, ChatContextTopic, ChatMessage, Conversation, ConversationSummary, ProjectFile } from "../../contracts/api";
 import { chatApi } from "../../data/chatApi";
 import { hasSettledAssistantReply } from "../../domain/conversation";
 import { errorMessage } from "../../domain/errors";
@@ -11,6 +11,7 @@ type ChatSendContext = {
   currentFile?: AgentContextFile;
   ai_editable_files?: AgentContextFile[];
   context_files?: ChatContextFile[];
+  context_topics?: ChatContextTopic[];
 };
 
 type ChatSendOptions = {
@@ -48,6 +49,7 @@ export function useProjectChat({
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [proposalUpdating, setProposalUpdating] = useState(false);
+  const [contextTopics, setContextTopics] = useState<ChatContextTopic[]>([]);
 
   const filteredConversations = useMemo(() => {
     const query = conversationFilter.trim().toLowerCase();
@@ -335,6 +337,7 @@ export function useProjectChat({
     cancelEditingMessage,
     availableContextFiles: fileContext.availableContextFiles,
     contextFiles: fileContext.contextFiles,
+    contextTopics,
     conversationFilter,
     conversations,
     createConversation,
@@ -355,6 +358,7 @@ export function useProjectChat({
     setActiveConversation,
     setAiEditableFiles: fileContext.setAiEditableFiles,
     setContextFiles: fileContext.setContextFiles,
+    setContextTopics,
     setConversationFilter,
     setEditDraft,
     showJumpToLatest: scroll.showJumpToLatest,

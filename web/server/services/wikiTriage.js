@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { readTopics } from "./topicsService.js";
+import { readTopics, getResearchPlanDigestMapping } from "./topicsService.js";
 import { readQuestions } from "./questionsService.js";
 
 // ── Project settings ────────────────────────────────────────────────
@@ -149,7 +149,7 @@ function collectTopicDigests(topics, topicIds) {
  * @param {object} scope - from computeBuildScope (needs: isFirstBuild, projectMdChanged, feedbackMarkers, humanInputsChanged)
  * @param {string[]} changedDigests - digest paths that changed (from content-hash ledger diff)
  * @param {boolean} isFullRebuild - user requested full rebuild
- * @returns {{ action: "skip"|"targeted"|"full", affectedPages: Array, unchangedPages: Array, fullRebuildReason: string|null }}
+ * @returns {Promise<{ action: "skip"|"targeted"|"full", affectedPages: Array, unchangedPages: Array, fullRebuildReason: string|null }>}
  */
 export async function computeWikiTriage(projectPath, scope, changedDigests, isFullRebuild = false) {
   // ── Forced full rebuild ──
@@ -264,9 +264,29 @@ export async function computeWikiTriage(projectPath, scope, changedDigests, isFu
   }
 
   // 4. Deepen-queued topics → wiki pages
+  // For deepen-queued topics, also inject digest paths from the research plan
+  // since topic.sources hasn't been reconciled yet at this point.
+  let researchPlanDigests = new Map();
+  if (deepenTopics.length > 0) {
+    try {
+      researchPlanDigests = await getResearchPlanDigestMapping(projectPath, topics);
+    } catch {
+      // Non-fatal: fall back to existing topic.sources mapping
+    }
+  }
+
   for (const topic of deepenTopics) {
     const wikiPage = topicToWikiPage.get(topic.id);
     addAffectedPage(wikiPage, topic.id, "queued for deepening");
+
+    // Inject research-plan-derived digests as new evidence for the wiki page
+    const planDigests = researchPlanDigests.get(topic.id) ?? [];
+    if (wikiPage && affectedMap.has(wikiPage)) {
+      const entry = affectedMap.get(wikiPage);
+      for (const digestPath of planDigests) {
+        entry.newDigests.add(digestPath);
+      }
+    }
   }
 
   // 5. Dependencies: if a topic is affected, also flag its dependents

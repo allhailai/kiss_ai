@@ -30,20 +30,24 @@ export function MainContentArea({
   designWorkspace,
   fileWorkspace,
   onAiFileAssist,
+  onAddTopicToChat,
   onOpenFile,
   projectChat,
   projectSlug,
   rebuildWorkspace,
   selectProjectChatConversation,
+  topicsRefreshKey,
 }: {
   designWorkspace: DesignWorkspaceController;
   fileWorkspace: FileWorkspaceController;
   onAiFileAssist: () => void;
+  onAddTopicToChat: (topicId: string, label: string) => void;
   onOpenFile: (path: string) => void;
   projectChat: ProjectChatController;
   projectSlug: string;
   rebuildWorkspace: RebuildWorkspaceController;
   selectProjectChatConversation: (conversationId: string) => void;
+  topicsRefreshKey: number;
 }) {
   const route = useRouteContext();
   const toastWorkspace = useToastContext();
@@ -57,10 +61,12 @@ export function MainContentArea({
           models={rebuildWorkspace.models}
           onModelChange={rebuildWorkspace.setSelectedModelId}
           onNavigateToFile={onOpenFile}
+          onAddTopicToChat={onAddTopicToChat}
           projectChat={projectChat}
           projectSlug={projectSlug}
           selectProjectChatConversation={selectProjectChatConversation}
           selectedModelId={rebuildWorkspace.selectedModelId}
+          topicsRefreshKey={topicsRefreshKey}
         />
       ) : null}
       {fileWorkspaceConfig ? (

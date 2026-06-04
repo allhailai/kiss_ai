@@ -301,9 +301,12 @@ export function registerProjectRoutes(app, {
         }
         updates.confidence = request.body.confidence;
       }
+      if (request.body?.details !== undefined) {
+        updates.details = request.body.details === null ? null : String(request.body.details).trim() || null;
+      }
 
       if (Object.keys(updates).length === 0) {
-        throw httpError("No valid fields to update. Provide 'label' and/or 'confidence'.", 400, "no_updates");
+        throw httpError("No valid fields to update. Provide 'label', 'confidence', and/or 'details'.", 400, "no_updates");
       }
 
       const updated = await updateTopic(request.project.path, topicId, updates);

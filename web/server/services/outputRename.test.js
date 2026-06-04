@@ -9,7 +9,7 @@ vi.mock("node:fs/promises", () => {
       readFile: vi.fn(async (filePath) => {
         const content = store.get(filePath);
         if (content === undefined) {
-          const err = new Error(`ENOENT: no such file or directory, open '${filePath}'`);
+          const err = /** @type {any} */ (new Error(`ENOENT: no such file or directory, open '${filePath}'`));
           err.code = "ENOENT";
           throw err;
         }
@@ -25,7 +25,7 @@ vi.mock("node:fs/promises", () => {
         }
         const entries = store.get(`__dir__${dirPath}`);
         if (!entries) {
-          const err = new Error(`ENOENT: no such file or directory, scandir '${dirPath}'`);
+          const err = /** @type {any} */ (new Error(`ENOENT: no such file or directory, scandir '${dirPath}'`));
           err.code = "ENOENT";
           throw err;
         }
@@ -33,7 +33,7 @@ vi.mock("node:fs/promises", () => {
       }),
       access: vi.fn(async (filePath) => {
         if (!store.has(filePath)) {
-          const err = new Error(`ENOENT: no such file or directory, access '${filePath}'`);
+          const err = /** @type {any} */ (new Error(`ENOENT: no such file or directory, access '${filePath}'`));
           err.code = "ENOENT";
           throw err;
         }
@@ -41,7 +41,7 @@ vi.mock("node:fs/promises", () => {
       rename: vi.fn(async (oldPath, newPath) => {
         const content = store.get(oldPath);
         if (content === undefined) {
-          const err = new Error(`ENOENT: ${oldPath}`);
+          const err = /** @type {any} */ (new Error(`ENOENT: ${oldPath}`));
           err.code = "ENOENT";
           throw err;
         }
@@ -54,6 +54,7 @@ vi.mock("node:fs/promises", () => {
   };
 });
 
+// @ts-expect-error -- accessing mock-internal __store
 const { __store: store } = await import("node:fs/promises");
 const { renameOutput } = await import("./outputRename.js");
 

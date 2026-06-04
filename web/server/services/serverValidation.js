@@ -178,7 +178,7 @@ export async function recordBuildFileChanges(projectPath) {
     }
 
     if (entries.length > 0) {
-      await recordFileChanges(projectPath, entries);
+      await recordFileChanges(projectPath, /** @type {{ path: string, status: "new"|"edited" }[]} */ (entries));
     }
   } catch (error) {
     // Non-fatal — badges are a convenience, not critical

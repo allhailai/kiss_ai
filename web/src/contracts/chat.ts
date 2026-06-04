@@ -6,6 +6,11 @@ export type ChatMessageStatus = "complete" | "streaming" | "error";
 
 export type ChatContextFile = AgentContextFileSelection;
 
+export type ChatContextTopic = {
+  topicId: string;
+  label: string;
+};
+
 export type ChatMessage = {
   id: string;
   role: ChatMessageRole;
@@ -18,6 +23,7 @@ export type ChatMessage = {
     currentFile?: AgentContextFile;
     ai_editable_files?: AgentEditableTargetFile[];
     context_files?: AgentContextSourceFile[];
+    context_topics?: ChatContextTopic[];
   };
   metadata?: ChatMessageMetadata;
 };
@@ -175,6 +181,7 @@ export type SendChatMessageRequest = {
     currentFile?: AgentContextFile;
     ai_editable_files?: AgentEditableTargetFile[];
     context_files?: AgentContextSourceFile[];
+    context_topics?: ChatContextTopic[];
   };
 };
 

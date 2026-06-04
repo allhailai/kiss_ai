@@ -419,17 +419,25 @@
   color: var(--color-primary);
 }
 
-.topic-card-justification {
+.topic-card-details {
+  display: grid;
+  gap: 4px;
+}
+
+.topic-card-details-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--color-secondary) 80%, var(--color-primary));
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.topic-card-details-text {
   margin: 0;
   color: var(--color-secondary);
   font-size: 0.8rem;
   font-weight: 600;
   line-height: 1.4;
-}
-
-.topic-card-justification strong {
-  font-weight: 800;
-  color: color-mix(in srgb, var(--color-secondary) 80%, var(--color-primary));
 }
 
 .topic-card-metrics {
@@ -439,6 +447,10 @@
   color: var(--color-secondary);
   font-size: 0.68rem;
   font-weight: 700;
+}
+
+.topic-metric-contrarian {
+  color: var(--color-success);
 }
 
 .topic-card-related {
@@ -513,6 +525,7 @@
 .topic-dismiss-button,
 .topic-view-wiki-button,
 .topic-deprecate-button,
+.topic-add-to-chat-button,
 .topic-deepen-button,
 .topic-park-button,
 .topic-settle-button {
@@ -552,6 +565,20 @@
   border-color: color-mix(in srgb, var(--color-secondary) 44%, var(--color-border));
   color: var(--color-primary);
   outline: 2px solid color-mix(in srgb, var(--color-secondary) 18%, transparent);
+  outline-offset: 2px;
+}
+
+.topic-add-to-chat-button {
+  border: 1px solid color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+  color: var(--color-accent);
+}
+
+.topic-add-to-chat-button:hover,
+.topic-add-to-chat-button:focus-visible {
+  background: color-mix(in srgb, var(--color-accent) 22%, var(--color-surface));
+  border-color: var(--color-accent);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
   outline-offset: 2px;
 }
 

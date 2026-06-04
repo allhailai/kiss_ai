@@ -109,19 +109,23 @@ export function AIWorkspace({
   models,
   onModelChange,
   onNavigateToFile,
+  onAddTopicToChat,
   projectChat,
   projectSlug,
   selectProjectChatConversation,
   selectedModelId,
+  topicsRefreshKey,
 }: {
   context: Record<string, string>;
   models: RebuildModel[];
   onModelChange: (modelId: string) => void;
   onNavigateToFile: (path: string) => void;
+  onAddTopicToChat: (topicId: string, label: string) => void;
   projectChat: ProjectChatController;
   projectSlug: string;
   selectProjectChatConversation: (conversationId: string) => void;
   selectedModelId: string;
+  topicsRefreshKey: number;
 }) {
   const [activeTab, setActiveTabState] = useState<AiTab>(() => parseTabFromContext(context));
 
@@ -230,7 +234,9 @@ export function AIWorkspace({
         {activeTab === "topics" ? (
           <TopicsWorkspace
             onNavigateToFile={onNavigateToFile}
+            onAddTopicToChat={onAddTopicToChat}
             projectSlug={projectSlug}
+            refreshKey={topicsRefreshKey}
           />
         ) : null}
         {activeTab === "questions" ? (

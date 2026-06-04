@@ -9,7 +9,7 @@ vi.mock("node:fs/promises", () => {
       readFile: vi.fn(async (filePath) => {
         const content = store.get(filePath);
         if (content === undefined) {
-          const err = new Error(`ENOENT: no such file or directory, open '${filePath}'`);
+          const err = /** @type {any} */ (new Error(`ENOENT: no such file or directory, open '${filePath}'`));
           err.code = "ENOENT";
           throw err;
         }
@@ -18,7 +18,7 @@ vi.mock("node:fs/promises", () => {
       readdir: vi.fn(async (dirPath, options) => {
         const entries = store.get(`__dir__${dirPath}`) ?? [];
         if (entries.length === 0 && !store.has(`__dir__${dirPath}`)) {
-          const err = new Error(`ENOENT: no such file or directory, scandir '${dirPath}'`);
+          const err = /** @type {any} */ (new Error(`ENOENT: no such file or directory, scandir '${dirPath}'`));
           err.code = "ENOENT";
           throw err;
         }
@@ -35,6 +35,7 @@ vi.mock("node:fs/promises", () => {
   };
 });
 
+// @ts-expect-error -- accessing mock-internal __store
 const { __store: store } = await import("node:fs/promises");
 const { buildSourceMapping, discoverDirectedOutputs } = await import("./sourceMapping.js");
 

@@ -25,7 +25,11 @@ export async function readTopics(projectPath) {
     return {
       version: data.version ?? 2,
       last_updated: data.last_updated ?? null,
-      topics: Array.isArray(data.topics) ? data.topics : [],
+      topics: Array.isArray(data.topics) ? data.topics.map((t) => ({
+        ...t,
+        // Auto-populate details from justification.goal_support for legacy topics
+        details: t.details !== undefined ? t.details : (t.justification?.goal_support || null),
+      })) : [],
       clusters: Array.isArray(data.clusters) ? data.clusters : [],
     };
   } catch {
@@ -149,6 +153,7 @@ export async function updateTopic(projectPath, topicId, updates) {
 
   if (updates.label !== undefined) topic.label = updates.label;
   if (updates.confidence !== undefined) topic.confidence = updates.confidence;
+  if (updates.details !== undefined) topic.details = updates.details;
 
   await writeTopics(projectPath, data.topics, data.clusters);
   return topic;
@@ -334,6 +339,7 @@ export async function createTopic(projectPath, { label, justification, conversat
     id: topicId,
     label: trimmedLabel,
     state: "shallow",
+    details: null,
     confidence: "high",
     depth: 0,
     parent: null,
@@ -391,6 +397,7 @@ function migrateFromLegacyTopicGraph(legacy) {
     id: t.id,
     label: t.label || t.id,
     state: "shallow",
+    details: null,
     confidence: "high",
     depth: 0,
     parent: null,
@@ -430,4 +437,223 @@ function migrateFromLegacyTopicGraph(legacy) {
     topics,
     clusters: [],
   };
+}
+
+// ── Source Reconciliation ────────────────────────────────────────────
+
+/**
+ * Normalize a string for fuzzy topic matching: lowercase, strip
+ * punctuation, collapse whitespace.
+ */
+function normalizeLabel(label) {
+  return (label || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Match a research plan `query.topic` string to a topic in the taxonomy.
+ *
+ * Strategies (in priority order):
+ *  1. Exact label match (case-insensitive, normalized)
+ *  2. topic.id appears as a substring of the query topic (handles "federal-marketing-rules — deeper research")
+ *  3. Normalized label is a substring of the query topic or vice-versa
+ *
+ * @param {string} queryTopic - The `topic` field from a research plan query entry
+ * @param {Array} topics - The topics array from topics.json
+ * @returns {object|null} The matched topic, or null
+ */
+function matchQueryToTopic(queryTopic, topics) {
+  const normalizedQuery = normalizeLabel(queryTopic);
+
+  // 1. Exact normalized label match
+  for (const topic of topics) {
+    if (normalizeLabel(topic.label) === normalizedQuery) return topic;
+  }
+
+  // 2. topic.id contained in the query topic (handles slug-style references)
+  for (const topic of topics) {
+    const normalizedId = topic.id.replace(/_/g, " ").replace(/-/g, " ").toLowerCase();
+    if (normalizedQuery.includes(normalizedId) && normalizedId.length > 3) return topic;
+  }
+
+  // 3. Substring containment (either direction, min 4 chars)
+  for (const topic of topics) {
+    const normalizedLabel = normalizeLabel(topic.label);
+    if (normalizedLabel.length > 3 && normalizedQuery.length > 3) {
+      if (normalizedQuery.includes(normalizedLabel) || normalizedLabel.includes(normalizedQuery)) {
+        return topic;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Reconcile topic sources after a build by reading the research plan
+ * and matching fetched URLs back to topics in topics.json.
+ *
+ * This fixes the core deepening bug: sources fetched during a build
+ * are never written back to the topic's `sources` array.
+ *
+ * @param {string} projectPath - Absolute path to the project root
+ * @returns {Promise<{ reconciledTopics: number, newSourcesAdded: number, details: Array }>}
+ */
+export async function reconcileTopicSources(projectPath) {
+  const { parseResearchPlan, urlToSlug } = await import("./webResearch.js");
+
+  // Read current topics
+  const data = await readTopics(projectPath);
+  if (data.topics.length === 0) {
+    return { reconciledTopics: 0, newSourcesAdded: 0, details: [] };
+  }
+
+  // Read research plan
+  let plan;
+  try {
+    plan = await parseResearchPlan(projectPath);
+  } catch {
+    // No research plan (e.g., first build with no sources yet)
+    return { reconciledTopics: 0, newSourcesAdded: 0, details: [] };
+  }
+
+  const now = new Date().toISOString();
+  const webResearchDir = path.join(projectPath, "sources", "web_research");
+  let totalNewSources = 0;
+  const details = [];
+
+  // Build a map of topic → new source entries from the research plan
+  /** @type {Map<string, Array<{path: string, type: string, relevance: string}>>} */
+  const topicNewSources = new Map();
+
+  for (const query of plan.queries) {
+    const topic = matchQueryToTopic(query.topic, data.topics);
+    if (!topic) continue;
+
+    for (const urlEntry of query.urls) {
+      const slug = urlToSlug(urlEntry.url);
+      const sourcePath = `sources/web_research/${slug}.md`;
+
+      // Verify the file actually exists on disk
+      try {
+        await fs.access(path.join(webResearchDir, `${slug}.md`));
+      } catch {
+        continue; // File wasn't fetched or was deleted
+      }
+
+      if (!topicNewSources.has(topic.id)) {
+        topicNewSources.set(topic.id, []);
+      }
+      topicNewSources.get(topic.id).push({
+        path: sourcePath,
+        type: urlEntry.type || "unknown",
+        relevance: urlEntry.relevance || "",
+      });
+    }
+  }
+
+  // Apply new sources to each matched topic
+  for (const [topicId, newSources] of topicNewSources) {
+    const topic = data.topics.find((t) => t.id === topicId);
+    if (!topic) continue;
+
+    // Ensure sources is an array
+    if (!Array.isArray(topic.sources)) {
+      topic.sources = [];
+    }
+
+    // Build set of existing source paths for dedup
+    const existingPaths = new Set(
+      topic.sources.map((s) => (typeof s === "string" ? s : s.path)),
+    );
+
+    let addedCount = 0;
+    for (const newSource of newSources) {
+      if (existingPaths.has(newSource.path)) continue;
+
+      topic.sources.push({
+        path: newSource.path,
+        relevance: 0.8,
+        added_at: now,
+        type: newSource.type,
+        contribution: newSource.relevance,
+      });
+      existingPaths.add(newSource.path);
+      addedCount++;
+    }
+
+    if (addedCount > 0) {
+      totalNewSources += addedCount;
+
+      // Update metrics
+      topic.metrics = topic.metrics || {};
+      topic.metrics.source_count = topic.sources.length;
+      topic.metrics.last_updated = now;
+
+      // Compute distinct source types
+      const sourceTypes = new Set();
+      for (const source of topic.sources) {
+        const type = typeof source === "string" ? "unknown" : (source.type || "unknown");
+        if (type !== "unknown") sourceTypes.add(type);
+      }
+      topic.metrics.source_types = [...sourceTypes];
+
+      details.push({
+        topicId: topic.id,
+        topicLabel: topic.label,
+        sourcesAdded: addedCount,
+        totalSources: topic.sources.length,
+        sourceTypes: [...sourceTypes],
+      });
+    }
+  }
+
+  if (totalNewSources > 0) {
+    await writeTopics(projectPath, data.topics, data.clusters);
+  }
+
+  return { reconciledTopics: details.length, newSourcesAdded: totalNewSources, details };
+}
+
+/**
+ * Extract the topic→digest mapping from the research plan.
+ * Used by wiki triage to map new digests to deepen-queued topics
+ * before source reconciliation has run.
+ *
+ * @param {string} projectPath
+ * @param {Array} topics - The topics array from topics.json
+ * @returns {Promise<Map<string, string[]>>} Map of topicId → digest paths
+ */
+export async function getResearchPlanDigestMapping(projectPath, topics) {
+  const { parseResearchPlan, urlToSlug } = await import("./webResearch.js");
+
+  /** @type {Map<string, string[]>} */
+  const topicDigests = new Map();
+
+  let plan;
+  try {
+    plan = await parseResearchPlan(projectPath);
+  } catch {
+    return topicDigests;
+  }
+
+  for (const query of plan.queries) {
+    const topic = matchQueryToTopic(query.topic, topics);
+    if (!topic) continue;
+
+    for (const urlEntry of query.urls) {
+      const slug = urlToSlug(urlEntry.url);
+      const digestPath = `sources/digests/${slug}.md`;
+
+      if (!topicDigests.has(topic.id)) {
+        topicDigests.set(topic.id, []);
+      }
+      topicDigests.get(topic.id).push(digestPath);
+    }
+  }
+
+  return topicDigests;
 }

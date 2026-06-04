@@ -128,8 +128,6 @@ export function KnowledgebaseSectionBody({
               fileChanges={fileChanges}
               files={sourceFiles}
               loading={loading && currentView === "inputs"}
-              onDeleteFile={onDeleteProjectFile}
-              onDeleteFolder={onDeleteProjectFolder}
               onOpenFile={onOpenFile}
               selectedPath={selectedPath}
             />
@@ -159,8 +157,6 @@ export function KnowledgebaseSectionBody({
               fileChanges={fileChanges}
               files={wikiFiles}
               loading={loading && currentView === "outputs"}
-              onDeleteFile={onDeleteProjectFile}
-              onDeleteFolder={onDeleteProjectFolder}
               onOpenFile={onOpenFile}
               selectedPath={selectedPath}
             />
@@ -228,8 +224,6 @@ export function OutputsSectionBody({
               fileChanges={fileChanges}
               files={reportFiles}
               loading={loading && currentView === "reports"}
-              onDeleteFile={onDeleteProjectFile}
-              onDeleteFolder={onDeleteProjectFolder}
               onOpenFile={onOpenFile}
               selectedPath={selectedPath}
             />
