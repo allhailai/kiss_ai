@@ -5,6 +5,9 @@ import type { ProjectChatController } from "./hooks/useProjectChat";
 import { QuestionsWorkspace } from "../features/questions/QuestionsWorkspace";
 import { TopicsWorkspace } from "../features/topics/TopicsWorkspace";
 import { ProjectChatConversationHistory } from "../features/chat/ProjectChatConversationHistory";
+import { EmptyProjectGuide } from "../features/onboarding/EmptyProjectGuide";
+import { useUxPreferences } from "./contexts/UxPreferencesContext";
+import { useBuildContext } from "./contexts/BuildContext";
 
 const VALID_TABS = new Set<AiTab>(["conversations", "topics", "questions"]);
 
@@ -25,10 +28,12 @@ function truncate(text: string | undefined | null, max: number): string {
 function AiSummaryCards({
   questions,
   topics,
+  showTopics,
   onSwitchTab,
 }: {
   questions: BuildQuestion[];
   topics: Topic[];
+  showTopics: boolean;
   onSwitchTab: (tab: AiTab) => void;
 }) {
   const topicsByState = useMemo(() => {
@@ -56,45 +61,45 @@ function AiSummaryCards({
 
   return (
     <div className="ai-summary-cards">
-      <section className="ai-summary-card" onClick={() => onSwitchTab("topics")}>
-        <div className="ai-summary-card-header">
-          <h3 className="ai-summary-card-title">Topics</h3>
-          <button
-            className="ai-summary-cta"
-            onClick={(e) => { e.stopPropagation(); onSwitchTab("topics"); }}
-            type="button"
-          >
-            View →
-          </button>
-        </div>
-        <div className="ai-summary-stats">
-          <span className="ai-summary-stat">{totalTopics} total · {progressPct}% deep</span>
-          <span className="ai-summary-stat">
-            {topicsByState.deep} deep · {topicsByState.shallow} shallow · {topicsByState.seed} seed
-          </span>
-        </div>
-      </section>
+      {showTopics ? (
+        <section className="ai-summary-card" onClick={() => onSwitchTab("topics")}>
+          <div className="ai-summary-card-header">
+            <h3 className="ai-summary-card-title">Research Areas</h3>
+            <button
+              className="ai-summary-cta"
+              onClick={(e) => { e.stopPropagation(); onSwitchTab("topics"); }}
+              type="button"
+            >
+              View →
+            </button>
+          </div>
+          <div className="ai-summary-stats">
+            <span className="ai-summary-stat">{totalTopics} area{totalTopics !== 1 ? "s" : ""} being researched · {progressPct}% complete</span>
+
+          </div>
+        </section>
+      ) : null}
 
       <section className="ai-summary-card" onClick={() => onSwitchTab("questions")}>
         <div className="ai-summary-card-header">
-          <h3 className="ai-summary-card-title">Questions</h3>
+          <h3 className="ai-summary-card-title">Needs Your Input</h3>
           <button
             className="ai-summary-cta"
             onClick={(e) => { e.stopPropagation(); onSwitchTab("questions"); }}
             type="button"
           >
-            View →
+            {openQuestions.length > 0 ? "Answer →" : "View →"}
           </button>
         </div>
         <div className="ai-summary-stats">
           {blockingCount > 0 ? (
-            <span className="ai-summary-stat ai-summary-stat-warn">{blockingCount} blocking</span>
+            <span className="ai-summary-stat ai-summary-stat-warn">{blockingCount} required before next update</span>
           ) : null}
+            <span className="ai-summary-stat">
+              {blockingCount} required · {importantCount} recommended · {informationalCount} optional
+            </span>
           <span className="ai-summary-stat">
-            {blockingCount} blocking · {importantCount} important · {informationalCount} info
-          </span>
-          <span className="ai-summary-stat">
-            {answeredQuestions.length} of {questions.length} resolved
+              {answeredQuestions.length} of {questions.length} answered
           </span>
         </div>
       </section>
@@ -123,6 +128,9 @@ export function AIWorkspace({
   selectProjectChatConversation: (conversationId: string) => void;
   selectedModelId: string;
 }) {
+  const { preferences } = useUxPreferences();
+  const build = useBuildContext();
+  const hasNeverBuilt = !build.status?.lastSuccessfulRunAt;
   const [activeTab, setActiveTabState] = useState<AiTab>(() => parseTabFromContext(context));
 
   // Sync from context on external navigation (e.g. legacy URL redirects)
@@ -130,6 +138,13 @@ export function AIWorkspace({
     const t = parseTabFromContext(context);
     setActiveTabState(t);
   }, [context]);
+
+  // If user navigated to hidden Topics tab but preference is off, redirect
+  useEffect(() => {
+    if (activeTab === "topics" && !preferences.showTopics) {
+      setActiveTabState("conversations");
+    }
+  }, [activeTab, preferences.showTopics]);
 
   const setActiveTab = useCallback((tab: AiTab) => {
     setActiveTabState(tab);
@@ -172,28 +187,41 @@ export function AIWorkspace({
   const blockingQuestions = questions.filter((q) => q.status === "open" && q.priority === "blocking").length;
   const seedTopics = topics.filter((t) => t.state === "seed").length;
 
+  // Build tabs dynamically based on preferences
   const tabs: Array<{ id: AiTab; label: string; badge?: number; badgeClass?: string }> = [
-    { id: "conversations", label: "Conversations" },
-    { id: "topics", label: "Topics", badge: seedTopics > 0 ? seedTopics : undefined, badgeClass: "ai-tab-badge-open" },
-    { id: "questions", label: "Questions", badge: openQuestions > 0 ? openQuestions : undefined, badgeClass: blockingQuestions > 0 ? "ai-tab-badge-blocking" : "ai-tab-badge-open" },
+    { id: "conversations", label: "Chat History" },
   ];
+
+  if (preferences.showTopics) {
+    tabs.push({ id: "topics", label: "Research Areas", badge: seedTopics > 0 ? seedTopics : undefined, badgeClass: "ai-tab-badge-open" });
+  }
+
+  tabs.push({ id: "questions", label: "Needs Your Input", badge: openQuestions > 0 ? openQuestions : undefined, badgeClass: blockingQuestions > 0 ? "ai-tab-badge-blocking" : "ai-tab-badge-open" });
 
   return (
     <div className="ai-workspace">
       <header className="ai-workspace-header">
-        <h2>AI</h2>
+        <h2>Welcome back</h2>
         {summaryLoading ? (
           <p className="ai-workspace-summary">Loading…</p>
         ) : (
           <p className="ai-workspace-summary">
-            {topics.length} topic{topics.length !== 1 ? "s" : ""}
-            {" · "}
-            {openQuestions} open question{openQuestions !== 1 ? "s" : ""}
-            {blockingQuestions > 0 ? ` (${blockingQuestions} blocking)` : ""}
+            {openQuestions > 0
+              ? `You have ${openQuestions} item${openQuestions !== 1 ? "s" : ""} that need${openQuestions === 1 ? "s" : ""} your attention`
+              : "Everything is up to date"}
           </p>
         )}
       </header>
 
+      {hasNeverBuilt && !summaryLoading ? (
+        <EmptyProjectGuide
+          models={build.models}
+          status={build.status}
+          onOpenBuild={build.openBuildPanel}
+          onConnectionChange={build.refreshStatus}
+        />
+      ) : (
+        <>
       <nav className="ai-tab-bar" role="tablist">
         {tabs.map((tab) => (
           <button
@@ -219,6 +247,7 @@ export function AIWorkspace({
               <AiSummaryCards
                 questions={questions}
                 topics={topics}
+                showTopics={preferences.showTopics}
                 onSwitchTab={setActiveTab}
               />
             ) : null}
@@ -227,7 +256,7 @@ export function AIWorkspace({
             </div>
           </>
         ) : null}
-        {activeTab === "topics" ? (
+        {activeTab === "topics" && preferences.showTopics ? (
           <TopicsWorkspace
             onNavigateToFile={onNavigateToFile}
             projectSlug={projectSlug}
@@ -243,6 +272,8 @@ export function AIWorkspace({
           />
         ) : null}
       </div>
+      </>
+      )}
     </div>
   );
 }

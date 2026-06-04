@@ -40,7 +40,7 @@
   background: var(--color-secondary);
   color: white;
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .chat-filter,
@@ -383,7 +383,7 @@
   padding: 6px 10px;
   border-radius: 9px;
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .chat-message-edit-actions button[type="submit"] {
@@ -461,7 +461,7 @@
   background: var(--color-success);
   color: white;
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -519,7 +519,7 @@
   background: var(--color-secondary);
   color: white;
   font-size: 0.76rem;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   transition: box-shadow 0.15s, opacity 0.15s;
@@ -561,7 +561,7 @@
   background: var(--color-secondary);
   color: white;
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   transition: box-shadow 0.15s, opacity 0.15s;
 }
@@ -614,7 +614,7 @@
 .chat-context-chip-remove {
   flex: 0 0 auto;
   color: var(--color-secondary);
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .chat-composer {
@@ -684,7 +684,7 @@
 .chat-composer-secondary-action {
   border-radius: var(--radius-full);
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .chat-context-trigger,
@@ -851,10 +851,10 @@
   margin: 0;
   color: var(--color-secondary);
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 1.1;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .chat-model-trigger small {
@@ -916,7 +916,7 @@
   background: var(--color-danger);
   color: white;
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   animation: chat-stop-pulse 2s ease-in-out infinite;
 }
@@ -1161,7 +1161,7 @@
   padding: 7px 14px;
   border-radius: var(--radius-full);
   font-size: 0.8rem;
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
   transition: background 0.12s ease;
 }
@@ -1305,7 +1305,7 @@
   background: color-mix(in srgb, var(--color-accent) 8%, white);
   color: var(--color-accent);
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease, transform 0.1s ease;
@@ -1399,7 +1399,7 @@
   background: color-mix(in srgb, var(--color-secondary) 8%, white);
   color: var(--color-secondary);
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease, transform 0.1s ease;
@@ -1535,7 +1535,7 @@
   background: var(--color-secondary);
   color: white;
   font-size: 0.8rem;
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
   transition: background 0.12s ease;
 }
@@ -1613,7 +1613,7 @@
   background: color-mix(in srgb, var(--color-background) 72%, white);
   color: var(--color-secondary);
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 1;
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease;
@@ -1633,7 +1633,7 @@
   background: color-mix(in srgb, var(--color-secondary) 8%, white);
   color: var(--color-secondary);
   font-size: 0.72rem;
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease;
@@ -1749,7 +1749,7 @@
   padding: 7px 14px;
   border-radius: var(--radius-full);
   font-size: 0.8rem;
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
   transition: background 0.12s ease;
 }

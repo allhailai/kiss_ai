@@ -194,11 +194,11 @@ export function GlobalFileSearch({
             aria-label="Build in progress — click to view"
             className="global-activity-badge"
             onClick={openBuildPanel}
-            title={buildPhaseLabel ? `Building: ${buildPhaseLabel}` : "Build in progress"}
+            title={buildPhaseLabel ? `Updating: ${buildPhaseLabel}` : "Update in progress"}
             type="button"
           >
             <span className="global-activity-dot" aria-hidden="true" />
-            <span>{buildPhaseLabel || "Working…"}</span>
+            <span>{buildPhaseLabel || "Updating…"}</span>
           </button>
         ) : null}
       </div>

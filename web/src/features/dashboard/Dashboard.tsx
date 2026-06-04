@@ -39,15 +39,15 @@ export function Dashboard({
     <div className="panel-stack">
       <header className="page-header">
         <span className="eyebrow">Project dashboard</span>
-        <h2>Current project state</h2>
-        <p>Readiness, rebuild history, and local runtime availability.</p>
+        <h2>Project Overview</h2>
+        <p>Status, update history, and AI service availability.</p>
       </header>
 
       <div className="card-grid">
-        <StatusCard label="Last successful run" value={formatLocalDateTime(status?.lastSuccessfulRunAt)} />
+        <StatusCard label="Last successful update" value={formatLocalDateTime(status?.lastSuccessfulRunAt)} />
         <StatusCard label="Scaling mode" value={status?.scalingMode ?? "Unknown"} />
-        <StatusCard label="Latest build" value={rebuildStatusLabel(status?.rebuildStatus)} />
-        <StatusCard label="Checks" value={lintStatusLabel(status?.lintStatus)} />
+        <StatusCard label="Last research update" value={rebuildStatusLabel(status?.rebuildStatus)} />
+        <StatusCard label="Quality checks" value={lintStatusLabel(status?.lintStatus)} />
         <StatusCard label="Review notes" value={String(status?.humanAttentionCount ?? 0)} />
       </div>
 
@@ -57,18 +57,18 @@ export function Dashboard({
 
       <section className="content-card">
         <div className="section-heading">
-          <h3>Runtime readiness</h3>
+          <h3>AI Service Status</h3>
         </div>
         <p>
-          Cursor SDK rebuilds are{" "}
+          Research updates are{" "}
           <strong>
-            {status?.cursorApiKeyAvailable ? `available from ${status.cursorApiKeySource}` : "blocked until a Cursor API key is available"}
+            {status?.cursorApiKeyAvailable ? `available from ${status.cursorApiKeySource}` : "blocked until an AI service key is configured"}
           </strong>
           .
         </p>
         {status?.cursorApiKeyWarnings?.length ? (
           <div className="warning-callout">
-            <strong>Cursor API key warning</strong>
+            <strong>AI service key warning</strong>
             <ul>
               {status.cursorApiKeyWarnings.map((warning) => (
                 <li key={warning}>{warning}</li>

@@ -327,7 +327,7 @@
   border-radius: 4px;
   font-size: 10px;
   font-weight: 600;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.3px;
   background: #e0e0e0;
   color: #666;
@@ -599,7 +599,7 @@
   color: var(--color-text-muted, #aaa);
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.3px;
 }
 
@@ -610,7 +610,7 @@
   color: var(--color-text-muted, #aaa);
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.3px;
 }
 

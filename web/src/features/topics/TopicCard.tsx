@@ -80,7 +80,7 @@ export function TopicCard({
         </span>
         {hasDisposition ? (
           <span className={`topic-disposition-pill topic-disposition-${topic.disposition}`}>
-            {isParked ? "Parked" : "Settled"}
+            {isParked ? "Paused" : "Done"}
           </span>
         ) : null}
       </header>
@@ -177,7 +177,7 @@ export function TopicCard({
                         </span>
                       </div>
                       <div className="topic-deepen-entry-row">
-                        <span className="topic-deepen-entry-label">Wiki</span>
+                        <span className="topic-deepen-entry-label">Knowledge Page</span>
                         <span>
                           {entry.word_count_after.toLocaleString()} words (was {entry.word_count_before.toLocaleString()})
                           {wordPct !== 0 ? ` — ${wordPct > 0 ? "+" : ""}${wordPct}%` : ""}
@@ -251,7 +251,7 @@ export function TopicCard({
               onClick={() => onNavigateToFile(topic.wiki_page!)}
               type="button"
             >
-              View Enriched Wiki Page
+              View Knowledge Page
             </button>
           ) : null}
         </div>
@@ -287,7 +287,7 @@ export function TopicCard({
             title={isRunningDeepen ? "Deepening in progress…" : topic.queued_for_deepen ? "Remove from deepen queue" : "Add to deepen queue"}
             type="button"
           >
-            {isRunningDeepen ? (<><span className="topic-deepen-spinner" /> Running</>) : topic.queued_for_deepen ? "Queued ✓" : "Go Deeper"}
+            {isRunningDeepen ? (<><span className="topic-deepen-spinner" /> Running</>) : topic.queued_for_deepen ? "Queued ✓" : "Research More"}
           </button>
           {topic.wiki_page ? (
             <button
@@ -295,42 +295,42 @@ export function TopicCard({
               onClick={() => onNavigateToFile(topic.wiki_page!)}
               type="button"
             >
-              View Wiki Page
+              View Knowledge Page
             </button>
           ) : null}
-          <button
-            className="topic-park-button"
-            disabled={saving}
-            onClick={() => void handleDisposition("parked")}
-            title="Defer — revisit this topic later"
-            type="button"
-          >
-            Park
-          </button>
-          <button
-            className="topic-settle-button"
-            disabled={saving}
-            onClick={() => void handleDisposition("settled")}
-            title="Good enough — don't go deeper on this topic"
-            type="button"
-          >
-            Settle
-          </button>
-          <button
-            className="topic-deprecate-button"
-            disabled={saving}
-            onClick={() => void handleResolve("deprecate")}
-            type="button"
-          >
-            Deprecate
-          </button>
+            <button
+              className="topic-park-button"
+              disabled={saving}
+              onClick={() => void handleDisposition("parked")}
+              title="Pause — come back to this topic later"
+              type="button"
+            >
+              Pause
+            </button>
+            <button
+              className="topic-settle-button"
+              disabled={saving}
+              onClick={() => void handleDisposition("settled")}
+              title="This topic has enough coverage"
+              type="button"
+            >
+              Done
+            </button>
+            <button
+              className="topic-deprecate-button"
+              disabled={saving}
+              onClick={() => void handleResolve("deprecate")}
+              type="button"
+            >
+              Remove
+            </button>
         </div>
       ) : null}
 
       {hasDisposition && !isDeprecated ? (
         <div className="topic-card-disposition-info">
           <span className="topic-card-disposition-note">
-            {isParked ? "Parked" : "Settled"}{topic.disposition_at ? ` · ${formatLocalDateTime(topic.disposition_at, "")}` : ""}
+            {isParked ? "Paused" : "Done"}{topic.disposition_at ? ` · ${formatLocalDateTime(topic.disposition_at, "")}` : ""}
             {topic.disposition_note ? ` — ${topic.disposition_note}` : ""}
           </span>
           <button
@@ -346,7 +346,7 @@ export function TopicCard({
 
       {isDeprecated && topic.deprecation ? (
         <span className="topic-card-deprecated-note">
-          Deprecated: {topic.deprecation.reason ?? "unknown reason"}
+          Removed: {topic.deprecation.reason ?? "unknown reason"}
           {topic.deprecation.deprecated_at ? ` · ${formatLocalDateTime(topic.deprecation.deprecated_at, "")}` : ""}
         </span>
       ) : null}

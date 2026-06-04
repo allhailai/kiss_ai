@@ -112,10 +112,10 @@ function EditorPane({
   const hasSavedDiff = savedChangedLineCount > 0 || savedDeletedLineCount > 0;
   const savedDiffLabel =
     hasSavedDiff
-      ? `${(savedChangedLineCount + savedDeletedLineCount).toLocaleString()} saved Git diff ${
-          savedChangedLineCount + savedDeletedLineCount === 1 ? "line" : "lines"
+      ? `${(savedChangedLineCount + savedDeletedLineCount).toLocaleString()} saved ${
+          savedChangedLineCount + savedDeletedLineCount === 1 ? "change" : "changes"
         }`
-      : "No saved Git diff";
+      : "No saved changes";
   const canWrite = selected.editable || selected.annotation;
   const showAiFileAssist = Boolean(onAiFileAssist && canWrite && (hasUnsavedChanges || hasSavedDiff));
 
@@ -144,7 +144,7 @@ function EditorPane({
           </button>
           {hasSavedDiff ? (
             <button className="editor-secondary-button" disabled={!canWrite} onClick={onRevert} type="button">
-              Revert to Committed State
+              Restore Original
             </button>
           ) : null}
           {canWrite && hasUnsavedChanges ? (
@@ -162,7 +162,7 @@ function EditorPane({
 
       <div className="editor-meta">
         <span className="editor-diff-legend" aria-label="Editor diff highlight legend">
-          <span className="editor-diff-key editor-diff-key-unsaved">Unsaved edits</span>
+          <span className="editor-diff-key editor-diff-key-unsaved">Your changes (not saved)</span>
           <span className="editor-diff-key editor-diff-key-saved">{savedDiffLabel}</span>
         </span>
       </div>

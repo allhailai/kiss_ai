@@ -57,7 +57,7 @@
   border-radius: 12px;
   background: var(--color-accent);
   color: white;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .human-input-dropzone input {
@@ -115,7 +115,7 @@
   border-radius: 10px;
   background: var(--color-secondary);
   color: white;
-  font-weight: 800;
+  font-weight: 600;
   font-size: 0.78rem;
   line-height: 1.2;
 }

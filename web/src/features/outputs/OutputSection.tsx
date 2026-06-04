@@ -35,8 +35,8 @@ export function OutputSection({
   selectedModelId: string;
   type: "report" | "artifact";
 }) {
-  const typeLabel = type === "report" ? "Reports" : "Artifacts";
-  const typeSingular = type === "report" ? "Report" : "Artifact";
+  const typeLabel = type === "report" ? "Reports" : "Custom Documents";
+  const typeSingular = type === "report" ? "Report" : "Document";
 
   // ── Data ──────────────────────────────────────────────────────
   const [outputStatus, setOutputStatus] = useState<OutputStatusResponse | null>(null);
@@ -127,7 +127,7 @@ export function OutputSection({
           setBuildingSlugs(new Set());
           setBuilding(false);
           setSelectedFiles(new Set());
-          flash("Build complete ✓");
+          flash("Generation complete ✓");
           void refreshStatus();
         } else if (!state.running) {
           setBuildingSlugs(new Set());
@@ -313,7 +313,7 @@ export function OutputSection({
       reportRows.some((r) => r.path === f)
     );
     if (files.length === 0) return;
-    flash(`Building ${files.length} ${files.length === 1 ? typeSingular.toLowerCase() : typeLabel.toLowerCase()}…`);
+    flash(`Generating ${files.length} ${files.length === 1 ? typeSingular.toLowerCase() : typeLabel.toLowerCase()}…`);
     try {
       // Both artifact and report builds go through the same API — backend handles queuing
       await outputsApi.buildOutputs(projectSlug, files, type, buildModelId || undefined);
@@ -322,11 +322,11 @@ export function OutputSection({
       buildStartedAtRef.current = Date.now();
       setBuilding(true);
       setBuildingSlugs(new Set(files));
-      flash(`Build started for ${files.length} ${files.length === 1 ? typeSingular.toLowerCase() : typeLabel.toLowerCase()}.`);
+      flash(`Generation started for ${files.length} ${files.length === 1 ? typeSingular.toLowerCase() : typeLabel.toLowerCase()}.`);
       // Completion is detected by the rebuild state polling effect above
     } catch (err) {
       setBuilding(false);
-      flash(err instanceof Error ? err.message : "Build failed");
+      flash(err instanceof Error ? err.message : "Generation failed");
     }
   }
 
@@ -468,11 +468,11 @@ export function OutputSection({
           <h2 className="output-section-title">{typeLabel}</h2>
           {lastKnowledgeBuildLabel ? (
             <p className="output-section-subtitle">
-              Last knowledge build: {lastKnowledgeBuildLabel}
+              Last research update: {lastKnowledgeBuildLabel}
             </p>
           ) : (
             <p className="output-section-subtitle">
-              No knowledge build yet
+              No research update yet
             </p>
           )}
         </div>
@@ -549,7 +549,7 @@ export function OutputSection({
             onChange={(e) => setSortBy(e.target.value as SortBy)}
           >
             <option value="name">Sort: Name</option>
-            <option value="buildDate">Sort: Build date</option>
+            <option value="buildDate">Sort: Last generated</option>
           </select>
           <div className="output-section-status-filter">
             <button
@@ -702,8 +702,8 @@ export function OutputSection({
               type="button"
             >
               {building
-                ? "Building…"
-                : `Build ${selectedCount} ${selectedCount === 1 ? typeSingular : typeLabel}`}
+                ? "Generating…"
+                : `Generate ${selectedCount} ${selectedCount === 1 ? typeSingular : typeLabel}`}
             </button>
           </div>
         </div>
@@ -764,14 +764,14 @@ function FileRow({
     if (isBuilding) {
       return (
         <span className="output-status-badge output-status-building">
-          ⏳ Building…
+          ⏳ Generating…
         </span>
       );
     }
     if (!row.builtAt) {
       return (
         <span className="output-status-badge output-status-unbuilt">
-          ○ Not built
+          ○ Not generated
         </span>
       );
     }

@@ -10,7 +10,7 @@ export type RightPanelState = {
 
 const rightPanelByKind: Record<RightPanelKind, NonNullable<RightPanelState>> = {
   "agent-chat": { kind: "agent-chat", title: "Agent Chat" },
-  "build-project": { kind: "build-project", title: "Build Project" },
+  "build-project": { kind: "build-project", title: "Update Research" },
 };
 
 export function panelForKind(kind: RightPanelKind) {

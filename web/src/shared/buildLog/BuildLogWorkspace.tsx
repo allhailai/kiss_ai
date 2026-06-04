@@ -5,7 +5,7 @@ import { rebuildStatusLabel } from "../../domain/rebuild";
 
 function MarkdownBlock({
   content,
-  emptyMessage = "No build log content found yet.",
+  emptyMessage = "No update history content found yet.",
   technicalSummary,
 }: {
   content: string;
@@ -91,7 +91,7 @@ export function BuildLogWorkspace({
   return (
     <div className="panel-stack build-log-workspace">
       <header className="page-header build-log-header">
-        <h2>Build Log</h2>
+        <h2>Update History</h2>
         <div className="build-log-metrics" aria-label="Build log status summary">
           <BuildLogMetric label="Status" value={rebuildStatusLabel(rebuild?.status ?? status?.rebuildStatus)} />
           <BuildLogMetric label="Last success" value={formatLocalDateTime(status?.lastSuccessfulRunAt)} />
@@ -103,7 +103,7 @@ export function BuildLogWorkspace({
       {attentionCount ? (
         <section className="build-log-review-notes">
           <strong>Review Notes</strong>
-          <p>The build finished. These optional notes can help improve source confidence or project settings.</p>
+          <p>The update finished. These optional notes can help improve source confidence or project settings.</p>
           {reviewNotes.length ? (
             <div className="build-log-review-note-list">
               {reviewNotes.slice(0, 5).map((item, index) => (

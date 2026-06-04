@@ -8,10 +8,10 @@ type PhaseStep = {
 
 const PHASES: PhaseStep[] = [
   { id: "research", label: "Researching" },
-  { id: "fetching", label: "Pulling Sources" },
-  { id: "digests", label: "Digesting" },
-  { id: "wiki", label: "Wiki Build" },
-  { id: "recording", label: "Recording" },
+  { id: "fetching", label: "Gathering sources" },
+  { id: "digests", label: "Analyzing" },
+  { id: "wiki", label: "Writing notes" },
+  { id: "recording", label: "Finishing up" },
 ];
 
 function getPhaseIndex(phase: string | null | undefined): number {
@@ -37,7 +37,7 @@ export function BuildPhaseTracker({ rebuild }: { rebuild: RebuildState | null })
   const detail = rebuild?.buildPhaseDetail || null;
 
   return (
-    <div className="build-phase-tracker" role="status" aria-label="Build progress">
+    <div className="build-phase-tracker" role="status" aria-label="Research update progress">
       <div className="build-phase-steps">
         {PHASES.map((phase, i) => {
           const status = buildError && i >= currentIndex && i > 0

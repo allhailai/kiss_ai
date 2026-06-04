@@ -25,6 +25,7 @@ export function KnowledgebaseSectionBody({
   onOpenFile,
   onOpenView,
   selectedPath,
+  showFileBrowser,
   sourceFiles,
   toggleSubsection,
   wikiFiles,
@@ -45,6 +46,7 @@ export function KnowledgebaseSectionBody({
   onOpenFile: (path: string) => void;
   onOpenView: (view: View, path?: string | null) => void;
   selectedPath: string | null;
+  showFileBrowser: boolean;
   sourceFiles: ProjectFile[];
   toggleSubsection: (id: string, event?: React.MouseEvent<HTMLButtonElement>) => void;
   wikiFiles: ProjectFile[];
@@ -58,7 +60,7 @@ export function KnowledgebaseSectionBody({
           onClick={() => onOpenView(defineNavTarget.view, defineNavTarget.path)}
           type="button"
         >
-          <span className="nav-section-label"><strong>1) Project Definition</strong></span>
+          <span className="nav-section-label"><strong>Project Brief</strong></span>
         </button>
       </div>
 
@@ -73,7 +75,7 @@ export function KnowledgebaseSectionBody({
           type="button"
           aria-expanded={expandedSubsections.has("source-data")}
         >
-          <span className="nav-section-label"><strong>2) Source Data</strong></span>
+          <span className="nav-section-label"><strong>Your Sources</strong></span>
           <b aria-hidden="true">{expandedSubsections.has("source-data") ? "-" : "+"}</b>
         </button>
 
@@ -88,26 +90,28 @@ export function KnowledgebaseSectionBody({
               onClick={() => onOpenView("inputs")}
               type="button"
             >
-              <span>Human Sources</span>
+              <span>Uploaded Files</span>
             </button>
 
             {onCreateFolder ? (
               <HumanInputActions onCreateFolder={onCreateFolder} onCreateTextFile={onCreateTextFile} onUploadFiles={onUploadFiles} />
             ) : null}
 
-            <FileTreeBlock
-              emptyLabel="No human-acquired files yet."
-              emptyDirectories={humanInputEmptyDirectories}
-              files={humanInputFiles}
-              loading={loading && currentView === "inputs"}
-              onCreateTextFile={onCreateTextFile}
-              onDeleteFile={onDeleteHumanInputFile}
-              onDeleteFolder={onDeleteFolder}
-              onMoveFile={onMoveFile}
-              onUploadFiles={onUploadFiles}
-              onOpenFile={onOpenFile}
-              selectedPath={selectedPath}
-            />
+            {showFileBrowser ? (
+              <FileTreeBlock
+                emptyLabel="No documents added yet."
+                emptyDirectories={humanInputEmptyDirectories}
+                files={humanInputFiles}
+                loading={loading && currentView === "inputs"}
+                onCreateTextFile={onCreateTextFile}
+                onDeleteFile={onDeleteHumanInputFile}
+                onDeleteFolder={onDeleteFolder}
+                onMoveFile={onMoveFile}
+                onUploadFiles={onUploadFiles}
+                onOpenFile={onOpenFile}
+                selectedPath={selectedPath}
+              />
+            ) : null}
 
             <button
               className={
@@ -118,17 +122,19 @@ export function KnowledgebaseSectionBody({
               onClick={() => onOpenView("inputs")}
               type="button"
             >
-              <span>AI Sources</span>
+              <span>Research Findings</span>
             </button>
-            <FileTreeBlock
-              emptyLabel="No source files yet. Run a build to gather sources."
-              files={sourceFiles}
-              loading={loading && currentView === "inputs"}
-              onDeleteFile={onDeleteProjectFile}
-              onDeleteFolder={onDeleteProjectFolder}
-              onOpenFile={onOpenFile}
-              selectedPath={selectedPath}
-            />
+            {showFileBrowser ? (
+              <FileTreeBlock
+                emptyLabel="No sources yet. Update research to gather sources."
+                files={sourceFiles}
+                loading={loading && currentView === "inputs"}
+                onDeleteFile={onDeleteProjectFile}
+                onDeleteFolder={onDeleteProjectFolder}
+                onOpenFile={onOpenFile}
+                selectedPath={selectedPath}
+              />
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -144,14 +150,14 @@ export function KnowledgebaseSectionBody({
           type="button"
           aria-expanded={expandedSubsections.has("wiki")}
         >
-          <span className="nav-section-label"><strong>3) Wiki</strong></span>
+          <span className="nav-section-label"><strong>Research Notes</strong></span>
           <b aria-hidden="true">{expandedSubsections.has("wiki") ? "-" : "+"}</b>
         </button>
 
-        {expandedSubsections.has("wiki") ? (
+        {expandedSubsections.has("wiki") && showFileBrowser ? (
           <div className="nav-section-body">
             <FileTreeBlock
-              emptyLabel="No wiki pages yet. Run a knowledge build first."
+              emptyLabel="No knowledge pages yet. Update research first."
               files={wikiFiles}
               loading={loading && currentView === "outputs"}
               onDeleteFile={onDeleteProjectFile}
@@ -181,6 +187,7 @@ export function OutputsSectionBody({
   reportFiles,
   selectedArtifactSlug,
   selectedPath,
+  showFileBrowser,
   toggleSubsection,
 }: {
   currentView: View;
@@ -195,6 +202,7 @@ export function OutputsSectionBody({
   reportFiles: ProjectFile[];
   selectedArtifactSlug: string | null;
   selectedPath: string | null;
+  showFileBrowser: boolean;
   toggleSubsection: (id: string, event?: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
@@ -210,14 +218,14 @@ export function OutputsSectionBody({
           type="button"
           aria-expanded={expandedSubsections.has("reports")}
         >
-          <span className="nav-section-label"><strong>4) Reports</strong></span>
+          <span className="nav-section-label"><strong>Reports</strong></span>
           <b aria-hidden="true">{expandedSubsections.has("reports") ? "-" : "+"}</b>
         </button>
 
-        {expandedSubsections.has("reports") ? (
+        {expandedSubsections.has("reports") && showFileBrowser ? (
           <div className="nav-section-body">
             <FileTreeBlock
-              emptyLabel="No reports yet. Create one with the chat agent."
+              emptyLabel="No reports yet. Create one with the AI assistant."
               files={reportFiles}
               loading={loading && currentView === "reports"}
               onDeleteFile={onDeleteProjectFile}
@@ -240,7 +248,7 @@ export function OutputsSectionBody({
           type="button"
           aria-expanded={expandedSubsections.has("artifacts")}
         >
-          <span className="nav-section-label"><strong>5) Artifacts</strong></span>
+          <span className="nav-section-label"><strong>Custom Documents</strong></span>
           <b aria-hidden="true">{expandedSubsections.has("artifacts") ? "-" : "+"}</b>
         </button>
 

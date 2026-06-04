@@ -72,7 +72,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
         buildRunStartedAtRef.current = state.startedAt;
         setBuilding(true);
         setActiveTab("preview");
-        flash("Resuming build — agent is generating HTML…");
+        flash("Resuming generation — agent is creating HTML…");
       }
     }).catch(() => { /* ignore — recovery is best-effort */ });
   }, [selectedSlug, projectSlug]);
@@ -185,9 +185,9 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
         await artifactsApi.update(projectSlug, selectedSlug, selectedSpec.frontmatter, editBody);
         const updated = await artifactsApi.read(projectSlug, selectedSlug);
         setSelectedSpec(updated);
-        flash("Saved & building — agent is generating HTML…");
+        flash("Saved & generating — agent is creating HTML…");
       } else {
-        flash("Build started — agent is generating HTML…");
+        flash("Generation started — agent is creating HTML…");
       }
 
       const result = await artifactsApi.build(projectSlug, selectedSlug, String(selectedSpec?.frontmatter.modelId ?? ""));
@@ -201,7 +201,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
       setActiveTab("preview");
     } catch (error) {
       setBuilding(false);
-      flash(error instanceof Error ? error.message : "Build failed");
+      flash(error instanceof Error ? error.message : "Generation failed");
     }
   }
 
@@ -254,11 +254,11 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
               popoutRef.current.location.reload();
             }
           } catch { /* cross-origin or closed — ignore */ }
-          flash("Build complete ✓");
+          flash("Generation complete ✓");
         } else {
           // error, interrupted, blocked, etc.
           await refreshList();
-          flash(state.message || "Build failed — check the build log.");
+          flash(state.message || "Generation failed — check the update history.");
         }
       } catch {
         // polling error — ignore
@@ -332,7 +332,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
             className={`artifacts-tab ${activeTab === "preview" ? "active" : ""}`}
             onClick={() => setActiveTab("preview")}
             disabled={!isBuilt && !building}
-            title={!isBuilt && !building ? "Build the artifact first to see a preview" : undefined}
+            title={!isBuilt && !building ? "Generate the artifact first to see a preview" : undefined}
             type="button"
           >
             Preview
@@ -358,7 +358,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
             <span className="artifacts-stale-notice" title="The preview may not reflect recent changes">
               <span className="artifacts-stale-icon">⚠</span>
               Stale:
-              {staleReasons.includes("build") ? <span className="artifacts-stale-pill">🔨 Build</span> : null}
+              {staleReasons.includes("build") ? <span className="artifacts-stale-pill">🔨 Updated</span> : null}
               {staleReasons.includes("deepened") ? <span className="artifacts-stale-pill">📚 Deepened</span> : null}
               {staleReasons.includes("spec") ? <span className="artifacts-stale-pill">✏️ Spec</span> : null}
             </span>
@@ -380,7 +380,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
             <button
               className="artifacts-action-btn"
               onClick={() => triggerDownload(artifactsApi.previewUrl(projectSlug, selectedSlug), `${selectedSlug}.html`)}
-              title="Download the built HTML file"
+              title="Download the generated HTML file"
               type="button"
             >
               ↓ HTML
@@ -402,7 +402,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
             onClick={() => void handleBuild()}
             type="button"
           >
-            {building ? "Building…" : "Build"}
+            {building ? "Generating…" : "Generate"}
           </button>
           <button
             className="artifacts-action-btn artifacts-delete-btn"
@@ -447,13 +447,13 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
                     void artifactsApi.update(projectSlug, selectedSlug, updated.frontmatter, editBody);
                   }}
                 >
-                  <option value="manual">manual — build only when you click Build</option>
-                  <option value="on_build">on_build — auto-rebuild with each project build</option>
+                  <option value="manual">manual — generate only when you click Generate</option>
+                  <option value="on_build">automatic — regenerate with each research update</option>
                 </select>
                 <small className="artifacts-meta-hint">
                   {String(selectedSpec.frontmatter.lifecycle ?? "manual") === "on_build"
-                    ? "This artifact will be automatically rebuilt whenever the project runs a full build."
-                    : "This artifact is only rebuilt when you manually click the Build button."}
+                    ? "This artifact will be automatically regenerated whenever the project runs a research update."
+                    : "This artifact is only regenerated when you manually click the Generate button."}
                 </small>
               </dd>
               <dt>Model</dt>
@@ -494,7 +494,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
               </dd>
               {selectedArtifact?.lastBuilt ? (
                 <>
-                  <dt>Last Built</dt>
+                  <dt>Last Generated</dt>
                   <dd>{new Date(selectedArtifact.lastBuilt).toLocaleString()}</dd>
                 </>
               ) : null}
@@ -535,7 +535,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
             />
           ) : (
             <div className="artifacts-placeholder">
-              <p>This artifact hasn't been built yet. Click <strong>Build</strong> to generate it.</p>
+              <p>This artifact hasn't been generated yet. Click <strong>Generate</strong> to create it.</p>
             </div>
           )}
         </div>

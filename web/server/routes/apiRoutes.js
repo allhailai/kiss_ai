@@ -16,12 +16,14 @@ export function registerApiRoutes(app, deps) {
     readKeybindings: deps.readKeybindings,
     readPinnedProjects: deps.readPinnedProjects,
     readProjectsViewPreference: deps.readProjectsViewPreference,
+    readUxPreferences: deps.readUxPreferences,
     saveCursorApiKey: deps.saveCursorApiKey,
     systemSettings: deps.systemSettings,
     updateAndRestart: deps.updateAndRestart,
     updateKissAi: deps.updateKissAi,
     writePinnedProjects: deps.writePinnedProjects,
     writeProjectsViewPreference: deps.writeProjectsViewPreference,
+    writeUxPreferences: deps.writeUxPreferences,
   });
 
   registerProjectRoutes(app, {

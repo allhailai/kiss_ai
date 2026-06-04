@@ -15,7 +15,7 @@
 .build-log-review-notes > strong {
   color: var(--color-primary);
   font-size: 1rem;
-  font-weight: 950;
+  font-weight: 600;
 }
 
 .build-log-review-notes > p {
@@ -64,7 +64,7 @@
   color: var(--color-secondary);
   cursor: pointer;
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .build-log-review-note ul {
@@ -105,10 +105,10 @@
 .build-log-metric span {
   color: var(--color-secondary);
   font-size: 0.66rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.08em;
   line-height: 1.1;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .build-log-metric strong {
@@ -145,7 +145,7 @@
   border-radius: 14px 14px 0 0;
   background: color-mix(in srgb, var(--color-surface) 70%, var(--color-background));
   color: var(--color-secondary);
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -197,10 +197,10 @@
 .build-log-file-picker span {
   color: var(--color-secondary);
   font-size: 0.66rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.08em;
   line-height: 1.1;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .build-log-file-picker select {
@@ -208,7 +208,7 @@
   border-color: color-mix(in srgb, var(--color-secondary) 72%, var(--color-border));
   background: color-mix(in srgb, var(--color-secondary) 10%, var(--color-surface));
   color: var(--color-primary);
-  font-weight: 800;
+  font-weight: 600;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-secondary) 10%, transparent);
 }
 

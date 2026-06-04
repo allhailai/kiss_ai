@@ -8,22 +8,23 @@ import { DesignWorkspace } from "../features/design/DesignWorkspace";
 import { FileWorkspace } from "../features/files/FileWorkspace";
 import { ArtifactsView } from "../features/artifacts/ArtifactsView";
 import { OutputSectionPage } from "../features/outputs/OutputSectionPage";
+import { SettingsPage } from "../features/settings/SettingsPage";
 import { AIWorkspace } from "./AIWorkspace";
 
 const fileWorkspaceByView: Partial<Record<View, { title?: string; explainer?: string }>> = {
   requirements: {
-    title: "Project Definition",
+    title: "Project Brief",
   },
   inputs: {
-    explainer: "Sources are AI-managed. Use annotations to guide the AI.",
+    explainer: "These sources were gathered by the AI based on your project brief.",
   },
   outputs: {
-    explainer: "Wiki pages are built during knowledge builds. Use comments to guide the AI.",
+    explainer: "These notes are automatically generated from your research. Add comments to improve them.",
   },
 };
 
 const reportsFileWorkspaceConfig = {
-  explainer: "Reports are user-curated outputs. Edit directly or use the chat agent.",
+  explainer: "Edit your reports directly, or ask the AI for help.",
 };
 
 export function MainContentArea({
@@ -139,6 +140,9 @@ export function MainContentArea({
           selectedBuildModelId={rebuildWorkspace.selectedModelId}
           selectedFileContent={fileWorkspace.selected}
         />
+      ) : null}
+      {route.view === "settings" ? (
+        <SettingsPage />
       ) : null}
     </section>
   );

@@ -6,6 +6,7 @@ import type {
   SaveCursorApiKeyRequest,
   SaveCursorApiKeyResponse,
   SystemSettingsResponse,
+  UxPreferences,
 } from "../contracts/api";
 import { request } from "./request";
 
@@ -40,5 +41,11 @@ export const systemApi = {
   updateAndRestartKissAi: () =>
     request<KissAiUpdateAndRestartResponse>("/api/system/update-and-restart", {
       method: "POST",
+    }),
+  uxPreferences: () => request<UxPreferences>("/api/system/ux-preferences"),
+  setUxPreferences: (prefs: Partial<UxPreferences>) =>
+    request<UxPreferences>("/api/system/ux-preferences", {
+      method: "PUT",
+      body: JSON.stringify(prefs),
     }),
 };

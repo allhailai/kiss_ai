@@ -1,6 +1,6 @@
 import { parseRequestBody, saveCursorApiKeyBodySchema } from "./requestSchemas.js";
 
-export function registerSystemRoutes(app, { authMiddleware, checkKissAiUpdate, httpError, KISS_AI_MODE, readKeybindings, readPinnedProjects, readProjectsViewPreference, saveCursorApiKey, systemSettings, updateAndRestart, updateKissAi, writePinnedProjects, writeProjectsViewPreference }) {
+export function registerSystemRoutes(app, { authMiddleware, checkKissAiUpdate, httpError, KISS_AI_MODE, readKeybindings, readPinnedProjects, readProjectsViewPreference, readUxPreferences, saveCursorApiKey, systemSettings, updateAndRestart, updateKissAi, writePinnedProjects, writeProjectsViewPreference, writeUxPreferences }) {
   // In server mode, system mutation routes require admin. In standalone, no-op passthrough.
   const adminOnly = KISS_AI_MODE === "server" && authMiddleware ? authMiddleware.requireAdmin : (_req, _res, next) => next();
 
@@ -88,6 +88,26 @@ export function registerSystemRoutes(app, { authMiddleware, checkKissAiUpdate, h
   app.post("/api/system/update-and-restart", adminOnly, async (_request, response, next) => {
     try {
       response.json(await updateAndRestart());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/system/ux-preferences", async (_request, response, next) => {
+    try {
+      response.json(await readUxPreferences());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/system/ux-preferences", async (request, response, next) => {
+    try {
+      const updates = request.body;
+      if (!updates || typeof updates !== "object") {
+        throw httpError("Invalid UX preferences. Must be an object.", 400, "invalid_ux_preferences");
+      }
+      response.json(await writeUxPreferences(updates));
     } catch (error) {
       next(error);
     }

@@ -1,8 +1,8 @@
 export type RightPanelModeKind = "agent-chat" | "build-project";
 
 const rightPanelModes: Array<{ kind: RightPanelModeKind; label: string }> = [
-  { kind: "agent-chat", label: "AI" },
-  { kind: "build-project", label: "Build Project" },
+  { kind: "agent-chat", label: "Chat" },
+  { kind: "build-project", label: "Update Research" },
 ];
 
 export function RightPanelModeSwitch({

@@ -6,6 +6,7 @@ import { CompactModelPicker } from "../../shared/CompactModelPicker";
 import { renderMarkdownMessageContent } from "../../shared/chat/chatRendering";
 import { RightPanelModeSwitch, type RightPanelModeKind } from "../../shared/rightPanel/RightPanelModeSwitch";
 import { BuildPhaseTracker } from "./BuildPhaseTracker";
+import { useUxPreferences } from "../../app/contexts/UxPreferencesContext";
 
 function formatRunDuration(rebuild: RebuildState | null) {
   if (!rebuild?.startedAt) return "Not started";
@@ -36,21 +37,21 @@ function getLatestLogText(entry: string | null) {
 }
 
 function getEventLabel(event: AgentRunEvent) {
-  if (event.type === "run_status" && event.status === "finished_with_attention") return "Build complete";
-  if (event.type === "assistant_message") return "Build details";
-  if (event.type === "error") return "Error";
-  if (event.type === "run_status") return event.title || "Run status";
-  if (event.type === "tool_activity") return event.title || "Tool activity";
-  if (event.type === "artifact_change") return event.title || "Artifact";
-  return event.title || "System";
+  if (event.type === "run_status" && event.status === "finished_with_attention") return "Research updated";
+  if (event.type === "assistant_message") return "Update details";
+  if (event.type === "error") return "Something went wrong";
+  if (event.type === "run_status") return event.title || "Progress";
+  if (event.type === "tool_activity") return event.title || "Working...";
+  if (event.type === "artifact_change") return event.title || "Document update";
+  return event.title || "Progress";
 }
 
 function getEventText(event: AgentRunEvent) {
   if (event.type === "run_status" && event.status === "finished_with_attention") {
-    return "The build finished. Review notes are available if you want to improve source confidence or project settings.";
+    return "Research has been updated. Review notes are available if you want to improve source quality or project settings.";
   }
   if (event.type === "error") {
-    return "The build stopped before finishing. You can try again, or open the technical details below.";
+    return "The update couldn't finish. You can try again, or check the details below for more information.";
   }
   return event.text || event.title || event.status || "No details recorded.";
 }
@@ -111,13 +112,13 @@ function completionLabel(status: RebuildState["status"] | undefined) {
   switch (status) {
     case "finished":
     case "finished_with_attention":
-      return "Build complete";
+      return "Research updated";
     case "error":
-      return "Build error";
+      return "Update error";
     case "blocked":
-      return "Build blocked";
+      return "Update blocked";
     case "interrupted":
-      return "Build interrupted";
+      return "Update interrupted";
     default:
       return null;
   }
@@ -160,8 +161,8 @@ function BuildProjectEventBody({ event }: { event: AgentRunEvent }) {
       <div className="build-project-event-body">
         <p>
           {event.type === "error"
-            ? "The build stopped before finishing. You can try again, or expand this section if you need the technical runner message."
-            : "The agent recorded build details. Expand this section if you need the technical log."}
+            ? "The update stopped before finishing. You can try again, or expand this section if you need the technical runner message."
+            : "The agent recorded update details. Expand this section if you need the technical log."}
         </p>
         {technicalText ? (
           <details className="build-project-technical-event">
@@ -198,6 +199,7 @@ export function BuildProjectRightPanel({
   status: ProjectStatus | null;
 }) {
   const streamRef = useRef<HTMLDivElement | null>(null);
+  const { preferences } = useUxPreferences();
   const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
   const latestLogEntry = getLatestLogEntry(rebuild);
   const latestLogTimestamp = getLatestLogTimestamp(latestLogEntry);
@@ -207,8 +209,8 @@ export function BuildProjectRightPanel({
   const completion = completionLabel(rebuild?.status);
   const completionMessage =
     rebuild?.status === "finished_with_attention"
-      ? "The build finished. Review notes are available if you want to improve source confidence or project settings."
-      : rebuild?.message || "The latest project build has reached a terminal state.";
+      ? "Research has been updated. Review notes are available if you want to improve source quality or project settings."
+      : rebuild?.message || "The latest research update has reached a terminal state.";
   const hasEvents = Boolean(rebuild?.events.length);
   const hasLog = Boolean(rebuild?.log.length);
 
@@ -222,7 +224,7 @@ export function BuildProjectRightPanel({
       <header className="build-project-panel-header">
         <RightPanelModeSwitch activeKind="build-project" onSelect={onSelectPanel} />
         <div>
-          <h2>Build Knowledge</h2>
+          <h2>Update Research</h2>
         </div>
       </header>
 
@@ -234,7 +236,7 @@ export function BuildProjectRightPanel({
                 ? `${status!.blockingQuestionsCount} blocking question${status!.blockingQuestionsCount === 1 ? "" : "s"}`
                 : `${status!.openQuestionsCount} unanswered question${status!.openQuestionsCount === 1 ? "" : "s"}`}
             </strong>
-            <p>Answer before the next build for best results.</p>
+            <p>Answer before the next update for best results.</p>
           </div>
           <button onClick={onOpenQuestions} type="button">Answer</button>
         </div>
@@ -252,9 +254,9 @@ export function BuildProjectRightPanel({
           {!hasEvents && !hasLog && !buildRunning ? (
             <div className="build-project-empty">
               <button className="build-project-empty-action" disabled={startDisabled} onClick={onStart} type="button">
-                Build Knowledge
-              </button>
-              <p>Start a knowledge build to stream agent progress here.</p>
+              Update Research
+            </button>
+            <p>Start a research update to gather sources and build knowledge pages.</p>
             </div>
           ) : null}
 
@@ -289,9 +291,9 @@ export function BuildProjectRightPanel({
 
       <BuildPhaseTracker rebuild={rebuild} />
 
-      <section className="build-project-details" aria-label="Build details">
+      <section className="build-project-details" aria-label="Update details">
         <details>
-          <summary>Build Details</summary>
+          <summary>Update Details</summary>
 
           <div className="build-project-details-compact">
             <span className="build-project-detail-item">
@@ -358,10 +360,12 @@ export function BuildProjectRightPanel({
         </details>
       </section>
 
-      <section className="build-project-run-controls" aria-label="Run build project">
-        <CompactModelPicker disabled={buildRunning || !status?.cursorApiKeyAvailable} models={models} onModelChange={onModelChange} selectedModelId={selectedModelId} />
+      <section className="build-project-run-controls" aria-label="Update research">
+        {preferences.showModelPicker ? (
+          <CompactModelPicker disabled={buildRunning || !status?.cursorApiKeyAvailable} models={models} onModelChange={onModelChange} selectedModelId={selectedModelId} />
+        ) : null}
         <div className="build-project-run-actions">
-          {selectedModel ? (
+          {preferences.showModelPicker && selectedModel ? (
             <p title={selectedModel.description}>
               {formatModelLabel(selectedModel)} · {modelTierLabels[selectedModel.tier]}
             </p>
@@ -372,7 +376,7 @@ export function BuildProjectRightPanel({
             </button>
           ) : (
             <button className="build-project-build-button" disabled={startDisabled} onClick={onStart} type="button">
-              BUILD KNOWLEDGE
+              UPDATE RESEARCH
             </button>
           )}
         </div>

@@ -50,3 +50,18 @@ export type Keybindings = {
   toggleLeftPanel: string;
   toggleRightPanel: string;
 };
+
+/** User experience preferences controlling feature visibility. */
+export type UxPreferences = {
+  showFileBrowser: boolean;
+  showTopics: boolean;
+  showDesignIdentity: boolean;
+  showModelPicker: boolean;
+};
+
+export const defaultUxPreferences: UxPreferences = {
+  showFileBrowser: false,
+  showTopics: false,
+  showDesignIdentity: false,
+  showModelPicker: false,
+};

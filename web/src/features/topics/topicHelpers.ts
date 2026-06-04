@@ -27,12 +27,12 @@ export function setFilterInHash(filter: TopicsFilter): void {
 
 export function stateLabel(state: TopicState): string {
   switch (state) {
-    case "seed": return "Seed";
-    case "shallow": return "Shallow";
-    case "deep": return "Deep";
-    case "saturated": return "Saturated";
-    case "split_candidate": return "Split Candidate";
-    case "deprecated": return "Deprecated";
+    case "seed": return "New";
+    case "shallow": return "Getting Started";
+    case "deep": return "Well Covered";
+    case "saturated": return "Complete";
+    case "split_candidate": return "Needs Review";
+    case "deprecated": return "Removed";
   }
 }
 

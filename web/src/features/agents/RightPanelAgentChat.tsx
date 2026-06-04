@@ -351,15 +351,15 @@ export function RightPanelAgentChat({
 
   // Composer mode based on artifact session phase
   const composerPlaceholder = artifactSession.phase === "editing"
-    ? "Describe changes to the artifact..."
-    : "Ask the side-panel agent...";
+    ? "Describe changes to the document..."
+    : "Type a question or request...";
   const composerSubmitLabel = artifactSession.phase === "editing" ? "Update" : "Send";
 
   return (
     <div className="right-panel-agent-chat">
       <AgentConversationHeader
         activeConversationId={chat.activeConversation?.id}
-        activeTitle={chat.activeConversation?.title || "New AI Chat"}
+        activeTitle={chat.activeConversation?.title || "New Chat"}
         controlsDisabled={controlsDisabled}
         conversationFilter={chat.conversationFilter}
         filteredConversations={chat.filteredConversations}
@@ -375,8 +375,8 @@ export function RightPanelAgentChat({
           createdArtifactTitles={createdArtifactTitles}
           disabled={chat.sending}
           editable={false}
-          emptyDescription="Ask the side-panel agent about this project."
-          emptyTitle={chat.loading ? "Loading conversation..." : "Start AI chat"}
+          emptyDescription="I can help you explore your research, draft documents, or answer questions about your sources."
+          emptyTitle={chat.loading ? "Loading conversation..." : "Ask me anything about your project"}
           editProposals={chat.activeConversation?.editProposals ?? []}
           footer={activeProposal ? (
             <AgentEditProposalPanel
@@ -432,18 +432,17 @@ export function RightPanelAgentChat({
                   <div className="agent-current-file-actions" aria-label="Current file actions">
                     <details className="agent-current-file-help">
                       <summary aria-label="Explain Context and Editable targets">?</summary>
-                      <span className="agent-current-file-help-text" role="tooltip">
-                        <strong>Current file</strong>
-                        The open file is sent as the current file so AI knows what you are viewing.
-                        <strong>Context</strong> tells AI this file may be helpful when answering your questions. AI can still look at other project
-                        files if needed.
-                        <strong>Editable targets</strong>
-                        Editable files will be updated by AI. Add files that you want AI to update & edit.
-                      </span>
+                        <span className="agent-current-file-help-text" role="tooltip">
+                          <strong>Current file</strong>
+                          The file you have open is automatically shared with the AI so it knows what you're looking at.
+                          <strong>Reference</strong> tells the AI to use this file as background information when answering.
+                          <strong>Allow editing</strong>
+                          lets the AI make changes to this file when you ask it to.
+                        </span>
                     </details>
                     {!currentFileInContext ? (
                       <button className="agent-current-file-action-button" disabled={controlsDisabled} onClick={() => onAddContextFile(currentFile.path)} type="button">
-                        + Context
+                        + Reference
                       </button>
                     ) : null}
                     {currentFile.editable && !currentFileInAiEditable ? (
@@ -459,7 +458,7 @@ export function RightPanelAgentChat({
                         </button>
                       ) : (
                         <button className="agent-current-file-action-button" disabled={controlsDisabled} onClick={pinCurrentFileAsEditableTarget} type="button">
-                          + Editable
+                          + Allow Editing
                         </button>
                       )
                     ) : null}
@@ -473,7 +472,7 @@ export function RightPanelAgentChat({
           {visibleEditableTargets.length ? (
             <div className="agent-file-context agent-file-context-editable" aria-label="Editable target files">
               <div className="agent-context-header">
-                <span className="agent-context-label">AI Editable</span>
+                <span className="agent-context-label">Files AI Can Edit</span>
               </div>
               <div className="agent-context-chips">
                 {visibleEditableTargets.map(({ file, isCurrent }) => (
@@ -508,7 +507,7 @@ export function RightPanelAgentChat({
             <div className="agent-file-context" aria-label="Source context files">
               <div className="agent-context-header">
                 <button className="agent-context-label agent-context-label-button" onClick={toggleFilePicker} type="button">
-                  Context
+                  Reference Files
                 </button>
                 {contextFiles.length > 1 ? (
                   <button
@@ -623,11 +622,11 @@ export function RightPanelAgentChat({
             onSubmit={() => void sendMessage()}
             placeholder={composerPlaceholder}
             modelAdjacentAction={{
-              ariaLabel: "New AI Chat",
+              ariaLabel: "New Chat",
               disabled: controlsDisabled,
               label: "New chat",
               onClick: startNewConversation,
-              title: "New AI Chat",
+              title: "New Chat",
             }}
 
             selectedModelId={selectedModelId}

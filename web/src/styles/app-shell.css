@@ -5,11 +5,13 @@
   max-height: 100dvh;
   min-height: 0;
   display: grid;
-  grid-template-rows: 55px minmax(0, 1fr);
+  grid-template-rows: 60px minmax(0, 1fr);
   grid-template-columns: var(--left-nav-width) minmax(0, 1fr);
   overflow: hidden;
   background: var(--color-background);
   color: var(--color-primary);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
 }
 
 .app-shell.sidebar-collapsed {
@@ -23,4 +25,3 @@
 .app-shell.sidebar-collapsed.right-panel-open {
   grid-template-columns: 0px minmax(0, 1fr) minmax(320px, var(--right-panel-width));
 }
-

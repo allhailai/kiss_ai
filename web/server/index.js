@@ -499,6 +499,49 @@ async function writePinnedProjects(pinned) {
   return { pinned: settings.pinned_projects };
 }
 
+const defaultUxPreferences = {
+  showFileBrowser: false,
+  showTopics: false,
+  showDesignIdentity: false,
+  showModelPicker: false,
+};
+
+async function readUxPreferences() {
+  const settingsPath = path.join(PROJECTS_ROOT, ".kiss_ai_settings.json");
+  try {
+    const raw = await fs.readFile(settingsPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    const prefs = parsed?.ux_preferences ?? {};
+    return { ...defaultUxPreferences, ...prefs };
+  } catch {
+    return { ...defaultUxPreferences };
+  }
+}
+
+async function writeUxPreferences(updates) {
+  const settingsPath = path.join(PROJECTS_ROOT, ".kiss_ai_settings.json");
+  let settings = {};
+
+  try {
+    const raw = await fs.readFile(settingsPath, "utf-8");
+    settings = JSON.parse(raw);
+  } catch { /* missing or malformed — start fresh */ }
+
+  const current = settings.ux_preferences ?? {};
+  const validKeys = new Set(Object.keys(defaultUxPreferences));
+
+  // Only accept known boolean keys
+  for (const [key, value] of Object.entries(updates)) {
+    if (validKeys.has(key) && typeof value === "boolean") {
+      current[key] = value;
+    }
+  }
+
+  settings.ux_preferences = current;
+  await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+  return { ...defaultUxPreferences, ...settings.ux_preferences };
+}
+
 registerApiRoutes(app, {
   assistQuestion,
   authMiddleware,
@@ -537,6 +580,7 @@ registerApiRoutes(app, {
   readProjectsViewPreference,
   readProjectUiState,
   readTextFile,
+  readUxPreferences,
   renameOutputFile,
   resolveCursorApiKey,
   restoreFileFromHead,
@@ -569,6 +613,7 @@ registerApiRoutes(app, {
   writePinnedProjects,
   writeProjectsViewPreference,
   writeProjectUiState,
+  writeUxPreferences,
 });
 
 registerArtifactRoutes(app, { httpError, startArtifactBuild });

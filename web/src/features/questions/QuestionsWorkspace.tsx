@@ -4,17 +4,18 @@ import { projectsApi } from "../../data/projectsApi";
 import { formatLocalDateTime } from "../../domain/formatters";
 import { renderMarkdownMessageContent } from "../../shared/chat/chatRendering";
 import { CompactModelPicker } from "../../shared/CompactModelPicker";
+import { useUxPreferences } from "../../app/contexts/UxPreferencesContext";
 
 type QuestionsFilter = "all" | "open" | "answered";
 
 function priorityLabel(priority: BuildQuestion["priority"]) {
   switch (priority) {
     case "blocking":
-      return "Blocking";
+      return "Needs Your Input";
     case "important":
-      return "Important";
+      return "Recommended";
     default:
-      return "Informational";
+      return "Optional";
   }
 }
 
@@ -144,8 +145,6 @@ function QuestionCard({
 
       <div className="question-card-meta">
         <span>Asked {formatLocalDateTime(question.askedAt, "Unknown")}</span>
-        {question.askedDuring?.phase ? <span>Phase {question.askedDuring.phase}</span> : null}
-        {question.askedDuring?.modelId ? <span>{question.askedDuring.modelId}</span> : null}
       </div>
 
       {isOpen ? (
@@ -468,9 +467,9 @@ export function QuestionsWorkspace({
   return (
     <div className="questions-workspace">
       <header className="questions-header">
-        <h2>Questions</h2>
+        <h2>Questions for You</h2>
         <p className="questions-summary">
-          {openCount} open · {answeredCount} resolved · {questions.length} total
+          {openCount} open · {answeredCount} answered · {questions.length} total
         </p>
         <div className="questions-filter-bar">
           {(["all", "open", "answered"] as const).map((f) => (
@@ -480,7 +479,7 @@ export function QuestionsWorkspace({
               onClick={() => setFilter(f)}
               type="button"
             >
-              {f === "all" ? "All" : f === "open" ? "Open" : "Answered"}
+              {f === "all" ? "All" : f === "open" ? "Unanswered" : "Answered"}
             </button>
           ))}
         </div>
@@ -492,8 +491,8 @@ export function QuestionsWorkspace({
         <div className="questions-empty">
           <p>
             {questions.length === 0
-              ? "No questions yet. Run a build to generate questions from the AI."
-              : `No ${filter} questions.`}
+              ? "No questions yet. Run a research update to get started."
+              : `No ${filter === "open" ? "unanswered" : filter} questions.`}
           </p>
         </div>
       ) : (

@@ -140,7 +140,7 @@ export function ArtifactProposalCard({
         </div>
         <p className="artifact-proposal-card-title-display">{existingMatch.name}</p>
         <div className="artifact-proposal-card-meta">
-          <span>Status: {existingMatch.status === "built" ? "Built" : "Not built"}</span>
+          <span>Status: {existingMatch.status === "built" ? "Generated" : "Not generated"}</span>
           <span>This artifact was already created.</span>
         </div>
         <div className="artifact-proposal-card-actions">
@@ -172,7 +172,7 @@ export function ArtifactProposalCard({
             <li key={artifact.slug}>
               <strong>{artifact.name}</strong>
               <span className="artifact-proposal-card-duplicate-status">
-                {artifact.status === "built" ? "Built" : "Not built"}
+                {artifact.status === "built" ? "Generated" : "Not generated"}
               </span>
             </li>
           ))}

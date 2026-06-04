@@ -246,7 +246,7 @@
 
 .review-summary-card-title {
   font-size: 1.1rem;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--color-primary, #17202a);
   margin: 0;
   letter-spacing: -0.01em;
@@ -280,7 +280,7 @@
 
 .review-summary-hero-number {
   font-size: 1.75rem;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -340,7 +340,7 @@
 .review-summary-preview-label {
   font-size: 0.68rem;
   font-weight: 600;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.04em;
   color: var(--text-muted);
   display: block;

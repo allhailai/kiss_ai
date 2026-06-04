@@ -8,6 +8,7 @@ import { projectPathPrefixes } from "../../domain/projectPaths";
 import { type View } from "../../navigation/views";
 import type { ProjectFile } from "../../contracts/api";
 import { KnowledgebaseSectionBody, OutputsSectionBody } from "./WorkflowSectionMenu";
+import { useUxPreferences } from "../../app/contexts/UxPreferencesContext";
 
 const defaultExpandedSections = new Set<SimplifiedNavSectionId>(
   simplifiedNavSections.filter((section) => section.id !== "ai").map((section) => section.id),
@@ -52,6 +53,7 @@ export function SimplifiedNavigator({
   onOpenView: (view: View, path?: string | null) => void;
   onOpenFile: (path: string) => void;
 }) {
+  const { preferences } = useUxPreferences();
   const activeSection = sectionForView(currentView, selectedPath);
   const [expandedSections, setExpandedSections] = useState<Set<SimplifiedNavSectionId>>(
     () => new Set(defaultExpandedSections),
@@ -223,6 +225,7 @@ export function SimplifiedNavigator({
           onOpenFile={onOpenFile}
           onOpenView={onOpenView}
           selectedPath={selectedPath}
+          showFileBrowser={preferences.showFileBrowser}
           sourceFiles={sourceFiles}
           toggleSubsection={toggleSubsection}
           wikiFiles={wikiFiles}
@@ -245,6 +248,7 @@ export function SimplifiedNavigator({
           reportFiles={reportFiles}
           selectedArtifactSlug={selectedArtifactSlug}
           selectedPath={selectedPath}
+          showFileBrowser={preferences.showFileBrowser}
           toggleSubsection={toggleSubsection}
         />
       );

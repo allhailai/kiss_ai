@@ -1,6 +1,6 @@
 import { isDesignIdentityPath, projectPathPrefixes } from "../domain/projectPaths";
 
-export type View = "ai" | "requirements" | "inputs" | "outputs" | "reports" | "artifacts" | "design";
+export type View = "ai" | "requirements" | "inputs" | "outputs" | "reports" | "artifacts" | "design" | "settings";
 
 /** Legacy view IDs that are still recognized in URLs but redirect to the "ai" view. */
 export type LegacyAiView = "chat" | "review" | "questions" | "topics" | "suggestions";
@@ -16,7 +16,7 @@ export type RouteState = {
   context: Record<string, string>;
 };
 
-const views: View[] = ["ai", "requirements", "inputs", "outputs", "reports", "artifacts", "design"];
+const views: View[] = ["ai", "requirements", "inputs", "outputs", "reports", "artifacts", "design", "settings"];
 
 export const viewIds = new Set<View>(views);
 export const fileBackedViews = new Set<View>(["requirements", "inputs", "outputs", "reports", "artifacts", "design"]);

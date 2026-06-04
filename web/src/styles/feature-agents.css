@@ -74,7 +74,7 @@
 .agent-debug-log summary {
   color: var(--color-secondary);
   cursor: pointer;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .compact-list {

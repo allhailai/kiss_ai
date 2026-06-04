@@ -1,6 +1,6 @@
 .panel-stack {
   display: grid;
-  gap: 20px;
+  gap: 24px;
 }
 
 .design-workspace {
@@ -13,29 +13,29 @@
 .page-header p,
 .file-list p,
 .content-card p {
-  color: var(--color-secondary);
+  color: var(--text-muted);
   line-height: 1.6;
 }
 
 .content-card .chat-message-content p {
   color: var(--color-primary);
-  font-size: 0.9rem;
-  line-height: 1.45;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
 }
 
 .content-card .chat-message-assistant,
 .content-card .chat-message-system {
-  background: color-mix(in srgb, var(--color-surface) 94%, white);
+  background: var(--surface-raised);
 }
 
 .content-card .chat-message-user {
-  background: color-mix(in srgb, var(--color-background) 72%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 4%, var(--color-background));
 }
 
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 .dashboard-action-grid {
@@ -44,43 +44,51 @@
 
 .status-card,
 .content-card {
-  border: 1px solid var(--color-border);
-  border-radius: 18px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
   background: var(--color-surface);
-  padding: 18px;
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow var(--transition-normal), transform var(--transition-normal);
 }
 
 .status-card {
   display: grid;
   gap: 10px;
-  color: var(--color-primary);
+  color: var(--text-heading);
   text-align: left;
+}
+
+.status-card .eyebrow {
+  color: var(--text-muted);
 }
 
 .status-card strong {
   font-size: 1.05rem;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .dashboard-setup-note {
   margin: 0 0 14px;
-  font-size: 0.9rem;
+  font-size: var(--font-size-base);
 }
 
 .dashboard-setup-note strong {
-  color: var(--color-primary);
+  color: var(--text-heading);
 }
 
 .status-card-button:hover,
 .status-card-button:focus-visible {
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 7%, white);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
 }
 
 .dashboard-action-grid .status-card-button {
-  border-color: color-mix(in srgb, var(--color-accent) 36%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent) 12%, white);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 20%, var(--color-border-subtle));
+  background: color-mix(in srgb, var(--color-accent) 3%, white);
+  box-shadow: var(--shadow-sm);
 }
 
 .dashboard-action-grid .status-card-button .eyebrow {
@@ -90,7 +98,8 @@
 .dashboard-action-grid .status-card-button:hover,
 .dashboard-action-grid .status-card-button:focus-visible {
   border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 20%, white);
+  background: color-mix(in srgb, var(--color-accent) 6%, white);
+  box-shadow: var(--shadow-md);
 }
 
 .section-heading {
@@ -103,14 +112,23 @@
 .section-heading h3,
 .content-card h3 {
   margin: 0;
+  font-weight: 600;
 }
 
 .section-heading button,
 .editor-toolbar button,
 .content-card button {
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: 10px 16px;
+  border-radius: var(--radius-lg);
   background: var(--color-accent);
   color: white;
-  font-weight: 800;
+  font-weight: 600;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.section-heading button:hover,
+.editor-toolbar button:hover,
+.content-card button:hover {
+  background: var(--action-primary-hover);
+  box-shadow: var(--shadow-accent-glow);
 }

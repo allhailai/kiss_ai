@@ -27,7 +27,7 @@
   border-radius: 14px 14px 0 0;
   background: color-mix(in srgb, var(--color-surface) 70%, var(--color-background));
   color: var(--color-secondary);
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .design-tab.active {
@@ -240,7 +240,7 @@
 .design-token-fieldset legend {
   padding: 0 6px;
   color: var(--color-primary);
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .design-field {
@@ -253,7 +253,7 @@
 .design-color-row span {
   color: var(--color-secondary);
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.04em;
 }
 

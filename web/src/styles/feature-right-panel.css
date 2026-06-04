@@ -113,7 +113,7 @@
   background: color-mix(in srgb, var(--color-background) 78%, white);
   color: var(--color-secondary);
   font-size: 0.64rem;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 1;
   letter-spacing: 0.02em;
   cursor: pointer;
@@ -152,7 +152,7 @@
   background: var(--color-secondary);
   color: white;
   font-size: 0.82rem;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .right-panel-open-button.active,
@@ -219,7 +219,7 @@
   background: transparent;
   color: var(--color-secondary);
   font-size: 0.68rem;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -513,10 +513,10 @@
 .agent-context-label {
   color: var(--color-secondary);
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.06em;
   line-height: 1.1;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .agent-file-context-editable .agent-context-label {

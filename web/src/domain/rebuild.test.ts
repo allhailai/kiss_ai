@@ -39,22 +39,22 @@ describe("resolveEffectiveRebuildModelId", () => {
 });
 
 describe("rebuildStatusLabel", () => {
-  it("returns correct labels for known statuses", () => {
-    expect(rebuildStatusLabel("running")).toBe("Building");
-    expect(rebuildStatusLabel("finished")).toBe("Build complete");
-    expect(rebuildStatusLabel("finished_with_attention")).toBe("Build complete");
-    expect(rebuildStatusLabel("error")).toBe("Build error");
-    expect(rebuildStatusLabel("blocked")).toBe("Build blocked");
-    expect(rebuildStatusLabel("interrupted")).toBe("Build interrupted");
+  it("maps known statuses to human labels", () => {
+    expect(rebuildStatusLabel("running")).toBe("Updating…");
+    expect(rebuildStatusLabel("finished")).toBe("Update complete");
+    expect(rebuildStatusLabel("finished_with_attention")).toBe("Update complete");
+    expect(rebuildStatusLabel("error")).toBe("Update error");
+    expect(rebuildStatusLabel("blocked")).toBe("Update blocked");
+    expect(rebuildStatusLabel("interrupted")).toBe("Update interrupted");
     expect(rebuildStatusLabel("idle")).toBe("Not started");
   });
 
-  it("returns 'Not started' for null and undefined", () => {
+  it("returns 'Not started' for null/undefined", () => {
     expect(rebuildStatusLabel(null)).toBe("Not started");
     expect(rebuildStatusLabel(undefined)).toBe("Not started");
   });
 
-  it("returns the status string for unknown statuses", () => {
+  it("returns the raw status for unknown values", () => {
     expect(rebuildStatusLabel("some_new_status")).toBe("some_new_status");
   });
 });

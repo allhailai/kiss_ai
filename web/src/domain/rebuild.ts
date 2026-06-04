@@ -19,16 +19,16 @@ export function resolveEffectiveRebuildModelId(selectedModelId: string, models: 
 export function rebuildStatusLabel(status: string | null | undefined) {
   switch (status) {
     case "running":
-      return "Building";
+      return "Updating…";
     case "finished":
     case "finished_with_attention":
-      return "Build complete";
+      return "Update complete";
     case "error":
-      return "Build error";
+      return "Update error";
     case "blocked":
-      return "Build blocked";
+      return "Update blocked";
     case "interrupted":
-      return "Build interrupted";
+      return "Update interrupted";
     case "idle":
     case null:
     case undefined:

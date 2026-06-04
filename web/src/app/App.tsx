@@ -19,6 +19,7 @@ import type { AuthUser } from "../contracts/api";
 import { BuildProvider, type BuildContextValue } from "./contexts/BuildContext";
 import { RouteProvider } from "./contexts/RouteContext";
 import { ToastProvider } from "./contexts/ToastContext";
+import { UxPreferencesProvider } from "./contexts/UxPreferencesContext";
 import { UpdateCheckerModal } from "./UpdateCheckerModal";
 import { SettingsModal } from "./SettingsModal";
 import { MainContentArea } from "./MainContentArea";
@@ -100,7 +101,11 @@ export function AppWithAuth() {
   }
 
   // standalone or authenticated — render the full app
-  return <App />;
+  return (
+    <UxPreferencesProvider>
+      <App />
+    </UxPreferencesProvider>
+  );
 }
 
 export function App() {
@@ -208,7 +213,7 @@ export function App() {
 
   useEffect(() => {
     const projectName = rebuildWorkspace.status?.projectName ?? project.selectedProject?.name;
-    document.title = projectName ? `kiss: ${projectName}` : "kiss";
+    document.title = projectName ? `${projectName} — KISS AI` : "KISS AI";
   }, [project.selectedProject?.name, rebuildWorkspace.status?.projectName]);
 
   // Auto-open build panel when navigating from a legacy /rebuild URL
@@ -286,7 +291,7 @@ export function App() {
             onOpenProjectHome={() => route.navigateTo("ai")}
             onSwitchProject={project.clearSelectedProject}
           />
-          <RightPanelToggle active={isAgentPanelOpen} label="AI" onToggle={toggleAgentPanel} />
+          <RightPanelToggle active={isAgentPanelOpen} label="✦ Ask AI" onToggle={toggleAgentPanel} />
           <ToastViewport toasts={toastWorkspace.toasts} onDismiss={toastWorkspace.dismissToast} />
 
           <AppSidebar

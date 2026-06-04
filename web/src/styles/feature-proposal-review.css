@@ -30,7 +30,7 @@
   color: var(--color-secondary);
   font-size: 0.68rem;
   letter-spacing: 0.05em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .agent-edit-proposal-actions {
@@ -47,7 +47,7 @@
   background: white;
   color: var(--color-secondary);
   font-size: 0.7rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .agent-edit-proposal-actions button:disabled,
@@ -83,7 +83,7 @@
   overflow: hidden;
   color: var(--color-primary);
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -145,7 +145,7 @@
   background: color-mix(in srgb, var(--color-surface) 86%, var(--color-background));
   color: var(--color-secondary);
   font-size: 0.62rem;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 1.2;
 }
 
@@ -170,7 +170,7 @@
   cursor: pointer;
   color: var(--color-secondary);
   font-size: 0.7rem;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .agent-edit-proposal-detail-grid {
@@ -192,7 +192,7 @@
   color: var(--color-primary);
   font-size: 0.68rem;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .agent-edit-proposal-detail-row p,
@@ -222,9 +222,9 @@
   background: transparent;
   color: var(--color-secondary);
   font-size: 0.62rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
+  text-transform: none;
   opacity: 0.7;
   transition: opacity 0.12s ease, color 0.12s ease;
 }
@@ -270,7 +270,7 @@
   background: transparent;
   color: var(--color-primary);
   font-size: 0.8rem;
-  font-weight: 900;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -290,7 +290,7 @@
   background: transparent;
   color: var(--color-secondary);
   font-size: 0.72rem;
-  font-weight: 800;
+  font-weight: 600;
   white-space: nowrap;
   transition:
     background 0.16s ease,
@@ -318,7 +318,7 @@
   border-color: var(--color-accent);
   background: var(--color-accent);
   color: white;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .agent-current-file-edit-artifact:hover:not(:disabled),
@@ -347,7 +347,7 @@
   background: transparent;
   color: var(--color-secondary);
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 1;
   display: grid;
   place-items: center;
@@ -460,9 +460,9 @@
   flex: 0 0 auto;
   color: var(--color-secondary);
   font-size: 0.62rem;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .agent-context-chip button {
@@ -473,7 +473,7 @@
   background: transparent;
   color: var(--color-secondary);
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -524,7 +524,7 @@
   background: white;
   color: var(--color-secondary);
   font-size: 0.7rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .agent-file-picker input {

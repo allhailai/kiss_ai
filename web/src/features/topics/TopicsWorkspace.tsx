@@ -236,27 +236,27 @@ export function TopicsWorkspace({
 
   const filterConfig: Array<{ id: TopicsFilter; label: string; count: number; warn?: boolean }> = [
     { id: "all", label: "All", count: topics.length },
-    { id: "needs_review", label: "Needs Review", count: needsReviewCount, warn: needsReviewCount > 0 },
-    { id: "active", label: "Active", count: activeCount },
-    { id: "in_progress", label: "In Progress", count: inProgressCount },
+    { id: "needs_review", label: "New", count: needsReviewCount, warn: needsReviewCount > 0 },
+    { id: "active", label: "In Progress", count: activeCount },
+    { id: "in_progress", label: "Queued", count: inProgressCount },
     { id: "archived", label: "Archived", count: archivedCount },
   ];
 
   return (
     <div className="topics-workspace">
       <header className="topics-header">
-        <h2>Topics</h2>
+        <h2>Research Topics</h2>
         <p className="topics-summary">
           {topics.length} topic{topics.length !== 1 ? "s" : ""}
           {activeCount > 0 ? (
             <>
-              {" \u00b7 "}{activeCount} active (
+              {" \u00b7 "}{activeCount} in progress (
               <button
                 className={`topics-summary-link${filter === "deep" ? " active" : ""}`}
                 onClick={() => setFilter(filter === "deep" ? "active" : "deep")}
                 type="button"
               >
-                {deepCount} deep
+                {deepCount} well covered
               </button>
               ,{" "}
               <button
@@ -264,13 +264,13 @@ export function TopicsWorkspace({
                 onClick={() => setFilter(filter === "shallow" ? "active" : "shallow")}
                 type="button"
               >
-                {shallowCount} shallow
+                {shallowCount} getting started
               </button>
               )
             </>
           ) : null}
-          {inProgressCount > 0 ? <>{" \u00b7 "}{inProgressCount} in deepening queue</> : null}
-          {needsReviewCount > 0 ? <>{" \u00b7 "}{needsReviewCount} awaiting review</> : null}
+          {inProgressCount > 0 ? <>{" \u00b7 "}{inProgressCount} queued for deeper research</> : null}
+          {needsReviewCount > 0 ? <>{" \u00b7 "}{needsReviewCount} new topics to review</> : null}
         </p>
         <div className="topics-filter-row">
           <div className="topics-filter-bar">
@@ -346,7 +346,7 @@ export function TopicsWorkspace({
         <div className="topics-empty">
           <p>
             {topics.length === 0
-              ? "No topics yet. Run a build to discover topics from your project's evidence."
+              ? "No topics yet. Run a research update to discover topics from your documents."
               : `No ${filterConfig.find((f) => f.id === filter)?.label.toLowerCase() ?? filter} topics.`}
           </p>
         </div>

@@ -4,9 +4,9 @@
   grid-column: 1;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-surface) 92%, var(--color-background));
-  padding: 8px 10px;
+  background: var(--color-surface);
+  box-shadow: 1px 0 8px rgba(0, 0, 0, 0.04);
+  padding: 14px 16px;
   min-height: 0;
   overflow: auto;
 }
@@ -15,56 +15,54 @@
 
 .sidebar-close-button {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 12px;
+  right: 12px;
   z-index: 60;
   display: grid;
   place-items: center;
   min-width: 0;
-  height: 22px;
+  height: 24px;
   padding: 0 8px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-background) 78%, white);
-  color: var(--color-secondary);
-  font-size: 0.64rem;
-  font-weight: 900;
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
   line-height: 1;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
 .sidebar-close-button:hover,
 .sidebar-close-button:focus-visible {
-  border-color: color-mix(in srgb, var(--color-secondary) 44%, var(--color-border));
-  background: var(--color-secondary);
+  border-color: var(--color-accent);
+  background: var(--color-accent);
   color: white;
-  outline: none;
 }
 
 /* ── Sidebar Open Button ("Nav") — visible when sidebar is collapsed ── */
 
 .sidebar-open-button {
   position: fixed;
-  top: 58px;
+  top: 64px;
   left: 18px;
   z-index: 60;
-  padding: 5px 12px;
-  border-radius: 999px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
   background: var(--color-accent);
   color: white;
-  font-size: 0.82rem;
-  font-weight: 900;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
   opacity: 0.3;
-  transition: opacity 0.18s ease;
+  transition: opacity var(--transition-normal), box-shadow var(--transition-normal);
 }
 
 .sidebar-open-button:hover,
 .sidebar-open-button:focus-visible {
-  background: color-mix(in srgb, var(--color-accent) 86%, var(--color-console-background));
-  outline: 2px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
-  outline-offset: 2px;
+  background: var(--action-primary-hover);
+  box-shadow: var(--shadow-accent-glow);
   opacity: 1;
 }
 
@@ -103,30 +101,29 @@
   right: 8px;
   width: 12px;
   height: 72px;
-  border: 1px solid color-mix(in srgb, var(--color-border) 86%, var(--color-accent));
-  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
   background:
-    radial-gradient(circle, color-mix(in srgb, var(--color-secondary) 72%, transparent) 1.5px, transparent 2px) center / 6px 10px repeat-y,
+    radial-gradient(circle, var(--text-subtle) 1.5px, transparent 2px) center / 6px 10px repeat-y,
     var(--color-surface);
-  box-shadow: var(--shadow-soft);
-  opacity: 0.72;
+  opacity: 0.5;
   transform: translateY(-50%);
   transition:
-    background 0.16s ease,
-    border-color 0.16s ease,
-    opacity 0.16s ease,
-    transform 0.16s ease;
+    background var(--transition-normal),
+    border-color var(--transition-normal),
+    opacity var(--transition-normal),
+    transform var(--transition-normal);
 }
 
 .sidebar-resize-handle::after {
   top: 0;
   bottom: 0;
   right: 13px;
-  width: 2px;
-  background: color-mix(in srgb, var(--color-border) 68%, transparent);
+  width: 1px;
+  background: transparent;
   transition:
-    background 0.16s ease,
-    width 0.16s ease;
+    background var(--transition-normal),
+    width var(--transition-normal);
 }
 
 .sidebar-resize-handle:hover::before,
@@ -141,13 +138,8 @@
 
 .sidebar-resize-handle:hover::after,
 .sidebar-resize-handle:focus-visible::after {
-  width: 3px;
-  background: color-mix(in srgb, var(--color-accent) 64%, var(--color-border));
-}
-
-.sidebar-resize-handle:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-accent) 28%, transparent);
-  outline-offset: -2px;
+  width: 2px;
+  background: color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
 
 .sidebar-collapsed .sidebar-resize-handle {
@@ -159,20 +151,62 @@
 .sidebar-version {
   margin-top: auto;
   padding: 12px 6px 4px;
-  font-family: var(--font-mono, "SF Mono", "Fira Code", monospace);
+  font-family: var(--font-family-mono);
   font-size: 0.68rem;
-  color: var(--color-secondary);
-  opacity: 0.45;
+  color: var(--text-subtle);
+  opacity: 0.4;
   text-align: center;
   letter-spacing: 0.02em;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--transition-normal);
   user-select: all;
 }
 
 .sidebar-version:hover {
-  opacity: 0.85;
+  opacity: 0.8;
 }
 
 .sidebar-version-separator {
   margin: 0 4px;
+}
+
+/* ── Sidebar Footer Actions ── */
+
+.sidebar-footer-actions {
+  margin-top: auto;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.sidebar-settings-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--hit-target-min);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  text-align: left;
+}
+
+.sidebar-settings-button:hover {
+  background: var(--surface-hover);
+  color: var(--text-heading);
+}
+
+.sidebar-settings-button.active {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  color: var(--color-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+.sidebar-settings-button svg {
+  flex-shrink: 0;
 }

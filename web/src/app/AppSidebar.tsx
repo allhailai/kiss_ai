@@ -158,6 +158,19 @@ export function AppSidebar({
           onOpenView={(nextView, filePath) => route.navigateTo(nextView, filePath)}
           rebuildRunning={rebuildWorkspace.rebuild?.running ?? false}
         />
+        <div className="sidebar-footer-actions">
+          <button
+            className={`sidebar-settings-button${route.view === "settings" ? " active" : ""}`}
+            onClick={() => route.navigateTo("settings")}
+            title="Settings"
+            type="button"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M6.5 1.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1.05a5 5 0 0 1 1.37.57l.74-.74a.5.5 0 0 1 .71 0l1.41 1.41a.5.5 0 0 1 0 .71l-.74.74c.26.43.45.89.57 1.37h1.05a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5h-1.05a5 5 0 0 1-.57 1.37l.74.74a.5.5 0 0 1 0 .71l-1.41 1.41a.5.5 0 0 1-.71 0l-.74-.74a5 5 0 0 1-1.37.57v1.05a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5v-1.05a5 5 0 0 1-1.37-.57l-.74.74a.5.5 0 0 1-.71 0L2.27 12.1a.5.5 0 0 1 0-.71l.74-.74A5 5 0 0 1 2.44 9.3H1.39a.5.5 0 0 1-.5-.5v-2a.5.5 0 0 1 .5-.5h1.05a5 5 0 0 1 .57-1.37l-.74-.74a.5.5 0 0 1 0-.71L3.68 2.1a.5.5 0 0 1 .71 0l.74.74A5 5 0 0 1 6.5 2.27V1.5zM8 10.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" fill="currentColor"/>
+            </svg>
+            Settings
+          </button>
+        </div>
         <ServerVersion />
       </aside>
     </>

@@ -37,6 +37,19 @@ function DateCell({ timestamp }: { timestamp: string | null }) {
   );
 }
 
+function setupStatusLabel(status: string): string {
+  switch (status) {
+    case "initialized":
+      return "New";
+    case "built":
+      return "Ready";
+    case "unknown":
+      return "Unknown";
+    default:
+      return status.replace(/_/g, " ");
+  }
+}
+
 function PinButton({ pinned, onToggle }: { pinned: boolean; onToggle: () => void }) {
   return (
     <button
@@ -141,7 +154,7 @@ function ProjectTable({
                 <PinButton pinned={pinnedSlugs.has(project.slug)} onToggle={() => onTogglePin(project.slug)} />
               </td>
               <td className="project-table-name">{project.name}</td>
-              <td className="project-table-status"><span className="eyebrow">{project.setupStatus}</span></td>
+              <td className="project-table-status"><span className="eyebrow">{setupStatusLabel(project.setupStatus)}</span></td>
               <DateCell timestamp={project.createdAt} />
               <DateCell timestamp={project.lastBuildAt} />
               <DateCell timestamp={project.modifiedAt} />
@@ -250,7 +263,6 @@ export function ProjectPicker({
       <div className="project-picker-header">
         <div className="project-picker-title">
           <h1>Projects</h1>
-          {projectsRoot ? <code>{projectsRoot}</code> : null}
         </div>
         <div className="project-picker-update">
           {settingsSlot}
@@ -282,7 +294,7 @@ export function ProjectPicker({
 
         <div className="project-create-actions">
           <button disabled={!canCreate} type="submit">
-            {creatingProject ? "Building..." : "Build"}
+            {creatingProject ? "Creating..." : "Create"}
           </button>
         </div>
       </form>
@@ -305,14 +317,14 @@ export function ProjectPicker({
         </div>
       ) : null}
 
-      {!error && projects.length === 0 ? <p>No kiss_ai projects were found under the configured projects root.</p> : null}
+      {!error && projects.length === 0 ? <p>No projects found. Create your first project above to get started.</p> : null}
 
       {viewMode === "cards" ? (
         <div className="project-card-grid">
           {sortedProjects.map((project) => (
             <button className={`project-card${pinnedSlugs.has(project.slug) ? " project-card-pinned" : ""}`} key={project.slug} onClick={() => onSelect(project.slug)} type="button">
               <div className="project-card-top-row">
-                <span className="eyebrow">{project.setupStatus}</span>
+                <span className="eyebrow">{setupStatusLabel(project.setupStatus)}</span>
                 <PinButton pinned={pinnedSlugs.has(project.slug)} onToggle={() => handleTogglePin(project.slug)} />
               </div>
               <strong>{project.name}</strong>

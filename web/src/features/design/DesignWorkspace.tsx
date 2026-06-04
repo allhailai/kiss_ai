@@ -41,10 +41,10 @@ export function DesignWorkspace({
   const [activeDesignTab, setActiveDesignTab] = useState<"preview" | "edit">("preview");
   const savedDiffLabel =
     hasSavedDiff
-      ? `${(savedChangedLineCount + savedDeletedLineCount).toLocaleString()} saved Git diff ${
-          savedChangedLineCount + savedDeletedLineCount === 1 ? "line" : "lines"
+      ? `${(savedChangedLineCount + savedDeletedLineCount).toLocaleString()} saved ${
+          savedChangedLineCount + savedDeletedLineCount === 1 ? "change" : "changes"
         }`
-      : "No saved Git diff";
+      : "No saved changes";
 
   function updateDesignDraft(nextDraft: DesignIdentityDraft) {
     onDraft(serializeDesignIdentityDraft(nextDraft));
@@ -160,7 +160,7 @@ export function DesignWorkspace({
               <div className="editor-toolbar-actions">
                 {hasSavedDiff ? (
                   <button className="editor-secondary-button" disabled={!selected.editable || loading} onClick={onRevert} type="button">
-                    Revert to Committed State
+                    Restore Original
                   </button>
                 ) : null}
                 {selected.editable && hasUnsavedChanges ? (
@@ -185,7 +185,7 @@ export function DesignWorkspace({
                 Loaded {draft.length.toLocaleString()} characters across {draft.split("\n").length.toLocaleString()} lines.
               </span>
               <span className="editor-diff-legend" aria-label="Design editor diff highlight legend">
-                <span className="editor-diff-key editor-diff-key-unsaved">Unsaved edits</span>
+                <span className="editor-diff-key editor-diff-key-unsaved">Your changes (not saved)</span>
                 <span className="editor-diff-key editor-diff-key-saved">{savedDiffLabel}</span>
               </span>
             </div>

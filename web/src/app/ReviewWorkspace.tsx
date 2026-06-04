@@ -92,7 +92,7 @@ function SummaryDashboard({
       {/* ── Topics Section ─────────────────────── */}
       <section className="review-summary-card review-summary-topics" onClick={() => onSwitchTab("topics")}>
         <div className="review-summary-card-header">
-          <h3 className="review-summary-card-title">Topics</h3>
+          <h3 className="review-summary-card-title">Research Topics</h3>
           <button
             className="review-summary-cta"
             onClick={() => onSwitchTab("topics")}
@@ -104,7 +104,7 @@ function SummaryDashboard({
 
         <div className="review-topic-progress">
           <div className="review-topic-progress-header">
-            <span className="review-topic-progress-title">Research Depth</span>
+            <span className="review-topic-progress-title">Research Coverage</span>
             <span className="review-topic-progress-pct">{progressPct}% deep</span>
           </div>
           <div className="review-topic-progress-bar">
@@ -126,10 +126,10 @@ function SummaryDashboard({
             />
           </div>
           <div className="review-topic-progress-legend">
-            <span><b className="review-dot review-dot-saturated" /> Saturated ({topicsByState.saturated})</span>
-            <span><b className="review-dot review-dot-deep" /> Deep ({topicsByState.deep})</span>
-            <span><b className="review-dot review-dot-shallow" /> Shallow ({topicsByState.shallow})</span>
-            <span><b className="review-dot review-dot-seed" /> Seed ({topicsByState.seed})</span>
+            <span><b className="review-dot review-dot-saturated" /> Complete ({topicsByState.saturated})</span>
+            <span><b className="review-dot review-dot-deep" /> Well Covered ({topicsByState.deep})</span>
+            <span><b className="review-dot review-dot-shallow" /> Getting Started ({topicsByState.shallow})</span>
+            <span><b className="review-dot review-dot-seed" /> New ({topicsByState.seed})</span>
           </div>
         </div>
 
@@ -158,7 +158,7 @@ function SummaryDashboard({
       {/* ── Questions Section ──────────────────── */}
       <section className="review-summary-card review-summary-questions" onClick={() => onSwitchTab("questions")}>
         <div className="review-summary-card-header">
-          <h3 className="review-summary-card-title">Questions</h3>
+          <h3 className="review-summary-card-title">Questions for You</h3>
           <button
             className="review-summary-cta"
             onClick={() => onSwitchTab("questions")}
@@ -171,16 +171,16 @@ function SummaryDashboard({
         {blockingCount > 0 ? (
           <div className="review-summary-hero review-summary-hero-blocking">
             <span className="review-summary-hero-number">{blockingCount}</span>
-            <span className="review-summary-hero-label">blocking</span>
+            <span className="review-summary-hero-label">need your input</span>
           </div>
         ) : null}
 
         <div className="review-summary-stats">
           <span className="review-summary-stat">
-            {blockingCount} blocking · {importantCount} important · {informationalCount} informational
+            {blockingCount} need your input · {importantCount} recommended · {informationalCount} optional
           </span>
           <span className="review-summary-stat">
-            {answeredQuestions.length} of {questions.length} resolved
+            {answeredQuestions.length} of {questions.length} answered
           </span>
         </div>
 
@@ -263,8 +263,8 @@ export function ReviewWorkspace({
 
   // Tab order: Needs Attention, Topics, Questions
   const tabs: Array<{ id: ReviewTab; label: string; badge?: number; badgeClass?: string }> = [
-    { id: "attention", label: "Needs Attention" },
-    { id: "topics", label: "Topics", badge: seedTopics > 0 ? seedTopics : undefined, badgeClass: "review-tab-badge-open" },
+    { id: "attention", label: "Overview" },
+    { id: "topics", label: "Research Topics", badge: seedTopics > 0 ? seedTopics : undefined, badgeClass: "review-tab-badge-open" },
     { id: "questions", label: "Questions", badge: openQuestions > 0 ? openQuestions : undefined, badgeClass: blockingQuestions > 0 ? "review-tab-badge-blocking" : "review-tab-badge-open" },
   ];
 
@@ -277,9 +277,9 @@ export function ReviewWorkspace({
         ) : (
           <p className="review-summary">
             {topics.length} topic{topics.length !== 1 ? "s" : ""}
-            {topics.length > 0 ? ` (${deepTopics} deep, ${shallowTopics} shallow${seedTopics > 0 ? `, ${seedTopics} seed` : ""})` : ""}
+            {topics.length > 0 ? ` (${deepTopics} well covered, ${shallowTopics} getting started${seedTopics > 0 ? `, ${seedTopics} new` : ""})` : ""}
             {" · "}
-            {openQuestions} open question{openQuestions !== 1 ? "s" : ""}{blockingQuestions > 0 ? ` (${blockingQuestions} blocking)` : ""}
+            {openQuestions} open question{openQuestions !== 1 ? "s" : ""}{blockingQuestions > 0 ? ` (${blockingQuestions} need your input)` : ""}
           </p>
         )}
       </header>
