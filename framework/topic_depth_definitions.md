@@ -55,7 +55,7 @@ A topic remains **shallow** when any of the following are true:
 | Dimension | Shallow threshold |
 |---|---|
 | **Source diversity** | ≤2 distinct source types |
-| **Evidence specificity** | <3 concrete, cited data points |
+| **Evidence specificity** | <2 concrete, cited data points |
 | **Coverage gaps** | ≥2 open coverage gaps |
 | **Cross-referencing** | Wiki page doesn't reference findings from dependency topics |
 | **Contrarian evidence** | No counterarguments, limitations, or alternative interpretations documented |
@@ -78,7 +78,7 @@ A topic advances to **deep** when **ALL** of the following hold:
 | # | Dimension | Deep requirement |
 |---|---|---|
 | 1 | **Source diversity** | 3+ sources spanning ≥2 distinct source types |
-| 2 | **Evidence specificity** | ≥3 concrete, cited data points in the wiki page |
+| 2 | **Evidence specificity** | ≥2 concrete, cited data points in the wiki page |
 | 3 | **Coverage gap progress** | ≤1 remaining coverage gap |
 | 4 | **Cross-referencing** | Wiki page connects findings to ≥1 dependency topic |
 | 5 | **Contrarian evidence** | ≥1 counterargument, limitation, or alternative interpretation documented |

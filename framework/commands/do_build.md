@@ -274,7 +274,7 @@ Behavioral rules for updating topics:
 - **Existing non-deprecated, non-seed topics:** Update `sources`, `outputs`, `metrics`, `coverage_gaps`. Auto-advance `state` using the multi-dimensional depth criteria:
   - `shallow` → `deep` — ALL of the following must hold:
     1. **Source diversity:** 3+ sources spanning ≥2 distinct source types (e.g., government + trade press, academic + corporate filings). Count types from: primary_data, government, academic, corporate, trade_press, news, commentary.
-    2. **Evidence specificity:** Wiki page contains ≥3 concrete, cited data points — named statistics, quantified claims, dated events, regulatory citations, or direct quotes from primary sources.
+    2. **Evidence specificity:** Wiki page contains ≥2 concrete, cited data points — named statistics, quantified claims, dated events, regulatory citations, or direct quotes from primary sources.
     3. **Coverage gap progress:** Majority of original coverage gaps addressed (≤1 remaining gap).
     4. **Cross-referencing:** Wiki page explicitly connects findings to at least 1 dependency topic. Waived if the topic has no dependencies.
     5. **Contrarian evidence:** The page acknowledges at least 1 counterargument, limitation, or alternative interpretation.

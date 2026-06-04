@@ -6,7 +6,7 @@ import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
 import { createPromptBuilders } from "./promptBuilders.js";
 import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs, findDirectedOutputsWithoutArtifacts } from "./artifactService.js";
 import { runFetchPhase, runDigestPhase } from "./fetchAndDigestPhases.js";
-import { getDeepenQueue, clearDeepenQueue, readTopics, writeTopics, reconcileTopicSources } from "./topicsService.js";
+import { getDeepenQueue, clearDeepenQueue, readTopics, writeTopics, reconcileTopicSources, computeWikiMetrics, autoAdvanceTopicStates } from "./topicsService.js";
 import { computeWikiTriage, updateWikiPageTracker, resetWikiPageTracker, regenerateWikiIndex } from "./wikiTriage.js";
 import { validateFileExistence, readManifest, writeManifest, prependBuildLogEntry, gitSnapshot, recordBuildFileChanges } from "./serverValidation.js";
 import { readLedger, buildSnapshot, diffSnapshot, writeLedger, recordKnowledgeBuild, recordOutputBuild } from "./contentLedger.js";
@@ -554,22 +554,35 @@ export function createAgentJobService({
       // ── Compute build scope ──
       const scope = await computeBuildScope(project.path);
 
+      // Read deepen queue and find unsourced topics early (used in skip decision + prompt injection)
+      const deepenQueue = await getDeepenQueue(project.path);
+      let unsourcedTopics = [];
+      try {
+        const topicsData = await readTopics(project.path);
+        unsourcedTopics = topicsData.topics.filter(
+          (t) => t.state !== "deprecated" && t.state !== "seed"
+            && (!Array.isArray(t.sources) || t.sources.length === 0),
+        );
+      } catch {
+        // topics.json doesn't exist yet
+      }
+
+      // Build a human-readable scope summary
+      const scopeReasons = [];
+      if (scope.isFirstBuild) scopeReasons.push("first build");
+      if (scope.projectMdChanged) scopeReasons.push("project.md changed");
+      if (scope.feedbackMarkers.length > 0) scopeReasons.push(`${scope.feedbackMarkers.length} FEEDBACK marker(s)`);
+      if (unsourcedTopics.length > 0) scopeReasons.push(`${unsourcedTopics.length} unsourced topic(s)`);
+      if (deepenQueue.length > 0) scopeReasons.push(`${deepenQueue.length} deepen-queued topic(s)`);
+
       await appendRunEvent(project.slug, {
         type: "system",
-        title: scope.isFirstBuild
-          ? "Build scope: first build (full)"
-          : scope.projectMdChanged
-            ? "Build scope: project.md changed"
-            : scope.feedbackMarkers.length > 0
-              ? `Build scope: ${scope.feedbackMarkers.length} FEEDBACK marker(s)`
-              : "Build scope: no changes detected",
-        text: scope.isFirstBuild
-          ? "No previous build manifest found. Running full build."
-          : scope.projectMdChanged
-            ? "project.md hash changed."
-            : scope.feedbackMarkers.length > 0
-              ? `FEEDBACK markers in: ${scope.feedbackMarkers.join(", ")}`
-              : "No input changes detected. Change detection deferred to content-hash ledger after fetch + digest.",
+        title: scopeReasons.length > 0
+          ? `Build scope: ${scopeReasons.join(", ")}`
+          : "Build scope: no changes detected",
+        text: scopeReasons.length > 0
+          ? scopeReasons.join("; ")
+          : "No input changes detected. Change detection deferred to content-hash ledger after fetch + digest.",
         status: "scope_computed",
         runtime: "server",
       });
@@ -587,15 +600,31 @@ export function createAgentJobService({
         await appendRunEvent(project.slug, {
           type: "system",
           title: "Phase 1: Skipped (no project changes)",
-          text: "project.md unchanged, no FEEDBACK markers, no new inputs. Keeping existing research plan.",
+          text: "project.md unchanged, no FEEDBACK markers, no unsourced topics, no deepen queue. Keeping existing research plan.",
           status: "research_plan_skipped",
           runtime: "server",
         });
       } else {
-        // Check for deepen-queued topics and inject directives into research prompt
-        const deepenQueue = await getDeepenQueue(project.path);
         let researchPrompt = prompt; // base research prompt
 
+        // Inject UNSOURCED TOPICS directive
+        if (unsourcedTopics.length > 0) {
+          const unsourcedLines = [
+            "",
+            `UNSOURCED TOPICS: ${unsourcedTopics.length} topic(s) have zero sources and need initial research.`,
+            "For each of these topics, generate 2–4 search queries with diverse source types (primary, secondary, contrarian):",
+            "",
+          ];
+          for (const t of unsourcedTopics) {
+            unsourcedLines.push(`- ${t.label} (${t.id})`);
+            if (t.details) {
+              unsourcedLines.push(`  Details: ${t.details}`);
+            }
+          }
+          researchPrompt += unsourcedLines.join("\n");
+        }
+
+        // Inject DEEPEN DIRECTIVE
         if (deepenQueue.length > 0) {
           const deepenLines = [
             "",
@@ -615,9 +644,15 @@ export function createAgentJobService({
           researchPrompt += deepenLines.join("\n");
         }
 
+        // Build Phase 1 title
+        const phase1Parts = [];
+        if (unsourcedTopics.length > 0) phase1Parts.push(`${unsourcedTopics.length} unsourced`);
+        if (deepenQueue.length > 0) phase1Parts.push(`${deepenQueue.length} deepen`);
+        const phase1Suffix = phase1Parts.length > 0 ? ` (${phase1Parts.join(" + ")})` : "";
+
         await appendRunEvent(project.slug, {
           type: "system",
-          title: `Phase 1: Generating research plan${deepenQueue.length > 0 ? ` (+ ${deepenQueue.length} deepen directive(s))` : ""}`,
+          title: `Phase 1: Generating research plan${phase1Suffix}`,
           text: scope.isFirstBuild
             ? "Agent is searching the web and producing a research plan."
             : "Agent is updating the research plan based on project changes.",
@@ -907,8 +942,7 @@ export function createAgentJobService({
         buildPhaseDetail: "Writing manifest, build log, and git snapshot",
       });
 
-      // Resolve deepen queue info (may have been used in Phase 1)
-      const deepenQueue = await getDeepenQueue(project.path);
+      // deepenQueue was already read at the top of this try block (before Phase 1)
 
       // Collect the full set of wiki pages for the manifest
       const allWikiPages = triage.action === "skip"
@@ -998,6 +1032,55 @@ export function createAgentJobService({
           title: "Source reconciliation skipped",
           text: reconcileError instanceof Error ? reconcileError.message : "Unknown error",
           status: "reconciliation_skipped",
+          runtime: "server",
+        });
+      }
+
+      // Post-build: compute wiki-content-based metrics (data points, cross-refs, contrarian evidence)
+      try {
+        const wikiMetrics = await computeWikiMetrics(project.path);
+        if (wikiMetrics.updated > 0) {
+          await appendRunEvent(project.slug, {
+            type: "system",
+            title: `Wiki metrics: ${wikiMetrics.updated} topic(s) updated`,
+            text: wikiMetrics.details
+              .map((d) => `${d.topicLabel}: ${d.metrics.data_point_count} data pts, ${d.metrics.cross_references} cross-refs, contrarian: ${d.metrics.has_contrarian_evidence ? "yes" : "no"}`)
+              .join("; "),
+            status: "wiki_metrics_computed",
+            runtime: "server",
+          });
+        }
+      } catch (metricsError) {
+        // Non-fatal — log and continue
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Wiki metrics computation skipped",
+          text: metricsError instanceof Error ? metricsError.message : "Unknown error",
+          status: "wiki_metrics_skipped",
+          runtime: "server",
+        });
+      }
+
+      // Post-build: auto-advance topic states based on metrics (shallow→deep, deep→saturated)
+      try {
+        const advancement = await autoAdvanceTopicStates(project.path);
+        if (advancement.advanced > 0) {
+          await appendRunEvent(project.slug, {
+            type: "system",
+            title: `Topic state advancement: ${advancement.advanced} topic(s) advanced`,
+            text: advancement.details
+              .map((d) => `${d.topicLabel}: ${d.from} → ${d.to}`)
+              .join("; "),
+            status: "topics_advanced",
+            runtime: "server",
+          });
+        }
+      } catch (advanceError) {
+        await appendRunEvent(project.slug, {
+          type: "system",
+          title: "Topic state advancement skipped",
+          text: advanceError instanceof Error ? advanceError.message : "Unknown error",
+          status: "advancement_skipped",
           runtime: "server",
         });
       }

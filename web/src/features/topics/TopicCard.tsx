@@ -74,21 +74,75 @@ export function TopicCard({
         </div>
       ) : null}
 
-      <div className="topic-card-metrics">
-        <span>Sources: {topic.metrics?.source_count ?? 0}</span>
-        {topic.metrics?.source_types && topic.metrics.source_types.length > 0 ? (
-          <span>Types: {topic.metrics.source_types.join(", ")}</span>
-        ) : null}
-        <span>Data points: {topic.metrics?.data_point_count ?? 0}</span>
-        <span>Cross-refs: {topic.metrics?.cross_references ?? 0}</span>
-        {topic.metrics?.has_contrarian_evidence ? (
-          <span className="topic-metric-contrarian">Contrarian ✓</span>
-        ) : null}
-        {topic.metrics?.last_updated ? (
+      {topic.state !== "deprecated" && topic.state !== "seed" ? (() => {
+        const sourceCount = topic.metrics?.source_count ?? 0;
+        const sourceTypes = topic.metrics?.source_types ?? [];
+        const dataPoints = topic.metrics?.data_point_count ?? 0;
+        const gapCount = topic.coverage_gaps?.length ?? 0;
+        const crossRefs = topic.metrics?.cross_references ?? 0;
+        const hasContrarian = topic.metrics?.has_contrarian_evidence ?? false;
+
+        const criteria = [
+          {
+            label: "Source diversity",
+            met: sourceCount >= 3 && sourceTypes.length >= 2,
+            value: `${sourceCount} sources, ${sourceTypes.length} type${sourceTypes.length !== 1 ? "s" : ""}`,
+            target: "≥3 sources, ≥2 types",
+          },
+          {
+            label: "Evidence specificity",
+            met: dataPoints >= 2,
+            value: `${dataPoints} data point${dataPoints !== 1 ? "s" : ""}`,
+            target: "≥2 cited data points",
+          },
+          {
+            label: "Coverage gaps",
+            met: gapCount <= 1,
+            value: gapCount === 0 ? "none" : `${gapCount} gap${gapCount !== 1 ? "s" : ""}`,
+            target: "≤1 gap",
+          },
+          {
+            label: "Cross-referencing",
+            met: crossRefs >= 1,
+            value: `${crossRefs} ref${crossRefs !== 1 ? "s" : ""}`,
+            target: "≥1 dependency ref",
+          },
+          {
+            label: "Contrarian evidence",
+            met: hasContrarian,
+            value: hasContrarian ? "documented" : "none",
+            target: "≥1 counterargument",
+          },
+        ];
+        const metCount = criteria.filter((c) => c.met).length;
+
+        return (
+          <div className="topic-depth-tracker">
+            <div className="topic-depth-tracker-header">
+              <span className="topic-depth-tracker-title">Deep criteria</span>
+              <span className={`topic-depth-tracker-score${metCount === criteria.length ? " topic-depth-tracker-complete" : ""}`}>
+                {metCount}/{criteria.length}
+              </span>
+            </div>
+            <div className="topic-depth-tracker-list">
+              {criteria.map((c) => (
+                <div className={`topic-depth-criterion${c.met ? " topic-depth-criterion-met" : ""}`} key={c.label}>
+                  <span className="topic-depth-criterion-icon">{c.met ? "✓" : "✗"}</span>
+                  <span className="topic-depth-criterion-label">{c.label}</span>
+                  <span className="topic-depth-criterion-value">{c.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })() : null}
+
+      {topic.metrics?.last_updated ? (
+        <div className="topic-card-meta-row">
           <span>Updated: {formatLocalDateTime(topic.metrics.last_updated, "—")}</span>
-        ) : null}
-        <span>Origin: {topic.discovery?.origin ?? "unknown"}</span>
-      </div>
+          <span>Origin: {topic.discovery?.origin ?? "unknown"}</span>
+        </div>
+      ) : null}
 
       {dependencyLabels.length > 0 ? (
         <div className="topic-card-related">
@@ -134,7 +188,7 @@ export function TopicCard({
 
           {(topic.deepen_log?.length ?? 0) > 0 ? (
             <>
-              {topic.deepen_log.slice().reverse().map((entry, idx) => {
+              {topic.deepen_log.map((entry, idx) => {
                 const wordBefore = entry.word_count_before ?? 0;
                 const wordAfter = entry.word_count_after ?? 0;
                 const wordDelta = wordAfter - wordBefore;
@@ -144,6 +198,27 @@ export function TopicCard({
                 const stateChanged = entry.state_before !== entry.state_after;
                 const isLatest = idx === 0;
                 const hasWordData = entry.word_count_after != null;
+                const sourcesAdded = entry.sources_added ?? 0;
+                const sourcesTotal = entry.sources_total ?? 0;
+                // Array is newest-first, so the previous run is at idx+1
+                const prevTotal = topic.deepen_log[idx + 1]?.sources_total ?? 0;
+                const sourceDelta = sourcesAdded > 0 ? sourcesAdded : Math.max(0, sourcesTotal - prevTotal);
+                const runNumber = topic.deepen_log.length - idx;
+
+                // Build a meaningful summary string
+                const summaryParts: string[] = [];
+                if (sourceDelta > 0) {
+                  summaryParts.push(`+${sourceDelta} sources`);
+                }
+                if (hasWordData && wordDelta > 0) {
+                  summaryParts.push(`+${wordDelta.toLocaleString()} words`);
+                }
+                if (stateChanged) {
+                  summaryParts.push(`${stateLabel(entry.state_before)} → ${stateLabel(entry.state_after)}`);
+                }
+                if (summaryParts.length === 0) {
+                  summaryParts.push("no changes");
+                }
 
                 return (
                   <details
@@ -152,21 +227,22 @@ export function TopicCard({
                     open={isLatest}
                   >
                     <summary className="topic-deepen-entry-summary">
-                      <span className="topic-deepen-entry-date">{formatLocalDateTime(entry.deepened_at, "")}</span>
+                      <span className="topic-deepen-entry-date">
+                        Run #{runNumber} · {formatLocalDateTime(entry.deepened_at, "")}
+                      </span>
                       <span className="topic-deepen-entry-stats">
-                        +{entry.sources_added ?? 0} sources
-                        {hasWordData ? ` · ${wordAfter.toLocaleString()} words` : ""}
-                        {entry.sources_total != null ? ` · ${entry.sources_total} total` : ""}
-                        {stateChanged ? ` · ${stateLabel(entry.state_before)} → ${stateLabel(entry.state_after)}` : ""}
+                        {summaryParts.join(" · ")}
                       </span>
                     </summary>
                     <div className="topic-deepen-entry-body">
                       <div className="topic-deepen-entry-row">
                         <span className="topic-deepen-entry-label">Sources</span>
                         <span>
-                          {entry.sources_added ?? 0} new
-                          {entry.sources_total != null ? ` (${entry.sources_total} total)` : ""}
-                          {entry.unfetched && entry.unfetched.length > 0 ? ` · ${entry.unfetched.length} unfetched` : ""}
+                          {sourceDelta > 0
+                            ? `${sourceDelta} new (${sourcesTotal} total)`
+                            : sourcesTotal > 0
+                              ? `${sourcesTotal} total`
+                              : "none found"}
                         </span>
                       </div>
                       {hasWordData ? (
@@ -240,8 +316,31 @@ export function TopicCard({
               <ul>
                 {topic.sources.map((s) => {
                   const sourcePath = typeof s === "string" ? s : s.path;
-                  const basename = sourcePath.split("/").pop() ?? sourcePath;
-                  return <li key={sourcePath}>{basename.replace(/\.md$/, "").replace(/_/g, " ")}</li>;
+                  const basename = (sourcePath.split("/").pop() ?? sourcePath).replace(/\.md$/, "");
+
+                  // Parse URL-encoded filename: domain__path_segments
+                  const parts = basename.split("__");
+                  const domain = parts[0]?.replace(/_/g, ".") ?? "";
+                  const pathPart = parts.slice(1).join("__");
+
+                  // Clean up the path into a readable title
+                  let title = pathPart
+                    .replace(/_/g, " ")       // underscores → spaces
+                    .replace(/\b(html|htm|php|asp|aspx|pdf|json)\b/gi, "") // strip extensions
+                    .replace(/\b(index|default|view)\b/gi, "")  // strip generic page names
+                    .replace(/\s{2,}/g, " ")  // collapse whitespace
+                    .trim();
+
+                  // Capitalize first letter
+                  if (title) {
+                    title = title.charAt(0).toUpperCase() + title.slice(1);
+                    // Truncate long titles
+                    if (title.length > 60) title = title.slice(0, 57) + "…";
+                  }
+
+                  const label = title ? `${title} — ${domain}` : domain;
+
+                  return <li key={sourcePath} title={basename}>{label}</li>;
                 })}
               </ul>
             </details>

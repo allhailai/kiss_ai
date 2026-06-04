@@ -440,17 +440,92 @@
   line-height: 1.4;
 }
 
-.topic-card-metrics {
+/* ── Depth Criteria Tracker ── */
+
+.topic-depth-tracker {
+  border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--color-surface) 50%, transparent);
+}
+
+.topic-depth-tracker-header {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  color: var(--color-secondary);
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.topic-depth-tracker-title {
   font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.topic-depth-tracker-score {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--color-secondary);
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-secondary) 12%, transparent);
+}
+
+.topic-depth-tracker-complete {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+}
+
+.topic-depth-tracker-list {
+  display: grid;
+  gap: 2px;
+}
+
+.topic-depth-criterion {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-secondary);
+  padding: 1px 0;
+}
+
+.topic-depth-criterion-icon {
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-align: center;
+  color: color-mix(in srgb, var(--color-danger) 70%, var(--color-secondary));
+}
+
+.topic-depth-criterion-met .topic-depth-criterion-icon {
+  color: var(--color-success);
+}
+
+.topic-depth-criterion-label {
   font-weight: 700;
 }
 
-.topic-metric-contrarian {
-  color: var(--color-success);
+.topic-depth-criterion-met .topic-depth-criterion-label {
+  color: var(--color-primary);
+}
+
+.topic-depth-criterion-value {
+  font-weight: 600;
+  font-size: 0.65rem;
+  color: color-mix(in srgb, var(--color-secondary) 80%, transparent);
+  text-align: right;
+}
+
+.topic-card-meta-row {
+  display: flex;
+  gap: 12px;
+  color: var(--color-secondary);
+  font-size: 0.65rem;
+  font-weight: 600;
 }
 
 .topic-card-related {

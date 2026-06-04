@@ -619,6 +619,267 @@ export async function reconcileTopicSources(projectPath) {
 }
 
 /**
+ * Compute wiki-content-based metrics for all topics that have a wiki_page.
+ * Reads each wiki page from disk and extracts:
+ * - data_point_count: concrete, cited data points (numbers/dates with source refs)
+ * - cross_references: count of links to other wiki pages (not source links)
+ * - has_contrarian_evidence: whether the page discusses limitations/counterarguments
+ * - word_count: total word count of the wiki page
+ *
+ * This replaces reliance on the AI agent to set these metrics.
+ *
+ * @param {string} projectPath
+ * @returns {Promise<{updated: number, details: Array<{topicId: string, topicLabel: string, metrics: object}>}>}
+ */
+export async function computeWikiMetrics(projectPath) {
+  const data = await readTopics(projectPath);
+  if (data.topics.length === 0) {
+    return { updated: 0, details: [] };
+  }
+
+  const details = [];
+  let updatedCount = 0;
+
+  for (const topic of data.topics) {
+    if (topic.state === "deprecated" || topic.state === "seed") continue;
+    if (!topic.wiki_page) continue;
+
+    let content;
+    try {
+      content = await fs.readFile(path.join(projectPath, topic.wiki_page), "utf-8");
+    } catch {
+      continue; // Wiki page doesn't exist on disk
+    }
+
+    const metrics = analyzeWikiContent(content, data.topics, topic.id);
+
+    // Update topic metrics (preserve existing source_count, source_types, last_updated)
+    topic.metrics = topic.metrics || {};
+    const changed =
+      topic.metrics.data_point_count !== metrics.dataPointCount
+      || topic.metrics.cross_references !== metrics.crossReferences
+      || topic.metrics.has_contrarian_evidence !== metrics.hasContrarianEvidence
+      || topic.metrics.word_count !== metrics.wordCount;
+
+    if (changed) {
+      topic.metrics.data_point_count = metrics.dataPointCount;
+      topic.metrics.cross_references = metrics.crossReferences;
+      topic.metrics.has_contrarian_evidence = metrics.hasContrarianEvidence;
+      topic.metrics.word_count = metrics.wordCount;
+      updatedCount++;
+
+      details.push({
+        topicId: topic.id,
+        topicLabel: topic.label,
+        metrics: {
+          data_point_count: metrics.dataPointCount,
+          cross_references: metrics.crossReferences,
+          has_contrarian_evidence: metrics.hasContrarianEvidence,
+          word_count: metrics.wordCount,
+        },
+      });
+    }
+  }
+
+  if (updatedCount > 0) {
+    await writeTopics(projectPath, data.topics, data.clusters);
+  }
+
+  return { updated: updatedCount, details };
+}
+
+/**
+ * Auto-advance (or correct) topic states based on current metrics.
+ * Evaluates the correct state for each topic and moves it there:
+ *   - shallow → deep when all deep criteria are met
+ *   - deep → saturated when all saturated criteria are met
+ *   - deep → shallow when deep criteria are no longer met (correction)
+ *   - saturated → deep when saturated criteria are no longer met (correction)
+ *
+ * @param {string} projectPath
+ * @returns {Promise<{advanced: number, details: Array<{topicId: string, topicLabel: string, from: string, to: string}>}>}
+ */
+export async function autoAdvanceTopicStates(projectPath) {
+  const data = await readTopics(projectPath);
+  if (data.topics.length === 0) {
+    return { advanced: 0, details: [] };
+  }
+
+  const details = [];
+
+  for (const topic of data.topics) {
+    if (topic.state === "deprecated" || topic.state === "seed" || topic.state === "split_candidate") continue;
+
+    const m = topic.metrics || {};
+    const sourceCount = m.source_count ?? 0;
+    const sourceTypes = m.source_types ?? [];
+    const dataPoints = m.data_point_count ?? 0;
+    const crossRefs = m.cross_references ?? 0;
+    const hasContrarian = m.has_contrarian_evidence ?? false;
+    const gapCount = (topic.coverage_gaps ?? []).length;
+    const depCount = (topic.depends_on ?? []).length;
+
+    // Cross-referencing is waived if the topic has no dependencies
+    const crossRefsMet = crossRefs >= 1 || depCount === 0;
+
+    // Evaluate deep criteria (ALL must hold)
+    const meetsDeep =
+      sourceCount >= 3 && sourceTypes.length >= 2   // Source diversity
+      && dataPoints >= 2                             // Evidence specificity
+      && gapCount <= 1                               // Coverage gap progress
+      && crossRefsMet                                // Cross-referencing
+      && hasContrarian;                              // Contrarian evidence
+
+    // Evaluate saturated criteria (ALL must hold, higher bar)
+    const meetsSaturated = meetsDeep                 // Must still meet deep criteria
+      && gapCount === 0                              // Zero coverage gaps
+      && sourceCount >= 5 && sourceTypes.length >= 3 // Source diversity (higher)
+      && crossRefs >= 2                              // Cross-referencing (higher)
+      && dataPoints >= 5;                            // Evidence completeness (higher)
+
+    // Determine correct state
+    let targetState;
+    if (meetsSaturated) {
+      targetState = "saturated";
+    } else if (meetsDeep) {
+      targetState = "deep";
+    } else {
+      targetState = "shallow";
+    }
+
+    if (targetState !== topic.state) {
+      const from = topic.state;
+      topic.state = targetState;
+      details.push({ topicId: topic.id, topicLabel: topic.label, from, to: targetState });
+    }
+  }
+
+  if (details.length > 0) {
+    await writeTopics(projectPath, data.topics, data.clusters);
+  }
+
+  return { advanced: details.length, details };
+}
+
+/**
+ * Analyze wiki page content to extract depth-relevant metrics.
+ * @param {string} content - The wiki page markdown content
+ * @param {Array} allTopics - All topics in the project (for cross-ref detection)
+ * @param {string} selfId - The topic's own ID (to exclude self-references)
+ * @returns {{dataPointCount: number, crossReferences: number, hasContrarianEvidence: boolean, wordCount: number}}
+ */
+function analyzeWikiContent(content, allTopics, selfId) {
+  // ── Word count ──
+  const wordCount = content.split(/\s+/).filter((w) => w.length > 0).length;
+
+  // ── Data points: concrete, cited claims ──
+  // A data point is a line that contains a specific quantified claim.
+  // We use a line-based approach: split into lines and check each.
+  const lines = content.split("\n");
+  let dataPointCount = 0;
+
+  // Source citation pattern: [[sources/...]] or (Author, Year) style
+  const hasCitation = /\[\[sources\/|(?:\([A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*)?,?\s*(?:19|20)\d{2}\s*\))/;
+
+  // Quantified claim patterns (any of these on a cited line = data point)
+  const quantPatterns = [
+    /\b(?:19|20)\d{2}\b/,                              // Year references (1900s-2000s)
+    /\b\d[\d,]*\s*%/,                                  // Percentages
+    /(?:\$|€|£)\s*[\d,.]+/,                            // Currency
+    /\b\d[\d,]*\s+(?:million|billion|trillion)\b/i,    // Large quantities
+    /\b\d[\d,]*\s+(?:citations?|papers?|authors?|members?|awards?|publications?|volumes?|editions?|copies)\b/i,
+    /(?:ranked?|no\.|#)\s*\d+/i,                       // Rankings
+    /\b\d[\d,]+\s+(?:pages?|chapters?|words?)\b/i,    // Document metrics
+  ];
+
+  for (const line of lines) {
+    // Skip headings, blank lines, mermaid/code blocks
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("```") || trimmed.startsWith("|--")) continue;
+
+    // Option A: line has a source citation AND a quantified claim
+    if (hasCitation.test(line)) {
+      for (const qp of quantPatterns) {
+        if (qp.test(line)) {
+          dataPointCount++;
+          break; // One data point per line max
+        }
+      }
+    } else {
+      // Option B: standalone strong data points (currency, percentages, large numbers)
+      // These are specific enough to count even without an inline citation
+      const strongPatterns = [
+        /\b\d[\d,]*\s*%/,                              // Percentages
+        /(?:\$|€|£)\s*[\d,.]+/,                        // Currency
+        /\b\d[\d,]*\s+(?:million|billion|trillion)\b/i, // Large quantities
+      ];
+      for (const sp of strongPatterns) {
+        if (sp.test(line)) {
+          dataPointCount++;
+          break;
+        }
+      }
+    }
+  }
+
+  // ── Cross-references: links to other wiki pages ──
+  // Match [[outputs_ai/wiki/...]] links that point to OTHER topics
+  const wikiLinkPattern = /\[\[outputs_ai\/wiki\/([^\]]+)\]\]/g;
+  const crossRefPages = new Set();
+  for (const match of content.matchAll(wikiLinkPattern)) {
+    const linkedPage = match[1].replace(/\.md$/, "");
+    // Check if this links to a different topic's wiki page
+    const linkedTopic = allTopics.find(
+      (t) => t.id !== selfId && t.wiki_page && t.wiki_page.includes(linkedPage),
+    );
+    if (linkedTopic) {
+      crossRefPages.add(linkedTopic.id);
+    }
+  }
+
+  // Also check for simpler patterns: "see [[wiki/..." or "(see influence_methodology)"
+  const simpleWikiRef = /\[\[(?:wiki\/|outputs_ai\/wiki\/)([^\]]+)\]\]/g;
+  for (const match of content.matchAll(simpleWikiRef)) {
+    const linkedPage = match[1].replace(/\.md$/, "");
+    const linkedTopic = allTopics.find(
+      (t) => t.id !== selfId && t.wiki_page && t.wiki_page.includes(linkedPage),
+    );
+    if (linkedTopic) {
+      crossRefPages.add(linkedTopic.id);
+    }
+  }
+
+  const crossReferences = crossRefPages.size;
+
+  // ── Contrarian evidence: counterarguments, limitations, alternative views ──
+  const contrarianPatterns = [
+    /\bhowever\b.*(?:critic|argue|contend|challenge|dispute|question|debate)/i,
+    /\bcritics?\s+(?:argue|contend|point|note|suggest|maintain|claim|reply|say|charge|dismiss)/i,
+    /\blimitation(?:s)?\s+(?:of|include|are|is)/i,
+    /\bcounterargument/i,
+    /\balternative\s+(?:interpretation|view|perspective|explanation|approach)/i,
+    /\bdespite\s+(?:this|these|the|its)/i,
+    /\bon\s+the\s+other\s+hand\b/i,
+    /\bconversely\b/i,
+    /\bnevertheless\b/i,
+    /\b(?:has|have|is|are)\s+been\s+(?:criticized|challenged|questioned|disputed|debated|contested|dismissed)/i,
+    /\bskeptic(?:s|al|ism)\b/i,
+    /\bcontrovers(?:y|ial)\b/i,
+    /\bdrawback/i,
+    /\bweakness(?:es)?\b/i,
+    /\bcaveat/i,
+    /\bcontested\b/i,
+    /\bcritique(?:s|d)?\b/i,
+    /\bobjection(?:s)?\b/i,
+    /\bdismiss(?:es|ed)?\b/i,
+    /\brebut(?:s|ted|tal)?\b/i,
+  ];
+  const hasContrarianEvidence = contrarianPatterns.some((p) => p.test(content));
+
+  return { dataPointCount, crossReferences, hasContrarianEvidence, wordCount };
+}
+
+/**
  * Extract the topic→digest mapping from the research plan.
  * Used by wiki triage to map new digests to deepen-queued topics
  * before source reconciliation has run.

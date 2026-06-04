@@ -148,7 +148,158 @@ describe("buildScope", () => {
     const scope = await computeBuildScope(TEST_ROOT);
     // buildScope no longer tracks humanInputsChanged — that's the ledger's job
     expect(scope.humanInputsChanged).toBeUndefined();
-    // skipResearchPlan is true because projectMd matches and no feedback markers
+    // skipResearchPlan is true because projectMd matches, no feedback markers,
+    // and no topics.json means no unsourced topics
     expect(scope.skipResearchPlan).toBe(true);
+  });
+
+  it("does not skip Phase 1 when topics have zero sources", async () => {
+    const content = "# Test Project\n\nSame goal\n";
+    const { createHash } = await import("node:crypto");
+    const hash = createHash("sha256").update(content).digest("hex");
+
+    await createProject({
+      "project.md": content,
+      ".build/manifest.json": JSON.stringify({
+        version: 1,
+        last_build: "2026-05-17T00:00:00Z",
+        project_md_hash: hash,
+        directed_outputs: [],
+        wiki_pages: [],
+      }),
+      ".build/topics.json": JSON.stringify({
+        version: 2,
+        last_updated: "2026-05-17T00:00:00Z",
+        topics: [
+          {
+            id: "topic_with_sources",
+            label: "Topic With Sources",
+            state: "deep",
+            sources: [{ path: "sources/web_research/some_source.md", relevance: 0.9 }],
+          },
+          {
+            id: "topic_without_sources",
+            label: "Topic Without Sources",
+            state: "shallow",
+            sources: [],
+          },
+        ],
+      }),
+    });
+
+    const scope = await computeBuildScope(TEST_ROOT);
+    expect(scope.skipResearchPlan).toBe(false);
+    expect(scope.hasUnsourcedTopics).toBe(true);
+    expect(scope.unsourcedTopicCount).toBe(1);
+  });
+
+  it("does not skip Phase 1 when topics are queued for deepen", async () => {
+    const content = "# Test Project\n\nSame goal\n";
+    const { createHash } = await import("node:crypto");
+    const hash = createHash("sha256").update(content).digest("hex");
+
+    await createProject({
+      "project.md": content,
+      ".build/manifest.json": JSON.stringify({
+        version: 1,
+        last_build: "2026-05-17T00:00:00Z",
+        project_md_hash: hash,
+        directed_outputs: [],
+        wiki_pages: [],
+      }),
+      ".build/topics.json": JSON.stringify({
+        version: 2,
+        last_updated: "2026-05-17T00:00:00Z",
+        topics: [
+          {
+            id: "topic_queued",
+            label: "Topic Queued",
+            state: "shallow",
+            sources: [{ path: "sources/web_research/old.md", relevance: 0.8 }],
+            queued_for_deepen: true,
+          },
+        ],
+      }),
+    });
+
+    const scope = await computeBuildScope(TEST_ROOT);
+    expect(scope.skipResearchPlan).toBe(false);
+    expect(scope.hasDeepenQueue).toBe(true);
+    expect(scope.deepenQueueCount).toBe(1);
+  });
+
+  it("skips Phase 1 when all topics have sources and none are queued", async () => {
+    const content = "# Test Project\n\nSame goal\n";
+    const { createHash } = await import("node:crypto");
+    const hash = createHash("sha256").update(content).digest("hex");
+
+    await createProject({
+      "project.md": content,
+      ".build/manifest.json": JSON.stringify({
+        version: 1,
+        last_build: "2026-05-17T00:00:00Z",
+        project_md_hash: hash,
+        directed_outputs: [],
+        wiki_pages: [],
+      }),
+      ".build/topics.json": JSON.stringify({
+        version: 2,
+        last_updated: "2026-05-17T00:00:00Z",
+        topics: [
+          {
+            id: "topic_good",
+            label: "Fully Sourced Topic",
+            state: "deep",
+            sources: [{ path: "sources/web_research/a.md", relevance: 0.9 }],
+            queued_for_deepen: false,
+          },
+        ],
+      }),
+    });
+
+    const scope = await computeBuildScope(TEST_ROOT);
+    expect(scope.skipResearchPlan).toBe(true);
+    expect(scope.hasUnsourcedTopics).toBe(false);
+    expect(scope.hasDeepenQueue).toBe(false);
+  });
+
+  it("ignores deprecated and seed topics for unsourced check", async () => {
+    const content = "# Test Project\n\nSame goal\n";
+    const { createHash } = await import("node:crypto");
+    const hash = createHash("sha256").update(content).digest("hex");
+
+    await createProject({
+      "project.md": content,
+      ".build/manifest.json": JSON.stringify({
+        version: 1,
+        last_build: "2026-05-17T00:00:00Z",
+        project_md_hash: hash,
+        directed_outputs: [],
+        wiki_pages: [],
+      }),
+      ".build/topics.json": JSON.stringify({
+        version: 2,
+        last_updated: "2026-05-17T00:00:00Z",
+        topics: [
+          {
+            id: "deprecated_topic",
+            label: "Old Topic",
+            state: "deprecated",
+            sources: [],
+          },
+          {
+            id: "seed_topic",
+            label: "Seed Topic",
+            state: "seed",
+            sources: [],
+          },
+        ],
+      }),
+    });
+
+    const scope = await computeBuildScope(TEST_ROOT);
+    // Deprecated and seed topics should not trigger research
+    expect(scope.skipResearchPlan).toBe(true);
+    expect(scope.hasUnsourcedTopics).toBe(false);
   });
 });
