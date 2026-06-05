@@ -316,6 +316,7 @@ export function App() {
             fileWorkspace={fileWorkspace}
             onAiFileAssist={() => void chatActions.assistCurrentFile()}
             onAddTopicToChat={addTopicToChat}
+            onNewTopicViaChat={chatActions.requestNewTopicViaChat}
             onOpenFile={openProjectFileWithAgentContext}
             projectChat={projectChat}
             projectSlug={project.selectedProjectSlug}

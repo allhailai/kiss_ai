@@ -31,6 +31,7 @@ export function MainContentArea({
   fileWorkspace,
   onAiFileAssist,
   onAddTopicToChat,
+  onNewTopicViaChat,
   onOpenFile,
   projectChat,
   projectSlug,
@@ -42,6 +43,7 @@ export function MainContentArea({
   fileWorkspace: FileWorkspaceController;
   onAiFileAssist: () => void;
   onAddTopicToChat: (topicId: string, label: string) => void;
+  onNewTopicViaChat: () => void;
   onOpenFile: (path: string) => void;
   projectChat: ProjectChatController;
   projectSlug: string;
@@ -62,6 +64,7 @@ export function MainContentArea({
           onModelChange={rebuildWorkspace.setSelectedModelId}
           onNavigateToFile={onOpenFile}
           onAddTopicToChat={onAddTopicToChat}
+          onNewTopicViaChat={onNewTopicViaChat}
           projectChat={projectChat}
           projectSlug={projectSlug}
           selectProjectChatConversation={selectProjectChatConversation}

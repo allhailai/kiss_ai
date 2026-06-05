@@ -110,6 +110,7 @@ export function AIWorkspace({
   onModelChange,
   onNavigateToFile,
   onAddTopicToChat,
+  onNewTopicViaChat,
   projectChat,
   projectSlug,
   selectProjectChatConversation,
@@ -121,6 +122,7 @@ export function AIWorkspace({
   onModelChange: (modelId: string) => void;
   onNavigateToFile: (path: string) => void;
   onAddTopicToChat: (topicId: string, label: string) => void;
+  onNewTopicViaChat: () => void;
   projectChat: ProjectChatController;
   projectSlug: string;
   selectProjectChatConversation: (conversationId: string) => void;
@@ -235,6 +237,7 @@ export function AIWorkspace({
           <TopicsWorkspace
             onNavigateToFile={onNavigateToFile}
             onAddTopicToChat={onAddTopicToChat}
+            onNewTopicViaChat={onNewTopicViaChat}
             projectSlug={projectSlug}
             refreshKey={topicsRefreshKey}
           />

@@ -960,30 +960,3 @@
 .topics-new-topic-button:hover {
   background: color-mix(in srgb, var(--color-accent) 85%, black);
 }
-
-.topics-new-topic-button.active {
-  background: var(--color-surface);
-  color: var(--color-secondary);
-  border-color: var(--color-border);
-}
-
-.topics-new-topic-button.active:hover {
-  border-color: color-mix(in srgb, var(--color-secondary) 50%, var(--color-border));
-  color: var(--color-primary);
-}
-
-.topics-new-topic-form {
-  margin-top: 4px;
-  animation: topics-form-slide-in 0.2s ease-out;
-}
-
-@keyframes topics-form-slide-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}

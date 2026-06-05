@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Topic } from "../../contracts/api";
 import { useBuildContext } from "../../app/contexts/BuildContext";
-import { TopicConfirmationCard } from "../../shared/TopicConfirmationCard";
-import { projectsApi } from "../../data/projectsApi";
 import { TopicCard } from "./TopicCard";
 import { type TopicsFilter, isActiveTopic, parseFilterFromHash, setFilterInHash } from "./topicHelpers";
 
 export function TopicsWorkspace({
   onNavigateToFile,
   onAddTopicToChat,
+  onNewTopicViaChat,
   projectSlug,
   refreshKey = 0,
 }: {
   onNavigateToFile: (path: string) => void;
   onAddTopicToChat: (topicId: string, label: string) => void;
+  onNewTopicViaChat: () => void;
   projectSlug: string;
   refreshKey?: number;
 }) {
@@ -23,7 +23,6 @@ export function TopicsWorkspace({
   const [loading, setLoading] = useState(true);
   const [filter, setFilterState] = useState<TopicsFilter>(parseFilterFromHash);
   const [error, setError] = useState<string | null>(null);
-  const [showNewTopicForm, setShowNewTopicForm] = useState(false);
 
   const setFilter = useCallback((f: TopicsFilter) => {
     setFilterState(f);
@@ -288,12 +287,12 @@ export function TopicsWorkspace({
             ))}
           </div>
           <button
-            className={`topics-new-topic-button${showNewTopicForm ? " active" : ""}`}
-            onClick={() => setShowNewTopicForm((prev) => !prev)}
-            title={showNewTopicForm ? "Close new topic form" : "Create a new research topic"}
+            className="topics-new-topic-button"
+            onClick={onNewTopicViaChat}
+            title="Create a new research topic via AI chat"
             type="button"
           >
-            {showNewTopicForm ? "Cancel" : "+ New Topic"}
+            + New Topic
           </button>
           <div className="topics-action-buttons">
             {shallowCount > 0 ? (
@@ -319,22 +318,6 @@ export function TopicsWorkspace({
             ) : null}
           </div>
         </div>
-        {showNewTopicForm ? (
-          <div className="topics-new-topic-form">
-            <TopicConfirmationCard
-              projectSlug={projectSlug}
-              isBuilding={isBuilding}
-              listTopics={projectsApi.topics}
-              createTopic={projectsApi.createTopic}
-              onCreated={() => {
-                setShowNewTopicForm(false);
-                void fetchTopics();
-              }}
-              onDeepenNow={handleDeepenNow}
-              onCancel={() => setShowNewTopicForm(false)}
-            />
-          </div>
-        ) : null}
       </header>
 
       {error ? <p className="topics-error">{error}</p> : null}

@@ -235,6 +235,16 @@ export function useChatActions({
     toastWorkspace.setNotice(`Prepared AI File Assist for ${savedFile.path}.`);
   }, [fileWorkspace, openAgentChatPanel, projectChat, toastWorkspace]);
 
+  const requestNewTopicViaChat = useCallback(() => {
+    if (projectChat.loading || projectChat.sending || projectChat.proposalUpdating) return;
+    projectChat.startDraftConversation();
+    openAgentChatPanel();
+    setAgentDraftSeed({
+      id: `new-topic:${Date.now()}`,
+      draft: "I'd like to create a new topic. The name and description are:\n\n",
+    });
+  }, [openAgentChatPanel, projectChat]);
+
   return useMemo(
     () => ({
       agentDraftSeed,
@@ -244,7 +254,8 @@ export function useChatActions({
       assistCurrentFile,
       handleCreateTopic,
       refreshAfterMutation,
+      requestNewTopicViaChat,
     }),
-    [agentDraftSeed, applyChatArtifactRename, applyChatFileEdit, applyChatFileRename, assistCurrentFile, handleCreateTopic, refreshAfterMutation],
+    [agentDraftSeed, applyChatArtifactRename, applyChatFileEdit, applyChatFileRename, assistCurrentFile, handleCreateTopic, refreshAfterMutation, requestNewTopicViaChat],
   );
 }

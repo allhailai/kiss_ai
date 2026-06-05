@@ -202,6 +202,7 @@ export function ReviewWorkspace({
   onModelChange,
   onNavigateToFile,
   onAddTopicToChat,
+  onNewTopicViaChat,
   projectSlug,
   selectedModelId,
 }: {
@@ -209,6 +210,7 @@ export function ReviewWorkspace({
   onModelChange: (modelId: string) => void;
   onNavigateToFile: (path: string) => void;
   onAddTopicToChat: (topicId: string, label: string) => void;
+  onNewTopicViaChat: () => void;
   projectSlug: string;
   selectedModelId: string;
 }) {
@@ -320,6 +322,7 @@ export function ReviewWorkspace({
           <TopicsWorkspace
             onNavigateToFile={onNavigateToFile}
             onAddTopicToChat={onAddTopicToChat}
+            onNewTopicViaChat={onNewTopicViaChat}
             projectSlug={projectSlug}
           />
         ) : null}

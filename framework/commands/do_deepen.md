@@ -59,7 +59,7 @@ The build pipeline provides these values:
    - If **contrarian evidence** is unmet: explicitly search for criticism, limitations, opposing viewpoints, or alternative interpretations of the topic.
    - **Coverage gaps are the #1 priority.** For each gap in `TOPIC_COVERAGE_GAPS`, use its `search_hints` as search queries and include its `target_urls` in the research plan. If a gap has `attempts >= 2`, try alternative search strategies (different keywords, adjacent topics, broader/narrower scope). Every gap should have at least one search dedicated to resolving it.
    - If **cross-referencing** is unmet: read dependency topic wiki pages and identify connection points to weave in during synthesis.
-   - Aim for 3–6 new URLs. Quality over quantity. Prioritize primary and academic sources.
+   - Aim for 6–8 new URLs. Quality over quantity. Prioritize primary and academic sources. Cast a wider net to compensate for sources that may fail to fetch.
 11. Write `sources/research_plan.json` with ONLY the new URLs for this topic. Do not include URLs that are already in `sources/web_research/`. Use the same schema as `do_build_research.md`:
 
 ```json
