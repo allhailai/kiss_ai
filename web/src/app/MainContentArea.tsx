@@ -75,7 +75,7 @@ export function MainContentArea({
           aiFileAssistDisabled={fileWorkspace.loading || projectChat.loading || projectChat.sending || projectChat.proposalUpdating}
           projectFiles={fileWorkspace.projectFiles}
           onDraft={fileWorkspace.setDraft}
-          onAiFileAssist={onAiFileAssist}
+          onAiFileAssist={route.view !== "requirements" ? onAiFileAssist : undefined}
           onNotice={toastWorkspace.setNotice}
           onOpenFile={onOpenFile}
           onRevert={() => void fileWorkspace.revertSelected()}
