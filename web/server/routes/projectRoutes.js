@@ -3,38 +3,9 @@ import { readQuestions, answerQuestion, getQuestionCounts } from "../services/qu
 
 import { readTopics, resolveTopic, updateTopic, setDisposition, getTopicCounts, toggleDeepenQueue, queueAllShallowForDeepen, getDeepenLog, createTopic } from "../services/topicsService.js";
 
-function extractOpenQuestions(content) {
-  const lines = content.split("\n");
-  const openSection = [];
-  let inOpenQuestions = false;
 
-  for (const line of lines) {
-    if (/^##\s+Open Questions\s*$/i.test(line.trim())) {
-      inOpenQuestions = true;
-      continue;
-    }
-    if (inOpenQuestions && /^##\s+/.test(line.trim())) break;
-    if (inOpenQuestions) openSection.push(line.trim());
-  }
 
-  return openSection
-    .filter((line) => /^[-*]\s+\S/.test(line) || /^\d+\.\s+\S/.test(line) || /\?$/.test(line))
-    .filter((line) => !/^no open questions/i.test(line.replace(/^[-*]\s+|^\d+\.\s+/, "")))
-    .slice(0, 20);
-}
-
-async function readOpenQuestions(readTextFile, projectRoot) {
-  // Try v2 questions.md first, then fall back to v1 human_open_questions.md
-  for (const questionsPath of ["questions.md", "human_open_questions.md"]) {
-    try {
-      const file = await readTextFile(projectRoot, questionsPath);
-      return extractOpenQuestions(file.content);
-    } catch {
-      // try next
-    }
-  }
-  return [];
-}
+import { getProjectStatus } from "../services/projectStatus.js";
 
 export function registerProjectRoutes(app, {
   PROJECTS_ROOT,
@@ -122,51 +93,17 @@ export function registerProjectRoutes(app, {
 
   app.get("/api/projects/:projectSlug/status", async (request, response, next) => {
     try {
-      const project = request.project;
-      // Try v2 manifest first, fall back to v1 harness-state
-      const manifest = await readProjectJson(project.path, ".build/manifest.json", null);
-      const harness = manifest ? {} : await readProjectJson(project.path, ".harness-state.json", {});
-      const cursorApiKey = await resolveCursorApiKey();
-      const humanAttentionItems = getHumanAttentionItems(harness);
-      const questionCounts = await getQuestionCounts(project.path);
-
-      const topicCounts = await getTopicCounts(project.path);
-
-      response.json({
-        projectSlug: manifest?.project_slug ?? harness.project_slug ?? project.slug,
-        projectName: displayProjectName(manifest?.project_name ?? harness.project_name ?? project.name, project.slug),
-        setupStatus: manifest ? (manifest.last_build ? "built" : "initialized") : (harness.setup?.status ?? "unknown"),
-        setupInitializedAt: manifest?.created_at ?? harness.setup?.initialized_at ?? null,
-        lastRunAt: manifest?.last_build?.finished_at ?? harness.last_run_at ?? null,
-        lastSuccessfulRunAt: manifest?.last_build?.finished_at ?? harness.last_successful_run_at ?? null,
-        scalingMode: harness.scaling_assessment?.selected_mode ?? null,
-        rebuildStatus: harness.rebuild_scope?.status ?? null,
-        lintStatus: harness.last_lint?.status ?? null,
-        unresolvedReviewItems: harness.last_annotation_scan?.unresolved_review_items ?? [],
-        blockedArtifacts: harness.rebuild_scope?.blocked_artifacts ?? [],
-        staleOutputs: harness.rebuild_scope?.outputs_marked_stale ?? [],
-        humanAttentionItems,
-        humanAttentionCount: humanAttentionItems.length,
-        openQuestionsCount: questionCounts.openQuestionsCount,
-        blockingQuestionsCount: questionCounts.blockingQuestionsCount,
-        totalQuestionsCount: questionCounts.totalQuestionsCount,
-
-        seedTopicsCount: topicCounts.seedTopicsCount,
-        totalTopicsCount: topicCounts.totalTopicsCount,
-        parkedTopicsCount: topicCounts.parkedTopicsCount,
-        settledTopicsCount: topicCounts.settledTopicsCount,
-        cursorApiKeyAvailable: cursorApiKey.available,
-        cursorApiKeySource: cursorApiKey.source,
-        cursorApiKeyWarnings: cursorApiKey.warnings,
-        gitStatus: await gitStatus(project.path),
-        // v2 annotation counts from manifest
-        annotationCounts: manifest ? {
-          feedbackApplied: manifest.feedback_applied ?? 0,
-          coverageGapsWritten: manifest.coverage_gaps_written ?? 0,
-          autonomousActions: manifest.autonomous_actions ?? 0,
-        } : null,
-        buildNotes: manifest?.build_notes ?? null,
+      const status = await getProjectStatus({
+        project: request.project,
+        readProjectJson,
+        resolveCursorApiKey,
+        getHumanAttentionItems,
+        getQuestionCounts,
+        getTopicCounts,
+        gitStatus,
+        displayProjectName,
       });
+      response.json(status);
     } catch (error) {
       next(error);
     }
