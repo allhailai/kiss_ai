@@ -30,6 +30,7 @@ export function SimplifiedNavigator({
   onDeleteProjectFile,
   onDeleteProjectFolder,
   onMoveFile,
+  onNewArtifactViaChat,
   onUploadFiles,
   onOpenView,
   onOpenFile,
@@ -50,6 +51,7 @@ export function SimplifiedNavigator({
   onDeleteProjectFile?: (path: string) => void;
   onDeleteProjectFolder?: (folder: string) => void;
   onMoveFile?: (sourcePath: string, targetFolder: string) => void;
+  onNewArtifactViaChat?: () => void;
   onUploadFiles?: (files: File[]) => Promise<void>;
   onOpenView: (view: View, path?: string | null) => void;
   onOpenFile: (path: string) => void;
@@ -242,6 +244,7 @@ export function SimplifiedNavigator({
           loading={loading}
           onDeleteProjectFile={onDeleteProjectFile}
           onDeleteProjectFolder={onDeleteProjectFolder}
+          onNewArtifactViaChat={onNewArtifactViaChat}
           onOpenFile={onOpenFile}
           onOpenView={onOpenView}
           projectSlug={projectSlug}

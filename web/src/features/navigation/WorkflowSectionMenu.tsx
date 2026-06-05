@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { defineNavTarget } from "../../navigation/navigationModel";
 import { projectPathPrefixes } from "../../domain/projectPaths";
 import { type View } from "../../navigation/views";
@@ -176,6 +176,7 @@ export function OutputsSectionBody({
   loading,
   onDeleteProjectFile,
   onDeleteProjectFolder,
+  onNewArtifactViaChat,
   onOpenFile,
   onOpenView,
   projectSlug,
@@ -191,6 +192,7 @@ export function OutputsSectionBody({
   loading: boolean;
   onDeleteProjectFile?: (path: string) => void;
   onDeleteProjectFolder?: (folder: string) => void;
+  onNewArtifactViaChat?: () => void;
   onOpenFile: (path: string) => void;
   onOpenView: (view: View, path?: string | null) => void;
   projectSlug: string;
@@ -202,7 +204,7 @@ export function OutputsSectionBody({
 }) {
   return (
     <>
-      {/* ── 4) Reports ────────────────────────────────────── */}
+      {/* ── Reports ───────────────────────────────────────── */}
       <div className="nav-subsection">
         <button
           className={`nav-section-trigger${currentView === "reports" ? " active" : ""}`}
@@ -213,7 +215,7 @@ export function OutputsSectionBody({
           type="button"
           aria-expanded={expandedSubsections.has("reports")}
         >
-          <span className="nav-section-label"><strong>4) Reports</strong></span>
+          <span className="nav-section-label"><strong>Reports</strong></span>
           <b aria-hidden="true">{expandedSubsections.has("reports") ? "-" : "+"}</b>
         </button>
 
@@ -231,7 +233,7 @@ export function OutputsSectionBody({
         ) : null}
       </div>
 
-      {/* ── 5) Artifacts ──────────────────────────────────── */}
+      {/* ── Artifacts ─────────────────────────────────────── */}
       <div className="nav-subsection">
         <button
           className={`nav-section-trigger${currentView === "artifacts" ? " active" : ""}`}
@@ -242,7 +244,7 @@ export function OutputsSectionBody({
           type="button"
           aria-expanded={expandedSubsections.has("artifacts")}
         >
-          <span className="nav-section-label"><strong>5) Artifacts</strong></span>
+          <span className="nav-section-label"><strong>Artifacts</strong></span>
           <b aria-hidden="true">{expandedSubsections.has("artifacts") ? "-" : "+"}</b>
         </button>
 
@@ -253,6 +255,7 @@ export function OutputsSectionBody({
               selectedArtifactSlug={selectedArtifactSlug}
               isActive={currentView === "artifacts"}
               rebuildRunning={rebuildRunning}
+              onNewArtifactViaChat={onNewArtifactViaChat}
               onOpenView={onOpenView}
             />
           </div>
@@ -269,19 +272,17 @@ function ArtifactNavSection({
   selectedArtifactSlug,
   isActive,
   rebuildRunning,
+  onNewArtifactViaChat,
   onOpenView,
 }: {
   projectSlug: string;
   selectedArtifactSlug: string | null;
   isActive: boolean;
   rebuildRunning: boolean;
+  onNewArtifactViaChat?: () => void;
   onOpenView: (view: View, path?: string | null) => void;
 }) {
   const [artifacts, setArtifacts] = useState<ArtifactSpec[]>([]);
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const nameInputRef = useRef<HTMLInputElement | null>(null);
   const wasRunningRef = useRef(false);
 
   const refreshList = useCallback(async () => {
@@ -313,32 +314,9 @@ function ArtifactNavSection({
     wasRunningRef.current = rebuildRunning;
   }, [rebuildRunning, refreshList]);
 
-  useEffect(() => {
-    if (showForm && nameInputRef.current) {
-      nameInputRef.current.focus();
-    }
-  }, [showForm]);
-
-  async function handleCreate() {
-    const trimmed = newName.trim();
-    if (!trimmed) return;
-    setCreating(true);
-    try {
-      const result = await artifactsApi.create(projectSlug, trimmed, "## Goal\n\nDescribe the goal of this artifact...\n");
-      await refreshList();
-      onOpenView("artifacts", result.slug);
-      setNewName("");
-      setShowForm(false);
-    } catch {
-      // Ignore — inline form, no toast access
-    } finally {
-      setCreating(false);
-    }
-  }
-
   return (
     <>
-      {artifacts.length === 0 && !showForm ? (
+      {artifacts.length === 0 ? (
         <p className="simple-nav-state">No artifacts yet.</p>
       ) : (
         <div className="simple-nav-children">
@@ -368,45 +346,14 @@ function ArtifactNavSection({
         <div className="human-input-action-row">
           <button
             className="human-input-action-button"
-            onClick={() => setShowForm((prev) => !prev)}
+            onClick={onNewArtifactViaChat}
             type="button"
-            title="Create a new artifact"
-            aria-expanded={showForm}
+            title="Create a new artifact via AI chat"
           >
             <span className="human-input-action-icon" aria-hidden="true">+</span>
             <span>New artifact</span>
           </button>
         </div>
-
-        {showForm ? (
-          <form
-            className="human-input-name-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void handleCreate();
-            }}
-          >
-            <input
-              ref={nameInputRef}
-              className="human-input-name-input"
-              type="text"
-              placeholder="Artifact name…"
-              value={newName}
-              onChange={(event) => setNewName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") setShowForm(false);
-              }}
-              maxLength={120}
-            />
-            <button
-              className="human-input-name-submit"
-              type="submit"
-              disabled={!newName.trim() || creating}
-            >
-              Create
-            </button>
-          </form>
-        ) : null}
       </div>
     </>
   );

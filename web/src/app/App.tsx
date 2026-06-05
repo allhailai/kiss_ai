@@ -306,6 +306,7 @@ export function App() {
             leftNavWidth={leftNavWidth}
             onCollapse={() => setSidebarCollapsed(true)}
             onExpand={() => setSidebarCollapsed(false)}
+            onNewArtifactViaChat={chatActions.requestNewArtifactViaChat}
             onOpenFile={openProjectFileWithAgentContext}
             projectSlug={project.selectedProjectSlug}
             rebuildWorkspace={rebuildWorkspace}

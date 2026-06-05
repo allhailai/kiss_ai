@@ -33,6 +33,7 @@ export function AppSidebar({
   leftNavWidth,
   onCollapse,
   onExpand,
+  onNewArtifactViaChat,
   onOpenFile,
   projectSlug,
   rebuildWorkspace,
@@ -64,6 +65,7 @@ export function AppSidebar({
   };
   onCollapse: () => void;
   onExpand: () => void;
+  onNewArtifactViaChat: () => void;
   onOpenFile: (path: string) => void;
   projectSlug: string;
   rebuildWorkspace: {
@@ -155,6 +157,7 @@ export function AppSidebar({
           onDeleteProjectFile={(path) => void fileWorkspace.deleteProjectFile(path)}
           onDeleteProjectFolder={(folder) => void fileWorkspace.deleteProjectFolder(folder)}
           onMoveFile={(sourcePath, targetFolder) => void fileWorkspace.moveHumanInputFile(sourcePath, targetFolder)}
+          onNewArtifactViaChat={onNewArtifactViaChat}
           onUploadFiles={fileWorkspace.uploadHumanInputFiles}
           onOpenFile={onOpenFile}
           onOpenView={(nextView, filePath) => route.navigateTo(nextView, filePath)}

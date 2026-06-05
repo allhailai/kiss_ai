@@ -245,6 +245,16 @@ export function useChatActions({
     });
   }, [openAgentChatPanel, projectChat]);
 
+  const requestNewArtifactViaChat = useCallback(() => {
+    if (projectChat.loading || projectChat.sending || projectChat.proposalUpdating) return;
+    projectChat.startDraftConversation();
+    openAgentChatPanel();
+    setAgentDraftSeed({
+      id: `new-artifact:${Date.now()}`,
+      draft: "I'd like to create a new artifact. The name and description are:\n\n",
+    });
+  }, [openAgentChatPanel, projectChat]);
+
   return useMemo(
     () => ({
       agentDraftSeed,
@@ -254,8 +264,9 @@ export function useChatActions({
       assistCurrentFile,
       handleCreateTopic,
       refreshAfterMutation,
+      requestNewArtifactViaChat,
       requestNewTopicViaChat,
     }),
-    [agentDraftSeed, applyChatArtifactRename, applyChatFileEdit, applyChatFileRename, assistCurrentFile, handleCreateTopic, refreshAfterMutation, requestNewTopicViaChat],
+    [agentDraftSeed, applyChatArtifactRename, applyChatFileEdit, applyChatFileRename, assistCurrentFile, handleCreateTopic, refreshAfterMutation, requestNewArtifactViaChat, requestNewTopicViaChat],
   );
 }
