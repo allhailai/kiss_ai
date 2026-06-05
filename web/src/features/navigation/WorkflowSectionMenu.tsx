@@ -204,7 +204,7 @@ export function OutputsSectionBody({
 }) {
   return (
     <>
-      {/* ── 4) Reports ────────────────────────────────────── */}
+      {/* ── Reports ───────────────────────────────────────── */}
       <div className="nav-subsection">
         <button
           className={`nav-section-trigger${currentView === "reports" ? " active" : ""}`}
@@ -215,7 +215,7 @@ export function OutputsSectionBody({
           type="button"
           aria-expanded={expandedSubsections.has("reports")}
         >
-          <span className="nav-section-label"><strong>4) Reports</strong></span>
+          <span className="nav-section-label"><strong>Reports</strong></span>
           <b aria-hidden="true">{expandedSubsections.has("reports") ? "-" : "+"}</b>
         </button>
 
@@ -233,7 +233,7 @@ export function OutputsSectionBody({
         ) : null}
       </div>
 
-      {/* ── 5) Artifacts ──────────────────────────────────── */}
+      {/* ── Artifacts ─────────────────────────────────────── */}
       <div className="nav-subsection">
         <button
           className={`nav-section-trigger${currentView === "artifacts" ? " active" : ""}`}
@@ -244,7 +244,7 @@ export function OutputsSectionBody({
           type="button"
           aria-expanded={expandedSubsections.has("artifacts")}
         >
-          <span className="nav-section-label"><strong>5) Artifacts</strong></span>
+          <span className="nav-section-label"><strong>Artifacts</strong></span>
           <b aria-hidden="true">{expandedSubsections.has("artifacts") ? "-" : "+"}</b>
         </button>
 
