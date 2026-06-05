@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { defineNavTarget } from "../../navigation/navigationModel";
 import { projectPathPrefixes } from "../../domain/projectPaths";
 import { type View } from "../../navigation/views";
-import type { ArtifactSpec, ProjectFile } from "../../contracts/api";
+import type { ArtifactSpec, FileChangeStatus, ProjectFile } from "../../contracts/api";
 import { FileTreeNav } from "./FileTreeNav";
 import { artifactsApi } from "../../data/artifactsApi";
 
@@ -11,6 +11,7 @@ import { artifactsApi } from "../../data/artifactsApi";
 export function KnowledgebaseSectionBody({
   currentView,
   expandedSubsections,
+  fileChanges,
   humanInputEmptyDirectories,
   humanInputFiles,
   loading,
@@ -31,6 +32,7 @@ export function KnowledgebaseSectionBody({
 }: {
   currentView: View;
   expandedSubsections: Set<string>;
+  fileChanges: Record<string, FileChangeStatus>;
   humanInputEmptyDirectories?: string[];
   humanInputFiles: ProjectFile[];
   loading: boolean;
@@ -98,6 +100,7 @@ export function KnowledgebaseSectionBody({
             <FileTreeBlock
               emptyLabel="No human-acquired files yet."
               emptyDirectories={humanInputEmptyDirectories}
+              fileChanges={fileChanges}
               files={humanInputFiles}
               loading={loading && currentView === "inputs"}
               onCreateTextFile={onCreateTextFile}
@@ -122,10 +125,9 @@ export function KnowledgebaseSectionBody({
             </button>
             <FileTreeBlock
               emptyLabel="No source files yet. Run a build to gather sources."
+              fileChanges={fileChanges}
               files={sourceFiles}
               loading={loading && currentView === "inputs"}
-              onDeleteFile={onDeleteProjectFile}
-              onDeleteFolder={onDeleteProjectFolder}
               onOpenFile={onOpenFile}
               selectedPath={selectedPath}
             />
@@ -152,10 +154,9 @@ export function KnowledgebaseSectionBody({
           <div className="nav-section-body">
             <FileTreeBlock
               emptyLabel="No wiki pages yet. Run a knowledge build first."
+              fileChanges={fileChanges}
               files={wikiFiles}
               loading={loading && currentView === "outputs"}
-              onDeleteFile={onDeleteProjectFile}
-              onDeleteFolder={onDeleteProjectFolder}
               onOpenFile={onOpenFile}
               selectedPath={selectedPath}
             />
@@ -171,6 +172,7 @@ export function KnowledgebaseSectionBody({
 export function OutputsSectionBody({
   currentView,
   expandedSubsections,
+  fileChanges,
   loading,
   onDeleteProjectFile,
   onDeleteProjectFolder,
@@ -185,6 +187,7 @@ export function OutputsSectionBody({
 }: {
   currentView: View;
   expandedSubsections: Set<string>;
+  fileChanges: Record<string, FileChangeStatus>;
   loading: boolean;
   onDeleteProjectFile?: (path: string) => void;
   onDeleteProjectFolder?: (folder: string) => void;
@@ -218,10 +221,9 @@ export function OutputsSectionBody({
           <div className="nav-section-body">
             <FileTreeBlock
               emptyLabel="No reports yet. Create one with the chat agent."
+              fileChanges={fileChanges}
               files={reportFiles}
               loading={loading && currentView === "reports"}
-              onDeleteFile={onDeleteProjectFile}
-              onDeleteFolder={onDeleteProjectFolder}
               onOpenFile={onOpenFile}
               selectedPath={selectedPath}
             />
@@ -561,6 +563,7 @@ export function HumanInputActions({
 export function FileTreeBlock({
   emptyLabel,
   emptyDirectories,
+  fileChanges,
   files,
   loading,
   selectedPath,
@@ -573,6 +576,7 @@ export function FileTreeBlock({
 }: {
   emptyLabel: string;
   emptyDirectories?: string[];
+  fileChanges?: Record<string, FileChangeStatus>;
   files: ProjectFile[];
   loading: boolean;
   selectedPath: string | null;
@@ -609,6 +613,7 @@ export function FileTreeBlock({
 
   const content = hasContent ? (
     <FileTreeNav
+      fileChanges={fileChanges}
       files={files}
       emptyDirectories={emptyDirectories}
       selectedPath={selectedPath}

@@ -9,7 +9,7 @@ vi.mock("node:fs/promises", () => {
       readFile: vi.fn(async (filePath) => {
         const key = filePath.replace(/\\/g, "/");
         if (store.has(key)) return store.get(key);
-        const err = new Error(`ENOENT: ${key}`);
+        const err = /** @type {any} */ (new Error(`ENOENT: ${key}`));
         err.code = "ENOENT";
         throw err;
       }),
@@ -33,6 +33,7 @@ let topicsModule;
 beforeEach(async () => {
   vi.clearAllMocks();
   fsModule = (await import("node:fs/promises"));
+  // @ts-expect-error -- accessing mock-internal _store
   fsModule._store.clear();
   topicsModule = (await import("./topicsService.js"));
 });
@@ -241,6 +242,7 @@ describe("createAutoArtifactSpecs with coveredTopicIds", () => {
       modelId: "test-model",
       isFirstBuild: false,
       topics,
+      coveredTopicIds: undefined,
     });
 
     expect(result.created).toContain("topic_strat");

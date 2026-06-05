@@ -420,7 +420,13 @@ export async function executeResearchPlan(projectPath, plan, onProgress) {
           return { entry, result: null, skipped: true };
         }
 
-        const result = await fetchAndExtract(entry.url);
+        const HARD_TIMEOUT_MS = 45_000;
+        const result = await Promise.race([
+          fetchAndExtract(entry.url),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Hard timeout after ${HARD_TIMEOUT_MS / 1000}s`)), HARD_TIMEOUT_MS),
+          ),
+        ]).catch((err) => ({ error: err.message || "Fetch timed out", url: entry.url }));
         return { entry, result, skipped: false };
       }),
     );

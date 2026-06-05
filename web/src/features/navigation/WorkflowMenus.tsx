@@ -6,7 +6,7 @@ import {
 } from "../../navigation/navigationModel";
 import { projectPathPrefixes } from "../../domain/projectPaths";
 import { type View } from "../../navigation/views";
-import type { ProjectFile } from "../../contracts/api";
+import type { FileChangeStatus, ProjectFile } from "../../contracts/api";
 import { KnowledgebaseSectionBody, OutputsSectionBody } from "./WorkflowSectionMenu";
 
 const defaultExpandedSections = new Set<SimplifiedNavSectionId>(
@@ -15,6 +15,7 @@ const defaultExpandedSections = new Set<SimplifiedNavSectionId>(
 
 export function SimplifiedNavigator({
   currentView,
+  fileChanges,
   humanInputEmptyDirectories,
   projectFiles,
   projectSlug,
@@ -34,6 +35,7 @@ export function SimplifiedNavigator({
   onOpenFile,
 }: {
   currentView: View;
+  fileChanges: Record<string, FileChangeStatus>;
   humanInputEmptyDirectories?: string[];
   projectFiles: ProjectFile[];
   projectSlug: string;
@@ -209,6 +211,7 @@ export function SimplifiedNavigator({
         <KnowledgebaseSectionBody
           currentView={currentView}
           expandedSubsections={expandedSubsections as Set<string>}
+          fileChanges={fileChanges}
           humanInputEmptyDirectories={humanInputEmptyDirectories}
           humanInputFiles={humanInputFiles}
           loading={loading}
@@ -235,6 +238,7 @@ export function SimplifiedNavigator({
         <OutputsSectionBody
           currentView={currentView}
           expandedSubsections={expandedSubsections as Set<string>}
+          fileChanges={fileChanges}
           loading={loading}
           onDeleteProjectFile={onDeleteProjectFile}
           onDeleteProjectFolder={onDeleteProjectFolder}

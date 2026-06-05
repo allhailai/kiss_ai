@@ -201,12 +201,16 @@ export function ReviewWorkspace({
   models,
   onModelChange,
   onNavigateToFile,
+  onAddTopicToChat,
+  onNewTopicViaChat,
   projectSlug,
   selectedModelId,
 }: {
   models: RebuildModel[];
   onModelChange: (modelId: string) => void;
   onNavigateToFile: (path: string) => void;
+  onAddTopicToChat: (topicId: string, label: string) => void;
+  onNewTopicViaChat: () => void;
   projectSlug: string;
   selectedModelId: string;
 }) {
@@ -317,6 +321,8 @@ export function ReviewWorkspace({
         {activeTab === "topics" ? (
           <TopicsWorkspace
             onNavigateToFile={onNavigateToFile}
+            onAddTopicToChat={onAddTopicToChat}
+            onNewTopicViaChat={onNewTopicViaChat}
             projectSlug={projectSlug}
           />
         ) : null}

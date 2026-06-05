@@ -74,8 +74,13 @@ export function OutputSection({
   const refreshStatus = useCallback(async () => {
     try {
       if (type === "artifact") {
-        const result = await artifactsApi.list(projectSlug);
-        setArtifactSpecs(result.artifacts);
+        // Fetch both artifact specs AND output status (for lastKnowledgeBuild timestamp)
+        const [artifactResult, statusResult] = await Promise.all([
+          artifactsApi.list(projectSlug),
+          outputsApi.status(projectSlug).catch(() => null),
+        ]);
+        setArtifactSpecs(artifactResult.artifacts);
+        if (statusResult) setOutputStatus(statusResult);
       } else {
         const result = await outputsApi.status(projectSlug);
         setOutputStatus(result);

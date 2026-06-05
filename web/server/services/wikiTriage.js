@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { readTopics } from "./topicsService.js";
+import { readTopics, writeTopics, getResearchPlanDigestMapping } from "./topicsService.js";
 import { readQuestions } from "./questionsService.js";
 
 // ── Project settings ────────────────────────────────────────────────
@@ -149,7 +149,7 @@ function collectTopicDigests(topics, topicIds) {
  * @param {object} scope - from computeBuildScope (needs: isFirstBuild, projectMdChanged, feedbackMarkers, humanInputsChanged)
  * @param {string[]} changedDigests - digest paths that changed (from content-hash ledger diff)
  * @param {boolean} isFullRebuild - user requested full rebuild
- * @returns {{ action: "skip"|"targeted"|"full", affectedPages: Array, unchangedPages: Array, fullRebuildReason: string|null }}
+ * @returns {Promise<{ action: "skip"|"targeted"|"full", affectedPages: Array, unchangedPages: Array, fullRebuildReason: string|null }>}
  */
 export async function computeWikiTriage(projectPath, scope, changedDigests, isFullRebuild = false) {
   // ── Forced full rebuild ──
@@ -178,13 +178,19 @@ export async function computeWikiTriage(projectPath, scope, changedDigests, isFu
     (q) => q.status === "answered" && q.answeredBy && q.answeredBy !== "ai_auto",
   );
 
+  // Check for topics with sources but no wiki page
+  const hasTopicsWithoutWiki = topics.some(
+    (t) => t.state !== "deprecated" && t.state !== "seed" && !t.wiki_page && (t.sources?.length ?? 0) > 0,
+  );
+
   // ── Skip trigger: content-hash ledger says nothing changed ──
   if (
     changedDigests.length === 0 &&
     scope.feedbackMarkers.length === 0 &&
     pendingAnswers.length === 0 &&
     !scope.humanInputsChanged &&
-    deepenTopics.length === 0
+    deepenTopics.length === 0 &&
+    !hasTopicsWithoutWiki
   ) {
     return { action: "skip", affectedPages: [], unchangedPages: [], fullRebuildReason: null };
   }
@@ -204,10 +210,32 @@ export async function computeWikiTriage(projectPath, scope, changedDigests, isFu
 
   // Build forward index: topic ID → wiki page
   const topicToWikiPage = new Map();
+  const topicsNeedingWikiPage = [];
   for (const topic of topics) {
     if (topic.wiki_page) {
       topicToWikiPage.set(topic.id, topic.wiki_page);
+    } else if (
+      topic.state !== "deprecated" &&
+      topic.state !== "seed" &&
+      (topic.sources?.length ?? 0) > 0
+    ) {
+      // Topic has sources but no wiki page — assign one
+      const slug = topic.id
+        .replace(/^topic_/, "")
+        .replace(/_[a-z0-9]{8}$/, "")
+        .replace(/[^a-z0-9_]/gi, "_")
+        .replace(/_+/g, "_")
+        .toLowerCase();
+      const wikiPage = `outputs_ai/wiki/${slug}.md`;
+      topicToWikiPage.set(topic.id, wikiPage);
+      topic.wiki_page = wikiPage;
+      topicsNeedingWikiPage.push(topic);
     }
+  }
+
+  // Persist any newly assigned wiki_page values
+  if (topicsNeedingWikiPage.length > 0) {
+    await writeTopics(projectPath, topics, topicsData.clusters);
   }
 
   // Collect affected pages with reasons
@@ -221,6 +249,11 @@ export async function computeWikiTriage(projectPath, scope, changedDigests, isFu
     const entry = affectedMap.get(wikiPage);
     if (topicId) entry.topicIds.add(topicId);
     entry.reasons.add(reason);
+  }
+
+  // 0. Topics that just received a wiki_page assignment → always affected
+  for (const topic of topicsNeedingWikiPage) {
+    addAffectedPage(topic.wiki_page, topic.id, "new wiki page (first creation)");
   }
 
   // 1. Changed sources → topics → wiki pages
@@ -264,9 +297,29 @@ export async function computeWikiTriage(projectPath, scope, changedDigests, isFu
   }
 
   // 4. Deepen-queued topics → wiki pages
+  // For deepen-queued topics, also inject digest paths from the research plan
+  // since topic.sources hasn't been reconciled yet at this point.
+  let researchPlanDigests = new Map();
+  if (deepenTopics.length > 0) {
+    try {
+      researchPlanDigests = await getResearchPlanDigestMapping(projectPath, topics);
+    } catch {
+      // Non-fatal: fall back to existing topic.sources mapping
+    }
+  }
+
   for (const topic of deepenTopics) {
     const wikiPage = topicToWikiPage.get(topic.id);
     addAffectedPage(wikiPage, topic.id, "queued for deepening");
+
+    // Inject research-plan-derived digests as new evidence for the wiki page
+    const planDigests = researchPlanDigests.get(topic.id) ?? [];
+    if (wikiPage && affectedMap.has(wikiPage)) {
+      const entry = affectedMap.get(wikiPage);
+      for (const digestPath of planDigests) {
+        entry.newDigests.add(digestPath);
+      }
+    }
   }
 
   // 5. Dependencies: if a topic is affected, also flag its dependents
@@ -296,7 +349,9 @@ export async function computeWikiTriage(projectPath, scope, changedDigests, isFu
   for (const [page, entry] of affectedMap) {
     const pageTracker = tracker[page];
     const editCount = pageTracker?.incremental_edit_count ?? 0;
-    const mode = editCount >= threshold ? "full_rewrite" : "incremental";
+    // New pages (no tracker entry) always get full_rewrite; existing pages use threshold
+    const isNewPage = !pageTracker;
+    const mode = isNewPage || editCount >= threshold ? "full_rewrite" : "incremental";
 
     const topicIds = [...entry.topicIds];
     const allTopicDigests = collectTopicDigests(topics, topicIds);

@@ -3,6 +3,7 @@ import { projectsApi } from "../data/projectsApi";
 import {
   type BuildLogState,
   type DesignState,
+  type FileChangeStatus,
   type ProjectFile,
   type ProjectStatus,
   type ProjectSummary,
@@ -46,6 +47,7 @@ export function useProjectWorkspace() {
   const [rebuild, setRebuild] = useState<RebuildState | null>(null);
   const [design, setDesign] = useState<DesignState | null>(null);
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([designProjectFile]);
+  const [fileChanges, setFileChanges] = useState<Record<string, FileChangeStatus>>({});
   const [humanInputEmptyDirectories, setHumanInputEmptyDirectories] = useState<string[]>([]);
   const [fileLoading, setFileLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -90,6 +92,7 @@ export function useProjectWorkspace() {
     selectedProjectSlug,
     setBuildLog,
     setDesign,
+    setFileChanges,
     setHumanInputEmptyDirectories,
     setProjectFiles,
     setRebuild,
@@ -181,6 +184,14 @@ export function useProjectWorkspace() {
         setNotice("This link points to a file that is not available in the lab UI yet.");
         return;
       }
+
+      // Optimistically dismiss any "new"/"edited" badge for this file
+      setFileChanges((current) => {
+        if (!(path in current)) return current;
+        const next = { ...current };
+        delete next[path];
+        return next;
+      });
 
       if (projectFile?.previewable === false) {
         setNotice(`${path} is saved in the project, but this file type cannot be previewed in the lab UI.`);
@@ -331,6 +342,7 @@ export function useProjectWorkspace() {
     deleteProjectFolder,
     moveHumanInputFile,
     draft,
+    fileChanges,
     fileLoading,
     hasUnsavedChanges,
     humanInputEmptyDirectories,

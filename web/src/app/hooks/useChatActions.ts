@@ -71,6 +71,8 @@ export function useChatActions({
           }
           toastWorkspace.setNotice(`Applied and saved ${decision.path}.`);
           await fileWorkspace.refreshProjectFiles();
+          // Record the file change for sidebar badge
+          filesApi.recordFileChange(projectSlug!, decision.path, "new").catch(() => {});
           // Navigate to the file
           route.openProjectFile(decision.path);
           await rebuildWorkspace.refreshStatus();
@@ -90,6 +92,9 @@ export function useChatActions({
 
           fileWorkspace.setDraft(saved.content);
           toastWorkspace.setNotice(`Applied and saved ${edit.path}.`);
+
+          // Record the file change for sidebar badge
+          filesApi.recordFileChange(projectSlug!, edit.path, "edited").catch(() => {});
 
           // Refresh project files and the current file so left nav + editor update
           await fileWorkspace.refreshProjectFiles();
@@ -230,6 +235,16 @@ export function useChatActions({
     toastWorkspace.setNotice(`Prepared AI File Assist for ${savedFile.path}.`);
   }, [fileWorkspace, openAgentChatPanel, projectChat, toastWorkspace]);
 
+  const requestNewTopicViaChat = useCallback(() => {
+    if (projectChat.loading || projectChat.sending || projectChat.proposalUpdating) return;
+    projectChat.startDraftConversation();
+    openAgentChatPanel();
+    setAgentDraftSeed({
+      id: `new-topic:${Date.now()}`,
+      draft: "I'd like to create a new topic. The name and description are:\n\n",
+    });
+  }, [openAgentChatPanel, projectChat]);
+
   return useMemo(
     () => ({
       agentDraftSeed,
@@ -239,7 +254,8 @@ export function useChatActions({
       assistCurrentFile,
       handleCreateTopic,
       refreshAfterMutation,
+      requestNewTopicViaChat,
     }),
-    [agentDraftSeed, applyChatArtifactRename, applyChatFileEdit, applyChatFileRename, assistCurrentFile, handleCreateTopic, refreshAfterMutation],
+    [agentDraftSeed, applyChatArtifactRename, applyChatFileEdit, applyChatFileRename, assistCurrentFile, handleCreateTopic, refreshAfterMutation, requestNewTopicViaChat],
   );
 }

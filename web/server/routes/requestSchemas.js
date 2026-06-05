@@ -31,10 +31,16 @@ const agentContextFileSchema = contextFileSchema.extend({
   role: z.enum(["primary", "secondary"]).optional(),
 });
 
+const contextTopicSchema = z.object({
+  topicId: z.string().trim().min(1).max(200),
+  label: z.string().trim().max(300).optional(),
+});
+
 const chatContextSchema = z.object({
   currentFile: agentContextFileSchema.optional(),
   ai_editable_files: z.array(agentContextFileSchema).max(10).optional(),
   context_files: z.array(contextFileSchema).max(20).optional(),
+  context_topics: z.array(contextTopicSchema).max(20).optional(),
 });
 
 const conversationFileContextSchema = z.object({
@@ -174,6 +180,10 @@ export const filePathBodySchema = z.object({
   path: z.string().trim().min(1).max(1_000),
 });
 
+export const recordFileChangeBodySchema = filePathBodySchema.extend({
+  status: z.enum(["new", "edited"]),
+});
+
 export const writeFileBodySchema = filePathBodySchema.extend({
   content: maxUtf8Bytes(MAX_WRITE_FILE_BYTES, "File content is too large."),
   expectedContentHash: z.string().trim().min(1).max(160),
@@ -237,13 +247,13 @@ export const artifactRenameStatusParamsSchema = chatMessageParamsSchema.extend({
 
 export const createArtifactBodySchema = z.object({
   name: z.string().trim().min(1).max(255),
-  frontmatter: z.record(z.unknown()).optional(),
+  frontmatter: z.record(z.string(), z.unknown()).optional(),
   body: z.string().max(100_000).optional().default(""),
 });
 
 export const updateArtifactBodySchema = z
   .object({
-    frontmatter: z.record(z.unknown()).optional(),
+    frontmatter: z.record(z.string(), z.unknown()).optional(),
     body: z.string().max(100_000).optional(),
   })
   .refine((value) => value.frontmatter !== undefined || value.body !== undefined, {

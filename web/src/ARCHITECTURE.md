@@ -86,7 +86,7 @@ Domain modules should not import React, components, hooks, CodeMirror widgets, a
 `contracts/api.ts` is a barrel that re-exports all types from domain-focused sub-modules. Downstream code can import from `contracts/api` for convenience, or directly from the sub-module for tighter coupling:
 
 - `contracts/rebuild.ts`: rebuild state, agent run events, build questions, attention items
-- `contracts/chat.ts`: chat messages, conversations, conceptual diffs, edit proposals
+- `contracts/chat.ts`: chat messages, conversations, conceptual diffs, edit proposals, topic context types
 - `contracts/topics.ts`: topics, topic state, disposition, create/response shapes
 - `contracts/artifacts.ts`: artifact specs and source files
 - `contracts/buildLog.ts`: build log tabs, files, and state
@@ -141,7 +141,7 @@ Current features:
 - `rebuild/`
 - `search/`
 - `toast/`
-- `topics/` (sub-components: `TopicCard`, `topicHelpers`; composed via `app/ReviewWorkspace.tsx`)
+- `topics/` (sub-components: `TopicCard`, `topicHelpers`; composed via `app/ReviewWorkspace.tsx` and `app/AIWorkspace.tsx`; topics can be added to agent chat context via "+ Chat Context" button; the chat agent can edit topic details directly via `<topic_detail_edit>` tags)
 
 ## Styles Layer
 
@@ -176,7 +176,7 @@ The right-panel chat and AI File Assist are implementations of this protocol. Re
 
 Start here for the current protocol contract. Keep this section aligned with the implementation whenever proposal, review, or apply behavior changes.
 
-The frontend keeps shared conversation state and API orchestration in `app/hooks/useProjectChat.ts`; `features/agents/RightPanelAgentChat.tsx` owns the AI File Assist conversation composition. Shared conceptual diff review primitives live under `shared/conceptualDiff/`.
+The frontend keeps shared conversation state and API orchestration in `app/hooks/useProjectChat.ts`; `features/agents/RightPanelAgentChat.tsx` owns the AI File Assist conversation composition. Shared conceptual diff review primitives live under `shared/conceptualDiff/`. The chat panel also supports topic context: users add topics via `TopicCard` buttons, and the agent receives resolved topic data (state, sources, coverage gaps, details) in the prompt payload. The agent can edit topic details directly via `<topic_detail_edit>` tags, which are applied server-side after the response completes.
 
 Proposal requests use route-specific stacks. `contracts/api.ts` defines shared request/response shapes. AI File Assist uses `data/chatApi.ts`, `server/routes/chatRoutes.js`, and `server/services/chatAgent.js`. `FRAMEWORK_ROOT` defaults to `_kiss_ai/framework` in this workspace layout and can be overridden with `KISS_AI_FRAMEWORK_ROOT`. Shared conceptual diff parsing lives in `server/services/conceptualDiffs.js`; shared rejection memory lives in `server/services/conceptualDiffMemory.js`.
 

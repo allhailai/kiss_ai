@@ -120,5 +120,6 @@ Before finishing, verify:
 - Do not search the web. Use only the provided source data.
 - Do not modify the artifact spec file. It is user-owned.
 - Do not produce multiple HTML files. One `index.html` per artifact.
+- Do not read, modify, or rebuild any other artifact in `artifacts/builds/`. You are building ONLY the one artifact specified in this prompt. Other artifacts are managed by their own separate build runs.
 - Do not use external frameworks (React, Vue, Tailwind). Vanilla HTML/CSS/JS only.
 - Do not include API keys, credentials, or sensitive data in the HTML file.

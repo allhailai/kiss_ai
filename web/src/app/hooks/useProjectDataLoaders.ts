@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { type BuildLogState, type DesignState, type ProjectFile, type ProjectStatus, type RebuildState } from "../../contracts/api";
+import { type BuildLogState, type DesignState, type FileChangeStatus, type ProjectFile, type ProjectStatus, type RebuildState } from "../../contracts/api";
 import { filesApi } from "../../data/filesApi";
 import { projectsApi } from "../../data/projectsApi";
 import { rebuildApi } from "../../data/rebuildApi";
@@ -10,6 +10,7 @@ export function useProjectDataLoaders({
   selectedProjectSlug,
   setBuildLog,
   setDesign,
+  setFileChanges,
   setHumanInputEmptyDirectories,
   setProjectFiles,
   setRebuild,
@@ -18,6 +19,7 @@ export function useProjectDataLoaders({
   selectedProjectSlug: string | null;
   setBuildLog: (buildLog: BuildLogState | null) => void;
   setDesign: (design: DesignState | null) => void;
+  setFileChanges: (changes: Record<string, FileChangeStatus>) => void;
   setHumanInputEmptyDirectories: (dirs: string[]) => void;
   setProjectFiles: (files: ProjectFile[]) => void;
   setRebuild: (rebuild: RebuildState | null) => void;
@@ -86,8 +88,17 @@ export function useProjectDataLoaders({
     if (selectedProjectSlugRef.current === projectSlug) {
       setProjectFiles(uniqueFiles([...requirements.files, ...human.files, ...sources.files, ...inputsAi.files, ...outputs.files, designProjectFile]));
       setHumanInputEmptyDirectories(human.emptyDirectories ?? []);
+
+      // Merge fileChanges from all tree sections
+      const merged: Record<string, FileChangeStatus> = {};
+      for (const tree of [requirements, human, sources, inputsAi, outputs]) {
+        if (tree.fileChanges) {
+          Object.assign(merged, tree.fileChanges);
+        }
+      }
+      setFileChanges(merged);
     }
-  }, [requireSelectedProjectSlug, setHumanInputEmptyDirectories, setProjectFiles]);
+  }, [requireSelectedProjectSlug, setFileChanges, setHumanInputEmptyDirectories, setProjectFiles]);
 
   return {
     refreshBuildLog,

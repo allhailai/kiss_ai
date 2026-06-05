@@ -86,6 +86,7 @@ export function RightPanelOrchestrator({
             aiEditableFiles={agentFileContext.aiEditableFiles}
             chat={projectChat}
             contextFiles={agentFileContext.contextFiles}
+            contextTopics={projectChat.contextTopics}
             currentFile={agentFileContext.currentFile}
             draftSeed={draftSeed}
             highlightedContext={agentFileContext.highlightedContext}
@@ -95,6 +96,7 @@ export function RightPanelOrchestrator({
             onApplyFileRename={applyChatFileRename}
             onApplyArtifactRename={applyChatArtifactRename}
             onContextFilesChange={projectChat.setContextFiles}
+            onContextTopicsChange={projectChat.setContextTopics}
             onCreateTopic={onCreateTopic}
             onModelChange={rebuildWorkspace.setSelectedModelId}
             onRefreshAfterMutation={onRefreshAfterMutation}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import type {
   AgentContextFile,
   ChatContextFile,
+  ChatContextTopic,
   ChatMessageArtifactProposal,
   ChatMessageArtifactRename,
   ChatMessageFileEdit,
@@ -42,7 +43,7 @@ type RightPanelChatController = {
   scrollToLatest: () => void;
   sendMessage: (options: {
     content?: string;
-    context?: { currentFile?: AgentContextFile; ai_editable_files?: AgentContextFile[]; context_files?: ChatContextFile[] };
+    context?: { currentFile?: AgentContextFile; ai_editable_files?: AgentContextFile[]; context_files?: ChatContextFile[]; context_topics?: ChatContextTopic[] };
   }) => Promise<boolean>;
   sending: boolean;
   setConversationFilter: (query: string) => void;
@@ -64,6 +65,7 @@ export function RightPanelAgentChat({
   aiEditableFiles,
   chat,
   contextFiles,
+  contextTopics,
   currentFile,
   draftSeed,
   highlightedContext,
@@ -73,6 +75,7 @@ export function RightPanelAgentChat({
   onApplyFileRename,
   onApplyArtifactRename,
   onContextFilesChange,
+  onContextTopicsChange,
   onCreateTopic,
   onModelChange,
   onRefreshAfterMutation,
@@ -87,6 +90,7 @@ export function RightPanelAgentChat({
   aiEditableFiles: AgentContextFile[];
   chat: RightPanelChatController;
   contextFiles: ChatContextFile[];
+  contextTopics: ChatContextTopic[];
   currentFile: AgentContextFile | null;
   draftSeed: { id: string; draft: string } | null;
   highlightedContext: { path: string; target: "editable" | "context" } | null;
@@ -96,6 +100,7 @@ export function RightPanelAgentChat({
   onApplyFileRename: (rename: ChatMessageFileRename, renameIndex: number, messageId: string) => Promise<boolean>;
   onApplyArtifactRename: (rename: ChatMessageArtifactRename, renameIndex: number, messageId: string) => Promise<boolean>;
   onContextFilesChange: Dispatch<SetStateAction<ChatContextFile[]>>;
+  onContextTopicsChange: Dispatch<SetStateAction<ChatContextTopic[]>>;
   onCreateTopic: (proposal: ChatMessageTopicProposal) => Promise<void>;
   onModelChange: (modelId: string) => void;
   onRefreshAfterMutation: () => Promise<void>;
@@ -275,11 +280,12 @@ export function RightPanelAgentChat({
     const sent = await chat.sendMessage({
       content,
       context:
-        currentFile || requestAiEditableFiles.length || contextFiles.length
+        currentFile || requestAiEditableFiles.length || contextFiles.length || contextTopics.length
           ? {
               currentFile: currentFile ?? undefined,
               ai_editable_files: requestAiEditableFiles.length ? requestAiEditableFiles : undefined,
               context_files: contextFiles.length ? contextFiles : undefined,
+              context_topics: contextTopics.length ? contextTopics : undefined,
             }
           : undefined,
     });
@@ -534,6 +540,39 @@ export function RightPanelAgentChat({
                   >
                     <code title={file.path}>{labeledFileDisplayName(file)}</code>
                     <button aria-label={`Remove ${file.path} from context`} disabled={controlsDisabled} onClick={() => removeContextFile(file.path)} type="button">
+                      x
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {contextTopics.length ? (
+            <div className="agent-file-context agent-topic-context" aria-label="Topic context">
+              <div className="agent-context-header">
+                <span className="agent-context-label">Viewing topics</span>
+                {contextTopics.length > 1 ? (
+                  <button
+                    aria-label="Clear all topic context"
+                    className="agent-context-clear-all"
+                    disabled={controlsDisabled}
+                    onClick={() => onContextTopicsChange([])}
+                    type="button"
+                  >
+                    Clear all
+                  </button>
+                ) : null}
+              </div>
+              <div className="agent-context-chips">
+                {contextTopics.map((topic) => (
+                  <span className="agent-context-chip agent-context-chip-topic" key={topic.topicId}>
+                    <code title={topic.topicId}>{topic.label}</code>
+                    <button
+                      aria-label={`Remove ${topic.label} from context`}
+                      disabled={controlsDisabled}
+                      onClick={() => onContextTopicsChange((current) => current.filter((t) => t.topicId !== topic.topicId))}
+                      type="button"
+                    >
                       x
                     </button>
                   </span>

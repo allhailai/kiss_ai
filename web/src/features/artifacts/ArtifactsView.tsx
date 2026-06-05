@@ -44,11 +44,16 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
     return reasons;
   }, [selectedArtifact, lastProjectBuildAt]);
 
-  // Default to preview tab when selecting an artifact that's already built
+  // Default to preview tab when selecting an artifact that's already built.
+  // Also reset building state — the recovery effect below will re-enable it
+  // if this specific artifact is genuinely being built.
   const prevSlugRef = useRef<string | null>(null);
   useEffect(() => {
     if (selectedSlug !== prevSlugRef.current) {
       prevSlugRef.current = selectedSlug;
+      // Reset building state from any previous artifact
+      setBuilding(false);
+      buildRunStartedAtRef.current = null;
       if (selectedArtifact?.status === "built") {
         setActiveTab("preview");
       } else {
@@ -58,17 +63,17 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   }, [selectedSlug, selectedArtifact?.status]);
 
   // On mount or slug change, check server state to recover building state.
-  // This ensures the building spinner survives page refreshes and prevents
-  // duplicate builds by detecting an already-running artifact build.
-  const recoveryCheckedRef = useRef<string | null>(null);
+  // This ensures the building spinner survives page refreshes and navigation
+  // away/back. The slug-change effect above resets building=false first,
+  // then this effect re-enables it if the server confirms this artifact is building.
   useEffect(() => {
-    if (!selectedSlug || recoveryCheckedRef.current === selectedSlug) return;
-    recoveryCheckedRef.current = selectedSlug;
+    if (!selectedSlug) return;
 
     rebuildApi.rebuildState(projectSlug).then((state) => {
       const isArtifactBuild = state.runKind === "artifact_build" || state.runKind === "artifact_batch_build";
-      if (state.running && isArtifactBuild) {
-        // An artifact build is currently running — resume building UI
+      const isForThisArtifact = Array.isArray(state.buildQueue) && state.buildQueue.includes(selectedSlug);
+      if (state.running && isArtifactBuild && isForThisArtifact) {
+        // This specific artifact is currently being built — resume building UI
         buildRunStartedAtRef.current = state.startedAt;
         setBuilding(true);
         setActiveTab("preview");

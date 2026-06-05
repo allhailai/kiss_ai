@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
-import type { ProjectFile } from "../../contracts/api";
+import type { FileChangeStatus, ProjectFile } from "../../contracts/api";
 import { buildFileTree, getAncestorDirectoryKeys, humanizePathSegment, type FileTreeNode } from "../../domain/files";
 
 export function FileTreeNav({
+  fileChanges,
   files,
   emptyDirectories,
   selectedPath,
@@ -12,6 +13,7 @@ export function FileTreeNav({
   onMoveFile,
   onSelectFile,
 }: {
+  fileChanges?: Record<string, FileChangeStatus>;
   files: ProjectFile[];
   emptyDirectories?: string[];
   selectedPath: string | null;
@@ -129,6 +131,7 @@ export function FileTreeNav({
           depth={0}
           dragOverTarget={dragOverTarget}
           expandedDirectories={expandedDirectories}
+          fileChanges={fileChanges}
           inlineCreateFolder={inlineCreateFolder}
           key={node.key}
           node={node}
@@ -157,6 +160,7 @@ function FileTreeNodeRow({
   depth,
   dragOverTarget,
   expandedDirectories,
+  fileChanges,
   inlineCreateFolder,
   selectedPath,
   onCreateTextFile,
@@ -176,6 +180,7 @@ function FileTreeNodeRow({
   depth: number;
   dragOverTarget: string | null;
   expandedDirectories: Set<string>;
+  fileChanges?: Record<string, FileChangeStatus>;
   inlineCreateFolder: string | null;
   selectedPath: string | null;
   onCreateTextFile?: (name: string, folder?: string) => void;
@@ -332,6 +337,7 @@ function FileTreeNodeRow({
                 depth={depth + 1}
                 dragOverTarget={dragOverTarget}
                 expandedDirectories={expandedDirectories}
+                fileChanges={fileChanges}
                 inlineCreateFolder={inlineCreateFolder}
                 key={child.key}
                 node={child}
@@ -365,11 +371,18 @@ function FileTreeNodeRow({
     .filter(Boolean)
     .join(" ");
 
+  const changeStatus = fileChanges?.[node.file.path];
+
   const fileLabel = (
     <>
       <span className="file-tree-toggle" aria-hidden="true" />
       <span className="file-tree-label">{humanizePathSegment(node.name)}</span>
       {node.file.previewable === false ? <small>file</small> : null}
+      {changeStatus ? (
+        <span className={`file-tree-badge file-tree-badge-${changeStatus}`}>
+          {changeStatus}
+        </span>
+      ) : null}
     </>
   );
 

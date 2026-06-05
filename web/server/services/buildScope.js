@@ -184,9 +184,41 @@ export async function computeBuildScope(projectPath) {
   // for backward compatibility with skipResearchPlan and prompt builders.
   // The ledger is the authoritative source for change detection.
 
+  // Check topics for conditions that require Phase 1 to run
+  // (dynamic import to avoid circular dependency with topicsService)
+  let hasUnsourcedTopics = false;
+  let hasDeepenQueue = false;
+  let unsourcedTopicCount = 0;
+  let deepenQueueCount = 0;
+
+  try {
+    const { readTopics } = await import("./topicsService.js");
+    const topicsData = await readTopics(projectPath);
+    const activeTopics = topicsData.topics.filter(
+      (t) => t.state !== "deprecated" && t.state !== "seed",
+    );
+
+    const unsourced = activeTopics.filter(
+      (t) => !Array.isArray(t.sources) || t.sources.length === 0,
+    );
+    hasUnsourcedTopics = unsourced.length > 0;
+    unsourcedTopicCount = unsourced.length;
+
+    const deepenQueued = activeTopics.filter((t) => t.queued_for_deepen);
+    hasDeepenQueue = deepenQueued.length > 0;
+    deepenQueueCount = deepenQueued.length;
+  } catch {
+    // topics.json doesn't exist yet — not a reason to skip
+  }
+
   // Determine if we can skip the research plan phase
-  // (ledger diff will also be checked, but this gates Phase 1 specifically)
-  const skipResearchPlan = !isFirstBuild && !projectMdChanged && feedbackMarkers.length === 0;
+  // Phase 1 must run if: first build, project.md changed, feedback markers,
+  // unsourced topics that need initial research, or deepen-queued topics
+  const skipResearchPlan = !isFirstBuild
+    && !projectMdChanged
+    && feedbackMarkers.length === 0
+    && !hasUnsourcedTopics
+    && !hasDeepenQueue;
 
   return {
     isFirstBuild,
@@ -195,5 +227,9 @@ export async function computeBuildScope(projectPath) {
     projectMdDiff,
     feedbackMarkers,
     skipResearchPlan,
+    hasUnsourcedTopics,
+    unsourcedTopicCount,
+    hasDeepenQueue,
+    deepenQueueCount,
   };
 }

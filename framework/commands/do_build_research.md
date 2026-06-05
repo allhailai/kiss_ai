@@ -27,9 +27,14 @@ This agent run should complete in 1–3 minutes. The output is a single JSON fil
    - Remove URLs that are no longer relevant (e.g., if a topic was removed from project.md).
    - If no previous plan exists, generate from scratch.
 
+5. **Read `.build/topics.json`** if it exists. This is the V2 topic taxonomy managed by the build system. Pay special attention to:
+   - Topics with `"sources": []` (empty array) — these are new topics that need initial research. Generate 2–4 queries for each.
+   - Topics with `"discovery": { "origin": "user_chat" }` — these were added by the user via the chat agent and may not appear in `project.md`. They are equally important.
+   - The prompt may include an `UNSOURCED TOPICS` section listing these explicitly — if so, ensure every listed topic appears in your research plan output.
+
 ### Phase 2: Search
 
-5. **Search the web** for evidence that supports, refutes, or expands on the project's topics. For each topic area:
+6. **Search the web** for evidence that supports, refutes, or expands on the project's topics. For each topic area:
    - Search for primary sources: government data, corporate filings, annual reports, technical papers.
    - Search for secondary sources: trade press, industry analysis, expert commentary.
    - Search for contrarian sources: evidence that challenges the project thesis.
@@ -37,7 +42,7 @@ This agent run should complete in 1–3 minutes. The output is a single JSON fil
 
 ### Phase 3: Write Plan
 
-6. Write `sources/research_plan.json` with this structure:
+7. Write `sources/research_plan.json` with this structure:
 
 ```json
 {
@@ -88,11 +93,22 @@ If the prompt includes a `DEEPEN DIRECTIVE` section, certain topics need deeper 
 
 Mark all deepen URLs with their topic context in the `query.topic` field so the pipeline can trace which sources came from deepening.
 
+### Unsourced Topics
+
+If the prompt includes an `UNSOURCED TOPICS` section, these are new topics (typically created by the user via chat) that have zero sources and no existing research plan entries. For each unsourced topic:
+
+- Generate 2–4 search queries covering the topic from different angles
+- Include diverse source types: at least one primary source and one secondary source
+- Use the topic's `label` and `details` (if provided) to guide your searches
+- The `query.topic` field must match the topic label exactly so the pipeline can map sources back
+
+These topics are just as important as topics from `project.md` — do not skip them.
+
 ## Completion
 
 Report:
 - Number of topics covered.
 - Total URLs listed.
 - Number of topics deepened (if DEEPEN DIRECTIVE was present).
+- Number of unsourced topics bootstrapped (if UNSOURCED TOPICS was present).
 - Any topics with no sources found (gaps).
-

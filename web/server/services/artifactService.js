@@ -300,30 +300,11 @@ export async function discoverRelevantSources(projectPath, excludePaths = []) {
     // outputs_ai/ may not exist yet
   }
 
-  // Scan artifacts/builds/ for other artifact outputs
-  try {
-    const buildDirs = await fs.readdir(path.join(projectPath, ARTIFACT_BUILDS_DIR), { withFileTypes: true });
-    for (const entry of buildDirs) {
-      if (!entry.isDirectory()) continue;
-      const manifestPath = path.join(projectPath, ARTIFACT_BUILDS_DIR, entry.name, ".artifact-manifest.json");
-      const htmlPath = `artifacts/builds/${entry.name}/index.html`;
-      if (excludeSet.has(htmlPath)) continue;
-
-      try {
-        const manifestRaw = await fs.readFile(manifestPath, "utf8");
-        const manifest = JSON.parse(manifestRaw);
-        inventory.push({
-          relativePath: htmlPath,
-          snippet: `Built artifact: ${humanizeSlug(entry.name)} (built ${manifest.builtAt || "unknown"})`,
-          kind: "artifact",
-        });
-      } catch {
-        // No manifest = not built, skip
-      }
-    }
-  } catch {
-    // artifacts/builds/ may not exist yet
-  }
+  // NOTE: We intentionally do NOT include artifacts/builds/ in the discovery
+  // inventory. Listing other built artifacts here caused the Cursor agent to
+  // "helpfully" read and rebuild them during a single-artifact build, even
+  // though the prompt only targets one artifact. The agent only needs wiki
+  // pages, reports, and directed outputs as context.
 
   return inventory;
 }

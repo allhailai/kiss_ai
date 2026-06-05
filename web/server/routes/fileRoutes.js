@@ -8,12 +8,14 @@ import {
   parseRequestBody,
   parseRequestParams,
   parseRequestQuery,
+  recordFileChangeBodySchema,
   renameOutputFileBodySchema,
   searchFilesQuerySchema,
   treeSectionParamsSchema,
   uploadHumanInputsBodySchema,
   writeFileBodySchema,
 } from "./requestSchemas.js";
+import { getFileChanges, dismissFileChange, recordFileChange } from "../services/fileChanges.js";
 
 export function registerFileRoutes(app, {
   createHumanInputFolder,
@@ -49,6 +51,7 @@ export function registerFileRoutes(app, {
     try {
       const project = request.project;
       const { section } = parseRequestParams(treeSectionParamsSchema, request.params, httpError);
+      const fileChanges = await getFileChanges(project.path);
 
       if (section === "requirements") {
         response.json({
@@ -61,6 +64,7 @@ export function registerFileRoutes(app, {
               previewable: true,
               ...meta,
             })),
+          fileChanges,
         });
         return;
       }
@@ -70,10 +74,11 @@ export function registerFileRoutes(app, {
 
       if (section === "human") {
         const result = await listProjectFiles(project.path, config.root);
-        response.json({ files: result.files, emptyDirectories: result.emptyDirectories });
+        response.json({ files: result.files, emptyDirectories: result.emptyDirectories, fileChanges });
       } else {
         response.json({
           files: await listMarkdownFiles(project.path, config.root, config.kind, config.editable, config.annotation),
+          fileChanges,
         });
       }
     } catch (error) {
@@ -159,7 +164,10 @@ export function registerFileRoutes(app, {
   app.get("/api/projects/:projectSlug/file", async (request, response, next) => {
     try {
       const query = parseRequestQuery(filePathQuerySchema, request.query, httpError);
-      response.json(await readTextFile(request.project.path, query.path));
+      const file = await readTextFile(request.project.path, query.path);
+      // Dismiss any "new" / "edited" badge for this file (fire-and-forget)
+      dismissFileChange(request.project.path, query.path).catch(() => {});
+      response.json(file);
     } catch (error) {
       next(error);
     }
@@ -214,6 +222,16 @@ export function registerFileRoutes(app, {
     try {
       const body = parseRequestBody(renameOutputFileBodySchema, request.body, httpError);
       response.json(await renameOutputFile(request.project.path, body.fromPath, body.toPath));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/file/record-change", async (request, response, next) => {
+    try {
+      const body = parseRequestBody(recordFileChangeBodySchema, request.body, httpError);
+      await recordFileChange(request.project.path, body.path, body.status);
+      response.json({ ok: true });
     } catch (error) {
       next(error);
     }

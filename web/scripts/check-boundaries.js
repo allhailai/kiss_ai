@@ -138,6 +138,7 @@ const serverRules = [
         "contentLedger.js",
         "conversations.js",
         "cursorModels.js",
+        "fileChanges.js",
         "harnessState.js",
         "outputRename.js",
         "projectFiles.js",

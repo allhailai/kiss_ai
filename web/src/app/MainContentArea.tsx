@@ -10,40 +10,38 @@ import { ArtifactsView } from "../features/artifacts/ArtifactsView";
 import { OutputSectionPage } from "../features/outputs/OutputSectionPage";
 import { AIWorkspace } from "./AIWorkspace";
 
-const fileWorkspaceByView: Partial<Record<View, { title?: string; explainer?: string }>> = {
+const fileWorkspaceByView: Partial<Record<View, { title?: string }>> = {
   requirements: {
     title: "Project Definition",
   },
-  inputs: {
-    explainer: "Sources are AI-managed. Use annotations to guide the AI.",
-  },
-  outputs: {
-    explainer: "Wiki pages are built during knowledge builds. Use comments to guide the AI.",
-  },
-};
-
-const reportsFileWorkspaceConfig = {
-  explainer: "Reports are user-curated outputs. Edit directly or use the chat agent.",
+  inputs: {},
+  outputs: {},
 };
 
 export function MainContentArea({
   designWorkspace,
   fileWorkspace,
   onAiFileAssist,
+  onAddTopicToChat,
+  onNewTopicViaChat,
   onOpenFile,
   projectChat,
   projectSlug,
   rebuildWorkspace,
   selectProjectChatConversation,
+  topicsRefreshKey,
 }: {
   designWorkspace: DesignWorkspaceController;
   fileWorkspace: FileWorkspaceController;
   onAiFileAssist: () => void;
+  onAddTopicToChat: (topicId: string, label: string) => void;
+  onNewTopicViaChat: () => void;
   onOpenFile: (path: string) => void;
   projectChat: ProjectChatController;
   projectSlug: string;
   rebuildWorkspace: RebuildWorkspaceController;
   selectProjectChatConversation: (conversationId: string) => void;
+  topicsRefreshKey: number;
 }) {
   const route = useRouteContext();
   const toastWorkspace = useToastContext();
@@ -57,16 +55,19 @@ export function MainContentArea({
           models={rebuildWorkspace.models}
           onModelChange={rebuildWorkspace.setSelectedModelId}
           onNavigateToFile={onOpenFile}
+          onAddTopicToChat={onAddTopicToChat}
+          onNewTopicViaChat={onNewTopicViaChat}
           projectChat={projectChat}
           projectSlug={projectSlug}
           selectProjectChatConversation={selectProjectChatConversation}
           selectedModelId={rebuildWorkspace.selectedModelId}
+          topicsRefreshKey={topicsRefreshKey}
         />
       ) : null}
       {fileWorkspaceConfig ? (
         <FileWorkspace
           title={fileWorkspaceConfig.title}
-          explainer={fileWorkspaceConfig.explainer}
+
           selected={fileWorkspace.selected}
           selectedDiff={fileWorkspace.selectedDiff}
           draft={fileWorkspace.draft}
@@ -97,7 +98,7 @@ export function MainContentArea({
       ) : null}
       {route.view === "reports" && route.filePath ? (
         <FileWorkspace
-          explainer={reportsFileWorkspaceConfig.explainer}
+
           selected={fileWorkspace.selected}
           selectedDiff={fileWorkspace.selectedDiff}
           draft={fileWorkspace.draft}

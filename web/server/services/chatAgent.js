@@ -15,7 +15,7 @@ import { extractApplyResultFromText, extractConceptualDiffsFromText, firstTagCon
 import { normalizeChatContext } from "./chatContext.js";
 import { prepareCursorAgentRun } from "./cursorAgentRun.js";
 import { buildGitDiffPromptEntries } from "./gitDiffPrompt.js";
-import { readTopics } from "./topicsService.js";
+import { readTopics, updateTopic } from "./topicsService.js";
 import { listArtifactSpecs } from "./artifactService.js";
 
 const maxPromptFileBytes = 24 * 1024;
@@ -235,6 +235,26 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
   const history = conversation.messages.slice(-maxPromptHistoryMessages).map(formatHistoryMessage);
   const projectName = displayProjectName(harness.project_name ?? project.name, harness.project_slug ?? project.slug);
 
+  // Resolve context_topics from the latest user message context
+  const latestContextTopics = [...conversation.messages].reverse().find((m) => m.context?.context_topics?.length)?.context?.context_topics ?? [];
+  const topicMap = new Map(topicsData.topics.map((t) => [t.id, t]));
+  const resolvedContextTopics = latestContextTopics
+    .map((ct) => {
+      const topic = topicMap.get(ct.topicId);
+      if (!topic) return null;
+      return {
+        id: topic.id,
+        label: topic.label,
+        state: topic.state,
+        details: topic.details ?? null,
+        sources: (topic.sources ?? []).slice(0, 10).map((s) => ({ path: s.path, contribution: s.contribution })),
+        coverage_gaps: topic.coverage_gaps ?? [],
+        metrics: topic.metrics ?? null,
+        wiki_page: topic.wiki_page ?? null,
+      };
+    })
+    .filter(Boolean);
+
   const payload = {
     project: {
       slug: project.slug,
@@ -259,6 +279,7 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     ai_editable_files: authorizedAiEditableFiles,
     rejected_ai_editable_files: rejectedAiEditableFiles,
     context_files: contextFileResults,
+    ...(resolvedContextTopics.length ? { context_topics: resolvedContextTopics } : {}),
     existingTopics: topicsData.topics
       .filter((t) => t.state !== "deprecated")
       .map((t) => ({ label: t.label, state: t.state, disposition: t.disposition }))
@@ -286,6 +307,19 @@ async function createChatPrompt({ project, conversation, readTextFile, displayPr
     "- Stay inside the current project. User-selected source context files are limited to human_*.md, inputs_human/, inputs_ai/, and outputs_ai/.",
     "- Do not expose hidden chain-of-thought. Provide concise reasoning summaries when useful.",
     "- If context is missing, say what is missing and suggest the next best step.",
+    "",
+    "Topic Context Guidance:",
+    "- When the payload includes context_topics, these are research topics the user has explicitly selected for you to consider.",
+    "- Each topic includes its id, label, state (seed/shallow/deep/saturated), details (human-written description), sources, coverage_gaps, metrics, and wiki_page path.",
+    "- Use this topic context to give informed, topic-aware answers. Reference specific sources, state, and coverage gaps when relevant.",
+    "- You may edit a topic's details field when the user asks. Before editing:",
+    "  1. If the user's request is ambiguous or you have questions about scope, intent, or phrasing, ask 1-2 brief clarifying questions first.",
+    "  2. If the user's intent is fully clear with no open questions, proceed directly with the edit.",
+    "- Use the following tag format to edit details:",
+    "  <topic_detail_edit><topic_id>the-topic-id</topic_id><details>New details text here.</details></topic_detail_edit>",
+    "- The details field is a short human-readable description that helps scope the topic. Keep it concise (1-3 sentences).",
+    "- To clear details, use an empty <details></details> tag.",
+    "- You may only edit details for topics present in context_topics. Do not edit other topic fields.",
     "",
     "Topic Creation Guidance:",
     "- The payload includes existingTopics: a list of current research topics with their labels, states, and dispositions.",
@@ -551,6 +585,21 @@ export function extractTopicProposals(rawText) {
 }
 
 /**
+ * Extract topic detail edits from assistant text.
+ * The agent outputs <topic_detail_edit><topic_id>...</topic_id><details>...</details></topic_detail_edit> tags.
+ */
+export function extractTopicDetailEdits(rawText) {
+  return allTagContent(rawText, "topic_detail_edit")
+    .map((editText) => {
+      const topicId = firstTagContent(editText, "topic_id");
+      if (!topicId) return null;
+      const details = firstTagContent(editText, "details");
+      return { topicId, details: details || null };
+    })
+    .filter(Boolean);
+}
+
+/**
  * Extract artifact proposals from assistant text.
  * The agent outputs <artifact_proposal><title>...</title><summary>...</summary><details>...</details><spec_body>...</spec_body></artifact_proposal> tags.
  */
@@ -730,7 +779,17 @@ export function createChatAgentService({
         const fileRenames = extractFileRenameProposals(assistantText);
         const artifactRenames = extractArtifactRenameProposals(assistantText);
         const topicProposals = extractTopicProposals(assistantText);
+        const topicDetailEdits = extractTopicDetailEdits(assistantText);
         const artifactProposals = extractArtifactProposals(assistantText);
+
+        // Apply topic detail edits directly (no user approval needed)
+        for (const edit of topicDetailEdits) {
+          try {
+            await updateTopic(project.path, edit.topicId, { details: edit.details });
+          } catch {
+            // Best-effort — don't fail the response for a detail edit failure.
+          }
+        }
         const finalConversation = await appendMessage(project, conversationId, {
           id: assistantMessageId,
           role: "assistant",

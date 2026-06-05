@@ -111,6 +111,10 @@ describe("API routes", () => {
       readKeybindings: async () => ({}),
       saveCursorApiKey: async () => ({}),
       systemSettings: async () => ({ cursorApiKeyAvailable: false, cursorApiKeySource: null, cursorApiKeyWarnings: [] }),
+      readPinnedProjects: async () => [],
+      readProjectsViewPreference: async () => ({}),
+      writePinnedProjects: async () => ({}),
+      writeProjectsViewPreference: async () => ({}),
     });
     app.use(apiErrorHandler);
 
@@ -144,6 +148,10 @@ describe("API routes", () => {
       readKeybindings: async () => ({}),
       saveCursorApiKey: async () => ({}),
       systemSettings: async () => ({ cursorApiKeyAvailable: false, cursorApiKeySource: null, cursorApiKeyWarnings: [] }),
+      readPinnedProjects: async () => [],
+      readProjectsViewPreference: async () => ({}),
+      writePinnedProjects: async () => ({}),
+      writeProjectsViewPreference: async () => ({}),
     });
     app.use(apiErrorHandler);
 
@@ -178,6 +186,10 @@ describe("API routes", () => {
       systemSettings: async () => ({ cursorApiKeyAvailable: false, cursorApiKeySource: null, cursorApiKeyWarnings: [] }),
       updateAndRestart: async () => ({}),
       updateKissAi: async () => ({}),
+      readPinnedProjects: async () => [],
+      readProjectsViewPreference: async () => ({}),
+      writePinnedProjects: async () => ({}),
+      writeProjectsViewPreference: async () => ({}),
     });
     app.use(apiErrorHandler);
 
@@ -211,6 +223,10 @@ describe("API routes", () => {
       }),
       updateAndRestart: async () => ({}),
       updateKissAi: async () => ({}),
+      readPinnedProjects: async () => [],
+      readProjectsViewPreference: async () => ({}),
+      writePinnedProjects: async () => ({}),
+      writeProjectsViewPreference: async () => ({}),
     });
     app.use(apiErrorHandler);
 
@@ -244,6 +260,10 @@ describe("API routes", () => {
       systemSettings: async () => ({ cursorApiKeyAvailable: false, cursorApiKeySource: null, cursorApiKeyWarnings: [] }),
       updateAndRestart: async () => ({}),
       updateKissAi: async () => ({}),
+      readPinnedProjects: async () => [],
+      readProjectsViewPreference: async () => ({}),
+      writePinnedProjects: async () => ({}),
+      writeProjectsViewPreference: async () => ({}),
     });
     app.use(apiErrorHandler);
 
@@ -280,6 +300,8 @@ describe("API routes", () => {
       createHumanInputTextFile: async () => ({ file: {} }),
       deleteHumanInputFile: service.deleteHumanInputFile,
       deleteHumanInputFolder: async () => ({ folder: "" }),
+      deleteProjectFile: async () => ({}),
+      deleteProjectFolder: async () => ({}),
       gitFileDiff: service.gitFileDiff,
       humanFiles: new Map([["human_goal_requirements.md", { kind: "human", editable: true, annotation: false }]]),
       httpError,
@@ -287,6 +309,7 @@ describe("API routes", () => {
       listProjectFiles: service.listProjectFiles,
       moveHumanInputFile: async () => ({ oldPath: "", newPath: "", file: {} }),
       readTextFile: service.readTextFile,
+      renameOutputFile: async () => ({}),
       restoreFileFromHead: service.restoreFileFromHead,
       searchFiles: service.searchFiles,
       treeRoots: new Map(),
@@ -459,6 +482,8 @@ describe("API routes", () => {
       createHumanInputTextFile: async () => ({ file: {} }),
       deleteHumanInputFile: service.deleteHumanInputFile,
       deleteHumanInputFolder: async () => ({ folder: "" }),
+      deleteProjectFile: async () => ({}),
+      deleteProjectFolder: async () => ({}),
       gitFileDiff: service.gitFileDiff,
       humanFiles: new Map([["human_goal_requirements.md", { kind: "human", editable: true, annotation: false }]]),
       httpError,
@@ -466,6 +491,7 @@ describe("API routes", () => {
       listProjectFiles: service.listProjectFiles,
       moveHumanInputFile: async () => ({ oldPath: "", newPath: "", file: {} }),
       readTextFile: service.readTextFile,
+      renameOutputFile: async () => ({}),
       restoreFileFromHead: service.restoreFileFromHead,
       searchFiles: service.searchFiles,
       treeRoots: new Map([["outputs", { root: "outputs_ai", kind: "output", editable: true, annotation: true }]]),
@@ -501,6 +527,7 @@ describe("API routes", () => {
     });
     registerChatRoutes(app, {
       applyEditProposal: async () => ({}),
+      cancelChatAgent: () => ({}),
       createConversation: async () => ({}),
       editChatMessage: async () => ({}),
 
@@ -511,6 +538,9 @@ describe("API routes", () => {
       subscribeToConversation: () => () => undefined,
       updateConversation: async () => ({}),
       updateEditProposal: async () => ({}),
+      updateMessageArtifactRenameStatus: async () => ({}),
+      updateMessageFileEditStatus: async () => ({}),
+      updateMessageFileRenameStatus: async () => ({}),
     });
     app.use(apiErrorHandler);
 
