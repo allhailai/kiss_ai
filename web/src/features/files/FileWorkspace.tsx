@@ -7,7 +7,7 @@ import { MarkdownEditor } from "../../editor/MarkdownEditor";
 
 export function FileWorkspace({
   title,
-  explainer,
+
   selected,
   selectedDiff,
   draft,
@@ -24,7 +24,7 @@ export function FileWorkspace({
   projectSlug,
 }: {
   title?: string;
-  explainer?: string;
+
   selected: FileContent | null;
   selectedDiff: FileDiff | null;
   draft: string;
@@ -42,11 +42,10 @@ export function FileWorkspace({
 }) {
   return (
     <div className="document-workspace">
-      {title || explainer ? (
+      {title ? (
         <header className="document-header">
           <div>
-            {title ? <span className="eyebrow">{title}</span> : null}
-            {explainer ? <p>{explainer}</p> : null}
+            <span className="eyebrow">{title}</span>
           </div>
         </header>
       ) : null}
