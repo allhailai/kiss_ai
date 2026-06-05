@@ -128,7 +128,7 @@ describe("buildScope", () => {
     expect(notAffected).toHaveLength(0);
   });
 
-  it("does not check human inputs (now handled by content ledger)", async () => {
+  it("detects human input changes and prevents Phase 1 skip", async () => {
     const content = "# Test Project\n\nSame goal\n";
     const { createHash } = await import("node:crypto");
     const hash = createHash("sha256").update(content).digest("hex");
@@ -146,11 +146,10 @@ describe("buildScope", () => {
     });
 
     const scope = await computeBuildScope(TEST_ROOT);
-    // buildScope no longer tracks humanInputsChanged — that's the ledger's job
-    expect(scope.humanInputsChanged).toBeUndefined();
-    // skipResearchPlan is true because projectMd matches, no feedback markers,
-    // and no topics.json means no unsourced topics
-    expect(scope.skipResearchPlan).toBe(true);
+    // Early detection: file exists in inputs_human/ but ledger has no record
+    expect(scope.humanInputsChanged).toBe(true);
+    // Phase 1 should NOT be skipped when human inputs changed
+    expect(scope.skipResearchPlan).toBe(false);
   });
 
   it("does not skip Phase 1 when topics have zero sources", async () => {
