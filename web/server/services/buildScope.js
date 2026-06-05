@@ -179,10 +179,25 @@ export async function computeBuildScope(projectPath) {
 
   const feedbackMarkers = [...sourcesMarkers.feedbackPaths, ...outputsMarkers.feedbackPaths].sort();
 
-  // NOTE: humanInputsChanged and projectMdChanged are now also computed
-  // by the content-hash ledger (diffSnapshot). The values here are kept
-  // for backward compatibility with skipResearchPlan and prompt builders.
-  // The ledger is the authoritative source for change detection.
+  // NOTE: humanInputsChanged is also computed later by the content-hash
+  // ledger (diffSnapshot), which is authoritative. This early check runs
+  // BEFORE Phase 1 so that the research plan phase is not skipped when
+  // human inputs change. The ledger diff later overwrites this value.
+
+  // Early detection: compare human input file list against stored ledger
+  let humanInputsChanged = false;
+  try {
+    const { readLedger } = await import("./contentLedger.js");
+    const ledger = await readLedger(projectPath);
+    const currentHumanFiles = await listHumanInputFiles(projectPath);
+    const previousHumanFiles = Object.keys(ledger?.human_inputs ?? {}).sort();
+
+    // Changed if file count differs or any file path was added/removed
+    humanInputsChanged = currentHumanFiles.length !== previousHumanFiles.length
+      || currentHumanFiles.some((f, i) => f !== previousHumanFiles[i]);
+  } catch {
+    // If we can't check, assume no change
+  }
 
   // Check topics for conditions that require Phase 1 to run
   // (dynamic import to avoid circular dependency with topicsService)
@@ -213,12 +228,13 @@ export async function computeBuildScope(projectPath) {
 
   // Determine if we can skip the research plan phase
   // Phase 1 must run if: first build, project.md changed, feedback markers,
-  // unsourced topics that need initial research, or deepen-queued topics
+  // unsourced topics, deepen-queued topics, or human inputs changed
   const skipResearchPlan = !isFirstBuild
     && !projectMdChanged
     && feedbackMarkers.length === 0
     && !hasUnsourcedTopics
-    && !hasDeepenQueue;
+    && !hasDeepenQueue
+    && !humanInputsChanged;
 
   return {
     isFirstBuild,
@@ -231,5 +247,6 @@ export async function computeBuildScope(projectPath) {
     unsourcedTopicCount,
     hasDeepenQueue,
     deepenQueueCount,
+    humanInputsChanged,
   };
 }

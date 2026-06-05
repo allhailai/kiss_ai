@@ -322,7 +322,18 @@ export async function computeWikiTriage(projectPath, scope, changedDigests, isFu
     }
   }
 
-  // 5. Dependencies: if a topic is affected, also flag its dependents
+  // 5. Human inputs changed → all wiki pages need updating
+  // Human-uploaded documents are global context not tied to specific topics,
+  // so when they change, all existing wiki pages should be re-synthesized.
+  if (scope.humanInputsChanged) {
+    for (const topic of topics) {
+      if (topic.wiki_page && topic.state !== "deprecated" && topic.state !== "seed") {
+        addAffectedPage(topic.wiki_page, topic.id, "human inputs changed");
+      }
+    }
+  }
+
+  // 6. Dependencies: if a topic is affected, also flag its dependents
   const affectedTopicIds = new Set();
   for (const entry of affectedMap.values()) {
     for (const topicId of entry.topicIds) {
