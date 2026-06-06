@@ -832,3 +832,305 @@ export async function createAutoArtifactSpecs(projectPath, { modelId, isFirstBui
 
   return { created, skipped };
 }
+
+// ─── Section-Level Editing Functions ───────────────────────────────────────────
+// These functions power section-level regeneration of built HTML artifacts.
+// They rely on the section structure contract in do_build_artifact.md:
+//   - Flat, non-nested <section id="..."> tags
+//   - id as the first attribute (though regexes handle any order for defense in depth)
+//   - No </section> literals inside SVG text, HTML attributes, or JS strings
+
+/** Escape a string for safe interpolation into a RegExp. */
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Scan built HTML for section boundaries.
+ * Returns an array of { id, title, startIdx, endIdx }.
+ */
+export function discoverSections(html) {
+  const sections = [];
+  const seenIds = new Set();
+  // Flexible attribute order — matches <section id="x"> and <section class="y" id="x">
+  const regex = /<section\s[^>]*id="([^"]+)"[^>]*>/g;
+  let match;
+
+  while ((match = regex.exec(html)) !== null) {
+    const id = match[1];
+    const startIdx = match.index;
+
+    if (seenIds.has(id)) {
+      console.warn(`[sections] Duplicate section id="${id}" at index ${startIdx}. Skipping.`);
+      continue;
+    }
+    seenIds.add(id);
+
+    const sectionEnd = html.indexOf('</section>', startIdx);
+    if (sectionEnd === -1) {
+      console.warn(`[sections] No closing </section> found for id="${id}". Skipping.`);
+      continue;
+    }
+
+    // Guard: verify no nested <section> opens between this tag and its close
+    const nextOpen = html.indexOf('<section ', startIdx + match[0].length);
+    if (nextOpen !== -1 && nextOpen < sectionEnd) {
+      console.warn(`[sections] Section "${id}" appears nested (next <section> at ${nextOpen} before </section> at ${sectionEnd}). Skipping.`);
+      continue;
+    }
+
+    // Extract heading for title
+    const sectionContent = html.slice(startIdx, sectionEnd);
+    const headingMatch = sectionContent.match(/<h[1-3][^>]*>([^<]+)/);
+    const title = headingMatch ? headingMatch[1].trim() : id;
+
+    sections.push({ id, title, startIdx, endIdx: sectionEnd + '</section>'.length });
+  }
+
+  return sections;
+}
+
+/**
+ * Extract a specific section's boundaries and inner HTML.
+ * Returns { outerStart, outerEnd, innerStart, innerEnd, innerHTML } or null.
+ */
+export function extractSection(html, sectionId) {
+  // Flexible attribute order — defense in depth beyond the id-first contract
+  const regex = new RegExp(`<section\\s[^>]*id="${escapeRegExp(sectionId)}"[^>]*>`);
+  const match = regex.exec(html);
+  if (!match) return null;
+
+  const startIdx = match.index;
+  const innerStart = startIdx + match[0].length;
+  const endTag = '</section>';
+
+  const innerEnd = html.indexOf(endTag, innerStart);
+  if (innerEnd === -1) return null;
+
+  // Guard: verify no nested <section> between inner start and close tag
+  const nextOpen = html.indexOf('<section ', innerStart);
+  if (nextOpen !== -1 && nextOpen < innerEnd) {
+    console.warn(`[sections] Section "${sectionId}" contains a nested <section> — extraction unsafe.`);
+    return null;
+  }
+
+  return {
+    outerStart: startIdx,
+    outerEnd: innerEnd + endTag.length,
+    innerStart,
+    innerEnd,
+    innerHTML: html.slice(innerStart, innerEnd).trim(),
+  };
+}
+
+/**
+ * Sanitize agent output before splicing into the HTML document.
+ * Strips document-level wrappers, attempts to extract target section content
+ * if the agent wrapped its output in <section> tags, and rejects fragments
+ * that would corrupt the document structure.
+ */
+export function sanitizeFragment(rawHtml, sectionId) {
+  let cleaned = rawHtml;
+
+  // Strip any document-level wrappers
+  cleaned = cleaned.replace(/<!DOCTYPE[^>]*>/gi, '');
+  cleaned = cleaned.replace(/<\/?html[^>]*>/gi, '');
+  cleaned = cleaned.replace(/<\/?head[^>]*>/gi, '');
+  cleaned = cleaned.replace(/<\/?body[^>]*>/gi, '');
+
+  // Strip outer <section> wrapper if agent included one (greedy — takes outermost)
+  const sectionMatch = cleaned.match(/^[\s]*<section[^>]*>([\s\S]*)<\/section>[\s]*$/i);
+  if (sectionMatch) cleaned = sectionMatch[1];
+
+  cleaned = cleaned.trim();
+
+  // Check for <section> tags FIRST — try to extract our target section's content.
+  // This must come before the </section> rejection check, because a wrapped fragment
+  // like <section id="X">...content...</section> contains both.
+  if (/<section\s/i.test(cleaned)) {
+    const innerMatch = cleaned.match(
+      new RegExp(`<section[^>]*id="${escapeRegExp(sectionId)}"[^>]*>([\s\S]*?)</section>`, 'i')
+    );
+    if (innerMatch) {
+      cleaned = innerMatch[1].trim();
+    } else {
+      console.warn('[sections] Fragment contains <section> tags but none match target section — rejecting.');
+      return null;
+    }
+  }
+
+  // Reject if fragment STILL contains </section> after extraction
+  if (cleaned.includes('</section>')) {
+    console.warn('[sections] Fragment contains </section> after extraction — rejecting.');
+    return null;
+  }
+
+  return cleaned;
+}
+
+/**
+ * Splice a new section fragment into the HTML document, replacing the target section's innerHTML.
+ * Adds a data-section-id attribute for CSS scoping and validates tag balance.
+ * Returns the updated HTML string, or null if the operation would corrupt the document.
+ */
+export function replaceSection(html, sectionId, rawFragment) {
+  const section = extractSection(html, sectionId);
+  if (!section) return null;
+
+  const newInnerHTML = sanitizeFragment(rawFragment, sectionId);
+  if (!newInnerHTML || newInnerHTML.length === 0) return null;
+
+  // Reconstruct the section with a data attribute for CSS scoping
+  const openTag = html.slice(section.outerStart, section.innerStart);
+  const updatedOpenTag = openTag.includes('data-section-id')
+    ? openTag
+    : openTag.replace(/<section(\s)/, `<section data-section-id="${sectionId}"$1`);
+
+  const result =
+    html.slice(0, section.outerStart) +
+    updatedOpenTag +
+    '\n' + newInnerHTML + '\n' +
+    '</section>' +
+    html.slice(section.outerEnd);
+
+  // Validate: section tag counts must remain balanced
+  const openCount = (result.match(/<section\s/g) || []).length;
+  const closeCount = (result.match(/<\/section>/g) || []).length;
+  if (openCount !== closeCount) {
+    console.error(`[sections] Tag imbalance after splice: ${openCount} open vs ${closeCount} close. Aborting.`);
+    return null;
+  }
+
+  return result;
+}
+
+/**
+ * After a section is regenerated, update the corresponding nav link text
+ * to match the new heading. Returns the updated HTML or the original if
+ * no nav link or heading is found.
+ */
+export function updateNavText(html, sectionId, newSectionHTML) {
+  const headingMatch = newSectionHTML.match(/<h[1-3][^>]*>([^<]+)/);
+  if (!headingMatch) return html;
+
+  const newTitle = headingMatch[1].trim();
+  const navLinkRegex = new RegExp(
+    `(<a\\s[^>]*href="#${escapeRegExp(sectionId)}"[^>]*>)[^<]*(</a>)`, 'i'
+  );
+
+  if (!navLinkRegex.test(html)) return html;
+  return html.replace(navLinkRegex, `$1${newTitle}$2`);
+}
+
+/**
+ * Check how many sections have scoped <style> blocks (indicator of style fragmentation).
+ * Returns { total, withScopedStyles, fragmentationRatio, suggestRebuild }.
+ */
+export function checkStyleFragmentation(html) {
+  const sections = discoverSections(html);
+  let withScopedStyles = 0;
+  for (const section of sections) {
+    const sectionHTML = html.slice(section.startIdx, section.endIdx);
+    if (/<style[^>]*>/i.test(sectionHTML)) withScopedStyles++;
+  }
+  return {
+    total: sections.length,
+    withScopedStyles,
+    fragmentationRatio: sections.length > 0 ? withScopedStyles / sections.length : 0,
+    suggestRebuild: sections.length > 0 && (withScopedStyles / sections.length) > 0.5,
+  };
+}
+
+/**
+ * Create a timestamped backup of index.html before regeneration.
+ * Aborts (throws) if the backup copy fails — never risk losing the original.
+ * Caps at 5 backups per artifact.
+ */
+export async function createSectionBackup(indexPath, backupsDir) {
+  await fs.mkdir(backupsDir, { recursive: true });
+
+  const backupPath = path.join(backupsDir, `index.html.pre-regen-${Date.now()}`);
+  try {
+    await fs.copyFile(indexPath, backupPath);
+  } catch (err) {
+    throw new Error(`Cannot create backup before regeneration: ${err.message}. Aborting.`);
+  }
+
+  // Cap at 5 backups
+  const files = await fs.readdir(backupsDir);
+  const sorted = files.filter(f => f.startsWith('index.html.pre-regen-')).sort();
+  while (sorted.length > 5) {
+    await fs.unlink(path.join(backupsDir, sorted.shift()));
+  }
+
+  return backupPath;
+}
+
+/**
+ * Read and update the artifact manifest for section regeneration tracking.
+ * Increments regenerationCount, adds the section to regeneratedSections,
+ * and sets contractVersion if missing.
+ */
+export async function updateManifestForRegeneration(projectPath, artifactSlug, sectionId) {
+  const manifestPath = path.join(projectPath, ARTIFACT_BUILDS_DIR, artifactSlug, '.artifact-manifest.json');
+
+  let manifest = {};
+  try {
+    const raw = await fs.readFile(manifestPath, 'utf8');
+    manifest = JSON.parse(raw);
+  } catch {
+    // Manifest may not exist — create minimal one
+    manifest = { slug: artifactSlug, format: 'html' };
+  }
+
+  // Track original build size on first regeneration
+  if (!manifest.originalBuildSize) {
+    try {
+      const indexPath = path.join(projectPath, ARTIFACT_BUILDS_DIR, artifactSlug, 'index.html');
+      const stat = await fs.stat(indexPath);
+      manifest.originalBuildSize = stat.size;
+    } catch { /* ignore */ }
+  }
+
+  manifest.regenerationCount = (manifest.regenerationCount || 0) + 1;
+  manifest.lastRegeneratedAt = new Date().toISOString();
+
+  if (!Array.isArray(manifest.regeneratedSections)) {
+    manifest.regeneratedSections = [];
+  }
+  if (!manifest.regeneratedSections.includes(sectionId)) {
+    manifest.regeneratedSections.push(sectionId);
+  }
+
+  if (!manifest.contractVersion) {
+    manifest.contractVersion = 2;
+  }
+
+  await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+  return manifest;
+}
+
+/**
+ * Stamp the artifact manifest after a successful full build.
+ * Sets contractVersion (so the UI knows section editing is safe),
+ * and resets regeneration tracking (full build is a clean slate).
+ */
+export async function stampManifestAfterBuild(projectPath, artifactSlug) {
+  const manifestPath = path.join(projectPath, ARTIFACT_BUILDS_DIR, artifactSlug, '.artifact-manifest.json');
+
+  let manifest = {};
+  try {
+    const raw = await fs.readFile(manifestPath, 'utf8');
+    manifest = JSON.parse(raw);
+  } catch {
+    // Manifest may not exist (agent failed to write it) — create minimal one
+    manifest = { slug: artifactSlug, format: 'html' };
+  }
+
+  manifest.contractVersion = 2;
+  manifest.regenerationCount = 0;
+  manifest.regeneratedSections = [];
+
+  await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+}
+

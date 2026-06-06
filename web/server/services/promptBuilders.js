@@ -449,12 +449,158 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
     return lines.join("\n");
   }
 
+  /**
+   * Build a focused prompt for regenerating a single section of a built HTML artifact.
+   *
+   * @param {object} params
+   * @param {object} params.project - { path, slug, name }
+   * @param {object} params.artifactSpec - { frontmatter, body, slug }
+   * @param {string} params.sectionId - the id of the section being regenerated
+   * @param {string} params.sectionTitle - the heading/title of the section
+   * @param {string} params.currentSectionHTML - the current inner HTML of the section
+   * @param {string} params.globalStylesheet - the full <style> block contents from <head>
+   * @param {Array}  params.otherSections - [{ id, title, snippet }] for context
+   * @param {Array}  params.resolvedSources - [{ relativePath, content }]
+   * @param {string} params.userInstruction - the user's regeneration instruction
+   * @param {Array}  params.cdnDependencies - [string] CDN script/link tags from <head>
+   */
+  async function createSectionRegenerationPrompt({
+    project,
+    artifactSpec,
+    sectionId,
+    sectionTitle,
+    currentSectionHTML,
+    globalStylesheet,
+    otherSections,
+    resolvedSources,
+    userInstruction,
+    cdnDependencies,
+  }) {
+    const lines = [
+      'Regenerate one section of an existing HTML artifact.',
+      '',
+      `SECTION ID: ${sectionId}`,
+      `SECTION TITLE: ${sectionTitle}`,
+      '',
+      `USER INSTRUCTION: "${userInstruction}"`,
+      '',
+    ];
+
+    // Artifact goal / spec body
+    if (artifactSpec.body) {
+      lines.push(
+        '── ARTIFACT GOAL ──────────────────────────────────────────',
+        '',
+        artifactSpec.body,
+        '',
+      );
+    }
+
+    // Current section HTML
+    lines.push(
+      '── CURRENT SECTION HTML (modify as instructed) ──────────────',
+      '',
+      currentSectionHTML,
+      '',
+    );
+
+    // Adjacent section summaries
+    if (otherSections.length > 0) {
+      lines.push(
+        '── OTHER SECTIONS (for context — do not reproduce these) ──',
+        '',
+      );
+      for (const section of otherSections) {
+        lines.push(`- ${section.id}: "${section.snippet}"`);
+      }
+      lines.push('');
+    }
+
+    // Available section IDs for cross-links
+    const allSectionIds = [sectionId, ...otherSections.map(s => s.id)];
+    lines.push(
+      '── AVAILABLE SECTION IDs (for internal links) ──────────────',
+      allSectionIds.join(', '),
+      '',
+    );
+
+    // CDN dependencies
+    if (cdnDependencies.length > 0) {
+      lines.push(
+        '── CDN DEPENDENCIES LOADED ──────────────────────────────',
+        ...cdnDependencies,
+        '',
+      );
+    } else {
+      lines.push(
+        '── CDN DEPENDENCIES LOADED ──────────────────────────────',
+        'No CDN libraries loaded. Use inline SVG or vanilla JS only.',
+        '',
+      );
+    }
+
+    // Global stylesheet
+    lines.push(
+      '── GLOBAL STYLESHEET (use classes from this stylesheet) ──',
+      '',
+      globalStylesheet,
+      '',
+    );
+
+    // Source data
+    if (resolvedSources.length > 0) {
+      lines.push(
+        '── SOURCE DATA (factual context for data-driven content) ──',
+        '',
+      );
+      for (const source of resolvedSources) {
+        const content = source.content.length > 3000
+          ? source.content.slice(0, 3000) + '\n\n[... truncated ...]'
+          : source.content;
+        lines.push(`── ${source.relativePath} ──`, '', content, '');
+      }
+    }
+
+    // Design identity
+    lines.push(
+      '── DESIGN IDENTITY ──────────────────────────────────────────',
+      '',
+    );
+    try {
+      const designIdentity = await fs.readFile(path.join(project.path, 'human_design_identity.md'), 'utf8');
+      lines.push(designIdentity.slice(0, 3000));
+    } catch {
+      lines.push('No human_design_identity.md found. Use a clean, professional design.');
+    }
+
+    // Output rules
+    lines.push(
+      '',
+      '── OUTPUT RULES ──────────────────────────────────────────',
+      '- Output the inner HTML for this section.',
+      '- Do NOT include <section>, </section>, <html>, <head>, or <body> wrapper tags.',
+      '- Never include the literal string </section> anywhere in your output —',
+      '  not in code comments, JS strings, SVG text, or HTML content.',
+      `- You MAY include <style> blocks scoped with [data-section-id="${sectionId}"] for new CSS classes.`,
+      '  For element-level overrides, also use the scoping prefix:',
+      `    [data-section-id="${sectionId}"] h2 { font-size: 2rem; }`,
+      '- You MAY include <script> blocks wrapped in an IIFE for new JavaScript.',
+      '- Use CSS classes from the global stylesheet where applicable.',
+      `- Prefix any element IDs with the section ID to avoid collisions (e.g., "${sectionId}-chart" instead of "chart").`,
+      '- Keep the same data and factual content unless the user instruction says otherwise.',
+      '- If the user asks to update data, use the SOURCE DATA above — do not invent numbers.',
+    );
+
+    return lines.join('\n');
+  }
+
   return {
     createArtifactPrompt,
     createAutoAnswerPrompt,
     createFilePrompt,
     createProposeOutputArtifactsPrompt,
     createResearchPrompt,
+    createSectionRegenerationPrompt,
     createSynthesisPrompt,
     createValidationPrompt, // deprecated — throws if called
     createWikiOnlyPrompt, // deprecated — delegates to createSynthesisPrompt

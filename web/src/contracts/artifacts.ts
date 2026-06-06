@@ -24,3 +24,15 @@ export type AvailableSourceFile = {
   kind: string;
   name: string;
 };
+
+export type ArtifactSection = {
+  id: string;
+  title: string;
+};
+
+export type ArtifactSectionsResponse = {
+  sections: ArtifactSection[];
+  regeneratedSections: string[];
+  regenerationCount: number;
+  contractVersion: number | null;
+};

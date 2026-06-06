@@ -5,7 +5,7 @@ import { downloadProjectFile, triggerDownload } from "../../data/downloadFile";
 import { useRouteContext } from "../../app/contexts/RouteContext";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
 import { groupModelsByTier, modelDisplayName, modelTierLabels } from "../../domain/modelLabels";
-import type { ArtifactSpec, ArtifactSpecDetail, AvailableSourceFile, FileContent, RebuildModel } from "../../contracts/api";
+import type { ArtifactSpec, ArtifactSpecDetail, ArtifactSection, ArtifactSectionsResponse, AvailableSourceFile, FileContent, RebuildModel } from "../../contracts/api";
 
 type Tab = "spec" | "preview";
 
@@ -28,6 +28,17 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   const buildRunStartedAtRef = useRef<string | null>(null);
   const popoutRef = useRef<Window | null>(null);
   const noopOpenFile = useCallback(() => {}, []);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  // Section panel state
+  const [sections, setSections] = useState<ArtifactSection[]>([]);
+  const [regeneratedSections, setRegeneratedSections] = useState<string[]>([]);
+  const [contractVersion, setContractVersion] = useState<number | null>(null);
+  const [sectionsLoading, setSectionsLoading] = useState(false);
+  const [sectionPanelOpen, setSectionPanelOpen] = useState(false);
+  const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
+  const [regenInstruction, setRegenInstruction] = useState("");
+  const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null);
 
   const selectedArtifact = artifacts.find((a) => a.slug === selectedSlug) ?? null;
   const isBuilt = selectedArtifact?.status === "built";
@@ -300,6 +311,58 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
     setTimeout(() => setNotice(null), 5000);
   }
 
+  // Load sections when preview tab is active and artifact is built
+  const loadSections = useCallback(async () => {
+    if (!selectedSlug || !isBuilt) return;
+    setSectionsLoading(true);
+    try {
+      const result = await artifactsApi.sections(projectSlug, selectedSlug);
+      setSections(result.sections);
+      setRegeneratedSections(result.regeneratedSections);
+      setContractVersion(result.contractVersion);
+    } catch {
+      setSections([]);
+    } finally {
+      setSectionsLoading(false);
+    }
+  }, [projectSlug, selectedSlug, isBuilt]);
+
+  useEffect(() => {
+    if (activeTab === "preview" && isBuilt) {
+      void loadSections();
+    }
+  }, [activeTab, isBuilt, loadSections, previewKey]);
+
+  function handleScrollToSection(sectionId: string) {
+    const iframe = iframeRef.current;
+    if (!iframe || !selectedSlug) return;
+    // Use hash fragment navigation — works with sandboxed iframes
+    const baseUrl = artifactsApi.previewUrl(projectSlug, selectedSlug);
+    iframe.src = `${baseUrl}#${sectionId}`;
+  }
+
+  async function handleRegenerateSection(sectionId: string) {
+    if (!selectedSlug || !regenInstruction.trim()) return;
+    setRegeneratingSection(sectionId);
+    try {
+      await artifactsApi.regenerateSection(
+        projectSlug,
+        selectedSlug,
+        sectionId,
+        regenInstruction.trim(),
+        String(selectedSpec?.frontmatter.modelId ?? ""),
+      );
+      setBuilding(true);
+      setRegenInstruction("");
+      setExpandedSectionId(null);
+      flash(`Regenerating section: ${sectionId}…`);
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Regeneration failed");
+    } finally {
+      setRegeneratingSection(null);
+    }
+  }
+
   const hasChanges = selectedSpec && editBody !== selectedSpec.body;
 
   if (!selectedSlug) {
@@ -527,17 +590,45 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
           {building ? (
             <div className="artifacts-building-overlay">
               <div className="artifacts-building-spinner" />
-              <p>Agent is generating the HTML artifact…</p>
+              <p>Agent is {regeneratingSection ? `regenerating section…` : `generating the HTML artifact…`}</p>
               <p className="artifacts-building-hint">This may take a minute. The preview will load automatically when ready.</p>
             </div>
           ) : isBuilt ? (
-            <iframe
-              key={previewKey}
-              className="artifacts-preview-iframe"
-              src={artifactsApi.previewUrl(projectSlug, selectedSlug)}
-              title={`Preview: ${selectedSpec.frontmatter.name ?? selectedSlug}`}
-              sandbox="allow-scripts"
-            />
+            <div className="artifacts-preview-with-sections">
+              <iframe
+                key={previewKey}
+                ref={iframeRef}
+                className="artifacts-preview-iframe"
+                src={artifactsApi.previewUrl(projectSlug, selectedSlug)}
+                title={`Preview: ${selectedSpec.frontmatter.name ?? selectedSlug}`}
+                sandbox="allow-scripts"
+              />
+              {sectionPanelOpen ? (
+                <SectionPanel
+                  sections={sections}
+                  regeneratedSections={regeneratedSections}
+                  contractVersion={contractVersion}
+                  loading={sectionsLoading}
+                  expandedSectionId={expandedSectionId}
+                  regenInstruction={regenInstruction}
+                  regeneratingSection={regeneratingSection}
+                  building={building}
+                  onScrollTo={handleScrollToSection}
+                  onExpand={(id) => setExpandedSectionId(expandedSectionId === id ? null : id)}
+                  onInstructionChange={setRegenInstruction}
+                  onRegenerate={handleRegenerateSection}
+                />
+              ) : null}
+              <button
+                className={`artifacts-sections-toggle ${sectionPanelOpen ? "open" : ""}`}
+                onClick={() => setSectionPanelOpen(!sectionPanelOpen)}
+                type="button"
+                title={sectionPanelOpen ? "Hide sections" : "Show sections"}
+              >
+                {sectionPanelOpen ? "›" : "‹"}
+                <span className="artifacts-sections-toggle-label">{sectionPanelOpen ? "" : "Sections"}</span>
+              </button>
+            </div>
           ) : (
             <div className="artifacts-placeholder">
               <p>This artifact hasn't been built yet. Click <strong>Build</strong> to generate it.</p>
@@ -687,3 +778,100 @@ function ArtifactContextHints({
   );
 }
 
+/* ─── Section Panel ──────────────────────────────────────── */
+
+function SectionPanel({
+  sections,
+  regeneratedSections,
+  contractVersion,
+  loading,
+  expandedSectionId,
+  regenInstruction,
+  regeneratingSection,
+  building,
+  onScrollTo,
+  onExpand,
+  onInstructionChange,
+  onRegenerate,
+}: {
+  sections: ArtifactSection[];
+  regeneratedSections: string[];
+  contractVersion: number | null;
+  loading: boolean;
+  expandedSectionId: string | null;
+  regenInstruction: string;
+  regeneratingSection: string | null;
+  building: boolean;
+  onScrollTo: (id: string) => void;
+  onExpand: (id: string) => void;
+  onInstructionChange: (value: string) => void;
+  onRegenerate: (id: string) => void;
+}) {
+  return (
+    <div className="artifacts-section-panel">
+      <div className="artifacts-section-panel-header">
+        <h3>Sections</h3>
+      </div>
+      {contractVersion === null ? (
+        <div className="artifacts-section-panel-warning">
+          This artifact was built before section editing was supported. Visual changes will work, but interactive features may need a full rebuild.
+        </div>
+      ) : null}
+      {loading ? (
+        <div className="artifacts-section-panel-loading">Loading sections…</div>
+      ) : sections.length === 0 ? (
+        <div className="artifacts-section-panel-empty">No sections found.</div>
+      ) : (
+        <ul className="artifacts-section-list">
+          {sections.map((section) => {
+            const isModified = regeneratedSections.includes(section.id);
+            const isExpanded = expandedSectionId === section.id;
+            return (
+              <li key={section.id} className={`artifacts-section-item ${isExpanded ? "expanded" : ""}`}>
+                <div className="artifacts-section-item-header">
+                  <button
+                    className="artifacts-section-item-title"
+                    onClick={() => onScrollTo(section.id)}
+                    type="button"
+                    title={`Scroll to ${section.title}`}
+                  >
+                    {section.title}
+                    {isModified ? <span className="artifacts-section-modified-badge">edited</span> : null}
+                  </button>
+                  <button
+                    className="artifacts-section-regen-toggle"
+                    onClick={() => onExpand(section.id)}
+                    disabled={building}
+                    type="button"
+                    title="Regenerate this section"
+                  >
+                    ✏️
+                  </button>
+                </div>
+                {isExpanded ? (
+                  <div className="artifacts-section-regen-form">
+                    <textarea
+                      className="artifacts-section-regen-input"
+                      placeholder="Describe the changes you want…"
+                      value={regenInstruction}
+                      onChange={(e) => onInstructionChange(e.target.value)}
+                      rows={3}
+                    />
+                    <button
+                      className="artifacts-section-regen-btn"
+                      disabled={!regenInstruction.trim() || regeneratingSection === section.id || building}
+                      onClick={() => onRegenerate(section.id)}
+                      type="button"
+                    >
+                      {regeneratingSection === section.id ? "Regenerating…" : "Regenerate"}
+                    </button>
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}

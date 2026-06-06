@@ -1,4 +1,4 @@
-import type { ArtifactSpec, ArtifactSpecDetail, AvailableSourceFile, RebuildState } from "../contracts/api";
+import type { ArtifactSpec, ArtifactSpecDetail, ArtifactSectionsResponse, AvailableSourceFile, RebuildState } from "../contracts/api";
 import { projectBase, request } from "./request";
 
 export const artifactsApi = {
@@ -48,4 +48,18 @@ export const artifactsApi = {
 
   availableSources: (projectSlug: string) =>
     request<{ files: AvailableSourceFile[] }>(`${projectBase(projectSlug)}/artifacts/available-sources`),
+
+  sections: (projectSlug: string, artifactSlug: string) =>
+    request<ArtifactSectionsResponse>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/sections`,
+    ),
+
+  regenerateSection: (projectSlug: string, artifactSlug: string, sectionId: string, instruction: string, modelId?: string) =>
+    request<RebuildState>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/sections/${encodeURIComponent(sectionId)}/regenerate`,
+      {
+        method: "POST",
+        body: JSON.stringify({ instruction, modelId: modelId ?? null }),
+      },
+    ),
 };

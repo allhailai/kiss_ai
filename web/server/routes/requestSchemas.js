@@ -264,6 +264,11 @@ export const buildArtifactBodySchema = z.object({
   modelId: optionalTrimmedString(160),
 });
 
+export const regenerateSectionBodySchema = z.object({
+  instruction: z.string().trim().min(1).max(10_000),
+  modelId: optionalTrimmedString(160),
+});
+
 function parseRequestPart(schema, value, httpError, label) {
   const result = schema.safeParse(value);
   if (result.success) return result.data;

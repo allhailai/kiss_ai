@@ -48,6 +48,13 @@ Write a **single self-contained HTML file** to the path specified in the prompt 
 - Dark/light theme support if specified in the spec's `design.theme` field
 - Print-friendly CSS (`@media print` rules) for artifacts the user might export
 
+**Section structure contract (required for section-level editing):**
+- Each `<section>` MUST have a stable, descriptive `id` attribute in `lowercase-kebab-case` (e.g., `id="executive-summary"`, `id="risk-heatmap"`). The `id` MUST be the first attribute on the `<section>` tag.
+- Do NOT nest `<section>` tags. Every `<section>` must be a direct child of `<main>` — flat structure only.
+- Never include the literal string `</section>` inside SVG `<text>` elements, HTML attributes, or JavaScript string literals.
+- Never use `!important` in CSS rules.
+- All JavaScript that interacts with a specific section's DOM elements MUST be placed inside that section as an IIFE `<script>` block, not in a global script at the end of `<body>`. Global `<script>` blocks should only contain cross-cutting logic (e.g., theme toggles, print handlers, nav scroll highlights) that does not target elements inside a single section.
+
 **Readability contract:**
 - All text content must be fully visible without clipping, truncation, or overflow hiding. Do not use `overflow: hidden` on any element that contains text labels.
 - Data labels inside bar charts, progress indicators, or badge elements must have enough width to display their full text. If a proportional-width bar would be too narrow for its label, place the label outside the bar (to the right, or above it) instead of inside.

@@ -8,16 +8,19 @@ import {
   readArtifactPreviewHtml,
   slugifyArtifactName,
   ensureArtifactDirs,
+  discoverSections,
+  getArtifactBuildStatus,
 } from "../services/artifactService.js";
 import {
   createArtifactBodySchema,
   renameArtifactBodySchema,
   updateArtifactBodySchema,
   buildArtifactBodySchema,
+  regenerateSectionBodySchema,
   parseRequestBody,
 } from "./requestSchemas.js";
 
-export function registerArtifactRoutes(app, { httpError, startArtifactBuild }) {
+export function registerArtifactRoutes(app, { httpError, startArtifactBuild, startSectionRegeneration }) {
   // List all artifact specs + build status
   app.get("/api/projects/:projectSlug/artifacts", async (request, response, next) => {
     try {
@@ -145,6 +148,57 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild }) {
       response.type("html").send(html);
     } catch (error) {
       if (error.code === "ENOENT") return next(httpError("Artifact has not been built yet.", 404, "artifact_not_built"));
+      next(error);
+    }
+  });
+
+  // ─── Section-Level Editing Routes ─────────────────────────────────────────
+
+  // List sections discovered in the built HTML
+  app.get("/api/projects/:projectSlug/artifacts/:artifactSlug/sections", async (request, response, next) => {
+    try {
+      const html = await readArtifactPreviewHtml(request.project.path, request.params.artifactSlug);
+      const sections = discoverSections(html);
+      // Also return manifest info for UI indicators (regeneratedSections, contractVersion)
+      const manifest = await getArtifactBuildStatus(request.project.path, request.params.artifactSlug);
+      response.json({
+        sections: sections.map(s => ({ id: s.id, title: s.title })),
+        regeneratedSections: manifest?.regeneratedSections || [],
+        regenerationCount: manifest?.regenerationCount || 0,
+        contractVersion: manifest?.contractVersion || null,
+      });
+    } catch (error) {
+      if (error.code === "ENOENT") return next(httpError("Artifact has not been built yet.", 404, "artifact_not_built"));
+      next(error);
+    }
+  });
+
+  // Regenerate a single section
+  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/sections/:sectionId/regenerate", async (request, response, next) => {
+    try {
+      const { instruction, modelId: requestedModelId } = parseRequestBody(regenerateSectionBodySchema, request.body, httpError);
+      const sectionId = request.params.sectionId;
+      // Validate sectionId matches the kebab-case contract from do_build_artifact.md
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(sectionId)) {
+        return next(httpError(`Invalid section ID: "${sectionId}". Must be lowercase kebab-case.`, 400, "invalid_section_id"));
+      }
+      let modelId = requestedModelId ?? null;
+      if (!modelId) {
+        try {
+          const spec = await readArtifactSpec(request.project.path, request.params.artifactSlug);
+          modelId = spec.frontmatter.modelId ?? null;
+        } catch { /* non-fatal */ }
+      }
+      const result = await startSectionRegeneration(
+        request.project,
+        request.params.artifactSlug,
+        sectionId,
+        instruction,
+        modelId,
+      );
+      response.json(result);
+    } catch (error) {
+      if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
       next(error);
     }
   });

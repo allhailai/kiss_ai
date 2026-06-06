@@ -4,7 +4,7 @@ import { computeBuildScope } from "./buildScope.js";
 import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
 import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
 import { createPromptBuilders } from "./promptBuilders.js";
-import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs, findDirectedOutputsWithoutArtifacts } from "./artifactService.js";
+import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs, findDirectedOutputsWithoutArtifacts, discoverSections, extractSection, replaceSection, updateNavText, checkStyleFragmentation, createSectionBackup, updateManifestForRegeneration, stampManifestAfterBuild, readArtifactPreviewHtml, getArtifactBuildPath } from "./artifactService.js";
 import { runFetchPhase, runDigestPhase } from "./fetchAndDigestPhases.js";
 import { getDeepenQueue, clearDeepenQueue, readTopics, writeTopics, reconcileTopicSources, computeWikiMetrics, autoAdvanceTopicStates } from "./topicsService.js";
 import { computeWikiTriage, updateWikiPageTracker, resetWikiPageTracker, regenerateWikiIndex } from "./wikiTriage.js";
@@ -37,6 +37,7 @@ export function createAgentJobService({
     createFilePrompt,
     createProposeOutputArtifactsPrompt,
     createResearchPrompt,
+    createSectionRegenerationPrompt,
     createSynthesisPrompt,
     createWikiOnlyPrompt,
     createWikiPagePrompt,
@@ -531,12 +532,17 @@ export function createAgentJobService({
   async function runAgentJob({ project, apiKey, modelId, prompt, jobName, runKind, releaseProjectAgent, signal, jobContext }) {
     // Artifact builds get their own simple pipeline
     if (runKind === "artifact_build") {
-      return await runArtifactBuildJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent });
+      return await runArtifactBuildJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent, jobContext });
     }
 
     // Batch artifact builds — run each artifact sequentially
     if (runKind === "artifact_batch_build") {
       return await runBatchArtifactBuildJob({ project, apiKey, modelId, jobName, releaseProjectAgent, artifactSlugs: jobContext?.artifactSlugs || [] });
+    }
+
+    // Section regeneration — rebuild a single section of a built artifact
+    if (runKind === "section_regeneration") {
+      return await runSectionRegenerationJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent, jobContext });
     }
 
     // Output builds (reports) get their own pipeline
@@ -1501,7 +1507,7 @@ export function createAgentJobService({
     }
   }
 
-  async function runArtifactBuildJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent }) {
+  async function runArtifactBuildJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent, jobContext }) {
     activeRebuilds.add(project.slug);
 
     try {
@@ -1531,6 +1537,14 @@ export function createAgentJobService({
 
       const buildCompletion = createAgentJobCompletionMessage(jobName);
       const { message, status } = await buildCompletion({ project, result });
+
+      // Stamp contractVersion into the manifest so the UI knows section editing is safe
+      if (status === "finished" || status === "finished_with_attention") {
+        const artifactSlug = jobContext?.artifactSlugs?.[0];
+        if (artifactSlug) {
+          try { await stampManifestAfterBuild(project.path, artifactSlug); } catch { /* non-fatal */ }
+        }
+      }
 
       const current = await getRebuildState(project.slug);
       await setRebuildState(project.slug, {
@@ -1568,6 +1582,155 @@ export function createAgentJobService({
         text: message,
         status: "error",
         runtime: "cursor",
+      });
+    } finally {
+      activeRebuilds.delete(project.slug);
+      releaseProjectAgent();
+    }
+  }
+
+  async function runSectionRegenerationJob({ project, apiKey, modelId, prompt, jobName, releaseProjectAgent, jobContext }) {
+    const { artifactSlug, sectionId } = jobContext;
+    activeRebuilds.add(project.slug);
+
+    try {
+      const buildDir = getArtifactBuildPath(project.path, artifactSlug);
+      const indexPath = path.join(buildDir, 'index.html');
+      const backupsDir = path.join(buildDir, '.backups');
+      const fragmentPath = path.join(buildDir, '.section-fragment.html');
+
+      // Create backup — abort if this fails
+      await createSectionBackup(indexPath, backupsDir);
+
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: `Regenerating section: ${sectionId}`,
+        text: `Agent is regenerating the "${sectionId}" section.`,
+        status: "section_regeneration",
+        runtime: "cursor",
+      });
+
+      const stateBeforeRegen = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...stateBeforeRegen,
+        buildPhase: "section_regeneration",
+        buildPhaseDetail: `Regenerating section: ${sectionId}`,
+      });
+
+      // The agent writes the fragment to .section-fragment.html
+      // Add a directive to the prompt telling the agent where to write
+      const fullPrompt = prompt + `\n\nWrite your output to: artifacts/builds/${artifactSlug}/.section-fragment.html\nWrite ONLY the inner HTML content for this section — no surrounding document tags.`;
+
+      const result = await runSingleAgentPhase({
+        project,
+        apiKey,
+        modelId,
+        prompt: fullPrompt,
+        phaseName: `Section: ${sectionId}`,
+        signal: undefined,
+      });
+
+      if (result.status !== 'finished') {
+        const buildCompletion = createAgentJobCompletionMessage(jobName);
+        const { message, status } = await buildCompletion({ project, result });
+
+        const current = await getRebuildState(project.slug);
+        await setRebuildState(project.slug, {
+          ...current,
+          running: false,
+          status,
+          finishedAt: new Date().toISOString(),
+          message,
+          buildQueue: null,
+        });
+        return;
+      }
+
+      // Read the fragment the agent wrote
+      let rawFragment;
+      try {
+        rawFragment = await fs.readFile(fragmentPath, 'utf8');
+      } catch {
+        throw new Error(`Agent did not write the section fragment to ${fragmentPath}. Regeneration failed.`);
+      }
+
+      // Clean up the fragment file
+      try { await fs.unlink(fragmentPath); } catch { /* ignore */ }
+
+      // Read current HTML and splice
+      const currentHtml = await fs.readFile(indexPath, 'utf8');
+      let updatedHtml = replaceSection(currentHtml, sectionId, rawFragment);
+
+      if (!updatedHtml) {
+        throw new Error(`Failed to splice regenerated section "${sectionId}" — sanitization or tag balance check failed. Backup preserved.`);
+      }
+
+      // Update nav text if heading changed
+      const section = extractSection(updatedHtml, sectionId);
+      if (section) {
+        updatedHtml = updateNavText(updatedHtml, sectionId, section.innerHTML);
+      }
+
+      // Validate: the section ID must still be present
+      if (!updatedHtml.includes(`id="${sectionId}"`)) {
+        throw new Error(`Section "${sectionId}" not found in spliced HTML — validation failed. Restoring backup.`);
+      }
+
+      // Write the updated HTML
+      await fs.writeFile(indexPath, updatedHtml, 'utf8');
+
+      // Update manifest
+      const manifest = await updateManifestForRegeneration(project.path, artifactSlug, sectionId);
+
+      // Check style fragmentation
+      const fragmentation = checkStyleFragmentation(updatedHtml);
+
+      const successMessage = fragmentation.suggestRebuild
+        ? `Section "${sectionId}" regenerated. Note: ${fragmentation.withScopedStyles}/${fragmentation.total} sections have scoped styles — consider a full rebuild.`
+        : `Section "${sectionId}" regenerated successfully.`;
+
+      const current = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...current,
+        running: false,
+        status: 'finished',
+        finishedAt: new Date().toISOString(),
+        message: successMessage,
+        buildQueue: null,
+      });
+
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: `Section "${sectionId}" regenerated`,
+        text: successMessage,
+        status: "finished",
+        runtime: "server",
+        metadata: {
+          sectionId,
+          artifactSlug,
+          regenerationCount: manifest.regenerationCount,
+          fragmentation,
+        },
+      });
+    } catch (error) {
+      await finishAssistantMessage(project.slug);
+      const message = error instanceof Error ? error.message : `Unknown section regeneration failure.`;
+
+      const current = await getRebuildState(project.slug);
+      await setRebuildState(project.slug, {
+        ...current,
+        running: false,
+        status: "error",
+        finishedAt: new Date().toISOString(),
+        message,
+        buildQueue: null,
+      });
+      await appendRunEvent(project.slug, {
+        type: "error",
+        title: `${jobName} failed`,
+        text: message,
+        status: "error",
+        runtime: "server",
       });
     } finally {
       activeRebuilds.delete(project.slug);
@@ -1634,6 +1797,8 @@ export function createAgentJobService({
           });
 
           if (result.status === "finished") {
+            // Stamp contractVersion so section editing works for this artifact
+            try { await stampManifestAfterBuild(project.path, artifactSlug); } catch { /* non-fatal */ }
             await appendRunEvent(project.slug, {
               type: "system",
               title: `Artifact ${progressLabel}: ${artifactName} finished`,
@@ -1801,6 +1966,79 @@ export function createAgentJobService({
     return await getRebuildState(projectSlug);
   }
 
+  async function startSectionRegeneration(project, artifactSlug, sectionId, instruction, requestedModelId) {
+    const spec = await readArtifactSpec(project.path, artifactSlug);
+    const html = await readArtifactPreviewHtml(project.path, artifactSlug);
+
+    // Discover all sections for context
+    const allSections = discoverSections(html);
+    const targetSection = allSections.find(s => s.id === sectionId);
+    if (!targetSection) {
+      throw httpError(`Section "${sectionId}" not found in artifact "${artifactSlug}".`, 404, 'section_not_found');
+    }
+
+    // Extract the current section's inner HTML
+    const extracted = extractSection(html, sectionId);
+    if (!extracted) {
+      throw httpError(`Could not extract section "${sectionId}".`, 500, 'section_extraction_failed');
+    }
+
+    // Extract global stylesheet from <head>
+    const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+    const globalStylesheet = styleMatch ? styleMatch[1] : '';
+
+    // Extract CDN dependencies from <head>
+    const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+    const cdnDependencies = [];
+    if (headMatch) {
+      const headContent = headMatch[1];
+      const cdnRegex = /<(?:script|link)\s[^>]*(?:src|href)="(https?:\/\/[^"]+)"[^>]*>/gi;
+      let cdnMatch;
+      while ((cdnMatch = cdnRegex.exec(headContent)) !== null) {
+        cdnDependencies.push(cdnMatch[0]);
+      }
+    }
+
+    // Build other section summaries (~200 chars each)
+    const otherSections = allSections
+      .filter(s => s.id !== sectionId)
+      .map(s => {
+        const sectionContent = html.slice(s.startIdx, s.endIdx);
+        // Strip tags for a text-only snippet
+        const textOnly = sectionContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        return { id: s.id, title: s.title, snippet: textOnly.slice(0, 200) };
+      });
+
+    // Resolve source data
+    const sourceGlobs = Array.isArray(spec.frontmatter.sources) ? spec.frontmatter.sources : [];
+    const resolvedSources = await resolveArtifactSources(project.path, sourceGlobs);
+
+    const prompt = await createSectionRegenerationPrompt({
+      project,
+      artifactSpec: spec,
+      sectionId,
+      sectionTitle: targetSection.title,
+      currentSectionHTML: extracted.innerHTML,
+      globalStylesheet,
+      otherSections,
+      resolvedSources,
+      userInstruction: instruction,
+      cdnDependencies,
+    });
+
+    return await startAgentJob({
+      project,
+      requestedModelId,
+      runKind: 'section_regeneration',
+      startMessage: `Regenerating section: ${sectionId}`,
+      noApiKeyMessage: 'No Cursor API key found. Section regeneration is unavailable from the UI.',
+      noModelsMessage: 'No Cursor models available for section regeneration.',
+      jobName: `Section: ${sectionId}`,
+      prompt,
+      jobContext: { artifactSlug, sectionId },
+    });
+  }
+
   return {
     cancelAgentJob,
     startArtifactBuild,
@@ -1809,5 +2047,6 @@ export function createAgentJobService({
     startKnowledgeBuild,
     startOutputBuild,
     startRebuild, // deprecated alias for startKnowledgeBuild
+    startSectionRegeneration,
   };
 }
