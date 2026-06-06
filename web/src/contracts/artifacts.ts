@@ -36,3 +36,11 @@ export type ArtifactSectionsResponse = {
   regenerationCount: number;
   contractVersion: number | null;
 };
+
+export type ElementContext = {
+  elementTag: string;
+  elementId?: string;
+  cssPath?: string;
+  elementText?: string;
+  elementHTML?: string;
+};

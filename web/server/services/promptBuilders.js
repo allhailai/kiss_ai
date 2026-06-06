@@ -463,6 +463,7 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
    * @param {Array}  params.resolvedSources - [{ relativePath, content }]
    * @param {string} params.userInstruction - the user's regeneration instruction
    * @param {Array}  params.cdnDependencies - [string] CDN script/link tags from <head>
+   * @param {object} [params.elementContext] - optional targeted element from inspection mode
    */
   async function createSectionRegenerationPrompt({
     project,
@@ -475,6 +476,7 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
     resolvedSources,
     userInstruction,
     cdnDependencies,
+    elementContext,
   }) {
     const lines = [
       'Regenerate one section of an existing HTML artifact.',
@@ -485,6 +487,29 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
       `USER INSTRUCTION: "${userInstruction}"`,
       '',
     ];
+
+    // Element-level targeting from inspection mode
+    if (elementContext) {
+      lines.push(
+        '── TARGETED ELEMENT (the user is pointing at this specific element) ──',
+        '',
+        `Element type: ${elementContext.elementTag}`,
+      );
+      if (elementContext.cssPath) {
+        lines.push(`Location: ${elementContext.cssPath}`);
+      }
+      if (elementContext.elementText) {
+        lines.push(`Text content: "${elementContext.elementText}"`);
+      }
+      if (elementContext.elementHTML) {
+        lines.push('', 'Current HTML:', elementContext.elementHTML);
+      }
+      lines.push(
+        '',
+        'Focus your changes on this element. The user\'s instruction refers to it specifically.',
+        '',
+      );
+    }
 
     // Artifact goal / spec body
     if (artifactSpec.body) {

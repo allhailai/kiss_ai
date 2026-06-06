@@ -267,6 +267,13 @@ export const buildArtifactBodySchema = z.object({
 export const regenerateSectionBodySchema = z.object({
   instruction: z.string().trim().min(1).max(10_000),
   modelId: optionalTrimmedString(160),
+  elementContext: z.object({
+    elementTag: z.string().max(30),
+    elementId: z.string().max(200).optional(),
+    cssPath: z.string().max(500).optional(),
+    elementText: z.string().max(300).optional(),
+    elementHTML: z.string().max(1000).optional(),
+  }).optional(),
 });
 
 function parseRequestPart(schema, value, httpError, label) {

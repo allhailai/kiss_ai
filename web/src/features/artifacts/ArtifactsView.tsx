@@ -5,7 +5,13 @@ import { downloadProjectFile, triggerDownload } from "../../data/downloadFile";
 import { useRouteContext } from "../../app/contexts/RouteContext";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
 import { groupModelsByTier, modelDisplayName, modelTierLabels } from "../../domain/modelLabels";
-import type { ArtifactSpec, ArtifactSpecDetail, ArtifactSection, ArtifactSectionsResponse, AvailableSourceFile, FileContent, RebuildModel } from "../../contracts/api";
+import type { ArtifactSpec, ArtifactSpecDetail, ArtifactSection, ArtifactSectionsResponse, AvailableSourceFile, ElementContext, FileContent, RebuildModel } from "../../contracts/api";
+
+type FeedbackTarget = {
+  sectionId: string;
+  sectionTitle: string;
+  elementContext?: ElementContext;
+};
 
 type Tab = "spec" | "preview";
 
@@ -37,8 +43,13 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   const [sectionsLoading, setSectionsLoading] = useState(false);
   const [sectionPanelOpen, setSectionPanelOpen] = useState(false);
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
-  const [regenInstruction, setRegenInstruction] = useState("");
-  const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null);
+
+  // Feedback form state (shared between section panel clicks and inspection mode clicks)
+  const [feedbackTarget, setFeedbackTarget] = useState<FeedbackTarget | null>(null);
+  const [feedbackInstruction, setFeedbackInstruction] = useState("");
+
+  // Inspection / annotation mode (Phase 2)
+  const [annotationMode, setAnnotationMode] = useState(false);
 
   const selectedArtifact = artifacts.find((a) => a.slug === selectedSlug) ?? null;
   const isBuilt = selectedArtifact?.status === "built";
@@ -341,20 +352,28 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
     iframe.src = `${baseUrl}#${sectionId}`;
   }
 
-  async function handleRegenerateSection(sectionId: string) {
-    if (!selectedSlug || !regenInstruction.trim()) return;
+  function handleOpenFeedback(sectionId: string, sectionTitle: string, elementContext?: ElementContext) {
+    setFeedbackTarget({ sectionId, sectionTitle, elementContext });
+    setFeedbackInstruction("");
+    if (!sectionPanelOpen) setSectionPanelOpen(true);
+  }
+
+  async function handleSubmitFeedback() {
+    if (!selectedSlug || !feedbackTarget || !feedbackInstruction.trim()) return;
+    const { sectionId, elementContext } = feedbackTarget;
     setRegeneratingSection(sectionId);
     try {
       await artifactsApi.regenerateSection(
         projectSlug,
         selectedSlug,
         sectionId,
-        regenInstruction.trim(),
+        feedbackInstruction.trim(),
         String(selectedSpec?.frontmatter.modelId ?? ""),
+        elementContext,
       );
       setBuilding(true);
-      setRegenInstruction("");
-      setExpandedSectionId(null);
+      setFeedbackInstruction("");
+      setFeedbackTarget(null);
       flash(`Regenerating section: ${sectionId}…`);
     } catch (error) {
       flash(error instanceof Error ? error.message : "Regeneration failed");
@@ -362,6 +381,45 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
       setRegeneratingSection(null);
     }
   }
+
+  // Inspection mode: toggle annotation overlay in the iframe
+  function toggleAnnotationMode() {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    const next = !annotationMode;
+    setAnnotationMode(next);
+    iframe.contentWindow.postMessage(
+      { type: next ? 'kiss-enter-annotation' : 'kiss-exit-annotation' },
+      '*',
+    );
+  }
+
+  // Listen for annotation clicks from the iframe
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (event.data?.type !== 'kiss-annotation-selected') return;
+      const { sectionId, elementTag, elementId, cssPath, elementText, elementHTML } = event.data;
+      if (!sectionId) return;
+      const section = sections.find(s => s.id === sectionId);
+      const sectionTitle = section?.title ?? sectionId;
+      handleOpenFeedback(sectionId, sectionTitle, {
+        elementTag,
+        elementId: elementId || undefined,
+        cssPath: cssPath || undefined,
+        elementText: elementText || undefined,
+        elementHTML: elementHTML || undefined,
+      });
+    }
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [sections]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Exit annotation mode when leaving preview
+  useEffect(() => {
+    if (activeTab !== 'preview' && annotationMode) {
+      setAnnotationMode(false);
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasChanges = selectedSpec && editBody !== selectedSpec.body;
 
@@ -609,14 +667,17 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
                   regeneratedSections={regeneratedSections}
                   contractVersion={contractVersion}
                   loading={sectionsLoading}
-                  expandedSectionId={expandedSectionId}
-                  regenInstruction={regenInstruction}
+                  feedbackTarget={feedbackTarget}
+                  feedbackInstruction={feedbackInstruction}
                   regeneratingSection={regeneratingSection}
                   building={building}
+                  annotationMode={annotationMode}
                   onScrollTo={handleScrollToSection}
-                  onExpand={(id) => setExpandedSectionId(expandedSectionId === id ? null : id)}
-                  onInstructionChange={setRegenInstruction}
-                  onRegenerate={handleRegenerateSection}
+                  onOpenFeedback={handleOpenFeedback}
+                  onFeedbackInstructionChange={setFeedbackInstruction}
+                  onSubmitFeedback={handleSubmitFeedback}
+                  onCloseFeedback={() => setFeedbackTarget(null)}
+                  onToggleAnnotation={toggleAnnotationMode}
                 />
               ) : null}
               <button
@@ -785,32 +846,46 @@ function SectionPanel({
   regeneratedSections,
   contractVersion,
   loading,
-  expandedSectionId,
-  regenInstruction,
+  feedbackTarget,
+  feedbackInstruction,
   regeneratingSection,
   building,
+  annotationMode,
   onScrollTo,
-  onExpand,
-  onInstructionChange,
-  onRegenerate,
+  onOpenFeedback,
+  onFeedbackInstructionChange,
+  onSubmitFeedback,
+  onCloseFeedback,
+  onToggleAnnotation,
 }: {
   sections: ArtifactSection[];
   regeneratedSections: string[];
   contractVersion: number | null;
   loading: boolean;
-  expandedSectionId: string | null;
-  regenInstruction: string;
+  feedbackTarget: FeedbackTarget | null;
+  feedbackInstruction: string;
   regeneratingSection: string | null;
   building: boolean;
+  annotationMode: boolean;
   onScrollTo: (id: string) => void;
-  onExpand: (id: string) => void;
-  onInstructionChange: (value: string) => void;
-  onRegenerate: (id: string) => void;
+  onOpenFeedback: (sectionId: string, sectionTitle: string) => void;
+  onFeedbackInstructionChange: (value: string) => void;
+  onSubmitFeedback: () => void;
+  onCloseFeedback: () => void;
+  onToggleAnnotation: () => void;
 }) {
   return (
     <div className="artifacts-section-panel">
       <div className="artifacts-section-panel-header">
         <h3>Sections</h3>
+        <button
+          className={`artifacts-inspect-btn ${annotationMode ? "active" : ""}`}
+          onClick={onToggleAnnotation}
+          type="button"
+          title={annotationMode ? "Exit inspection mode" : "Inspect elements in the preview"}
+        >
+          🎯
+        </button>
       </div>
       {contractVersion === null ? (
         <div className="artifacts-section-panel-warning">
@@ -825,9 +900,9 @@ function SectionPanel({
         <ul className="artifacts-section-list">
           {sections.map((section) => {
             const isModified = regeneratedSections.includes(section.id);
-            const isExpanded = expandedSectionId === section.id;
+            const isActive = feedbackTarget?.sectionId === section.id;
             return (
-              <li key={section.id} className={`artifacts-section-item ${isExpanded ? "expanded" : ""}`}>
+              <li key={section.id} className={`artifacts-section-item ${isActive ? "active" : ""}`}>
                 <div className="artifacts-section-item-header">
                   <button
                     className="artifacts-section-item-title"
@@ -839,39 +914,93 @@ function SectionPanel({
                     {isModified ? <span className="artifacts-section-modified-badge">edited</span> : null}
                   </button>
                   <button
-                    className="artifacts-section-regen-toggle"
-                    onClick={() => onExpand(section.id)}
+                    className="artifacts-section-comment-btn"
+                    onClick={() => onOpenFeedback(section.id, section.title)}
                     disabled={building}
                     type="button"
-                    title="Regenerate this section"
+                    title="Comment on this section"
                   >
-                    ✏️
+                    💬
                   </button>
                 </div>
-                {isExpanded ? (
-                  <div className="artifacts-section-regen-form">
-                    <textarea
-                      className="artifacts-section-regen-input"
-                      placeholder="Describe the changes you want…"
-                      value={regenInstruction}
-                      onChange={(e) => onInstructionChange(e.target.value)}
-                      rows={3}
-                    />
-                    <button
-                      className="artifacts-section-regen-btn"
-                      disabled={!regenInstruction.trim() || regeneratingSection === section.id || building}
-                      onClick={() => onRegenerate(section.id)}
-                      type="button"
-                    >
-                      {regeneratingSection === section.id ? "Regenerating…" : "Regenerate"}
-                    </button>
-                  </div>
-                ) : null}
               </li>
             );
           })}
         </ul>
       )}
+
+      {/* ─── Docked Feedback Form ─── */}
+      {feedbackTarget ? (
+        <SectionFeedbackForm
+          target={feedbackTarget}
+          instruction={feedbackInstruction}
+          submitting={regeneratingSection === feedbackTarget.sectionId}
+          disabled={building}
+          onInstructionChange={onFeedbackInstructionChange}
+          onSubmit={onSubmitFeedback}
+          onClose={onCloseFeedback}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/* ─── Feedback Form (docked at bottom of section panel) ── */
+
+function SectionFeedbackForm({
+  target,
+  instruction,
+  submitting,
+  disabled,
+  onInstructionChange,
+  onSubmit,
+  onClose,
+}: {
+  target: FeedbackTarget;
+  instruction: string;
+  submitting: boolean;
+  disabled: boolean;
+  onInstructionChange: (value: string) => void;
+  onSubmit: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="artifacts-section-feedback-form">
+      <div className="artifacts-section-feedback-header">
+        <span className="artifacts-section-feedback-title">{target.sectionTitle}</span>
+        <button
+          className="artifacts-section-feedback-close"
+          onClick={onClose}
+          type="button"
+          title="Close"
+        >
+          ×
+        </button>
+      </div>
+      {target.elementContext ? (
+        <div className="artifacts-section-feedback-element">
+          <span className="artifacts-section-feedback-element-tag">{target.elementContext.elementTag}</span>
+          {target.elementContext.cssPath ? (
+            <span className="artifacts-section-feedback-element-path">{target.elementContext.cssPath}</span>
+          ) : null}
+        </div>
+      ) : null}
+      <textarea
+        className="artifacts-section-feedback-textarea"
+        placeholder="What should change?…"
+        value={instruction}
+        onChange={(e) => onInstructionChange(e.target.value)}
+        rows={3}
+        autoFocus
+      />
+      <button
+        className="artifacts-section-feedback-submit"
+        disabled={!instruction.trim() || submitting || disabled}
+        onClick={onSubmit}
+        type="button"
+      >
+        {submitting ? "Regenerating…" : "Regenerate"}
+      </button>
     </div>
   );
 }

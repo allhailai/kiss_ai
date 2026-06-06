@@ -11,6 +11,7 @@ import {
   discoverSections,
   getArtifactBuildStatus,
 } from "../services/artifactService.js";
+import { getAnnotationScript } from "../services/annotationScript.js";
 import {
   createArtifactBodySchema,
   renameArtifactBodySchema,
@@ -141,10 +142,17 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
     }
   });
 
-  // Serve built artifact HTML
+  // Serve built artifact HTML (with annotation script injected)
   app.get("/api/projects/:projectSlug/artifacts/:artifactSlug/preview", async (request, response, next) => {
     try {
-      const html = await readArtifactPreviewHtml(request.project.path, request.params.artifactSlug);
+      let html = await readArtifactPreviewHtml(request.project.path, request.params.artifactSlug);
+      // Inject the annotation script before </body> so inspection mode works
+      const annotationScript = getAnnotationScript();
+      if (html.includes('</body>')) {
+        html = html.replace('</body>', annotationScript + '\n</body>');
+      } else {
+        html += annotationScript;
+      }
       response.type("html").send(html);
     } catch (error) {
       if (error.code === "ENOENT") return next(httpError("Artifact has not been built yet.", 404, "artifact_not_built"));
@@ -176,7 +184,7 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   // Regenerate a single section
   app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/sections/:sectionId/regenerate", async (request, response, next) => {
     try {
-      const { instruction, modelId: requestedModelId } = parseRequestBody(regenerateSectionBodySchema, request.body, httpError);
+      const { instruction, modelId: requestedModelId, elementContext } = parseRequestBody(regenerateSectionBodySchema, request.body, httpError);
       const sectionId = request.params.sectionId;
       // Validate sectionId matches the kebab-case contract from do_build_artifact.md
       if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(sectionId)) {
@@ -195,6 +203,7 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
         sectionId,
         instruction,
         modelId,
+        elementContext,
       );
       response.json(result);
     } catch (error) {

@@ -1,0 +1,135 @@
+/**
+ * Returns the annotation script to be injected into served artifact HTML.
+ * The script is inert by default — it only activates when it receives
+ * a postMessage from the parent frame.
+ */
+export function getAnnotationScript() {
+  return `
+<script>
+(function() {
+  var active = false;
+  var overlay = null;
+  var label = null;
+
+  var SEMANTIC_TAGS = [
+    'SECTION','ARTICLE','NAV','HEADER','FOOTER','MAIN','ASIDE',
+    'DIV','SVG','TABLE','FIGURE','UL','OL','DL',
+    'H1','H2','H3','H4','H5','H6',
+    'BLOCKQUOTE','PRE','IMG','CANVAS','FORM'
+  ];
+
+  window.addEventListener('message', function(e) {
+    if (!e.data || typeof e.data.type !== 'string') return;
+    if (e.data.type === 'kiss-enter-annotation') activate();
+    if (e.data.type === 'kiss-exit-annotation') deactivate();
+  });
+
+  function activate() {
+    if (active) return;
+    active = true;
+
+    overlay = document.createElement('div');
+    overlay.id = '__kiss-overlay';
+    overlay.style.cssText = 'position:fixed;pointer-events:none;border:2px solid #c87040;' +
+      'background:rgba(200,112,64,0.06);z-index:99999;transition:top 0.08s,left 0.08s,width 0.08s,height 0.08s;' +
+      'display:none;border-radius:3px;';
+    document.body.appendChild(overlay);
+
+    label = document.createElement('div');
+    label.id = '__kiss-label';
+    label.style.cssText = 'position:fixed;pointer-events:none;z-index:100000;padding:2px 6px;' +
+      'background:#c87040;color:#fff;font-size:10px;font-weight:700;font-family:system-ui,sans-serif;' +
+      'border-radius:0 0 4px 4px;text-transform:uppercase;letter-spacing:0.5px;display:none;white-space:nowrap;';
+    document.body.appendChild(label);
+
+    document.addEventListener('mousemove', handleHover, true);
+    document.addEventListener('click', handleClick, true);
+    document.body.style.cursor = 'crosshair';
+  }
+
+  function deactivate() {
+    if (!active) return;
+    active = false;
+    document.removeEventListener('mousemove', handleHover, true);
+    document.removeEventListener('click', handleClick, true);
+    document.body.style.cursor = '';
+    if (overlay) { overlay.remove(); overlay = null; }
+    if (label) { label.remove(); label = null; }
+  }
+
+  function findSemanticParent(el) {
+    var current = el;
+    while (current && current !== document.body && current !== document.documentElement) {
+      if (SEMANTIC_TAGS.indexOf(current.tagName) !== -1) return current;
+      current = current.parentElement;
+    }
+    return el;
+  }
+
+  function getSectionId(el) {
+    var current = el;
+    while (current) {
+      if (current.tagName === 'SECTION' && current.id) return current.id;
+      current = current.parentElement;
+    }
+    return null;
+  }
+
+  function buildCssPath(el) {
+    var parts = [];
+    var current = el;
+    var depth = 0;
+    while (current && current !== document.body && depth < 4) {
+      var seg = current.tagName.toLowerCase();
+      if (current.id) { seg = '#' + current.id; parts.unshift(seg); break; }
+      if (current.className && typeof current.className === 'string') {
+        var cls = current.className.trim().split(/\\s+/).slice(0, 2).join('.');
+        if (cls) seg += '.' + cls;
+      }
+      parts.unshift(seg);
+      current = current.parentElement;
+      depth++;
+    }
+    return parts.join(' > ');
+  }
+
+  function handleHover(e) {
+    if (!active || !overlay || !label) return;
+    var target = findSemanticParent(e.target);
+    var rect = target.getBoundingClientRect();
+    overlay.style.display = 'block';
+    overlay.style.top = rect.top + 'px';
+    overlay.style.left = rect.left + 'px';
+    overlay.style.width = rect.width + 'px';
+    overlay.style.height = rect.height + 'px';
+
+    var sectionId = getSectionId(target);
+    var tagName = target.tagName.toLowerCase();
+    label.textContent = tagName + (sectionId ? ' in #' + sectionId : '');
+    label.style.display = 'block';
+    label.style.top = Math.max(0, rect.top) + 'px';
+    label.style.left = rect.left + 'px';
+  }
+
+  function handleClick(e) {
+    if (!active) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var target = findSemanticParent(e.target);
+    var sectionId = getSectionId(target);
+    var text = (target.textContent || '').replace(/\\s+/g, ' ').trim();
+
+    window.parent.postMessage({
+      type: 'kiss-annotation-selected',
+      sectionId: sectionId,
+      elementTag: target.tagName.toLowerCase(),
+      elementId: target.id || null,
+      elementClasses: target.className && typeof target.className === 'string' ? target.className : '',
+      elementText: text.slice(0, 200),
+      elementHTML: target.outerHTML.slice(0, 500),
+      cssPath: buildCssPath(target),
+    }, '*');
+  }
+})();
+</script>`;
+}

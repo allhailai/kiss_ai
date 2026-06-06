@@ -1966,7 +1966,7 @@ export function createAgentJobService({
     return await getRebuildState(projectSlug);
   }
 
-  async function startSectionRegeneration(project, artifactSlug, sectionId, instruction, requestedModelId) {
+  async function startSectionRegeneration(project, artifactSlug, sectionId, instruction, requestedModelId, elementContext) {
     const spec = await readArtifactSpec(project.path, artifactSlug);
     const html = await readArtifactPreviewHtml(project.path, artifactSlug);
 
@@ -2024,6 +2024,7 @@ export function createAgentJobService({
       resolvedSources,
       userInstruction: instruction,
       cdnDependencies,
+      elementContext,
     });
 
     return await startAgentJob({
