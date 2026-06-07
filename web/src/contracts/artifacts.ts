@@ -44,3 +44,15 @@ export type ElementContext = {
   elementText?: string;
   elementHTML?: string;
 };
+
+export type Annotation = {
+  id: string;
+  sectionId: string;
+  sectionTitle: string;
+  instruction: string;
+  elementContext?: ElementContext | null;
+  status: "pending" | "applied" | "failed";
+  previouslyApplied?: boolean;
+  createdAt: string;
+  updatedAt: string;
+};

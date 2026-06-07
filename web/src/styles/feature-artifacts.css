@@ -793,13 +793,13 @@
   align-items: center;
   gap: 5px;
   padding: 4px 10px;
-  background: none;
-  border: 1px solid var(--color-border, #444);
+  background: color-mix(in srgb, var(--color-accent, #c87040) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent, #c87040) 55%, #fff);
   border-radius: 5px;
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
-  color: var(--color-text-muted, #999);
+  color: color-mix(in srgb, var(--color-accent, #c87040) 55%, #fff);
   white-space: nowrap;
   transition: color 0.15s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
@@ -809,9 +809,9 @@
 }
 
 .artifacts-inspect-btn:hover:not(.active) {
-  color: var(--color-text, #ccc);
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--color-text-muted, #666);
+  background: color-mix(in srgb, var(--color-accent, #c87040) 22%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent, #c87040) 45%, #fff);
+  color: color-mix(in srgb, var(--color-accent, #c87040) 45%, #fff);
 }
 
 .artifacts-inspect-btn.active {
@@ -1108,6 +1108,46 @@
   letter-spacing: 0.5px;
 }
 
+/* ── Applied Annotations History ─────────────────────────── */
+
+.artifacts-annotation-history {
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-border, #333);
+}
+
+.artifacts-annotation-history-header {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted, #666);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  transition: color 0.15s;
+}
+
+.artifacts-annotation-history-header::-webkit-details-marker {
+  display: none;
+}
+
+.artifacts-annotation-history-header:hover {
+  color: var(--color-text-muted, #888);
+}
+
+.artifacts-annotation-history[open] > .artifacts-annotation-history-header {
+  border-bottom: 1px solid var(--color-border, #2a2a2a);
+}
+
+.artifacts-annotation-history .artifacts-annotation-card {
+  opacity: 0.5;
+}
+
+.artifacts-annotation-history .artifacts-annotation-card:hover {
+  opacity: 0.8;
+}
+
 /* ── Annotation Card ─────────────────────────────────────── */
 
 .artifacts-annotation-card {
@@ -1123,6 +1163,25 @@
 .artifacts-annotation-card.failed {
   opacity: 0.5;
   border-left: 2px solid #c44;
+}
+
+.artifacts-annotation-card.reactivated {
+  border-left: 2px solid color-mix(in srgb, var(--color-accent, #c87040) 60%, #fff);
+}
+
+.artifacts-annotation-reactivated-badge {
+  display: inline-block;
+  flex-shrink: 0;
+  margin-left: 5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: color-mix(in srgb, var(--color-accent, #c87040) 15%, transparent);
+  color: color-mix(in srgb, var(--color-accent, #c87040) 55%, #fff);
+  vertical-align: middle;
 }
 
 .artifacts-annotation-card-header {

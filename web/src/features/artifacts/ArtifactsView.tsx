@@ -1034,6 +1034,7 @@ function SectionPanel({
 }) {
   const pendingAnnotations = annotations.filter(a => a.status === "pending");
   const failedAnnotations = annotations.filter(a => a.status === "failed");
+  const appliedAnnotations = annotations.filter(a => a.status === "applied");
   const pendingCount = pendingAnnotations.length;
   const failedCount = failedAnnotations.length;
   const affectedSectionIds = new Set(pendingAnnotations.map(a => a.sectionId));
@@ -1143,12 +1144,12 @@ function SectionPanel({
         </ul>
       )}
 
-      {annotations.length > 0 ? (
+      {pendingAnnotations.length > 0 ? (
         <div className="artifacts-annotation-queue">
           <div className="artifacts-annotation-queue-header">
-            📝 {pendingCount > 0 ? `${pendingCount} pending` : "No pending"} annotation{pendingCount !== 1 ? "s" : ""}
+            📝 {pendingCount} pending annotation{pendingCount !== 1 ? "s" : ""}
           </div>
-          {annotations.map((ann) => (
+          {pendingAnnotations.map((ann) => (
             <AnnotationCard
               key={ann.id}
               annotation={ann}
@@ -1184,6 +1185,27 @@ function SectionPanel({
           Retry {failedCount} failed annotation{failedCount !== 1 ? "s" : ""}
         </button>
       ) : null}
+
+      {appliedAnnotations.length > 0 ? (
+        <details className="artifacts-annotation-history">
+          <summary className="artifacts-annotation-history-header">
+            ✓ {appliedAnnotations.length} applied annotation{appliedAnnotations.length !== 1 ? "s" : ""}
+          </summary>
+          {appliedAnnotations.map((ann) => (
+            <AnnotationCard
+              key={ann.id}
+              annotation={ann}
+              isEditing={editingAnnotationId === ann.id}
+              onHighlight={() => onHighlightAnnotation(ann)}
+              onStartEditing={() => onStartEditing(ann.id)}
+              onCancelEditing={onCancelEditing}
+              onUpdate={(instruction) => onUpdateAnnotation(ann.id, instruction)}
+              onDelete={() => onDeleteAnnotation(ann.id)}
+              onToggle={() => onToggleAnnotation(ann.id)}
+            />
+          ))}
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -1211,9 +1233,10 @@ function AnnotationCard({
 }) {
   const [editText, setEditText] = useState(annotation.instruction);
   const isPending = annotation.status === "pending";
+  const isReactivated = isPending && annotation.previouslyApplied;
 
   return (
-    <div className={`artifacts-annotation-card ${annotation.status}`}>
+    <div className={`artifacts-annotation-card ${annotation.status}${isReactivated ? " reactivated" : ""}`}>
       <div className="artifacts-annotation-card-header">
         <button
           className="artifacts-annotation-card-section"
@@ -1223,6 +1246,7 @@ function AnnotationCard({
         >
           {annotation.sectionTitle}
         </button>
+        {isReactivated ? <span className="artifacts-annotation-reactivated-badge">reactivated</span> : null}
         {isPending ? (
           <span className="artifacts-annotation-card-actions">
             <button onClick={onStartEditing} type="button" data-tooltip="Edit">✎</button>
