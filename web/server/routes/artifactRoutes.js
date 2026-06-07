@@ -14,6 +14,7 @@ import {
   unhideSectionInHtml,
   listBuildVersions,
   revertToBuildVersion,
+  revertToLatestBuild,
 } from "../services/artifactService.js";
 import { getAnnotationScript } from "../services/annotationScript.js";
 import {
@@ -260,6 +261,16 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
         activeVersionDirName = buildStatus?.activeVersionDirName ?? null;
       } catch { /* ignore */ }
       response.json({ versions, activeVersionDirName });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Switch back to the latest build (must be before :versionDirName route)
+  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/versions/latest/revert", async (request, response, next) => {
+    try {
+      await revertToLatestBuild(request.project.path, request.params.artifactSlug);
+      response.json({ ok: true });
     } catch (error) {
       next(error);
     }

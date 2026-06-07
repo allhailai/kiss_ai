@@ -87,13 +87,19 @@ export const artifactsApi = {
   // ─── Build Versioning ───────────────────────────────────────
 
   versions: (projectSlug: string, artifactSlug: string) =>
-    request<{ versions: BuildVersion[] }>(
+    request<{ versions: BuildVersion[]; activeVersionDirName: string | null }>(
       `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/versions`,
     ),
 
   revertVersion: (projectSlug: string, artifactSlug: string, versionDirName: string) =>
     request<{ version: number; dirName: string; timestamp: string }>(
       `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/versions/${encodeURIComponent(versionDirName)}/revert`,
+      { method: "POST" },
+    ),
+
+  revertToLatest: (projectSlug: string, artifactSlug: string) =>
+    request<{ ok: boolean }>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/versions/latest/revert`,
       { method: "POST" },
     ),
 
