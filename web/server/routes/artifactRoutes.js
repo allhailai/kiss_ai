@@ -7,7 +7,7 @@ import {
   deleteArtifactSpec,
   readArtifactPreviewHtml,
   slugifyArtifactName,
-  ensureArtifactDirs,
+  getArtifactBuildStatus,
   discoverSections,
   hideSectionInHtml,
   unhideSectionInHtml,

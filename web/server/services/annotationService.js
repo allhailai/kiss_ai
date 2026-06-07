@@ -208,11 +208,3 @@ export async function toggleAnnotation(projectPath, artifactSlug, annotationId, 
   return annotation;
 }
 
-/**
- * Remove all applied annotations (called after full rebuild).
- */
-export async function clearApplied(projectPath, artifactSlug) {
-  const annotations = await readAnnotations(projectPath, artifactSlug);
-  const remaining = annotations.filter(a => a.status !== "applied");
-  await writeAnnotations(projectPath, artifactSlug, remaining);
-}
