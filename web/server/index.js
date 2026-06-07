@@ -413,7 +413,7 @@ const { assistQuestion } = createQuestionAiAssistService({
   runCursorAgentText,
 });
 
-const { cancelAgentJob, startArtifactBuild, startFullRebuild, startHumanAttentionResolution, startKnowledgeBuild, startOutputBuild, startRebuild, startSectionRegeneration } = createAgentJobService({
+const { cancelAgentJob, startArtifactBuild, startBatchSectionRegeneration, startFullRebuild, startHumanAttentionResolution, startKnowledgeBuild, startOutputBuild, startRebuild, startSectionRegeneration } = createAgentJobService({
   FRAMEWORK_ROOT,
   activeRebuilds,
   appendAssistantDelta,
@@ -589,7 +589,7 @@ registerApiRoutes(app, {
   writeProjectUiState,
 });
 
-registerArtifactRoutes(app, { httpError, startArtifactBuild, startSectionRegeneration });
+registerArtifactRoutes(app, { httpError, startArtifactBuild, startSectionRegeneration, startBatchSectionRegeneration });
 
 app.use(apiErrorHandler);
 

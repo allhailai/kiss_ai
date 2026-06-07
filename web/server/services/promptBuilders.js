@@ -249,7 +249,7 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
   }
 
 
-  async function createArtifactPrompt(project, artifactSpec, resolvedSources, discoveryInventory = [], specHash = null) {
+  async function createArtifactPrompt(project, artifactSpec, resolvedSources, discoveryInventory = [], specHash = null, pendingAnnotations = []) {
     const lines = [
       `Build the artifact: ${artifactSpec.frontmatter.name || artifactSpec.slug}`,
       "",
@@ -446,6 +446,15 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
       lines.push("");
     }
 
+    // User annotations from previous builds (instruction text only — no element context)
+    if (pendingAnnotations.length > 0) {
+      lines.push('── USER ANNOTATIONS (incorporate into your design) ──────────', '');
+      for (const ann of pendingAnnotations) {
+        lines.push(`- ${ann.sectionTitle || ann.sectionId}: "${ann.instruction}"`);
+      }
+      lines.push('');
+    }
+
     return lines.join("\n");
   }
 
@@ -464,6 +473,7 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
    * @param {string} params.userInstruction - the user's regeneration instruction
    * @param {Array}  params.cdnDependencies - [string] CDN script/link tags from <head>
    * @param {object} [params.elementContext] - optional targeted element from inspection mode
+   * @param {Array}  [params.annotations] - optional batch annotations [{ instruction, elementContext? }]
    */
   async function createSectionRegenerationPrompt({
     project,
@@ -477,6 +487,7 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
     userInstruction,
     cdnDependencies,
     elementContext,
+    annotations,
   }) {
     const lines = [
       'Regenerate one section of an existing HTML artifact.',
@@ -484,31 +495,45 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
       `SECTION ID: ${sectionId}`,
       `SECTION TITLE: ${sectionTitle}`,
       '',
-      `USER INSTRUCTION: "${userInstruction}"`,
-      '',
     ];
 
-    // Element-level targeting from inspection mode
-    if (elementContext) {
-      lines.push(
-        '── TARGETED ELEMENT (the user is pointing at this specific element) ──',
-        '',
-        `Element type: ${elementContext.elementTag}`,
-      );
-      if (elementContext.cssPath) {
-        lines.push(`Location: ${elementContext.cssPath}`);
+    // Build instructions — supports both single instruction and batch annotations
+    // annotations is an optional array of { instruction, elementContext? }
+    const instructionItems = annotations && annotations.length > 0
+      ? annotations
+      : [{ instruction: userInstruction, elementContext }];
+
+    if (instructionItems.length === 1) {
+      // Single instruction — classic format
+      const item = instructionItems[0];
+      lines.push(`USER INSTRUCTION: "${item.instruction}"`, '');
+
+      if (item.elementContext) {
+        lines.push(
+          '── TARGETED ELEMENT (the user is pointing at this specific element) ──',
+          '',
+          `Element type: ${item.elementContext.elementTag}`,
+        );
+        if (item.elementContext.cssPath) lines.push(`Location: ${item.elementContext.cssPath}`);
+        if (item.elementContext.elementText) lines.push(`Text content: "${item.elementContext.elementText}"`);
+        if (item.elementContext.elementHTML) lines.push('', 'Current HTML:', item.elementContext.elementHTML);
+        lines.push('', 'Focus your changes on this element. The user\'s instruction refers to it specifically.', '');
       }
-      if (elementContext.elementText) {
-        lines.push(`Text content: "${elementContext.elementText}"`);
+    } else {
+      // Multiple instructions — numbered list
+      lines.push(`USER INSTRUCTIONS (${instructionItems.length} changes requested):`, '');
+      for (let i = 0; i < instructionItems.length; i++) {
+        const item = instructionItems[i];
+        lines.push(`${i + 1}. "${item.instruction}"`);
+        if (item.elementContext) {
+          const ctx = item.elementContext;
+          const location = [ctx.elementTag, ctx.cssPath].filter(Boolean).join(' at ');
+          lines.push(`   TARGETED ELEMENT: ${location}`);
+          if (ctx.elementText) lines.push(`   Text: "${ctx.elementText.slice(0, 100)}"`);
+        }
+        lines.push('');
       }
-      if (elementContext.elementHTML) {
-        lines.push('', 'Current HTML:', elementContext.elementHTML);
-      }
-      lines.push(
-        '',
-        'Focus your changes on this element. The user\'s instruction refers to it specifically.',
-        '',
-      );
+      lines.push('Apply ALL of the above changes to this section.', '');
     }
 
     // Artifact goal / spec body

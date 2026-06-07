@@ -13,15 +13,26 @@ import {
 } from "../services/artifactService.js";
 import { getAnnotationScript } from "../services/annotationScript.js";
 import {
+  listAnnotations,
+  addAnnotation,
+  updateAnnotation,
+  deleteAnnotation,
+  getPendingBySection,
+  retryFailed,
+  toggleAnnotation,
+} from "../services/annotationService.js";
+import {
   createArtifactBodySchema,
   renameArtifactBodySchema,
   updateArtifactBodySchema,
   buildArtifactBodySchema,
   regenerateSectionBodySchema,
+  createAnnotationBodySchema,
+  updateAnnotationBodySchema,
   parseRequestBody,
 } from "./requestSchemas.js";
 
-export function registerArtifactRoutes(app, { httpError, startArtifactBuild, startSectionRegeneration }) {
+export function registerArtifactRoutes(app, { httpError, startArtifactBuild, startSectionRegeneration, startBatchSectionRegeneration }) {
   // List all artifact specs + build status
   app.get("/api/projects/:projectSlug/artifacts", async (request, response, next) => {
     try {
@@ -206,6 +217,102 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
         elementContext,
       );
       response.json(result);
+    } catch (error) {
+      if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
+      next(error);
+    }
+  });
+
+  // ─── Annotation Routes ──────────────────────────────────────────────────────
+
+  // List all annotations for an artifact
+  app.get("/api/projects/:projectSlug/artifacts/:artifactSlug/annotations", async (request, response, next) => {
+    try {
+      const annotations = await listAnnotations(request.project.path, request.params.artifactSlug);
+      response.json({ annotations });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Add an annotation
+  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/annotations", async (request, response, next) => {
+    try {
+      const data = parseRequestBody(createAnnotationBodySchema, request.body, httpError);
+      const annotation = await addAnnotation(request.project.path, request.params.artifactSlug, data, httpError);
+      response.status(201).json(annotation);
+    } catch (error) {
+      if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
+      next(error);
+    }
+  });
+
+  // Update an annotation
+  app.put("/api/projects/:projectSlug/artifacts/:artifactSlug/annotations/:annotationId", async (request, response, next) => {
+    try {
+      const updates = parseRequestBody(updateAnnotationBodySchema, request.body, httpError);
+      const annotation = await updateAnnotation(request.project.path, request.params.artifactSlug, request.params.annotationId, updates, httpError);
+      response.json(annotation);
+    } catch (error) {
+      if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
+      next(error);
+    }
+  });
+
+  // Delete an annotation
+  app.delete("/api/projects/:projectSlug/artifacts/:artifactSlug/annotations/:annotationId", async (request, response, next) => {
+    try {
+      await deleteAnnotation(request.project.path, request.params.artifactSlug, request.params.annotationId, httpError);
+      response.json({ ok: true });
+    } catch (error) {
+      if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
+      next(error);
+    }
+  });
+
+  // Apply all pending annotations (batch section regeneration)
+  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/annotations/apply", async (request, response, next) => {
+    try {
+      const sectionGroups = await getPendingBySection(request.project.path, request.params.artifactSlug);
+      if (sectionGroups.length === 0) {
+        return next(httpError("No pending annotations to apply.", 422, "no_pending_annotations"));
+      }
+
+      // Determine model from spec
+      let modelId = null;
+      try {
+        const spec = await readArtifactSpec(request.project.path, request.params.artifactSlug);
+        modelId = spec.frontmatter.modelId ?? null;
+      } catch { /* non-fatal */ }
+
+      const result = await startBatchSectionRegeneration(
+        request.project,
+        request.params.artifactSlug,
+        sectionGroups,
+        modelId,
+      );
+      response.json(result);
+    } catch (error) {
+      if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
+      next(error);
+    }
+  });
+
+  // Retry all failed annotations (reset to pending)
+  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/annotations/retry", async (request, response, next) => {
+    try {
+      const count = await retryFailed(request.project.path, request.params.artifactSlug);
+      response.json({ retriedCount: count });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Toggle annotation status (pending ↔ applied/failed)
+  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/annotations/:annotationId/toggle", async (request, response, next) => {
+    try {
+      const annotation = await toggleAnnotation(request.project.path, request.params.artifactSlug, request.params.annotationId, httpError);
+      response.json(annotation);
     } catch (error) {
       if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
       next(error);

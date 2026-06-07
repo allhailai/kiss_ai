@@ -22,7 +22,33 @@ export function getAnnotationScript() {
     if (!e.data || typeof e.data.type !== 'string') return;
     if (e.data.type === 'kiss-enter-annotation') activate();
     if (e.data.type === 'kiss-exit-annotation') deactivate();
+    if (e.data.type === 'kiss-highlight-element') highlightElement(e.data.cssPath, e.data.sectionId);
+    if (e.data.type === 'kiss-scroll-to-section') scrollToSection(e.data.sectionId);
   });
+
+  function highlightElement(cssPath, sectionId) {
+    // Try to find by CSS path first, fall back to section
+    var el = cssPath ? document.querySelector(cssPath) : null;
+    if (!el && sectionId) el = document.getElementById(sectionId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Pulse animation
+    el.style.transition = 'outline 0.2s, outline-offset 0.2s';
+    el.style.outline = '3px solid #c87040';
+    el.style.outlineOffset = '2px';
+    setTimeout(function() {
+      el.style.outline = '3px solid rgba(200,112,64,0.3)';
+      setTimeout(function() {
+        el.style.outline = '';
+        el.style.outlineOffset = '';
+      }, 1500);
+    }, 800);
+  }
+
+  function scrollToSection(sectionId) {
+    var el = document.getElementById(sectionId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   function activate() {
     if (active) return;

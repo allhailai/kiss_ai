@@ -264,16 +264,30 @@ export const buildArtifactBodySchema = z.object({
   modelId: optionalTrimmedString(160),
 });
 
+const elementContextSchema = z.object({
+  elementTag: z.string().max(30),
+  elementId: z.string().max(200).optional(),
+  cssPath: z.string().max(500).optional(),
+  elementText: z.string().max(300).optional(),
+  elementHTML: z.string().max(1000).optional(),
+});
+
 export const regenerateSectionBodySchema = z.object({
   instruction: z.string().trim().min(1).max(10_000),
   modelId: optionalTrimmedString(160),
-  elementContext: z.object({
-    elementTag: z.string().max(30),
-    elementId: z.string().max(200).optional(),
-    cssPath: z.string().max(500).optional(),
-    elementText: z.string().max(300).optional(),
-    elementHTML: z.string().max(1000).optional(),
-  }).optional(),
+  elementContext: elementContextSchema.optional(),
+});
+
+export const createAnnotationBodySchema = z.object({
+  sectionId: z.string().trim().min(1).max(200),
+  sectionTitle: z.string().trim().min(1).max(500),
+  instruction: z.string().trim().min(1).max(10_000),
+  elementContext: elementContextSchema.optional(),
+});
+
+export const updateAnnotationBodySchema = z.object({
+  instruction: z.string().trim().min(1).max(10_000),
+  elementContext: elementContextSchema.optional(),
 });
 
 function parseRequestPart(schema, value, httpError, label) {

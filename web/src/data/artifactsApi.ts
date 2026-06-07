@@ -1,4 +1,4 @@
-import type { ArtifactSpec, ArtifactSpecDetail, ArtifactSectionsResponse, AvailableSourceFile, ElementContext, RebuildState } from "../contracts/api";
+import type { Annotation, ArtifactSpec, ArtifactSpecDetail, ArtifactSectionsResponse, AvailableSourceFile, ElementContext, RebuildState } from "../contracts/api";
 import { projectBase, request } from "./request";
 
 export const artifactsApi = {
@@ -61,5 +61,48 @@ export const artifactsApi = {
         method: "POST",
         body: JSON.stringify({ instruction, modelId: modelId ?? null, ...(elementContext ? { elementContext } : {}) }),
       },
+    ),
+
+  // ─── Annotations ────────────────────────────────────────────
+
+  listAnnotations: (projectSlug: string, artifactSlug: string) =>
+    request<{ annotations: Annotation[] }>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/annotations`,
+    ),
+
+  addAnnotation: (projectSlug: string, artifactSlug: string, data: { sectionId: string; sectionTitle: string; instruction: string; elementContext?: ElementContext }) =>
+    request<Annotation>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/annotations`,
+      { method: "POST", body: JSON.stringify(data) },
+    ),
+
+  updateAnnotation: (projectSlug: string, artifactSlug: string, annotationId: string, updates: { instruction: string; elementContext?: ElementContext }) =>
+    request<Annotation>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/annotations/${encodeURIComponent(annotationId)}`,
+      { method: "PUT", body: JSON.stringify(updates) },
+    ),
+
+  deleteAnnotation: (projectSlug: string, artifactSlug: string, annotationId: string) =>
+    request<{ ok: boolean }>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/annotations/${encodeURIComponent(annotationId)}`,
+      { method: "DELETE" },
+    ),
+
+  applyAnnotations: (projectSlug: string, artifactSlug: string) =>
+    request<RebuildState>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/annotations/apply`,
+      { method: "POST" },
+    ),
+
+  retryAnnotations: (projectSlug: string, artifactSlug: string) =>
+    request<{ retriedCount: number }>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/annotations/retry`,
+      { method: "POST" },
+    ),
+
+  toggleAnnotation: (projectSlug: string, artifactSlug: string, annotationId: string) =>
+    request<Annotation>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/annotations/${encodeURIComponent(annotationId)}/toggle`,
+      { method: "POST" },
     ),
 };
