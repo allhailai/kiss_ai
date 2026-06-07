@@ -4,7 +4,7 @@ import { computeBuildScope } from "./buildScope.js";
 import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
 import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
 import { createPromptBuilders } from "./promptBuilders.js";
-import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs, findDirectedOutputsWithoutArtifacts, discoverSections, extractSection, replaceSection, updateNavText, checkStyleFragmentation, createSectionBackup, updateManifestForRegeneration, stampManifestAfterBuild, readArtifactPreviewHtml, getArtifactBuildPath } from "./artifactService.js";
+import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs, findDirectedOutputsWithoutArtifacts, discoverSections, extractSection, replaceSection, insertSectionAfter, updateNavText, checkStyleFragmentation, createSectionBackup, updateManifestForRegeneration, stampManifestAfterBuild, readArtifactPreviewHtml, getArtifactBuildPath } from "./artifactService.js";
 import { runFetchPhase, runDigestPhase } from "./fetchAndDigestPhases.js";
 import { getDeepenQueue, clearDeepenQueue, readTopics, writeTopics, reconcileTopicSources, computeWikiMetrics, autoAdvanceTopicStates } from "./topicsService.js";
 import { computeWikiTriage, updateWikiPageTracker, resetWikiPageTracker, regenerateWikiIndex } from "./wikiTriage.js";
@@ -33,6 +33,7 @@ export function createAgentJobService({
   const activeAbortControllers = new Map();
 
   const {
+    createAddSectionPrompt,
     createArtifactPrompt,
     createAutoAnswerPrompt,
     createFilePrompt,
@@ -1755,12 +1756,17 @@ export function createAgentJobService({
       for (const job of sectionJobs) {
         completed++;
         const progressLabel = `(${completed}/${totalCount})`;
+        const isAddSection = job.type === 'add_section';
 
         try {
           await appendRunEvent(project.slug, {
             type: "system",
-            title: `Regenerating section ${progressLabel}: ${job.sectionTitle}`,
-            text: `Applying ${job.annotationIds.length} annotation(s) to section "${job.sectionId}".`,
+            title: isAddSection
+              ? `Adding new section ${progressLabel}`
+              : `Regenerating section ${progressLabel}: ${job.sectionTitle}`,
+            text: isAddSection
+              ? `Creating a new section based on the user's description.`
+              : `Applying ${job.annotationIds.length} annotation(s) to section "${job.sectionId}".`,
             status: "section_regeneration",
             runtime: "server",
           });
@@ -1769,22 +1775,28 @@ export function createAgentJobService({
           await setRebuildState(project.slug, {
             ...stateBeforeBuild,
             buildPhase: "section_regeneration",
-            buildPhaseDetail: `Regenerating ${job.sectionTitle} ${progressLabel}`,
+            buildPhaseDetail: isAddSection
+              ? `Adding new section ${progressLabel}`
+              : `Regenerating ${job.sectionTitle} ${progressLabel}`,
           });
 
           const buildDir = getArtifactBuildPath(project.path, artifactSlug);
           const fragmentPath = path.join(buildDir, '.section-fragment.html');
           const indexPath = path.join(buildDir, 'index.html');
 
-          // Append file-write directive (same as single-section regen)
-          const fullPrompt = job.prompt + `\n\nWrite your output to: artifacts/builds/${artifactSlug}/.section-fragment.html\nWrite ONLY the inner HTML content for this section — no surrounding document tags.`;
+          // Build the file-write directive based on job type
+          const writeDirective = isAddSection
+            ? `\n\nWrite your output to: artifacts/builds/${artifactSlug}/.section-fragment.html\nWrite the COMPLETE <section id="...">...</section> block including the opening and closing section tags.`
+            : `\n\nWrite your output to: artifacts/builds/${artifactSlug}/.section-fragment.html\nWrite ONLY the inner HTML content for this section — no surrounding document tags.`;
+
+          const fullPrompt = job.prompt + writeDirective;
 
           const result = await runSingleAgentPhase({
             project,
             apiKey,
             modelId,
             prompt: fullPrompt,
-            phaseName: `Section: ${job.sectionTitle}`,
+            phaseName: isAddSection ? `New Section` : `Section: ${job.sectionTitle}`,
             signal: undefined,
           });
 
@@ -1812,29 +1824,49 @@ export function createAgentJobService({
 
           await createSectionBackup(indexPath, path.join(buildDir, '.backups'));
 
-          let updatedHtml = replaceSection(currentHtml, job.sectionId, rawFragment);
-          if (!updatedHtml) {
-            failed++;
-            try { await markFailed(project.path, artifactSlug, job.annotationIds); } catch { /* non-fatal */ }
-            continue;
-          }
+          let updatedHtml;
 
-          // Update nav text if heading changed
-          const section = extractSection(updatedHtml, job.sectionId);
-          if (section) {
-            updatedHtml = updateNavText(updatedHtml, job.sectionId, section.innerHTML);
+          if (isAddSection) {
+            // Insert a new section block into the HTML
+            updatedHtml = insertSectionAfter(currentHtml, job.afterSectionId, rawFragment);
+            if (!updatedHtml) {
+              failed++;
+              try { await markFailed(project.path, artifactSlug, job.annotationIds); } catch { /* non-fatal */ }
+              continue;
+            }
+          } else {
+            // Replace existing section's inner HTML
+            updatedHtml = replaceSection(currentHtml, job.sectionId, rawFragment);
+            if (!updatedHtml) {
+              failed++;
+              try { await markFailed(project.path, artifactSlug, job.annotationIds); } catch { /* non-fatal */ }
+              continue;
+            }
+
+            // Update nav text if heading changed
+            const section = extractSection(updatedHtml, job.sectionId);
+            if (section) {
+              updatedHtml = updateNavText(updatedHtml, job.sectionId, section.innerHTML);
+            }
           }
 
           await fs.writeFile(indexPath, updatedHtml, 'utf8');
-          await updateManifestForRegeneration(project.path, artifactSlug, job.sectionId);
+
+          if (!isAddSection) {
+            await updateManifestForRegeneration(project.path, artifactSlug, job.sectionId);
+          }
 
           // Mark annotations as applied
           try { await markApplied(project.path, artifactSlug, job.annotationIds); } catch { /* non-fatal */ }
 
           await appendRunEvent(project.slug, {
             type: "system",
-            title: `Section ${progressLabel}: ${job.sectionTitle} regenerated`,
-            text: `Successfully applied ${job.annotationIds.length} annotation(s).`,
+            title: isAddSection
+              ? `New section added ${progressLabel}`
+              : `Section ${progressLabel}: ${job.sectionTitle} regenerated`,
+            text: isAddSection
+              ? `Successfully created and inserted a new section.`
+              : `Successfully applied ${job.annotationIds.length} annotation(s).`,
             status: "section_complete",
             runtime: "server",
           });
@@ -1844,8 +1876,10 @@ export function createAgentJobService({
           try { await markFailed(project.path, artifactSlug, job.annotationIds); } catch { /* non-fatal */ }
           await appendRunEvent(project.slug, {
             type: "error",
-            title: `Section ${progressLabel}: ${job.sectionTitle} failed`,
-            text: err instanceof Error ? err.message : `Unknown error regenerating ${job.sectionId}`,
+            title: isAddSection
+              ? `New section failed ${progressLabel}`
+              : `Section ${progressLabel}: ${job.sectionTitle} failed`,
+            text: err instanceof Error ? err.message : `Unknown error processing ${job.sectionId}`,
             status: "section_error",
             runtime: "server",
           });
@@ -1855,8 +1889,8 @@ export function createAgentJobService({
       // Final summary
       const succeeded = totalCount - failed;
       const message = failed > 0
-        ? `Regenerated ${succeeded} of ${totalCount} sections (${failed} failed).`
-        : `All ${totalCount} sections regenerated successfully.`;
+        ? `Processed ${succeeded} of ${totalCount} section(s) (${failed} failed).`
+        : `All ${totalCount} section(s) processed successfully.`;
       const status = failed > 0 ? (succeeded > 0 ? "finished" : "error") : "finished";
 
       const current = await getRebuildState(project.slug);
@@ -2214,59 +2248,111 @@ export function createAgentJobService({
     const html = await readArtifactPreviewHtml(project.path, artifactSlug);
     const allSections = discoverSections(html);
 
+    // Extract shared context once
+    const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+    const globalStylesheet = styleMatch ? styleMatch[1] : '';
+
+    const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+    const cdnDependencies = [];
+    if (headMatch) {
+      const cdnRegex = /<(?:script|link)\s[^>]*(?:src|href)="(https?:\/\/[^"]+)"[^>]*>/gi;
+      let cdnMatch;
+      while ((cdnMatch = cdnRegex.exec(headMatch[1])) !== null) {
+        cdnDependencies.push(cdnMatch[0]);
+      }
+    }
+
+    const sourceGlobs = Array.isArray(spec.frontmatter.sources) ? spec.frontmatter.sources : [];
+    const resolvedSources = await resolveArtifactSources(project.path, sourceGlobs);
+
     // Build prompts for each section group
     const sectionJobs = [];
     for (const { sectionId, annotations } of sectionGroups) {
-      const targetSection = allSections.find(s => s.id === sectionId);
-      if (!targetSection) continue;
+      // Handle add_section annotations separately
+      const addSectionAnns = annotations.filter(a => a.type === 'add_section');
+      const regularAnns = annotations.filter(a => a.type !== 'add_section');
 
-      const extracted = extractSection(html, sectionId);
-      if (!extracted) continue;
+      // Process regular annotations (existing section regeneration)
+      if (regularAnns.length > 0) {
+        const targetSection = allSections.find(s => s.id === sectionId);
+        if (!targetSection) continue;
 
-      const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-      const globalStylesheet = styleMatch ? styleMatch[1] : '';
+        const extracted = extractSection(html, sectionId);
+        if (!extracted) continue;
 
-      const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
-      const cdnDependencies = [];
-      if (headMatch) {
-        const cdnRegex = /<(?:script|link)\s[^>]*(?:src|href)="(https?:\/\/[^"]+)"[^>]*>/gi;
-        let cdnMatch;
-        while ((cdnMatch = cdnRegex.exec(headMatch[1])) !== null) {
-          cdnDependencies.push(cdnMatch[0]);
-        }
-      }
+        const otherSections = allSections
+          .filter(s => s.id !== sectionId)
+          .map(s => {
+            const sectionContent = html.slice(s.startIdx, s.endIdx);
+            const textOnly = sectionContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            return { id: s.id, title: s.title, snippet: textOnly.slice(0, 200) };
+          });
 
-      const otherSections = allSections
-        .filter(s => s.id !== sectionId)
-        .map(s => {
-          const sectionContent = html.slice(s.startIdx, s.endIdx);
-          const textOnly = sectionContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-          return { id: s.id, title: s.title, snippet: textOnly.slice(0, 200) };
+        const prompt = await createSectionRegenerationPrompt({
+          project,
+          artifactSpec: spec,
+          sectionId,
+          sectionTitle: targetSection.title,
+          currentSectionHTML: extracted.innerHTML,
+          globalStylesheet,
+          otherSections,
+          resolvedSources,
+          userInstruction: regularAnns[0]?.instruction || '',
+          cdnDependencies,
+          annotations: regularAnns.map(a => ({ instruction: a.instruction, elementContext: a.elementContext })),
         });
 
-      const sourceGlobs = Array.isArray(spec.frontmatter.sources) ? spec.frontmatter.sources : [];
-      const resolvedSources = await resolveArtifactSources(project.path, sourceGlobs);
+        sectionJobs.push({
+          type: 'regenerate',
+          sectionId,
+          sectionTitle: targetSection.title,
+          prompt,
+          annotationIds: regularAnns.map(a => a.id),
+        });
+      }
 
-      const prompt = await createSectionRegenerationPrompt({
-        project,
-        artifactSpec: spec,
-        sectionId,
-        sectionTitle: targetSection.title,
-        currentSectionHTML: extracted.innerHTML,
-        globalStylesheet,
-        otherSections,
-        resolvedSources,
-        userInstruction: annotations[0]?.instruction || '',
-        cdnDependencies,
-        annotations: annotations.map(a => ({ instruction: a.instruction, elementContext: a.elementContext })),
-      });
+      // Process add_section annotations (new section creation)
+      for (const ann of addSectionAnns) {
+        const existingSections = allSections
+          .map(s => {
+            const sectionContent = html.slice(s.startIdx, s.endIdx);
+            const textOnly = sectionContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            return { id: s.id, title: s.title, snippet: textOnly.slice(0, 200) };
+          });
 
-      sectionJobs.push({
-        sectionId,
-        sectionTitle: targetSection.title,
-        prompt,
-        annotationIds: annotations.map(a => a.id),
-      });
+        // Extract full HTML of the adjacent section so the agent can avoid duplicating content.
+        // If afterSectionId is set, the adjacent section is that one.
+        // If null (insert at beginning), the adjacent section is the first one.
+        let adjacentSectionHTML = '';
+        const adjacentId = ann.afterSectionId || (allSections.length > 0 ? allSections[0].id : null);
+        if (adjacentId) {
+          const adjSection = allSections.find(s => s.id === adjacentId);
+          if (adjSection) {
+            adjacentSectionHTML = html.slice(adjSection.startIdx, adjSection.endIdx);
+          }
+        }
+
+        const prompt = await createAddSectionPrompt({
+          project,
+          artifactSpec: spec,
+          description: ann.instruction,
+          afterSectionId: ann.afterSectionId || null,
+          globalStylesheet,
+          existingSections,
+          resolvedSources,
+          cdnDependencies,
+          adjacentSectionHTML,
+        });
+
+        sectionJobs.push({
+          type: 'add_section',
+          sectionId: '__new_section__',
+          sectionTitle: 'New Section',
+          afterSectionId: ann.afterSectionId || null,
+          prompt,
+          annotationIds: [ann.id],
+        });
+      }
     }
 
     if (sectionJobs.length === 0) {

@@ -28,6 +28,7 @@ export type AvailableSourceFile = {
 export type ArtifactSection = {
   id: string;
   title: string;
+  hidden?: boolean;
 };
 
 export type ArtifactSectionsResponse = {
@@ -35,6 +36,7 @@ export type ArtifactSectionsResponse = {
   regeneratedSections: string[];
   regenerationCount: number;
   contractVersion: number | null;
+  hiddenSectionIds: string[];
 };
 
 export type ElementContext = {
@@ -53,6 +55,8 @@ export type Annotation = {
   elementContext?: ElementContext | null;
   status: "pending" | "applied" | "failed";
   previouslyApplied?: boolean;
+  type?: "add_section";
+  afterSectionId?: string | null;
   createdAt: string;
   updatedAt: string;
 };

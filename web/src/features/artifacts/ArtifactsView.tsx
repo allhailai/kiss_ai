@@ -38,6 +38,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
 
   // Section panel state
   const [sections, setSections] = useState<ArtifactSection[]>([]);
+  const [hiddenSectionIds, setHiddenSectionIds] = useState<string[]>([]);
   const [regeneratedSections, setRegeneratedSections] = useState<string[]>([]);
   const [contractVersion, setContractVersion] = useState<number | null>(null);
   const [sectionsLoading, setSectionsLoading] = useState(false);
@@ -389,6 +390,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
       setSections(result.sections);
       setRegeneratedSections(result.regeneratedSections);
       setContractVersion(result.contractVersion);
+      setHiddenSectionIds(result.hiddenSectionIds ?? []);
     } catch {
       setSections([]);
     } finally {
@@ -427,16 +429,17 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
     }
   }, [selectedSlug, isBuilt, loadAnnotations]);
 
-  // Always re-sync annotations when any build finishes (building → false).
+  // Always re-sync annotations and sections when any build finishes (building → false).
   // This is the single, durable reload point — no matter which polling path
-  // triggered the transition, annotations are guaranteed to refresh.
+  // triggered the transition, annotations and sections are guaranteed to refresh.
   const prevBuildingRef = useRef(false);
   useEffect(() => {
     if (prevBuildingRef.current && !building && selectedSlug && isBuilt) {
       void loadAnnotations();
+      void loadSections();
     }
     prevBuildingRef.current = building;
-  }, [building, selectedSlug, isBuilt, loadAnnotations]);
+  }, [building, selectedSlug, isBuilt, loadAnnotations, loadSections]);
 
   function handleOpenQuickAdd(sectionId: string, sectionTitle: string, elementContext?: ElementContext) {
     setQuickAddTarget({ sectionId, sectionTitle, elementContext });
@@ -526,6 +529,45 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
       },
       '*',
     );
+  }
+
+  // ─── Section Hide / Unhide / Add ────────────────────────────
+
+  async function handleHideSection(sectionId: string) {
+    if (!selectedSlug) return;
+    try {
+      const result = await artifactsApi.hideSection(projectSlug, selectedSlug, sectionId);
+      setSections(result.sections);
+      setHiddenSectionIds(result.hiddenSectionIds);
+      setPreviewKey((k) => k + 1); // immediately reload iframe
+      flash("Section hidden");
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Failed to hide section");
+    }
+  }
+
+  async function handleUnhideSection(sectionId: string) {
+    if (!selectedSlug) return;
+    try {
+      const result = await artifactsApi.unhideSection(projectSlug, selectedSlug, sectionId);
+      setSections(result.sections);
+      setHiddenSectionIds(result.hiddenSectionIds);
+      setPreviewKey((k) => k + 1); // immediately reload iframe
+      flash("Section visible again");
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Failed to show section");
+    }
+  }
+
+  async function handleAddSection(description: string, afterSectionId: string | null) {
+    if (!selectedSlug) return;
+    try {
+      await artifactsApi.addSection(projectSlug, selectedSlug, description, afterSectionId);
+      await loadAnnotations();
+      flash("New section added as draft annotation");
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Failed to add section");
+    }
   }
 
   // ─── Inspection mode ────────────────────────────────────────
@@ -809,7 +851,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
                 sandbox="allow-scripts"
               />
               {sectionPanelOpen ? (
-                <SectionPanel
+              <SectionPanel
                   sections={sections}
                   regeneratedSections={regeneratedSections}
                   contractVersion={contractVersion}
@@ -834,6 +876,9 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
                   onRetryFailed={handleRetryFailed}
                   onToggleAnnotation={handleToggleAnnotation}
                   onToggleInspection={toggleAnnotationMode}
+                  onHideSection={handleHideSection}
+                  onUnhideSection={handleUnhideSection}
+                  onAddSection={handleAddSection}
                 />
               ) : null}
               <button
@@ -1022,6 +1067,9 @@ function SectionPanel({
   onRetryFailed,
   onToggleAnnotation,
   onToggleInspection,
+  onHideSection,
+  onUnhideSection,
+  onAddSection,
 }: {
   sections: ArtifactSection[];
   regeneratedSections: string[];
@@ -1047,6 +1095,9 @@ function SectionPanel({
   onRetryFailed: () => void;
   onToggleAnnotation: (id: string) => void;
   onToggleInspection: () => void;
+  onHideSection: (sectionId: string) => void;
+  onUnhideSection: (sectionId: string) => void;
+  onAddSection: (description: string, afterSectionId: string | null) => void;
 }) {
   const pendingAnnotations = annotations.filter(a => a.status === "pending");
   const failedAnnotations = annotations.filter(a => a.status === "failed");
@@ -1054,6 +1105,29 @@ function SectionPanel({
   const pendingCount = pendingAnnotations.length;
   const failedCount = failedAnnotations.length;
   const affectedSectionIds = new Set(pendingAnnotations.map(a => a.sectionId));
+
+  // Draft section annotations (add_section type)
+  const draftSectionAnnotations = pendingAnnotations.filter(a => a.type === "add_section");
+
+  // Section filtering and delete confirmation state
+  const [showHidden, setShowHidden] = useState(true);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+
+  // Add section form state
+  const [addSectionOpen, setAddSectionOpen] = useState(false);
+  const [addSectionDescription, setAddSectionDescription] = useState("");
+  const [addSectionAfter, setAddSectionAfter] = useState<string | null>(null);
+
+  const hiddenCount = sections.filter(s => s.hidden).length;
+  const visibleSections = showHidden ? sections : sections.filter(s => !s.hidden);
+
+  function handleSubmitAddSection() {
+    if (!addSectionDescription.trim()) return;
+    onAddSection(addSectionDescription.trim(), addSectionAfter);
+    setAddSectionDescription("");
+    setAddSectionAfter(null);
+    setAddSectionOpen(false);
+  }
 
   return (
     <div className="artifacts-section-panel">
@@ -1075,6 +1149,18 @@ function SectionPanel({
           <span className="artifacts-inspect-btn-label">Pick UI to Annotate</span>
         </button>
       </div>
+      {hiddenCount > 0 ? (
+        <div className="artifacts-section-filter-bar">
+          <label className="artifacts-section-filter-toggle">
+            <input
+              type="checkbox"
+              checked={showHidden}
+              onChange={(e) => setShowHidden(e.target.checked)}
+            />
+            Show hidden ({hiddenCount})
+          </label>
+        </div>
+      ) : null}
       {contractVersion === null ? (
         <div className="artifacts-section-panel-warning">
           This artifact was built before section editing was supported. Visual changes will work, but interactive features may need a full rebuild.
@@ -1082,40 +1168,86 @@ function SectionPanel({
       ) : null}
       {loading ? (
         <div className="artifacts-section-panel-loading">Loading sections…</div>
-      ) : sections.length === 0 ? (
+      ) : visibleSections.length === 0 ? (
         <div className="artifacts-section-panel-empty">No sections found.</div>
       ) : (
         <ul className="artifacts-section-list">
-          {sections.map((section) => {
+          {visibleSections.map((section) => {
             const isModified = regeneratedSections.includes(section.id);
             const sectionAnnotationCount = pendingAnnotations.filter(a => a.sectionId === section.id).length;
             const isQuickAdding = quickAddTarget?.sectionId === section.id;
+            const isHidden = section.hidden === true;
+            const isConfirmingDelete = confirmingDeleteId === section.id;
             return (
-              <li key={section.id} className={`artifacts-section-item ${isQuickAdding ? "active" : ""}`}>
+              <li key={section.id} className={`artifacts-section-item ${isQuickAdding ? "active" : ""} ${isHidden ? "hidden" : ""}`}>
                 <div className="artifacts-section-item-header">
                   <button
                     className="artifacts-section-item-title"
                     onClick={() => onScrollTo(section.id)}
                     type="button"
-                    title={`Scroll to ${section.title}`}
+                    title={isHidden ? `${section.title} (hidden)` : `Scroll to ${section.title}`}
                   >
                     {section.title}
-                    {isModified ? <span className="artifacts-section-modified-badge">edited</span> : null}
+                    {isModified && !isHidden ? <span className="artifacts-section-modified-badge">edited</span> : null}
+                    {isHidden ? <span className="artifacts-section-deleted-badge">hidden</span> : null}
                   </button>
-                  <button
-                    className="artifacts-section-comment-btn"
-                    onClick={() => onOpenQuickAdd(section.id, section.title)}
-                    disabled={building}
-                    type="button"
-                    title="Comment on this section"
-                  >
-                    💬
-                    {sectionAnnotationCount > 0 ? (
-                      <span className="artifacts-annotation-count-badge">{sectionAnnotationCount}</span>
-                    ) : null}
-                  </button>
+                  {isHidden ? (
+                    <button
+                      className="artifacts-section-restore-btn"
+                      onClick={() => onUnhideSection(section.id)}
+                      type="button"
+                      title="Show (unhide) this section"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Show
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        className="artifacts-section-comment-btn"
+                        onClick={() => onOpenQuickAdd(section.id, section.title)}
+                        disabled={building}
+                        type="button"
+                        title="Comment on this section"
+                      >
+                        💬
+                        {sectionAnnotationCount > 0 ? (
+                          <span className="artifacts-annotation-count-badge">{sectionAnnotationCount}</span>
+                        ) : null}
+                      </button>
+                      <button
+                        className="artifacts-section-delete-btn"
+                        onClick={() => setConfirmingDeleteId(section.id)}
+                        disabled={building}
+                        type="button"
+                        title="Hide this section"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                      </button>
+                    </>
+                  )}
                 </div>
-                {isQuickAdding ? (
+                {isConfirmingDelete && !isHidden ? (
+                  <div className="artifacts-section-delete-confirm">
+                    <span className="artifacts-section-delete-confirm-text">Hide this section?</span>
+                    <button
+                      className="artifacts-section-delete-confirm-yes"
+                      onClick={() => { onHideSection(section.id); setConfirmingDeleteId(null); }}
+                      type="button"
+                      title="Confirm hide"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      className="artifacts-section-delete-confirm-no"
+                      onClick={() => setConfirmingDeleteId(null)}
+                      type="button"
+                      title="Cancel"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : null}
+                {isQuickAdding && !isHidden ? (
                   <div className="artifacts-quick-add">
                     {quickAddTarget.elementContext ? (
                       <div className="artifacts-section-feedback-element">
@@ -1160,10 +1292,88 @@ function SectionPanel({
         </ul>
       )}
 
+      {/* Draft section annotations */}
+      {draftSectionAnnotations.length > 0 ? (
+        <div className="artifacts-draft-sections">
+          {draftSectionAnnotations.map((ann) => (
+            <div key={ann.id} className="artifacts-draft-section-card">
+              <div className="artifacts-draft-section-header">
+                <span className="artifacts-draft-section-badge">Draft</span>
+                <span className="artifacts-draft-section-label">New Section</span>
+                <button
+                  className="artifacts-draft-section-remove"
+                  onClick={() => onDeleteAnnotation(ann.id)}
+                  type="button"
+                  title="Remove draft section"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="artifacts-draft-section-description">{ann.instruction}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Add Section button/form */}
+      {!addSectionOpen ? (
+        <button
+          className="artifacts-add-section-btn"
+          onClick={() => setAddSectionOpen(true)}
+          disabled={building}
+          type="button"
+        >
+          + Add Section
+        </button>
+      ) : (
+        <div className="artifacts-add-section-form">
+          <div className="artifacts-add-section-form-header">
+            <span>Add New Section</span>
+            <button
+              className="artifacts-add-section-form-close"
+              onClick={() => { setAddSectionOpen(false); setAddSectionDescription(""); setAddSectionAfter(null); }}
+              type="button"
+              title="Cancel"
+            >
+              ×
+            </button>
+          </div>
+          <select
+            className="artifacts-add-section-position"
+            value={addSectionAfter ?? "__beginning__"}
+            onChange={(e) => setAddSectionAfter(e.target.value === "__beginning__" ? null : e.target.value)}
+          >
+            <option value="__beginning__">At the beginning</option>
+            {sections.filter(s => !s.hidden).map((s) => (
+              <option key={s.id} value={s.id}>After: {s.title}</option>
+            ))}
+          </select>
+          <textarea
+            className="artifacts-add-section-textarea"
+            placeholder="Describe what this section should be about…"
+            value={addSectionDescription}
+            onChange={(e) => setAddSectionDescription(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey && addSectionDescription.trim()) { e.preventDefault(); handleSubmitAddSection(); } if (e.key === "Escape") { setAddSectionOpen(false); setAddSectionDescription(""); setAddSectionAfter(null); } }}
+            rows={3}
+            autoFocus
+          />
+          <div className="artifacts-add-section-form-actions">
+            <button
+              className="artifacts-add-section-submit"
+              disabled={!addSectionDescription.trim()}
+              onClick={handleSubmitAddSection}
+              type="button"
+            >
+              Add as Draft
+            </button>
+          </div>
+        </div>
+      )}
+
       {pendingAnnotations.length > 0 ? (
         <div className="artifacts-annotation-queue">
           <div className="artifacts-annotation-queue-header">
-            📝 {pendingCount} pending annotation{pendingCount !== 1 ? "s" : ""}
+            📝 {pendingCount} pending change{pendingCount !== 1 ? "s" : ""}
           </div>
           {pendingAnnotations.map((ann) => (
             <AnnotationCard
@@ -1188,7 +1398,7 @@ function SectionPanel({
           onClick={onApplyAnnotations}
           type="button"
         >
-          Regenerate {pendingCount} annotation{pendingCount !== 1 ? "s" : ""}
+          Regenerate w/ {pendingCount} change{pendingCount !== 1 ? "s" : ""}
         </button>
       ) : null}
 
@@ -1198,14 +1408,14 @@ function SectionPanel({
           onClick={onRetryFailed}
           type="button"
         >
-          Retry {failedCount} failed annotation{failedCount !== 1 ? "s" : ""}
+          Retry {failedCount} failed change{failedCount !== 1 ? "s" : ""}
         </button>
       ) : null}
 
       {appliedAnnotations.length > 0 ? (
         <details className="artifacts-annotation-history">
           <summary className="artifacts-annotation-history-header">
-            ✓ {appliedAnnotations.length} applied annotation{appliedAnnotations.length !== 1 ? "s" : ""}
+            ✓ {appliedAnnotations.length} applied change{appliedAnnotations.length !== 1 ? "s" : ""}
           </summary>
           {appliedAnnotations.map((ann) => (
             <AnnotationCard

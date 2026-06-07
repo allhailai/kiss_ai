@@ -7,6 +7,21 @@ import { readTopics } from "./topicsService.js";
 const ARTIFACT_SPECS_DIR = "artifacts/artifact_specs";
 const ARTIFACT_BUILDS_DIR = "artifacts/builds";
 
+/** Decode common HTML entities (named + numeric) in a string. */
+function decodeHtmlEntities(str) {
+  return str
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&mdash;/g, '—')
+    .replace(/&ndash;/g, '–');
+}
+
 // Derive a human-readable display name from a slug.
 // Mirrors the humanizePathSegment logic used everywhere else in the system.
 function humanizeSlug(slug) {
@@ -859,6 +874,7 @@ export function discoverSections(html) {
   while ((match = regex.exec(html)) !== null) {
     const id = match[1];
     const startIdx = match.index;
+    const openTag = match[0];
 
     if (seenIds.has(id)) {
       console.warn(`[sections] Duplicate section id="${id}" at index ${startIdx}. Skipping.`);
@@ -873,7 +889,7 @@ export function discoverSections(html) {
     }
 
     // Guard: verify no nested <section> opens between this tag and its close
-    const nextOpen = html.indexOf('<section ', startIdx + match[0].length);
+    const nextOpen = html.indexOf('<section ', startIdx + openTag.length);
     if (nextOpen !== -1 && nextOpen < sectionEnd) {
       console.warn(`[sections] Section "${id}" appears nested (next <section> at ${nextOpen} before </section> at ${sectionEnd}). Skipping.`);
       continue;
@@ -882,9 +898,12 @@ export function discoverSections(html) {
     // Extract heading for title
     const sectionContent = html.slice(startIdx, sectionEnd);
     const headingMatch = sectionContent.match(/<h[1-3][^>]*>([^<]+)/);
-    const title = headingMatch ? headingMatch[1].trim() : id;
+    const title = headingMatch ? decodeHtmlEntities(headingMatch[1].trim()) : id;
 
-    sections.push({ id, title, startIdx, endIdx: sectionEnd + '</section>'.length });
+    // Detect hidden (soft-deleted) sections
+    const hidden = /data-hidden="true"/.test(openTag) || /display\s*:\s*none/.test(openTag);
+
+    sections.push({ id, title, startIdx, endIdx: sectionEnd + '</section>'.length, hidden });
   }
 
   return sections;
@@ -999,6 +1018,89 @@ export function replaceSection(html, sectionId, rawFragment) {
   if (openCount !== closeCount) {
     console.error(`[sections] Tag imbalance after splice: ${openCount} open vs ${closeCount} close. Aborting.`);
     return null;
+  }
+
+  return result;
+}
+
+/**
+ * Insert a new complete <section> block into the HTML.
+ * If afterSectionId is provided and found, inserts after that section's </section>.
+ * If afterSectionId is null or not found, inserts at the start of <main> or <body>.
+ * The rawFragment should be a complete <section id="...">...</section> block.
+ * Returns the updated HTML or null on failure.
+ */
+export function insertSectionAfter(html, afterSectionId, rawFragment) {
+  // Validate: fragment should contain a <section> tag
+  if (!/<section\s/.test(rawFragment)) {
+    console.error('[sections] insertSectionAfter: fragment does not contain a <section> tag.');
+    return null;
+  }
+
+  let insertIdx;
+
+  if (afterSectionId) {
+    // Find the afterSection's closing tag
+    const allSections = discoverSections(html);
+    const afterSection = allSections.find(s => s.id === afterSectionId);
+    if (afterSection) {
+      insertIdx = afterSection.endIdx;
+    }
+  }
+
+  if (insertIdx === undefined) {
+    // Fallback: insert after the first <main> opening tag, or after <body> if no <main>
+    const mainMatch = html.match(/<main[^>]*>/i);
+    if (mainMatch) {
+      insertIdx = mainMatch.index + mainMatch[0].length;
+    } else {
+      const bodyMatch = html.match(/<body[^>]*>/i);
+      if (bodyMatch) {
+        insertIdx = bodyMatch.index + bodyMatch[0].length;
+      } else {
+        console.error('[sections] insertSectionAfter: no <main> or <body> tag found.');
+        return null;
+      }
+    }
+  }
+
+  let result = html.slice(0, insertIdx) + '\n' + rawFragment.trim() + '\n' + html.slice(insertIdx);
+
+  // Validate tag balance
+  const openCount = (result.match(/<section\s/g) || []).length;
+  const closeCount = (result.match(/<\/section>/g) || []).length;
+  if (openCount !== closeCount) {
+    console.error(`[sections] Tag imbalance after insert: ${openCount} open vs ${closeCount} close. Aborting.`);
+    return null;
+  }
+
+  // Extract the new section's ID and title from the fragment to add a nav link
+  const sectionIdMatch = rawFragment.match(/<section\s[^>]*id="([^"]+)"/);
+  const headingMatch = rawFragment.match(/<h[1-3][^>]*>([^<]+)/);
+  if (sectionIdMatch) {
+    const newId = sectionIdMatch[1];
+    const newTitle = headingMatch ? headingMatch[1].trim() : newId;
+    const navLink = `<li><a href="#${newId}">${newTitle}</a></li>`;
+
+    if (afterSectionId) {
+      // Insert nav link after the one for afterSectionId
+      const navLinkRegex = new RegExp(
+        `(<li>\\s*<a\\s[^>]*href="#${escapeRegExp(afterSectionId)}"[^>]*>[^<]*</a>\\s*</li>)`,
+        'i'
+      );
+      const navMatch = navLinkRegex.exec(result);
+      if (navMatch) {
+        const navInsertIdx = navMatch.index + navMatch[0].length;
+        result = result.slice(0, navInsertIdx) + '\n' + navLink + result.slice(navInsertIdx);
+      }
+    } else {
+      // Insert at the beginning of the nav list (after <ul>)
+      const navUlMatch = result.match(/<nav[^>]*>[\s\S]*?<ul[^>]*>/i);
+      if (navUlMatch) {
+        const navInsertIdx = navUlMatch.index + navUlMatch[0].length;
+        result = result.slice(0, navInsertIdx) + '\n' + navLink + result.slice(navInsertIdx);
+      }
+    }
   }
 
   return result;
@@ -1134,3 +1236,98 @@ export async function stampManifestAfterBuild(projectPath, artifactSlug) {
   await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
 }
 
+// ─── Section Hide / Unhide (Soft-Delete) ──────────────────────────────────────
+
+/**
+ * Hide a section in the built HTML by adding data-hidden="true" and style="display:none".
+ * Creates a backup before modifying. Returns the updated section list.
+ */
+export async function hideSectionInHtml(projectPath, artifactSlug, sectionId) {
+  const buildDir = path.join(projectPath, ARTIFACT_BUILDS_DIR, artifactSlug);
+  const indexPath = path.join(buildDir, 'index.html');
+  const backupsDir = path.join(buildDir, '.backups');
+
+  let html;
+  try {
+    html = await fs.readFile(indexPath, 'utf8');
+  } catch (err) {
+    throw Object.assign(new Error('Artifact has not been built yet.'), { statusCode: 404, code: 'artifact_not_built' });
+  }
+
+  // Find the section's opening tag
+  const regex = new RegExp(`<section\\s[^>]*id="${escapeRegExp(sectionId)}"[^>]*>`);
+  const match = regex.exec(html);
+  if (!match) {
+    throw Object.assign(new Error(`Section "${sectionId}" not found.`), { statusCode: 404, code: 'section_not_found' });
+  }
+
+  const openTag = match[0];
+
+  // Already hidden?
+  if (/data-hidden="true"/.test(openTag)) {
+    return discoverSections(html);
+  }
+
+  // Backup before modifying
+  await createSectionBackup(indexPath, backupsDir);
+
+  // Add data-hidden and display:none to the opening tag
+  let newOpenTag = openTag.replace(/<section(\s)/, '<section data-hidden="true"$1');
+  // Add style="display:none" — merge into existing style if present
+  if (/style="/.test(newOpenTag)) {
+    newOpenTag = newOpenTag.replace(/style="/, 'style="display:none;');
+  } else {
+    newOpenTag = newOpenTag.replace(/<section(\s)/, '<section style="display:none"$1');
+  }
+
+  const updatedHtml = html.slice(0, match.index) + newOpenTag + html.slice(match.index + openTag.length);
+  await fs.writeFile(indexPath, updatedHtml, 'utf8');
+
+  return discoverSections(updatedHtml);
+}
+
+/**
+ * Unhide (restore) a previously hidden section by removing data-hidden and display:none.
+ * Creates a backup before modifying. Returns the updated section list.
+ */
+export async function unhideSectionInHtml(projectPath, artifactSlug, sectionId) {
+  const buildDir = path.join(projectPath, ARTIFACT_BUILDS_DIR, artifactSlug);
+  const indexPath = path.join(buildDir, 'index.html');
+  const backupsDir = path.join(buildDir, '.backups');
+
+  let html;
+  try {
+    html = await fs.readFile(indexPath, 'utf8');
+  } catch (err) {
+    throw Object.assign(new Error('Artifact has not been built yet.'), { statusCode: 404, code: 'artifact_not_built' });
+  }
+
+  // Find the section's opening tag
+  const regex = new RegExp(`<section\\s[^>]*id="${escapeRegExp(sectionId)}"[^>]*>`);
+  const match = regex.exec(html);
+  if (!match) {
+    throw Object.assign(new Error(`Section "${sectionId}" not found.`), { statusCode: 404, code: 'section_not_found' });
+  }
+
+  const openTag = match[0];
+
+  // Not hidden?
+  if (!/data-hidden="true"/.test(openTag)) {
+    return discoverSections(html);
+  }
+
+  // Backup before modifying
+  await createSectionBackup(indexPath, backupsDir);
+
+  // Remove data-hidden attribute
+  let newOpenTag = openTag.replace(/\s*data-hidden="true"/, '');
+  // Remove display:none from style attribute
+  newOpenTag = newOpenTag.replace(/display\s*:\s*none\s*;?\s*/g, '');
+  // Clean up empty style attribute if nothing left
+  newOpenTag = newOpenTag.replace(/\s*style="\s*"/, '');
+
+  const updatedHtml = html.slice(0, match.index) + newOpenTag + html.slice(match.index + openTag.length);
+  await fs.writeFile(indexPath, updatedHtml, 'utf8');
+
+  return discoverSections(updatedHtml);
+}

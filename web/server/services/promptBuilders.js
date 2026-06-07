@@ -644,7 +644,168 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
     return lines.join('\n');
   }
 
+  /**
+   * Build a prompt for the agent to create a brand new section in a built HTML artifact.
+   * Unlike regeneration, this generates a complete <section>...</section> block.
+   *
+   * @param {object} params
+   * @param {string} [params.adjacentSectionHTML] - full HTML of the section immediately before/after the insertion point
+   */
+  async function createAddSectionPrompt({
+    project,
+    artifactSpec,
+    description,
+    afterSectionId,
+    globalStylesheet,
+    existingSections,
+    resolvedSources,
+    cdnDependencies,
+    adjacentSectionHTML,
+  }) {
+    // Generate a slug-style section ID from the description
+    const suggestedId = description
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40) || 'new-section';
+
+    const lines = [
+      'Create a brand new section to ADD to an existing HTML artifact.',
+      'This is an ADDITIVE operation — you are inserting one new section. No existing sections will be changed.',
+      '',
+      `DESCRIPTION (what the user wants this section to cover): "${description}"`,
+      '',
+      `SUGGESTED SECTION ID: ${suggestedId}`,
+      '(Use this ID or generate a suitable one. It must be unique among existing sections.)',
+      '',
+    ];
+
+    if (afterSectionId) {
+      const afterSection = existingSections.find(s => s.id === afterSectionId);
+      lines.push(`INSERT POSITION: After section "${afterSectionId}" (${afterSection ? afterSection.title : 'unknown'})`);
+    } else {
+      lines.push('INSERT POSITION: At the very beginning of the document, before the first existing section.');
+    }
+    lines.push('');
+
+    // Artifact goal — for context about what this document is
+    if (artifactSpec.body) {
+      lines.push(
+        '── ARTIFACT CONTEXT (describes the overall document — NOT a directive for your new section) ──',
+        'This is the existing document\'s spec. Your new section supplements it but should NOT rebuild it.',
+        '',
+        artifactSpec.body,
+        '',
+      );
+    }
+
+    // Adjacent section HTML — critical for preventing content overlap
+    if (adjacentSectionHTML) {
+      lines.push(
+        '── ADJACENT SECTION HTML (the section closest to where yours will be inserted) ──',
+        'IMPORTANT: Your new section will appear RIGHT NEXT to this content.',
+        'DO NOT duplicate or restate information that already appears here.',
+        'Your section must cover ONLY what the DESCRIPTION asks for, and only the parts not already present below.',
+        '',
+        adjacentSectionHTML.slice(0, 6000),
+        '',
+      );
+      if (adjacentSectionHTML.length > 6000) {
+        lines.push('[... truncated for context limits ...]', '');
+      }
+    }
+
+    // Existing section titles + snippets (brief context for the rest of the document)
+    if (existingSections.length > 0) {
+      lines.push(
+        '── EXISTING SECTIONS (for context — all these already exist in the document) ──',
+        '',
+      );
+      for (const section of existingSections) {
+        lines.push(`- ${section.id}: "${section.title}" (${section.snippet || 'no snippet'})`);
+      }
+      lines.push('');
+    }
+
+    // Existing section IDs (to avoid collisions)
+    lines.push(
+      '── EXISTING SECTION IDs (your new ID must not collide) ──',
+      existingSections.map(s => s.id).join(', '),
+      '',
+    );
+
+    // CDN dependencies
+    if (cdnDependencies.length > 0) {
+      lines.push(
+        '── CDN DEPENDENCIES LOADED ──────────────────────────────',
+        ...cdnDependencies,
+        '',
+      );
+    }
+
+    // Global stylesheet
+    lines.push(
+      '── GLOBAL STYLESHEET (use classes from this stylesheet) ──',
+      '',
+      globalStylesheet,
+      '',
+    );
+
+    // Source data
+    if (resolvedSources.length > 0) {
+      lines.push(
+        '── SOURCE DATA (factual context for data-driven content) ──',
+        '',
+      );
+      for (const source of resolvedSources) {
+        const content = source.content.length > 3000
+          ? source.content.slice(0, 3000) + '\n\n[... truncated ...]'
+          : source.content;
+        lines.push(`── ${source.relativePath} ──`, '', content, '');
+      }
+    }
+
+    // Design identity
+    lines.push(
+      '── DESIGN IDENTITY ──────────────────────────────────────────',
+      '',
+    );
+    try {
+      const designIdentity = await fs.readFile(path.join(project.path, 'human_design_identity.md'), 'utf8');
+      lines.push(designIdentity.slice(0, 3000));
+    } catch {
+      lines.push('No human_design_identity.md found. Use a clean, professional design.');
+    }
+
+    // Output rules — strong anti-duplication guardrails
+    lines.push(
+      '',
+      '── OUTPUT RULES ──────────────────────────────────────────',
+      '- Output a COMPLETE <section> block: <section id="your-id">...</section>',
+      '- Include a heading (<h2> or <h3>) as the first element inside the section.',
+      '- Match the visual style, tone, and complexity of the existing sections.',
+      '- Use CSS classes from the global stylesheet where applicable.',
+      `- You MAY include <style> blocks scoped with [data-section-id="your-id"] for new CSS classes.`,
+      '- You MAY include <script> blocks wrapped in an IIFE for interactive elements.',
+      '- If the content is data-driven, use the SOURCE DATA above — do not invent numbers.',
+      `- Add a data-section-id attribute to the opening tag: <section id="your-id" data-section-id="your-id">`,
+      '',
+      '── CRITICAL: ANTI-DUPLICATION RULES ──────────────────────',
+      '- DO NOT replicate dashboards, KPIs, charts, or data tables that already exist in adjacent sections.',
+      '- If the adjacent section already has a risk score, urgency dashboard, or summary — do NOT create another one.',
+      '- Your section should cover ONLY the specific topic described in DESCRIPTION.',
+      '- Keep the section FOCUSED and COMPACT — proportional to the description scope.',
+      '  A short description (1-2 sentences) should produce a short section, not a full dashboard.',
+      '- Think of your section as a COMPLEMENT to the existing content, not a replacement or restatement.',
+      '- If you find significant overlap between what the user asked for and what already exists,',
+      '  produce a BRIEF section that adds only the genuinely new information (e.g., a delta/change table, a trend indicator).',
+    );
+
+    return lines.join('\n');
+  }
+
   return {
+    createAddSectionPrompt,
     createArtifactPrompt,
     createAutoAnswerPrompt,
     createFilePrompt,

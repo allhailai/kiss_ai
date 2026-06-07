@@ -60,6 +60,12 @@ export async function addAnnotation(projectPath, artifactSlug, data, httpError) 
     updatedAt: now,
   };
 
+  // Support add_section annotation type
+  if (data.type === "add_section") {
+    annotation.type = "add_section";
+    annotation.afterSectionId = data.afterSectionId || null;
+  }
+
   annotations.push(annotation);
   await writeAnnotations(projectPath, artifactSlug, annotations);
   return annotation;

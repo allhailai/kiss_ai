@@ -7,6 +7,20 @@ export function getAnnotationScript() {
   return `
 <script>
 (function() {
+  // Intercept anchor-link clicks so in-document nav works inside sandboxed iframes.
+  // Native hash navigation can fail when the iframe has an opaque origin (sandbox without allow-same-origin).
+  document.addEventListener('click', function(e) {
+    var anchor = e.target.closest ? e.target.closest('a[href^="#"]') : null;
+    if (!anchor) return;
+    var targetId = anchor.getAttribute('href').slice(1);
+    if (!targetId) return;
+    var target = document.getElementById(targetId);
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+
   var active = false;
   var overlay = null;
   var label = null;

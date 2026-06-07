@@ -1349,3 +1349,354 @@
 .artifacts-annotation-card-actions button[data-tooltip]:hover::after {
   opacity: 1;
 }
+
+/* ── Section Delete / Hidden / Restore ───────────────────── */
+
+.artifacts-section-item.hidden {
+  opacity: 1;
+}
+
+.artifacts-section-item.hidden .artifacts-section-item-title {
+  text-decoration: line-through;
+  color: var(--color-text-muted, #888);
+}
+
+.artifacts-section-deleted-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: color-mix(in srgb, #c44 15%, transparent);
+  color: #c44;
+  vertical-align: middle;
+  text-decoration: none;
+}
+
+.artifacts-section-delete-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--color-text-muted, #aaa);
+  opacity: 0.4;
+  transition: opacity 0.15s, background 0.15s;
+  margin-right: 2px;
+}
+
+.artifacts-section-item:hover .artifacts-section-delete-btn {
+  opacity: 0.7;
+}
+
+.artifacts-section-delete-btn:hover:not(:disabled) {
+  opacity: 1;
+  color: var(--color-text, #ddd);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.artifacts-section-delete-btn:disabled {
+  opacity: 0.15;
+  cursor: default;
+}
+
+.artifacts-section-delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 8px;
+}
+
+.artifacts-section-delete-confirm-text {
+  font-size: 11px;
+  color: var(--color-warning, #e0a030);
+  font-weight: 600;
+  flex: 1;
+}
+
+.artifacts-section-delete-confirm-yes,
+.artifacts-section-delete-confirm-no {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1px solid var(--color-border, #444);
+  background: none;
+  color: var(--color-text, #ccc);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.artifacts-section-delete-confirm-yes:hover {
+  background: color-mix(in srgb, #c44 20%, transparent);
+  border-color: #c44;
+  color: #c44;
+}
+
+.artifacts-section-delete-confirm-no:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.artifacts-section-restore-btn {
+  flex-shrink: 0;
+  min-width: 28px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: color-mix(in srgb, var(--color-accent, #c87040) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent, #c87040) 50%, transparent);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-accent, #c87040) 60%, white);
+  transition: background 0.15s, border-color 0.15s;
+  margin-right: 6px;
+  padding: 0 6px;
+}
+
+.artifacts-section-restore-btn:hover {
+  background: color-mix(in srgb, var(--color-accent, #c87040) 28%, transparent);
+  border-color: var(--color-accent, #c87040);
+}
+
+/* ── Section Filter Bar ──────────────────────────────────── */
+
+.artifacts-section-filter-bar {
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--color-border, #333);
+  flex-shrink: 0;
+}
+
+.artifacts-section-filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--color-text-muted, #888);
+  cursor: pointer;
+  user-select: none;
+}
+
+.artifacts-section-filter-toggle input[type="checkbox"] {
+  accent-color: var(--color-accent, #c87040);
+  cursor: pointer;
+}
+
+/* ── Add Section Button / Form ───────────────────────────── */
+
+.artifacts-add-section-btn {
+  flex-shrink: 0;
+  width: calc(100% - 24px);
+  margin: 8px 12px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 1px dashed var(--color-border, #444);
+  background: none;
+  color: var(--color-text-muted, #888);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.artifacts-add-section-btn:hover:not(:disabled) {
+  border-color: var(--color-accent, #c87040);
+  color: var(--color-accent, #c87040);
+  background: color-mix(in srgb, var(--color-accent, #c87040) 6%, transparent);
+}
+
+.artifacts-add-section-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.artifacts-add-section-form {
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-border, #333);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--color-bg-subtle, rgba(255, 255, 255, 0.02));
+}
+
+.artifacts-add-section-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent, #c87040);
+}
+
+.artifacts-add-section-form-close {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--color-text-muted, #888);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.artifacts-add-section-form-close:hover {
+  color: var(--color-text, #ccc);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.artifacts-add-section-position {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border, #444);
+  border-radius: 5px;
+  background: var(--color-bg-subtle, rgba(255, 255, 255, 0.04));
+  color: var(--color-text, #ccc);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.artifacts-add-section-position:focus {
+  outline: none;
+  border-color: var(--color-accent, #c87040);
+}
+
+.artifacts-add-section-textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border, #444);
+  border-radius: 6px;
+  background: var(--color-bg-subtle, rgba(255, 255, 255, 0.04));
+  color: var(--color-text, #ccc);
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 48px;
+  line-height: 1.5;
+}
+
+.artifacts-add-section-textarea::placeholder {
+  color: var(--color-text-muted, #666);
+}
+
+.artifacts-add-section-textarea:focus {
+  outline: none;
+  border-color: var(--color-accent, #c87040);
+}
+
+.artifacts-add-section-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.artifacts-add-section-submit {
+  padding: 5px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--color-accent, #c87040);
+  background: var(--color-accent, #c87040);
+  color: var(--color-on-accent, #fff);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.artifacts-add-section-submit:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.artifacts-add-section-submit:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── Draft Section Cards ─────────────────────────────────── */
+
+.artifacts-draft-sections {
+  border-top: 1px solid var(--color-border, #333);
+}
+
+.artifacts-draft-section-card {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border, rgba(255, 255, 255, 0.06));
+  background: color-mix(in srgb, var(--color-accent, #c87040) 4%, transparent);
+}
+
+.artifacts-draft-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.artifacts-draft-section-badge {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: color-mix(in srgb, var(--color-accent, #c87040) 20%, transparent);
+  color: var(--color-accent, #c87040);
+}
+
+.artifacts-draft-section-label {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text, #ccc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifacts-draft-section-remove {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--color-text-muted, #888);
+  font-size: 12px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.artifacts-draft-section-remove:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text, #ccc);
+}
+
+.artifacts-draft-section-description {
+  font-size: 11px;
+  color: var(--color-text-muted, #aaa);
+  line-height: 1.4;
+  word-break: break-word;
+}

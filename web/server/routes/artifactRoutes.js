@@ -10,6 +10,8 @@ import {
   ensureArtifactDirs,
   discoverSections,
   getArtifactBuildStatus,
+  hideSectionInHtml,
+  unhideSectionInHtml,
 } from "../services/artifactService.js";
 import { getAnnotationScript } from "../services/annotationScript.js";
 import {
@@ -29,6 +31,7 @@ import {
   regenerateSectionBodySchema,
   createAnnotationBodySchema,
   updateAnnotationBodySchema,
+  addSectionBodySchema,
   parseRequestBody,
 } from "./requestSchemas.js";
 
@@ -180,14 +183,64 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
       const sections = discoverSections(html);
       // Also return manifest info for UI indicators (regeneratedSections, contractVersion)
       const manifest = await getArtifactBuildStatus(request.project.path, request.params.artifactSlug);
+      const hiddenSectionIds = sections.filter(s => s.hidden).map(s => s.id);
       response.json({
-        sections: sections.map(s => ({ id: s.id, title: s.title })),
+        sections: sections.map(s => ({ id: s.id, title: s.title, hidden: s.hidden || false })),
         regeneratedSections: manifest?.regeneratedSections || [],
         regenerationCount: manifest?.regenerationCount || 0,
         contractVersion: manifest?.contractVersion || null,
+        hiddenSectionIds,
       });
     } catch (error) {
       if (error.code === "ENOENT") return next(httpError("Artifact has not been built yet.", 404, "artifact_not_built"));
+      next(error);
+    }
+  });
+
+  // Add a new section (creates an add_section annotation)
+  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/sections", async (request, response, next) => {
+    try {
+      const { description, afterSectionId } = parseRequestBody(addSectionBodySchema, request.body, httpError);
+      const annotation = await addAnnotation(request.project.path, request.params.artifactSlug, {
+        type: "add_section",
+        sectionId: "__new_section__",
+        sectionTitle: "New Section",
+        instruction: description,
+        afterSectionId: afterSectionId || null,
+      }, httpError);
+      response.status(201).json(annotation);
+    } catch (error) {
+      if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
+      next(error);
+    }
+  });
+
+  // Hide (soft-delete) a section
+  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/sections/:sectionId/hide", async (request, response, next) => {
+    try {
+      const sectionId = request.params.sectionId;
+      const sections = await hideSectionInHtml(request.project.path, request.params.artifactSlug, sectionId);
+      response.json({
+        sections: sections.map(s => ({ id: s.id, title: s.title, hidden: s.hidden || false })),
+        hiddenSectionIds: sections.filter(s => s.hidden).map(s => s.id),
+      });
+    } catch (error) {
+      if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
+      next(error);
+    }
+  });
+
+  // Unhide (restore) a section
+  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/sections/:sectionId/unhide", async (request, response, next) => {
+    try {
+      const sectionId = request.params.sectionId;
+      const sections = await unhideSectionInHtml(request.project.path, request.params.artifactSlug, sectionId);
+      response.json({
+        sections: sections.map(s => ({ id: s.id, title: s.title, hidden: s.hidden || false })),
+        hiddenSectionIds: sections.filter(s => s.hidden).map(s => s.id),
+      });
+    } catch (error) {
+      if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
       next(error);
     }
   });

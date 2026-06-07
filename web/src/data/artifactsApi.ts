@@ -1,4 +1,4 @@
-import type { Annotation, ArtifactSpec, ArtifactSpecDetail, ArtifactSectionsResponse, AvailableSourceFile, ElementContext, RebuildState } from "../contracts/api";
+import type { Annotation, ArtifactSection, ArtifactSpec, ArtifactSpecDetail, ArtifactSectionsResponse, AvailableSourceFile, ElementContext, RebuildState } from "../contracts/api";
 import { projectBase, request } from "./request";
 
 export const artifactsApi = {
@@ -61,6 +61,27 @@ export const artifactsApi = {
         method: "POST",
         body: JSON.stringify({ instruction, modelId: modelId ?? null, ...(elementContext ? { elementContext } : {}) }),
       },
+    ),
+
+  addSection: (projectSlug: string, artifactSlug: string, description: string, afterSectionId: string | null) =>
+    request<Annotation>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/sections`,
+      {
+        method: "POST",
+        body: JSON.stringify({ description, afterSectionId }),
+      },
+    ),
+
+  hideSection: (projectSlug: string, artifactSlug: string, sectionId: string) =>
+    request<{ sections: ArtifactSection[]; hiddenSectionIds: string[] }>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/sections/${encodeURIComponent(sectionId)}/hide`,
+      { method: "POST" },
+    ),
+
+  unhideSection: (projectSlug: string, artifactSlug: string, sectionId: string) =>
+    request<{ sections: ArtifactSection[]; hiddenSectionIds: string[] }>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/sections/${encodeURIComponent(sectionId)}/unhide`,
+      { method: "POST" },
     ),
 
   // ─── Annotations ────────────────────────────────────────────

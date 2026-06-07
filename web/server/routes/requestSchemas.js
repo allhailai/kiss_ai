@@ -290,6 +290,11 @@ export const updateAnnotationBodySchema = z.object({
   elementContext: elementContextSchema.optional(),
 });
 
+export const addSectionBodySchema = z.object({
+  description: z.string().trim().min(1).max(10_000),
+  afterSectionId: z.string().trim().max(200).nullable().optional().default(null),
+});
+
 function parseRequestPart(schema, value, httpError, label) {
   const result = schema.safeParse(value);
   if (result.success) return result.data;
