@@ -39,6 +39,13 @@ export type ArtifactSectionsResponse = {
   hiddenSectionIds: string[];
 };
 
+export type BuildVersion = {
+  version: number;
+  timestamp: string;
+  dirName: string;
+  sizeBytes: number;
+};
+
 export type ElementContext = {
   elementTag: string;
   elementId?: string;

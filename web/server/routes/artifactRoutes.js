@@ -12,6 +12,8 @@ import {
   getArtifactBuildStatus,
   hideSectionInHtml,
   unhideSectionInHtml,
+  listBuildVersions,
+  revertToBuildVersion,
 } from "../services/artifactService.js";
 import { getAnnotationScript } from "../services/annotationScript.js";
 import {
@@ -241,6 +243,35 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
       });
     } catch (error) {
       if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
+      next(error);
+    }
+  });
+
+  // ── Build Versioning ──────────────────────────────────────────────────
+
+  // List build version snapshots
+  app.get("/api/projects/:projectSlug/artifacts/:artifactSlug/versions", async (request, response, next) => {
+    try {
+      const versions = await listBuildVersions(request.project.path, request.params.artifactSlug);
+      // Read manifest to find which version is currently active (after a revert)
+      let activeVersionDirName = null;
+      try {
+        const buildStatus = await getArtifactBuildStatus(request.project.path, request.params.artifactSlug);
+        activeVersionDirName = buildStatus?.activeVersionDirName ?? null;
+      } catch { /* ignore */ }
+      response.json({ versions, activeVersionDirName });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Revert to a previous build version
+  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/versions/:versionDirName/revert", async (request, response, next) => {
+    try {
+      const result = await revertToBuildVersion(request.project.path, request.params.artifactSlug, request.params.versionDirName);
+      response.json(result);
+    } catch (error) {
+      if (error.message?.includes('not found')) return next(httpError(error.message, 404, 'version_not_found'));
       next(error);
     }
   });

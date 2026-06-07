@@ -5,7 +5,7 @@ import { downloadProjectFile, triggerDownload } from "../../data/downloadFile";
 import { useRouteContext } from "../../app/contexts/RouteContext";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
 import { groupModelsByTier, modelDisplayName, modelTierLabels } from "../../domain/modelLabels";
-import type { Annotation, ArtifactSpec, ArtifactSpecDetail, ArtifactSection, ArtifactSectionsResponse, AvailableSourceFile, ElementContext, FileContent, RebuildModel } from "../../contracts/api";
+import type { Annotation, ArtifactSpec, ArtifactSpecDetail, ArtifactSection, ArtifactSectionsResponse, AvailableSourceFile, BuildVersion, ElementContext, FileContent, RebuildModel } from "../../contracts/api";
 
 type QuickAddTarget = {
   sectionId: string;
@@ -50,6 +50,13 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   const [quickAddTarget, setQuickAddTarget] = useState<QuickAddTarget | null>(null);
   const [quickAddText, setQuickAddText] = useState("");
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
+
+  // Build versioning
+  const [buildVersions, setBuildVersions] = useState<BuildVersion[]>([]);
+  const [activeVersionDirName, setActiveVersionDirName] = useState<string | null>(null);
+
+  // Rebuild warning modal
+  const [showRebuildWarning, setShowRebuildWarning] = useState(false);
 
   // Inspection / annotation mode
   const [annotationMode, setAnnotationMode] = useState(false);
@@ -262,6 +269,18 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
 
   async function handleBuild() {
     if (!selectedSlug) return;
+
+    // Check for modifications and show warning if needed
+    const hasModifications = hiddenSectionIds.length > 0
+      || regeneratedSections.length > 0
+      || annotations.some(a => a.status === "applied" && a.type === "add_section");
+
+    if (hasModifications && isBuilt && !showRebuildWarning) {
+      setShowRebuildWarning(true);
+      return;
+    }
+    setShowRebuildWarning(false);
+
     setBuilding(true);
     try {
       // Auto-save unsaved edits before building
@@ -287,6 +306,38 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
     } catch (error) {
       setBuilding(false);
       flash(error instanceof Error ? error.message : "Build failed");
+    }
+  }
+
+  // Load build versions
+  const loadVersions = useCallback(async () => {
+    if (!selectedSlug) return;
+    try {
+      const result = await artifactsApi.versions(projectSlug, selectedSlug);
+      setBuildVersions(result.versions);
+      setActiveVersionDirName(result.activeVersionDirName ?? null);
+    } catch { /* non-fatal */ }
+  }, [projectSlug, selectedSlug]);
+
+  // Load versions when preview tab is shown
+  useEffect(() => {
+    if (activeTab === "preview" && isBuilt && selectedSlug) {
+      void loadVersions();
+    }
+  }, [activeTab, isBuilt, selectedSlug, loadVersions]);
+
+  // Revert to a previous build version
+  async function handleRevertVersion(versionDirName: string) {
+    if (!selectedSlug) return;
+    try {
+      await artifactsApi.revertVersion(projectSlug, selectedSlug, versionDirName);
+      flash("Reverted to previous version");
+      setPreviewKey((k) => k + 1);
+      void loadSections();
+      void loadAnnotations();
+      void loadVersions();
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Failed to revert");
     }
   }
 
@@ -437,9 +488,10 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
     if (prevBuildingRef.current && !building && selectedSlug && isBuilt) {
       void loadAnnotations();
       void loadSections();
+      void loadVersions();
     }
     prevBuildingRef.current = building;
-  }, [building, selectedSlug, isBuilt, loadAnnotations, loadSections]);
+  }, [building, selectedSlug, isBuilt, loadAnnotations, loadSections, loadVersions]);
 
   function handleOpenQuickAdd(sectionId: string, sectionTitle: string, elementContext?: ElementContext) {
     setQuickAddTarget({ sectionId, sectionTitle, elementContext });
@@ -633,6 +685,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   }
 
   return (
+    <>
     <div className="artifacts-view">
       <div className="artifacts-toolbar">
         <div className="artifacts-tabs">
@@ -862,6 +915,8 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
                   editingAnnotationId={editingAnnotationId}
                   building={building}
                   annotationMode={annotationMode}
+                  buildVersions={buildVersions}
+                  activeVersionDirName={activeVersionDirName}
                   onScrollTo={handleScrollToSection}
                   onOpenQuickAdd={handleOpenQuickAdd}
                   onQuickAddTextChange={setQuickAddText}
@@ -879,6 +934,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
                   onHideSection={handleHideSection}
                   onUnhideSection={handleUnhideSection}
                   onAddSection={handleAddSection}
+                  onRevertVersion={handleRevertVersion}
                 />
               ) : null}
               <button
@@ -899,10 +955,46 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
         </div>
       )}
     </div>
+      {showRebuildWarning ? (
+        <div className="artifacts-rebuild-warning-overlay" onClick={() => setShowRebuildWarning(false)}>
+          <div className="artifacts-rebuild-warning-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="artifacts-rebuild-warning-icon">⚠️</div>
+            <h3 className="artifacts-rebuild-warning-title">Rebuild will replace all sections</h3>
+            <p className="artifacts-rebuild-warning-text">
+              This artifact has section-level changes that a full rebuild will overwrite:
+            </p>
+            <ul className="artifacts-rebuild-warning-list">
+              {hiddenSectionIds.length > 0 ? (
+                <li>{hiddenSectionIds.length} hidden section{hiddenSectionIds.length !== 1 ? "s" : ""}</li>
+              ) : null}
+              {regeneratedSections.length > 0 ? (
+                <li>{regeneratedSections.length} edited section{regeneratedSections.length !== 1 ? "s" : ""}</li>
+              ) : null}
+              {annotations.some(a => a.status === "applied" && a.type === "add_section") ? (
+                <li>{annotations.filter(a => a.status === "applied" && a.type === "add_section").length} added section{annotations.filter(a => a.status === "applied" && a.type === "add_section").length !== 1 ? "s" : ""}</li>
+              ) : null}
+            </ul>
+            <p className="artifacts-rebuild-warning-reassurance">
+              Your current build will be saved to <strong>Version History</strong> so you can revert if needed.
+            </p>
+            <div className="artifacts-rebuild-warning-actions">
+              <button
+                className="artifacts-rebuild-warning-cancel"
+                onClick={() => setShowRebuildWarning(false)}
+                type="button"
+              >Cancel</button>
+              <button
+                className="artifacts-rebuild-warning-proceed"
+                onClick={() => void handleBuild()}
+                type="button"
+              >Rebuild Anyway</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
-
-/* ─── Context Hints (Sources) ────────────────────────────────── */
 
 function ArtifactContextHints({
   projectSlug,
@@ -1070,6 +1162,9 @@ function SectionPanel({
   onHideSection,
   onUnhideSection,
   onAddSection,
+  buildVersions,
+  activeVersionDirName,
+  onRevertVersion,
 }: {
   sections: ArtifactSection[];
   regeneratedSections: string[];
@@ -1098,6 +1193,9 @@ function SectionPanel({
   onHideSection: (sectionId: string) => void;
   onUnhideSection: (sectionId: string) => void;
   onAddSection: (description: string, afterSectionId: string | null) => void;
+  buildVersions: BuildVersion[];
+  activeVersionDirName: string | null;
+  onRevertVersion: (versionDirName: string) => void;
 }) {
   const pendingAnnotations = annotations.filter(a => a.status === "pending");
   const failedAnnotations = annotations.filter(a => a.status === "failed");
@@ -1117,6 +1215,9 @@ function SectionPanel({
   const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [addSectionDescription, setAddSectionDescription] = useState("");
   const [addSectionAfter, setAddSectionAfter] = useState<string | null>(null);
+
+  // Version revert confirmation
+  const [confirmingRevertId, setConfirmingRevertId] = useState<string | null>(null);
 
   const hiddenCount = sections.filter(s => s.hidden).length;
   const visibleSections = showHidden ? sections : sections.filter(s => !s.hidden);
@@ -1430,6 +1531,67 @@ function SectionPanel({
               onToggle={() => onToggleAnnotation(ann.id)}
             />
           ))}
+        </details>
+      ) : null}
+
+      {/* Version History */}
+      {buildVersions.length > 0 ? (
+        <details className="artifacts-version-history">
+          <summary className="artifacts-version-history-header">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign: "-1px", marginRight: "4px", opacity: 0.7}}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+            Version History ({buildVersions.length})
+          </summary>
+          <ul className="artifacts-version-list">
+            {!activeVersionDirName ? (
+              <li className="artifacts-version-item artifacts-version-current">
+                <span className="artifacts-version-label">
+                  <span className="artifacts-version-current-dot">●</span>
+                  <span className="artifacts-version-current-text">Latest build</span>
+                </span>
+              </li>
+            ) : null}
+            {buildVersions.map((v) => {
+              const dateStr = new Date(v.timestamp).toLocaleString(undefined, {
+                month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+              });
+              const isConfirming = confirmingRevertId === v.dirName;
+              const isActive = activeVersionDirName === v.dirName;
+              return (
+                <li key={v.dirName} className={`artifacts-version-item${isActive ? " artifacts-version-active" : ""}`}>
+                  <span className="artifacts-version-label">
+                    {isActive ? <span className="artifacts-version-current-dot">●</span> : null}
+                    <span className="artifacts-version-number">v{v.version}</span>
+                    <span className="artifacts-version-date">{dateStr}</span>
+                    {isActive ? <span className="artifacts-version-active-tag">(active)</span> : null}
+                  </span>
+                  {isActive ? null : isConfirming ? (
+                    <span className="artifacts-version-confirm">
+                      <span className="artifacts-version-confirm-text">Revert?</span>
+                      <button
+                        className="artifacts-version-confirm-yes"
+                        onClick={() => { onRevertVersion(v.dirName); setConfirmingRevertId(null); }}
+                        type="button"
+                        title="Confirm revert"
+                      >✓</button>
+                      <button
+                        className="artifacts-version-confirm-no"
+                        onClick={() => setConfirmingRevertId(null)}
+                        type="button"
+                        title="Cancel"
+                      >✕</button>
+                    </span>
+                  ) : (
+                    <button
+                      className="artifacts-version-revert-btn"
+                      onClick={() => setConfirmingRevertId(v.dirName)}
+                      type="button"
+                      title={`Revert to v${v.version}`}
+                    >Revert</button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </details>
       ) : null}
     </div>

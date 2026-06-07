@@ -1,4 +1,4 @@
-import type { Annotation, ArtifactSection, ArtifactSpec, ArtifactSpecDetail, ArtifactSectionsResponse, AvailableSourceFile, ElementContext, RebuildState } from "../contracts/api";
+import type { Annotation, ArtifactSection, ArtifactSpec, ArtifactSpecDetail, ArtifactSectionsResponse, AvailableSourceFile, BuildVersion, ElementContext, RebuildState } from "../contracts/api";
 import { projectBase, request } from "./request";
 
 export const artifactsApi = {
@@ -81,6 +81,19 @@ export const artifactsApi = {
   unhideSection: (projectSlug: string, artifactSlug: string, sectionId: string) =>
     request<{ sections: ArtifactSection[]; hiddenSectionIds: string[] }>(
       `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/sections/${encodeURIComponent(sectionId)}/unhide`,
+      { method: "POST" },
+    ),
+
+  // ─── Build Versioning ───────────────────────────────────────
+
+  versions: (projectSlug: string, artifactSlug: string) =>
+    request<{ versions: BuildVersion[] }>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/versions`,
+    ),
+
+  revertVersion: (projectSlug: string, artifactSlug: string, versionDirName: string) =>
+    request<{ version: number; dirName: string; timestamp: string }>(
+      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/versions/${encodeURIComponent(versionDirName)}/revert`,
       { method: "POST" },
     ),
 

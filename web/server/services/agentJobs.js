@@ -4,7 +4,7 @@ import { computeBuildScope } from "./buildScope.js";
 import { buildSourceMapping, writeSourceMapping } from "./sourceMapping.js";
 import { extractAllBuildQuestions, readQuestions } from "./questionsService.js";
 import { createPromptBuilders } from "./promptBuilders.js";
-import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs, findDirectedOutputsWithoutArtifacts, discoverSections, extractSection, replaceSection, insertSectionAfter, updateNavText, checkStyleFragmentation, createSectionBackup, updateManifestForRegeneration, stampManifestAfterBuild, readArtifactPreviewHtml, getArtifactBuildPath } from "./artifactService.js";
+import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensureArtifactDirs, listArtifactSpecs, findDirectedOutputsWithoutArtifacts, discoverSections, extractSection, replaceSection, insertSectionAfter, updateNavText, checkStyleFragmentation, createSectionBackup, updateManifestForRegeneration, stampManifestAfterBuild, readArtifactPreviewHtml, getArtifactBuildPath, createBuildSnapshot } from "./artifactService.js";
 import { runFetchPhase, runDigestPhase } from "./fetchAndDigestPhases.js";
 import { getDeepenQueue, clearDeepenQueue, readTopics, writeTopics, reconcileTopicSources, computeWikiMetrics, autoAdvanceTopicStates } from "./topicsService.js";
 import { computeWikiTriage, updateWikiPageTracker, resetWikiPageTracker, regenerateWikiIndex } from "./wikiTriage.js";
@@ -2102,13 +2102,40 @@ export function createAgentJobService({
       pendingAnnotations = await getPendingAnnotations(project.path, artifactSlug);
     } catch { /* non-fatal — no annotations file yet */ }
 
-    // Delete old build output so the agent starts fresh (prevents incremental edits on stale HTML)
+    // Snapshot the current build before wiping (so user can revert)
+    try {
+      await createBuildSnapshot(project.path, artifactSlug);
+    } catch (snapErr) {
+      console.error(`[versions] Failed to snapshot before rebuild: ${snapErr.message}`);
+      // Non-fatal — continue with rebuild even if snapshot fails
+    }
+
+    // Delete old build output so the agent starts fresh (prevents incremental edits on stale HTML).
+    // Preserve .versions/ directory through the rebuild.
     const buildDir = path.join(project.path, "artifacts/builds", artifactSlug);
+    const versionsDir = path.join(buildDir, '.versions');
+    const tempVersionsDir = path.join(project.path, "artifacts/builds", `.versions-temp-${artifactSlug}`);
+    let hasVersions = false;
+    try {
+      await fs.access(versionsDir);
+      await fs.rename(versionsDir, tempVersionsDir);
+      hasVersions = true;
+    } catch { /* no versions dir yet */ }
+
     try {
       await fs.rm(buildDir, { recursive: true, force: true });
       await fs.mkdir(buildDir, { recursive: true });
     } catch {
       // Ignore — directory may not exist yet
+    }
+
+    // Restore .versions/ after clean slate
+    if (hasVersions) {
+      try {
+        await fs.rename(tempVersionsDir, versionsDir);
+      } catch (restoreErr) {
+        console.error(`[versions] Failed to restore versions dir: ${restoreErr.message}`);
+      }
     }
 
     const prompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory, specHash, pendingAnnotations);

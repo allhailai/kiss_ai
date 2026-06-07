@@ -1232,6 +1232,7 @@ export async function stampManifestAfterBuild(projectPath, artifactSlug) {
   manifest.contractVersion = 2;
   manifest.regenerationCount = 0;
   manifest.regeneratedSections = [];
+  delete manifest.activeVersionDirName;
 
   await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
 }
@@ -1330,4 +1331,172 @@ export async function unhideSectionInHtml(projectPath, artifactSlug, sectionId) 
   await fs.writeFile(indexPath, updatedHtml, 'utf8');
 
   return discoverSections(updatedHtml);
+}
+
+// ─── Build Versioning ─────────────────────────────────────────────────────────
+
+const MAX_BUILD_VERSIONS = 10;
+const VERSIONS_DIR = '.versions';
+
+/**
+ * Files that belong to a build snapshot (relative to the build dir).
+ * These are copied into each version directory.
+ */
+const SNAPSHOT_FILES = [
+  'index.html',
+  '.artifact-manifest.json',
+  '.artifact-annotations.json',
+];
+
+/**
+ * Create a versioned snapshot of the current build before a full rebuild.
+ * Returns { version, timestamp, dirName } or null if there's nothing to snapshot.
+ */
+export async function createBuildSnapshot(projectPath, artifactSlug) {
+  const buildDir = path.join(projectPath, ARTIFACT_BUILDS_DIR, artifactSlug);
+  const indexPath = path.join(buildDir, 'index.html');
+
+  // Nothing to snapshot if no index.html
+  try {
+    await fs.access(indexPath);
+  } catch {
+    return null;
+  }
+
+  const versionsDir = path.join(buildDir, VERSIONS_DIR);
+  await fs.mkdir(versionsDir, { recursive: true });
+
+  // Determine next version number
+  const existing = await listBuildVersions(projectPath, artifactSlug);
+  const nextNum = existing.length > 0 ? existing[0].version + 1 : 1;
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const dirName = `v${nextNum}_${timestamp}`;
+  const snapshotDir = path.join(versionsDir, dirName);
+  await fs.mkdir(snapshotDir, { recursive: true });
+
+  // Copy each snapshot file (skip missing ones — annotations/manifest may not exist)
+  for (const file of SNAPSHOT_FILES) {
+    const src = path.join(buildDir, file);
+    const dst = path.join(snapshotDir, file);
+    try {
+      await fs.copyFile(src, dst);
+    } catch {
+      // File doesn't exist — skip silently (e.g. no annotations yet)
+    }
+  }
+
+  // Prune oldest versions beyond cap
+  const allVersions = await listBuildVersions(projectPath, artifactSlug);
+  if (allVersions.length > MAX_BUILD_VERSIONS) {
+    const toPrune = allVersions.slice(MAX_BUILD_VERSIONS);
+    for (const v of toPrune) {
+      try {
+        await fs.rm(path.join(versionsDir, v.dirName), { recursive: true, force: true });
+      } catch {
+        // Best-effort pruning
+      }
+    }
+  }
+
+  console.log(`[versions] Created build snapshot ${dirName} for ${artifactSlug}`);
+  return { version: nextNum, timestamp: new Date().toISOString(), dirName };
+}
+
+/**
+ * List all build version snapshots for an artifact, sorted newest-first.
+ * Returns [{ version, timestamp, dirName, sizeBytes }].
+ */
+export async function listBuildVersions(projectPath, artifactSlug) {
+  const versionsDir = path.join(projectPath, ARTIFACT_BUILDS_DIR, artifactSlug, VERSIONS_DIR);
+
+  let entries;
+  try {
+    entries = await fs.readdir(versionsDir, { withFileTypes: true });
+  } catch {
+    return []; // No versions dir yet
+  }
+
+  const versions = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith('v')) continue;
+
+    // Parse "v3_2026-06-07T10-30-00-000Z" → version=3, timestamp from dir name
+    const match = entry.name.match(/^v(\d+)_(.+)$/);
+    if (!match) continue;
+
+    const version = parseInt(match[1], 10);
+
+    // Try to get index.html size for display
+    let sizeBytes = 0;
+    try {
+      const stat = await fs.stat(path.join(versionsDir, entry.name, 'index.html'));
+      sizeBytes = stat.size;
+    } catch { /* no index.html */ }
+
+    // Get the mtime of the snapshot directory for a clean timestamp
+    let timestamp;
+    try {
+      const dirStat = await fs.stat(path.join(versionsDir, entry.name));
+      timestamp = dirStat.mtime.toISOString();
+    } catch {
+      timestamp = match[2].replace(/-/g, ':'); // fallback: parse from dir name
+    }
+
+    versions.push({ version, timestamp, dirName: entry.name, sizeBytes });
+  }
+
+  // Sort newest first (highest version number)
+  versions.sort((a, b) => b.version - a.version);
+  return versions;
+}
+
+/**
+ * Revert the current build to a previous version snapshot.
+ * Snapshots the current build first (so nothing is lost), then copies
+ * the selected version's files into the build root.
+ * Returns the restored version metadata.
+ */
+export async function revertToBuildVersion(projectPath, artifactSlug, versionDirName) {
+  const buildDir = path.join(projectPath, ARTIFACT_BUILDS_DIR, artifactSlug);
+  const versionsDir = path.join(buildDir, VERSIONS_DIR);
+  const snapshotDir = path.join(versionsDir, versionDirName);
+
+  // Validate the version exists
+  try {
+    await fs.access(snapshotDir);
+  } catch {
+    throw new Error(`Version ${versionDirName} not found.`);
+  }
+
+  // Copy snapshot files back to build root
+  for (const file of SNAPSHOT_FILES) {
+    const src = path.join(snapshotDir, file);
+    const dst = path.join(buildDir, file);
+    try {
+      await fs.copyFile(src, dst);
+    } catch {
+      // File wasn't in the snapshot (e.g. no annotations) — remove current one if it exists
+      try { await fs.unlink(dst); } catch { /* already gone */ }
+    }
+  }
+
+  console.log(`[versions] Reverted ${artifactSlug} to ${versionDirName}`);
+
+  // Record active version in manifest so the UI can show which version is displayed
+  const manifestPath = path.join(buildDir, '.artifact-manifest.json');
+  let manifest = {};
+  try {
+    manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+  } catch { /* may not exist */ }
+  manifest.activeVersionDirName = versionDirName;
+  await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+
+  // Parse version info from dir name
+  const match = versionDirName.match(/^v(\d+)_(.+)$/);
+  return {
+    version: match ? parseInt(match[1], 10) : 0,
+    dirName: versionDirName,
+    timestamp: new Date().toISOString(),
+  };
 }
