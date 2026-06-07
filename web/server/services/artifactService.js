@@ -895,10 +895,12 @@ export function discoverSections(html) {
       continue;
     }
 
-    // Extract heading for title
+    // Extract heading for title — strip inline tags so <h2><span>1.</span> Foo</h2> → "1. Foo"
     const sectionContent = html.slice(startIdx, sectionEnd);
-    const headingMatch = sectionContent.match(/<h[1-3][^>]*>([^<]+)/);
-    const title = headingMatch ? decodeHtmlEntities(headingMatch[1].trim()) : id;
+    const headingMatch = sectionContent.match(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/i);
+    const title = headingMatch
+      ? decodeHtmlEntities(headingMatch[1].replace(/<[^>]+>/g, '').trim())
+      : id;
 
     // Detect hidden (soft-deleted) sections
     const hidden = /data-hidden="true"/.test(openTag) || /display\s*:\s*none/.test(openTag);
@@ -1210,6 +1212,9 @@ export async function updateManifestForRegeneration(projectPath, artifactSlug, s
     manifest.contractVersion = 2;
   }
 
+  // Clear activeVersionDirName — user has diverged from the version snapshot
+  delete manifest.activeVersionDirName;
+
   await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
   return manifest;
 }
@@ -1291,6 +1296,9 @@ export async function hideSectionInHtml(projectPath, artifactSlug, sectionId) {
   const updatedHtml = html.slice(0, match.index) + newOpenTag + html.slice(match.index + openTag.length);
   await fs.writeFile(indexPath, updatedHtml, 'utf8');
 
+  // Clear activeVersionDirName — user has diverged from the version snapshot
+  await clearActiveVersionFlag(buildDir);
+
   return discoverSections(updatedHtml);
 }
 
@@ -1337,7 +1345,28 @@ export async function unhideSectionInHtml(projectPath, artifactSlug, sectionId) 
   const updatedHtml = html.slice(0, match.index) + newOpenTag + html.slice(match.index + openTag.length);
   await fs.writeFile(indexPath, updatedHtml, 'utf8');
 
+  // Clear activeVersionDirName — user has diverged from the version snapshot
+  await clearActiveVersionFlag(buildDir);
+
   return discoverSections(updatedHtml);
+}
+
+/**
+ * Clear the activeVersionDirName flag from the manifest.
+ * Called when the user modifies the build (hide/unhide/regenerate) while
+ * viewing a version — signals that the build root has diverged from the
+ * snapshot and is no longer "on" that version.
+ */
+async function clearActiveVersionFlag(buildDir) {
+  const manifestPath = path.join(buildDir, '.artifact-manifest.json');
+  try {
+    const raw = await fs.readFile(manifestPath, 'utf8');
+    const manifest = JSON.parse(raw);
+    if (manifest.activeVersionDirName) {
+      delete manifest.activeVersionDirName;
+      await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+    }
+  } catch { /* manifest may not exist — nothing to clear */ }
 }
 
 // ─── Build Versioning ─────────────────────────────────────────────────────────
@@ -1374,7 +1403,7 @@ export async function createBuildSnapshot(projectPath, artifactSlug) {
   await fs.mkdir(versionsDir, { recursive: true });
 
   // Determine next version number
-  const existing = await listBuildVersions(projectPath, artifactSlug);
+  const { versions: existing } = await listBuildVersions(projectPath, artifactSlug);
   const nextNum = existing.length > 0 ? existing[0].version + 1 : 1;
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -1394,7 +1423,7 @@ export async function createBuildSnapshot(projectPath, artifactSlug) {
   }
 
   // Prune oldest versions beyond cap
-  const allVersions = await listBuildVersions(projectPath, artifactSlug);
+  const { versions: allVersions } = await listBuildVersions(projectPath, artifactSlug);
   if (allVersions.length > MAX_BUILD_VERSIONS) {
     const toPrune = allVersions.slice(MAX_BUILD_VERSIONS);
     for (const v of toPrune) {
@@ -1421,7 +1450,7 @@ export async function listBuildVersions(projectPath, artifactSlug) {
   try {
     entries = await fs.readdir(versionsDir, { withFileTypes: true });
   } catch {
-    return []; // No versions dir yet
+    return { versions: [], activeVersionDirName: null }; // No versions dir yet
   }
 
   const versions = [];
@@ -1459,7 +1488,15 @@ export async function listBuildVersions(projectPath, artifactSlug) {
 
   // Sort newest first (highest version number)
   versions.sort((a, b) => b.version - a.version);
-  return versions;
+
+  // Read activeVersionDirName from manifest to avoid a separate file read in the route
+  let activeVersionDirName = null;
+  try {
+    const manifest = await getArtifactBuildStatus(projectPath, artifactSlug);
+    activeVersionDirName = manifest?.activeVersionDirName ?? null;
+  } catch { /* ignore */ }
+
+  return { versions, activeVersionDirName };
 }
 
 /**
@@ -1536,6 +1573,14 @@ export async function revertToBuildVersion(projectPath, artifactSlug, versionDir
     console.error(`[versions] Could not save edits to active version: ${saveErr.message}`);
   }
 
+  // Capture the pre-revert manifest BEFORE overwriting.
+  // If the target version's snapshot has no manifest, we fall back to this
+  // so that critical fields (builtAt, specHash, slug, format) are never lost.
+  let preRevertManifest = null;
+  try {
+    preRevertManifest = JSON.parse(await fs.readFile(path.join(buildDir, '.artifact-manifest.json'), 'utf8'));
+  } catch { /* no manifest to preserve — that's fine */ }
+
   // Copy target version's snapshot files into build root
   for (const file of SNAPSHOT_FILES) {
     const src = path.join(snapshotDir, file);
@@ -1551,14 +1596,16 @@ export async function revertToBuildVersion(projectPath, artifactSlug, versionDir
   console.log(`[versions] Reverted ${artifactSlug} to ${versionDirName}`);
 
   // Record active version in manifest so the UI can show which version is displayed.
-  // Note: We write activeVersionDirName onto the VERSION's manifest (which was just
-  // copied from the snapshot). Fields like builtAt, specHash, regeneratedSections
-  // correctly reflect the version's state — this is intentional.
+  // Read the manifest that was just copied from the snapshot. If the snapshot had no
+  // manifest, fall back to the pre-revert manifest so we never lose fields.
   const manifestPath = path.join(buildDir, '.artifact-manifest.json');
-  let manifest = {};
+  let manifest;
   try {
     manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
-  } catch { /* may not exist */ }
+  } catch {
+    // Version snapshot had no manifest — use the pre-revert one
+    manifest = preRevertManifest || { slug: artifactSlug, format: 'html' };
+  }
   manifest.activeVersionDirName = versionDirName;
   await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
 

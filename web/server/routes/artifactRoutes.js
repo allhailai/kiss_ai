@@ -9,7 +9,6 @@ import {
   slugifyArtifactName,
   ensureArtifactDirs,
   discoverSections,
-  getArtifactBuildStatus,
   hideSectionInHtml,
   unhideSectionInHtml,
   listBuildVersions,
@@ -38,7 +37,7 @@ import {
   parseRequestBody,
 } from "./requestSchemas.js";
 
-export function registerArtifactRoutes(app, { httpError, startArtifactBuild, startSectionRegeneration, startBatchSectionRegeneration }) {
+export function registerArtifactRoutes(app, { httpError, startArtifactBuild, startSectionRegeneration, startBatchSectionRegeneration, getRebuildState }) {
   // List all artifact specs + build status
   app.get("/api/projects/:projectSlug/artifacts", async (request, response, next) => {
     try {
@@ -253,13 +252,7 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   // List build version snapshots
   app.get("/api/projects/:projectSlug/artifacts/:artifactSlug/versions", async (request, response, next) => {
     try {
-      const versions = await listBuildVersions(request.project.path, request.params.artifactSlug);
-      // Read manifest to find which version is currently active (after a revert)
-      let activeVersionDirName = null;
-      try {
-        const buildStatus = await getArtifactBuildStatus(request.project.path, request.params.artifactSlug);
-        activeVersionDirName = buildStatus?.activeVersionDirName ?? null;
-      } catch { /* ignore */ }
+      const { versions, activeVersionDirName } = await listBuildVersions(request.project.path, request.params.artifactSlug);
       response.json({ versions, activeVersionDirName });
     } catch (error) {
       next(error);
@@ -269,6 +262,11 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   // Switch back to the latest build (must be before :versionDirName route)
   app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/versions/latest/revert", async (request, response, next) => {
     try {
+      // Guard: prevent revert while a build is in progress
+      const state = await getRebuildState(request.project.slug);
+      if (state.running) {
+        return next(httpError('Cannot switch versions while a build is in progress.', 409, 'build_in_progress'));
+      }
       await revertToLatestBuild(request.project.path, request.params.artifactSlug);
       response.json({ ok: true });
     } catch (error) {
@@ -279,6 +277,11 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   // Revert to a previous build version
   app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/versions/:versionDirName/revert", async (request, response, next) => {
     try {
+      // Guard: prevent revert while a build is in progress
+      const state = await getRebuildState(request.project.slug);
+      if (state.running) {
+        return next(httpError('Cannot switch versions while a build is in progress.', 409, 'build_in_progress'));
+      }
       const result = await revertToBuildVersion(request.project.path, request.params.artifactSlug, request.params.versionDirName);
       response.json(result);
     } catch (error) {

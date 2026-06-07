@@ -183,7 +183,9 @@ export async function retryFailed(projectPath, artifactSlug) {
 }
 
 /**
- * Toggle a single annotation: pending → applied, applied/failed → pending.
+ * Toggle a single annotation:
+ *   pending → inactive (deactivated, removed from regen queue)
+ *   applied/failed/inactive → pending (re-queued)
  */
 export async function toggleAnnotation(projectPath, artifactSlug, annotationId, httpError) {
   const annotations = await readAnnotations(projectPath, artifactSlug);
@@ -194,10 +196,11 @@ export async function toggleAnnotation(projectPath, artifactSlug, annotationId, 
 
   const annotation = annotations[idx];
   if (annotation.status === "pending") {
-    annotation.status = "applied";
+    annotation.status = "inactive";
   } else {
+    const wasApplied = annotation.status === "applied";
     annotation.status = "pending";
-    annotation.previouslyApplied = true;
+    annotation.previouslyApplied = wasApplied || annotation.previouslyApplied;
   }
   annotation.updatedAt = new Date().toISOString();
 

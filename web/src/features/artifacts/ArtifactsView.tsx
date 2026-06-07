@@ -54,6 +54,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   // Build versioning
   const [buildVersions, setBuildVersions] = useState<BuildVersion[]>([]);
   const [activeVersionDirName, setActiveVersionDirName] = useState<string | null>(null);
+  const [switchingVersion, setSwitchingVersion] = useState(false);
 
   // Rebuild warning modal
   const [showRebuildWarning, setShowRebuildWarning] = useState(false);
@@ -328,7 +329,8 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
 
   // Revert to a previous build version
   async function handleRevertVersion(versionDirName: string) {
-    if (!selectedSlug) return;
+    if (!selectedSlug || switchingVersion) return;
+    setSwitchingVersion(true);
     try {
       await artifactsApi.revertVersion(projectSlug, selectedSlug, versionDirName);
       flash("Switched to previous version");
@@ -338,12 +340,15 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
       void loadVersions();
     } catch (error) {
       flash(error instanceof Error ? error.message : "Failed to revert");
+    } finally {
+      setSwitchingVersion(false);
     }
   }
 
   // Switch back to the latest build
   async function handleRevertToLatest() {
-    if (!selectedSlug) return;
+    if (!selectedSlug || switchingVersion) return;
+    setSwitchingVersion(true);
     try {
       await artifactsApi.revertToLatest(projectSlug, selectedSlug);
       flash("Switched to latest build");
@@ -353,6 +358,8 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
       void loadVersions();
     } catch (error) {
       flash(error instanceof Error ? error.message : "Failed to switch to latest");
+    } finally {
+      setSwitchingVersion(false);
     }
   }
 
@@ -929,6 +936,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
                   quickAddText={quickAddText}
                   editingAnnotationId={editingAnnotationId}
                   building={building}
+                  switchingVersion={switchingVersion}
                   annotationMode={annotationMode}
                   buildVersions={buildVersions}
                   activeVersionDirName={activeVersionDirName}
@@ -1160,6 +1168,7 @@ function SectionPanel({
   quickAddText,
   editingAnnotationId,
   building,
+  switchingVersion,
   annotationMode,
   onScrollTo,
   onOpenQuickAdd,
@@ -1192,6 +1201,7 @@ function SectionPanel({
   quickAddText: string;
   editingAnnotationId: string | null;
   building: boolean;
+  switchingVersion: boolean;
   annotationMode: boolean;
   onScrollTo: (id: string) => void;
   onOpenQuickAdd: (sectionId: string, sectionTitle: string) => void;
@@ -1218,9 +1228,9 @@ function SectionPanel({
   const pendingAnnotations = annotations.filter(a => a.status === "pending");
   const failedAnnotations = annotations.filter(a => a.status === "failed");
   const appliedAnnotations = annotations.filter(a => a.status === "applied");
+  const inactiveAnnotations = annotations.filter(a => a.status === "inactive");
   const pendingCount = pendingAnnotations.length;
   const failedCount = failedAnnotations.length;
-  const affectedSectionIds = new Set(pendingAnnotations.map(a => a.sectionId));
 
   // Draft section annotations (add_section type)
   const draftSectionAnnotations = pendingAnnotations.filter(a => a.type === "add_section");
@@ -1531,12 +1541,27 @@ function SectionPanel({
         </button>
       ) : null}
 
-      {appliedAnnotations.length > 0 ? (
+      {appliedAnnotations.length > 0 || inactiveAnnotations.length > 0 ? (
         <details className="artifacts-annotation-history">
           <summary className="artifacts-annotation-history-header">
-            ✓ {appliedAnnotations.length} applied change{appliedAnnotations.length !== 1 ? "s" : ""}
+            {appliedAnnotations.length > 0 ? `✓ ${appliedAnnotations.length} applied` : ''}
+            {appliedAnnotations.length > 0 && inactiveAnnotations.length > 0 ? ' · ' : ''}
+            {inactiveAnnotations.length > 0 ? `${inactiveAnnotations.length} inactive` : ''}
           </summary>
           {appliedAnnotations.map((ann) => (
+            <AnnotationCard
+              key={ann.id}
+              annotation={ann}
+              isEditing={editingAnnotationId === ann.id}
+              onHighlight={() => onHighlightAnnotation(ann)}
+              onStartEditing={() => onStartEditing(ann.id)}
+              onCancelEditing={onCancelEditing}
+              onUpdate={(instruction) => onUpdateAnnotation(ann.id, instruction)}
+              onDelete={() => onDeleteAnnotation(ann.id)}
+              onToggle={() => onToggleAnnotation(ann.id)}
+            />
+          ))}
+          {inactiveAnnotations.map((ann) => (
             <AnnotationCard
               key={ann.id}
               annotation={ann}
@@ -1568,7 +1593,7 @@ function SectionPanel({
                 <button
                   className="artifacts-version-revert-btn"
                   onClick={onRevertToLatest}
-                  disabled={building}
+                  disabled={building || switchingVersion}
                   type="button"
                   title="Switch to latest build"
                 >Switch</button>
@@ -1615,7 +1640,7 @@ function SectionPanel({
                     <button
                       className="artifacts-version-revert-btn"
                       onClick={() => setConfirmingRevertId(v.dirName)}
-                      disabled={building}
+                      disabled={building || switchingVersion}
                       type="button"
                       title={`Revert to v${v.version}`}
                     >Revert</button>

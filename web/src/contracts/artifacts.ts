@@ -61,7 +61,7 @@ export type Annotation = {
   sectionTitle: string;
   instruction: string;
   elementContext?: ElementContext | null;
-  status: "pending" | "applied" | "failed";
+  status: "pending" | "applied" | "failed" | "inactive";
   previouslyApplied?: boolean;
   type?: "add_section";
   afterSectionId?: string | null;

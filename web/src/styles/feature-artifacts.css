@@ -1063,6 +1063,11 @@
   border-left: 2px solid #c44;
 }
 
+.artifacts-annotation-card.inactive {
+  opacity: 0.35;
+  border-left: 2px solid var(--color-text-muted, #666);
+}
+
 .artifacts-annotation-card.reactivated {
   border-left: 2px solid color-mix(in srgb, var(--color-accent, #c87040) 60%, #fff);
 }
@@ -1148,25 +1153,7 @@
   margin-top: 4px;
 }
 
-.artifacts-annotation-status-badge {
-  flex-shrink: 0;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
 
-.artifacts-annotation-status-badge.applied {
-  background: color-mix(in srgb, #4a9 15%, transparent);
-  color: #4a9;
-}
-
-.artifacts-annotation-status-badge.failed {
-  background: color-mix(in srgb, #c44 15%, transparent);
-  color: #c44;
-}
 
 /* ── Batch Regenerate Button ─────────────────────────────── */
 

@@ -529,7 +529,7 @@ registerApiRoutes(app, {
   writeProjectUiState,
 });
 
-registerArtifactRoutes(app, { httpError, startArtifactBuild, startSectionRegeneration, startBatchSectionRegeneration });
+registerArtifactRoutes(app, { httpError, startArtifactBuild, startSectionRegeneration, startBatchSectionRegeneration, getRebuildState });
 
 app.use(apiErrorHandler);
 

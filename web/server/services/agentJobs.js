@@ -1928,6 +1928,41 @@ export function createAgentJobService({
     }
   }
 
+  /**
+   * Wipe the build directory for a fresh agent build while preserving
+   * the .versions/ directory through the process. Uses try/finally so
+   * restoration happens even if rm/mkdir throw.
+   */
+  async function wipeBuildDirPreservingVersions(projectPath, artifactSlug) {
+    const buildDir = path.join(projectPath, "artifacts/builds", artifactSlug);
+    const versionsDir = path.join(buildDir, '.versions');
+    const tempVersionsDir = path.join(projectPath, "artifacts/builds", `.versions-temp-${artifactSlug}`);
+    let hasVersions = false;
+    try {
+      await fs.access(versionsDir);
+      await fs.rename(versionsDir, tempVersionsDir);
+      hasVersions = true;
+    } catch { /* no versions dir yet */ }
+
+    try {
+      await fs.rm(buildDir, { recursive: true, force: true });
+      await fs.mkdir(buildDir, { recursive: true });
+    } catch {
+      // Directory may not exist yet
+    } finally {
+      // Always restore .versions/ from temp (even if rm/mkdir failed)
+      if (hasVersions) {
+        try {
+          await fs.mkdir(buildDir, { recursive: true });
+          await fs.rename(tempVersionsDir, versionsDir);
+        } catch (restoreErr) {
+          console.error(`[versions] Failed to restore versions dir: ${restoreErr.message}`);
+          try { await fs.rm(tempVersionsDir, { recursive: true, force: true }); } catch { /* best effort */ }
+        }
+      }
+    }
+  }
+
   async function runBatchArtifactBuildJob({ project, apiKey, modelId, jobName, releaseProjectAgent, artifactSlugs }) {
     activeRebuilds.add(project.slug);
     const totalCount = artifactSlugs.length;
@@ -1951,6 +1986,12 @@ export function createAgentJobService({
           const crypto = await import("node:crypto");
           const specHash = crypto.createHash("sha256").update(spec.rawContent).digest("hex");
 
+          // Read pending annotations before wiping the build dir (they live in the build dir)
+          let pendingAnnotations = [];
+          try {
+            pendingAnnotations = await getPendingAnnotations(project.path, artifactSlug);
+          } catch { /* non-fatal — no annotations file yet */ }
+
           // Snapshot the current build before wiping (so user can revert)
           try {
             await createBuildSnapshot(project.path, artifactSlug);
@@ -1959,32 +2000,9 @@ export function createAgentJobService({
           }
 
           // Delete old build output — preserve .versions/ through the rebuild
-          const buildDir = path.join(project.path, "artifacts/builds", artifactSlug);
-          const versionsDir = path.join(buildDir, '.versions');
-          const tempVersionsDir = path.join(project.path, "artifacts/builds", `.versions-temp-${artifactSlug}`);
-          let hasVersions = false;
-          try {
-            await fs.access(versionsDir);
-            await fs.rename(versionsDir, tempVersionsDir);
-            hasVersions = true;
-          } catch { /* no versions dir yet */ }
+          await wipeBuildDirPreservingVersions(project.path, artifactSlug);
 
-          try {
-            await fs.rm(buildDir, { recursive: true, force: true });
-            await fs.mkdir(buildDir, { recursive: true });
-          } catch { /* directory may not exist yet */ }
-
-          if (hasVersions) {
-            try {
-              await fs.mkdir(buildDir, { recursive: true });
-              await fs.rename(tempVersionsDir, versionsDir);
-            } catch (restoreErr) {
-              console.error(`[batch-build] Failed to restore .versions/: ${restoreErr.message}`);
-              try { await fs.rm(tempVersionsDir, { recursive: true, force: true }); } catch { /* best effort */ }
-            }
-          }
-
-          const prompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory, specHash);
+          const prompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory, specHash, pendingAnnotations);
           const artifactName = spec.frontmatter.name || artifactSlug;
 
           await appendRunEvent(project.slug, {
@@ -2138,35 +2156,7 @@ export function createAgentJobService({
 
     // Delete old build output so the agent starts fresh (prevents incremental edits on stale HTML).
     // Preserve .versions/ directory through the rebuild.
-    const buildDir = path.join(project.path, "artifacts/builds", artifactSlug);
-    const versionsDir = path.join(buildDir, '.versions');
-    const tempVersionsDir = path.join(project.path, "artifacts/builds", `.versions-temp-${artifactSlug}`);
-    let hasVersions = false;
-    try {
-      await fs.access(versionsDir);
-      await fs.rename(versionsDir, tempVersionsDir);
-      hasVersions = true;
-    } catch { /* no versions dir yet */ }
-
-    try {
-      await fs.rm(buildDir, { recursive: true, force: true });
-      await fs.mkdir(buildDir, { recursive: true });
-    } catch {
-      // Ignore — directory may not exist yet
-    } finally {
-      // Always restore .versions/ from temp (even if rm/mkdir failed)
-      if (hasVersions) {
-        try {
-          // Ensure buildDir exists before restoring into it
-          await fs.mkdir(buildDir, { recursive: true });
-          await fs.rename(tempVersionsDir, versionsDir);
-        } catch (restoreErr) {
-          console.error(`[versions] Failed to restore versions dir: ${restoreErr.message}`);
-          // Last resort: clean up the orphaned temp dir
-          try { await fs.rm(tempVersionsDir, { recursive: true, force: true }); } catch { /* best effort */ }
-        }
-      }
-    }
+    await wipeBuildDirPreservingVersions(project.path, artifactSlug);
 
     const prompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory, specHash, pendingAnnotations);
 
