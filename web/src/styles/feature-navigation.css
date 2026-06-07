@@ -364,12 +364,14 @@
   white-space: nowrap;
 }
 .file-tree-badge-new {
-  background: hsl(150, 55%, 22%);
-  color: hsl(150, 75%, 68%);
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+  color: var(--color-secondary);
 }
 .file-tree-badge-edited {
-  background: hsl(46, 50%, 65%);
-  color: #000;
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+  color: var(--color-secondary);
 }
 
 .file-tree-toggle {
