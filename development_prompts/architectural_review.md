@@ -32,27 +32,29 @@ _kiss_ai/
       agentRuns.js           Agent run tracking and lifecycle management
       contracts/             Server-side contracts (chatLimits.js)
       index.js               Express app setup and middleware
+      middleware/             Express middleware (requireAuth.js)
       routes/                API route handlers (see §1.3 for list)
       services/              Business logic services (see §3.1 for inventory)
+        pipelines/           Chat agent pipeline modules (chatPipelines, chatPromptBuilder, chatPromptHelpers, chatParsers)
       utils/                 Server utilities (sse.js)
     src/                     React frontend
       app/                   App shell, workspace orchestration
         contexts/            React contexts (BuildContext, RouteContext, ToastContext)
-        hooks/               App-level hooks (20 hooks — see §3.1)
-      contracts/             Shared API types (api.ts, agents.ts)
-      data/                  API transport helpers (13 files)
+        hooks/               App-level hooks (21 hooks — see §3.1)
+      contracts/             Shared API types (barrel api.ts + domain sub-modules)
+      data/                  API transport helpers (15 files)
       domain/                Pure helpers — no React, no IO (19 files)
-      editor/                CodeMirror wrapper and extensions (8 files)
-      features/              Workflow components (14 feature directories)
+      editor/                CodeMirror wrapper and extensions (12 files)
+      features/              Workflow components (15 feature directories)
       navigation/            Route and view models (4 files)
       shared/                App-neutral reusable components
         buildLog/            Build log workspace component
-        chat/                Shared chat primitives (ChatComposer, ChatMessageBubble, ChatThread)
+        chat/                Shared chat primitives (ChatComposer, ChatMessageBubble, ChatThread, chatRendering)
         conceptualDiff/      Conceptual diff review item component
         rightPanel/          Right panel mode switch component
         CompactModelPicker.tsx
         toast.ts
-      styles/                CSS per feature (24 files)
+      styles/                CSS per feature (26 files)
     scripts/                 Build and boundary check scripts (check-boundaries.js)
     LAB_NOTES.md             Hub runtime settings, repo boundaries, project-root assumptions
 ```
@@ -96,19 +98,23 @@ Are there any new uncontrolled edges that should be added to the boundary checke
 - Agent runtimes should be isolated — only `agentJobs.js` and `chatAgent.js` should call into `agentRuntimes/cursorSdk.js`.
 - `agentRuns.js` lives at the server root level (not in `services/`). Verify this is deliberate and its responsibilities don't overlap with service modules.
 - Check for service functions that have grown to handle too many concerns. Known large services (line counts as of last audit):
-  - `agentJobs.js` — 1644 lines
-  - `chatAgent.js` — 1226 lines
-  - `projectFiles.js` — 1024 lines
-  - `artifactService.js` — 853 lines
-  - `webResearch.js` — 817 lines
+  - `agentJobs.js` — 2300 lines
+  - `projectFiles.js` — 1326 lines
+  - `artifactService.js` — 1136 lines
+  - `topicsService.js` — 920 lines
+  - `webResearch.js` — 823 lines
+  - `promptBuilders.js` — 659 lines
   - `conversations.js` — 534 lines
-  - `promptBuilders.js` — 463 lines
-  - `topicsService.js` — 433 lines
-  - `wikiTriage.js` — 368 lines
+  - `pipelines/chatPipelines.js` — 531 lines
+  - `wikiTriage.js` — 434 lines
+  - `auth.js` — 349 lines
+  - `pipelines/chatPromptBuilder.js` — 287 lines
+  - `chatAgent.js` — 16 lines (thin facade over `pipelines/`)
 
 Current route files:
-  - `projectRoutes.js` (376 lines) — is it still a thin dispatcher or has business logic leaked in?
-  - `chatRoutes.js`, `fileRoutes.js`, `artifactRoutes.js`, `rebuildRoutes.js`, `apiRoutes.js`, `systemRoutes.js`, `aiRoutes.js`
+  - `artifactRoutes.js` (321 lines) — largest route file, check for business logic leaks
+  - `projectRoutes.js` (316 lines)
+  - `fileRoutes.js`, `chatRoutes.js`, `rebuildRoutes.js`, `authRoutes.js`, `apiRoutes.js`, `systemRoutes.js`, `aiRoutes.js`
 
 ---
 
@@ -132,8 +138,9 @@ Pay special attention to:
 ### 2.2 Unreferenced Exports
 
 Identify exported functions, types, or constants that are never imported anywhere. Focus on:
-- `contracts/api.ts` (758 lines) — types that no component or service uses
+- `contracts/api.ts` (22 lines, barrel re-export) — verify all sub-module types are consumed
 - `contracts/agents.ts` — verify all exported types are consumed
+- Contract sub-modules (`contracts/rebuild.ts`, `contracts/chat.ts`, `contracts/topics.ts`, etc.) — types that no component or service uses
 - `domain/` helpers that are exported but never called
 - `data/` transport functions that are never called
 - Server service functions that no route dispatches to
@@ -143,10 +150,12 @@ Identify exported functions, types, or constants that are never imported anywher
 Check for features that were removed but left remnants:
 - `features/suggestions/` — was fully removed. Verify the only remaining reference is the documented legacy bookmark redirect in `navigation/views.ts` (line 6–8). Search for "suggestion" references in views, navigation, CSS, routes, and ARCHITECTURE.md to confirm nothing else lingers.
 - Search the `styles/` directory for CSS files with no corresponding feature or component:
-  - `feature-ai-assist.css` — does a corresponding feature exist or is this orphan CSS?
+  - `feature-ai-workspace.css` — does a corresponding workspace component exist?
   - `feature-build-panel.css` — does this serve the `rebuild/` feature or is it separate?
   - `feature-proposal-review.css` — which component(s) consume this?
   - `feature-review.css` — which component(s) consume this?
+  - `feature-login.css` — which component(s) consume this?
+  - `feature-user-admin.css` — which component(s) consume this?
 - Check `navigation/views.ts` for view IDs that are never rendered.
 
 ### 2.4 Dead CSS
@@ -160,13 +169,13 @@ Current CSS files to verify:
 ```
 00-reset.css, 01-tokens.css, 99-responsive.css,
 app-shell.css, app-topbar.css,
-feature-agents.css, feature-ai-assist.css, feature-artifacts.css,
+feature-agents.css, feature-ai-workspace.css, feature-artifacts.css,
 feature-build-log.css, feature-build-panel.css, feature-chat.css,
 feature-dashboard.css, feature-design.css, feature-files.css,
-feature-navigation.css, feature-outputs.css, feature-project-picker.css,
-feature-proposal-review.css, feature-questions.css, feature-review.css,
-feature-right-panel.css, feature-sidebar.css, feature-toast.css,
-feature-topics.css
+feature-login.css, feature-navigation.css, feature-outputs.css,
+feature-project-picker.css, feature-proposal-review.css, feature-questions.css,
+feature-review.css, feature-right-panel.css, feature-sidebar.css,
+feature-toast.css, feature-topics.css, feature-user-admin.css
 ```
 
 ---
@@ -180,44 +189,55 @@ Report all files over 300 lines, sorted by size. As of last audit, the largest a
 **Server services:**
 | File | Lines | Notes |
 |------|-------|-------|
-| `agentJobs.js` | 1644 | Rebuild, deepen, artifact build pipeline orchestration |
-| `chatAgent.js` | 1226 | Chat/proposal lifecycle |
-| `projectFiles.js` | 1024 | Project file management |
-| `artifactService.js` | 853 | Artifact spec CRUD, source resolution, prompt templates, auto-generation |
-| `webResearch.js` | 817 | Web research pipeline |
+| `agentJobs.js` | 2300 | Rebuild, deepen, artifact build pipeline orchestration |
+| `projectFiles.js` | 1326 | Project file management |
+| `artifactService.js` | 1136 | Artifact spec CRUD, source resolution, prompt templates, auto-generation |
+| `topicsService.js` | 920 | Topic lifecycle, reconciliation, deepen queue |
+| `webResearch.js` | 823 | Web research pipeline |
+| `promptBuilders.js` | 659 | Prompt assembly patterns |
 | `conversations.js` | 534 | Conversation persistence |
-| `promptBuilders.js` | 463 | Prompt assembly patterns |
-| `topicsService.js` | 433 | Topic lifecycle |
-| `wikiTriage.js` | 368 | Wiki triage logic |
+| `pipelines/chatPipelines.js` | 531 | Chat/proposal lifecycle (extracted from chatAgent.js) |
+| `wikiTriage.js` | 434 | Wiki triage logic |
+| `auth.js` | 349 | Authentication service (server mode) |
+| `outputRename.js` | 299 | Output rename pipeline |
+| `pipelines/chatPromptBuilder.js` | 287 | Chat prompt construction |
+| `chatAgent.js` | 16 | Thin facade over `pipelines/` |
 
 **Frontend components:**
 | File | Lines | Notes |
 |------|-------|-------|
+| `features/artifacts/ArtifactsView.tsx` | 1310 | Artifact list + detail editor |
 | `editor/markdownTableExtension.ts` | 924 | Table editing extension |
-| `features/outputs/OutputSection.tsx` | 864 | Output section view |
-| `features/agents/RightPanelAgentChat.tsx` | 784 | Agent chat panel composition |
-| `contracts/api.ts` | 758 | Shared API contract hub |
-| `features/topics/TopicsWorkspace.tsx` | 759 | Topic management |
-| `features/navigation/WorkflowMenus.tsx` | 661 | Workflow menu structure |
-| `features/artifacts/ArtifactsView.tsx` | 600 | Artifact list + detail editor |
-| `features/navigation/FileTreeNav.tsx` | 542 | Navigation tree |
+| `features/outputs/OutputSection.tsx` | 869 | Output section view |
+| `features/agents/RightPanelAgentChat.tsx` | 685 | Agent chat panel composition |
+| `features/navigation/WorkflowSectionMenu.tsx` | 615 | Workflow section menu |
+| `features/navigation/FileTreeNav.tsx` | 558 | Navigation tree |
 | `features/questions/QuestionsWorkspace.tsx` | 517 | Question management |
-| `editor/annotationExtension.ts` | 452 | Annotation markers |
-| `app/hooks/useProjectChat.ts` | 396 | Chat orchestration hook |
+| `editor/annotationExtension.ts` | 454 | Annotation markers |
+| `features/topics/TopicCard.tsx` | 429 | Topic card component |
+| `editor/livePreviewExtension.ts` | 429 | Live markdown preview |
+| `shared/chat/ChatMessageBubble.tsx` | 425 | Chat message rendering |
+| `app/useProjectWorkspace.ts` | 396 | Workspace orchestration |
 | `features/design/DesignWorkspace.tsx` | 391 | Design identity form |
-| `shared/chat/ChatMessageBubble.tsx` | 390 | Chat message rendering |
-| `app/useProjectWorkspace.ts` | 382 | Workspace orchestration |
-| `app/App.tsx` | 381 | App shell composition |
+| `editor/wikiLinkExtension.ts` | 387 | Wiki link extension |
 | `features/rebuild/BuildProjectRightPanel.tsx` | 382 | Rebuild right panel |
-| `features/agents/TopicConfirmationCard.tsx` | 355 | Topic confirmation card |
+| `app/hooks/useProjectChat.ts` | 375 | Chat orchestration hook |
+| `features/userAdmin/UserAdminPanel.tsx` | 366 | User admin panel (server mode) |
+| `app/App.tsx` | 365 | App shell composition |
+| `features/topics/TopicsWorkspace.tsx` | 351 | Topic management |
+| `app/ReviewWorkspace.tsx` | 343 | Review workspace |
+| `features/projectPicker/ProjectPicker.tsx` | 334 | Project picker |
+| `editor/mermaidExtension.ts` | 303 | Mermaid diagram extension |
+| `shared/chat/ChatComposer.tsx` | 302 | Chat composer |
 
 **Server infrastructure:**
 | File | Lines | Notes |
 |------|-------|-------|
-| `server/index.js` | 412 | Express app setup |
+| `server/index.js` | 609 | Express app setup |
 | `server/agentRuns.js` | 356 | Agent run tracking |
-| `routes/projectRoutes.js` | 376 | Project API routes |
-| `routes/requestSchemas.js` | 284 | Request validation schemas |
+| `routes/artifactRoutes.js` | 321 | Artifact API routes |
+| `routes/projectRoutes.js` | 316 | Project API routes |
+| `routes/requestSchemas.js` | 315 | Request validation schemas |
 
 For each, identify:
 - How many distinct responsibilities it handles
@@ -260,7 +280,7 @@ Identify abstractions that add indirection without clear benefit:
 Compare `web/src/ARCHITECTURE.md` against the actual codebase:
 
 - **Module Map:** Does the directory listing match reality? Are there directories not documented?
-- **Feature List:** Does the `Current features:` list match `features/*/`? Are there extra or missing entries? Current features directories are: `agents`, `artifacts`, `chat`, `dashboard`, `design`, `files`, `navigation`, `outputs`, `projectPicker`, `questions`, `rebuild`, `search`, `toast`, `topics`.
+- **Feature List:** Does the `Current features:` list match `features/*/`? Are there extra or missing entries? Current features directories are: `agents`, `artifacts`, `chat`, `dashboard`, `design`, `files`, `navigation`, `outputs`, `projectPicker`, `questions`, `rebuild`, `search`, `toast`, `topics`, `userAdmin`.
 - **Import Boundary Rules:** Do the stated rules match what `check-boundaries.js` actually enforces?
 - **Deferred Review Items:** Are the listed files still the right ones? Have any been resolved? Should new ones be added? Note especially:
   - `features/outputs/OutputSection.tsx` (864 lines) — not listed but appears to be a deferred-quality candidate
@@ -363,11 +383,11 @@ Compare `web/src/contracts/api.ts` (758 lines) and `web/src/contracts/agents.ts`
 
 ### 6.1 Server Services
 
-Services **with** test files (19):
-`agentJobs`, `buildScope`, `chatAgent`, `chatContext`, `conceptualDiffMemory`, `conceptualDiffs`, `conversations`, `designIdentity`, `gitDiffPrompt`, `harnessState`, `kissAiUpdate`, `outputRename`, `projectFiles`, `projects`, `questionsService`, `sourceMapping`, `systemSettings`, `topicsService`, `webResearch`
+Services **with** test files (20):
+`agentJobs`, `buildScope`, `chatAgent`, `chatContext`, `conceptualDiffMemory`, `conceptualDiffs`, `conversations`, `designIdentity`, `gitDiffPrompt`, `harnessState`, `kissAiUpdate`, `outputArtifacts` (shared), `outputRename`, `projectFiles`, `projects`, `questionsService`, `secretStore`, `sourceMapping`, `systemSettings`, `topicsService`, `topicReconciliation` (shared), `webResearch`
 
-Services **without** test files (13):
-`artifactService`, `buildLogs`, `contentLedger`, `cursorAgentRun`, `cursorModels`, `fetchAndDigestPhases`, `httpErrors`, `projectAgentLock`, `projectUiState`, `promptBuilders`, `questionAiAssist`, `serverValidation`, `wikiTriage`
+Services **without** test files (22):
+`annotationScript`, `annotationService`, `artifactService`, `auth`, `buildLogs`, `contentLedger`, `cursorAgentRun`, `cursorModels`, `fetchAndDigestPhases`, `fileChanges`, `httpErrors`, `projectAgentLock`, `projectStatus`, `projectUiState`, `promptBuilders`, `questionAiAssist`, `serverValidation`, `wikiTriage`, `pipelines/chatParsers`, `pipelines/chatPipelines`, `pipelines/chatPromptBuilder`, `pipelines/chatPromptHelpers`
 
 Also untested:
 - `server/agentRuns.js` has `agentRuns.test.js` — verify coverage is meaningful.
@@ -384,9 +404,9 @@ Current frontend test files (14):
 - `navigation/routes.test.ts`
 
 Notable untested frontend modules:
-- `data/artifactsApi.ts`, `data/outputsApi.ts`, `data/projectsApi.ts`, `data/systemApi.ts`
+- `data/artifactsApi.ts`, `data/outputsApi.ts`, `data/projectsApi.ts`, `data/systemApi.ts`, `data/topicsApi.ts`, `data/downloadFile.ts`
 - `domain/modelLabels.ts`, `domain/projectPaths.ts`, `domain/errors.ts`
-- All `app/hooks/` (20 hooks, 0 tests)
+- All `app/hooks/` (21 hooks, 0 tests)
 - No feature component tests
 
 ### 6.3 Critical Path Coverage
@@ -418,18 +438,30 @@ Are these adequately tested or are they relying on integration-by-deployment?
 
 The following components and services appear to be recent additions. Verify they follow established patterns:
 
-- `features/outputs/OutputSection.tsx` (864 lines) + `OutputSectionPage.tsx` — follows feature isolation rules?
+- `features/outputs/OutputSection.tsx` (869 lines) + `OutputSectionPage.tsx` — follows feature isolation rules?
 - `features/agents/ArtifactProposalCard.tsx` — follows feature isolation?
-- `features/agents/TopicConfirmationCard.tsx` — follows feature isolation?
-- `server/services/artifactService.js` (853 lines) — follows service patterns?
+- `features/userAdmin/UserAdminPanel.tsx` — follows feature isolation?
+- `features/topics/TopicCard.tsx` — follows feature isolation?
+- `server/services/artifactService.js` (1136 lines) — follows service patterns?
+- `server/services/annotationService.js` — follows service patterns?
+- `server/services/annotationScript.js` — follows service patterns?
+- `server/services/auth.js` — follows service patterns?
 - `server/services/wikiTriage.js` — follows service patterns?
 - `server/services/outputRename.js` — follows service patterns?
 - `server/services/contentLedger.js` — follows service patterns?
 - `server/services/fetchAndDigestPhases.js` — follows service patterns?
-- `server/routes/artifactRoutes.js` — routes through to services correctly?
+- `server/services/projectStatus.js` — follows service patterns?
+- `server/services/fileChanges.js` — follows service patterns?
+- `server/services/pipelines/chatPipelines.js` (531 lines) — follows service patterns?
+- `server/services/pipelines/chatPromptBuilder.js` — follows service patterns?
+- `server/routes/artifactRoutes.js` (321 lines) — routes through to services correctly?
+- `server/routes/authRoutes.js` — routes through to services correctly?
 - `data/artifactsApi.ts` — follows transport helper patterns?
 - `data/outputsApi.ts` — follows transport helper patterns?
+- `data/topicsApi.ts` — follows transport helper patterns?
+- `data/downloadFile.ts` — follows transport helper patterns?
 - `shared/buildLog/BuildLogWorkspace.tsx` — belongs in `shared/` or should it be a feature?
+- `shared/chat/chatRendering.tsx` — follows shared component patterns?
 
 ### 7.2 Feature-to-Style Alignment
 

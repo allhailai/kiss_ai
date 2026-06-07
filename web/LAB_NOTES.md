@@ -39,6 +39,6 @@ The `_kiss_ai` repo tracks hub and framework code. Each managed project remains 
 
 ## Centralized Framework
 
-The canonical `kiss_ai` framework now lives at `kiss_ai_projects/_kiss_ai/framework/`. Managed projects should not keep copied `framework/` folders. Rebuild agents run from the selected project root, but follow the central command docs, normally `../_kiss_ai/framework/commands/do_all_rebuild.md`.
+The canonical `kiss_ai` framework now lives at `kiss_ai_projects/_kiss_ai/framework/`. Managed projects should not keep copied `framework/` folders. Rebuild agents run from the selected project root, but follow the central command docs, normally `../_kiss_ai/framework/commands/do_build.md`.
 
 Framework changes are committed in the `_kiss_ai` repo. Project rebuild snapshots remain project-local and should continue to commit generated inputs, outputs, logs, state, and human requirement changes from the selected project root only.

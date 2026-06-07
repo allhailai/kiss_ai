@@ -99,7 +99,9 @@ Domain modules should not import React, components, hooks, CodeMirror widgets, a
 
 Transport helpers are domain-specific modules. There is no aggregated API client — each module exports its own namespace object:
 
-- `data/authApi.ts`, `data/chatApi.ts`, `data/filesApi.ts`, `data/projectsApi.ts`, `data/rebuildApi.ts`, `data/systemApi.ts`, `data/artifactsApi.ts`
+- `data/authApi.ts`, `data/chatApi.ts`, `data/filesApi.ts`, `data/projectsApi.ts`, `data/rebuildApi.ts`, `data/systemApi.ts`, `data/artifactsApi.ts`, `data/outputsApi.ts`, `data/topicsApi.ts`
+- `data/downloadFile.ts`: file download trigger helper
+- `data/request.ts`: shared fetch wrapper
 
 ## Editor Layer
 
@@ -113,6 +115,10 @@ Use `editor/` for CodeMirror-specific behavior:
 - `annotationExtension.css`: annotation styling.
 - `markdownTableExtension.ts`: table editing extension public API.
 - `markdownTableExtension.css`: table interaction styling, including handles, selection, active cells, and context menus.
+- `livePreviewExtension.ts`: inline live markdown preview rendering (headings, bold, italic, links, images).
+- `livePreviewExtension.css`: live preview styling.
+- `mermaidExtension.ts`: inline Mermaid diagram rendering in the editor.
+- `mermaidExtension.css`: Mermaid diagram styling.
 
 Editor modules may import domain helpers and API contract types. They should receive app behavior through callbacks rather than importing workflow components or transport clients.
 
@@ -129,19 +135,21 @@ workspace orchestration.
 
 Current features:
 
-- `agents/` (sub-components: `AgentConversationHeader`, `AgentEditProposalPanel`, `agentChatHelpers`)
+- `agents/` (sub-components: `AgentConversationHeader`, `AgentEditProposalPanel`, `ArtifactProposalCard`, `agentChatHelpers`)
 - `artifacts/`
 - `chat/`
 - `dashboard/`
 - `design/`
 - `files/`
 - `navigation/`
+- `outputs/` (output file management, build status, output builds)
 - `projectPicker/`
 - `questions/` (composed via `app/ReviewWorkspace.tsx`)
 - `rebuild/`
 - `search/`
 - `toast/`
 - `topics/` (sub-components: `TopicCard`, `topicHelpers`; composed via `app/ReviewWorkspace.tsx` and `app/AIWorkspace.tsx`; topics can be added to agent chat context via "+ Chat Context" button; the chat agent can edit topic details directly via `<topic_detail_edit>` tags)
+- `userAdmin/` (server-mode user management panel, rendered from `app/SettingsModal.tsx`)
 
 ## Styles Layer
 
@@ -178,7 +186,14 @@ Start here for the current protocol contract. Keep this section aligned with the
 
 The frontend keeps shared conversation state and API orchestration in `app/hooks/useProjectChat.ts`; `features/agents/RightPanelAgentChat.tsx` owns the AI File Assist conversation composition. Shared conceptual diff review primitives live under `shared/conceptualDiff/`. The chat panel also supports topic context: users add topics via `TopicCard` buttons, and the agent receives resolved topic data (state, sources, coverage gaps, details) in the prompt payload. The agent can edit topic details directly via `<topic_detail_edit>` tags, which are applied server-side after the response completes.
 
-Proposal requests use route-specific stacks. `contracts/api.ts` defines shared request/response shapes. AI File Assist uses `data/chatApi.ts`, `server/routes/chatRoutes.js`, and `server/services/chatAgent.js`. `FRAMEWORK_ROOT` defaults to `_kiss_ai/framework` in this workspace layout and can be overridden with `KISS_AI_FRAMEWORK_ROOT`. Shared conceptual diff parsing lives in `server/services/conceptualDiffs.js`; shared rejection memory lives in `server/services/conceptualDiffMemory.js`.
+Proposal requests use route-specific stacks. `contracts/api.ts` defines shared request/response shapes. AI File Assist uses `data/chatApi.ts`, `server/routes/chatRoutes.js`, and `server/services/chatAgent.js`. `chatAgent.js` is a thin facade (extract/re-export layer) that delegates to `server/services/pipelines/`:
+
+- `pipelines/chatPipelines.js`: chat and proposal lifecycle orchestration.
+- `pipelines/chatPromptBuilder.js`: prompt construction for proposals and apply runs.
+- `pipelines/chatPromptHelpers.js`: shared formatting, file context, and trimming helpers.
+- `pipelines/chatParsers.js`: response parsing (conceptual diffs, topic edits, artifact renames).
+
+`FRAMEWORK_ROOT` defaults to `_kiss_ai/framework` in this workspace layout and can be overridden with `KISS_AI_FRAMEWORK_ROOT`. Shared conceptual diff parsing lives in `server/services/conceptualDiffs.js`; shared rejection memory lives in `server/services/conceptualDiffMemory.js`.
 
 The lifecycle is:
 
@@ -259,22 +274,27 @@ Follow the pattern established in the June 2026 architecture cleanup:
 
 ### Remaining components
 
-| Component | Lines | Suggested extraction |
-|-----------|-------|---------------------|
-| `features/navigation/WorkflowSectionMenu.tsx` | ~660 | Helper components → separate files if adding new section types |
-| `features/artifacts/ArtifactsView.tsx` | ~660 | Detail editor → `ArtifactDetailEditor.tsx`; list panel → `ArtifactListPanel.tsx` |
-| `features/navigation/FileTreeNav.tsx` | ~540 | Tree node → `FileTreeNode.tsx`; drag-drop → `useFileTreeDragDrop.ts` |
-| `features/questions/QuestionsWorkspace.tsx` | ~520 | Question card → `QuestionCard.tsx`; AI assist panel → `QuestionAiAssist.tsx` |
-| `features/design/DesignWorkspace.tsx` | ~390 | Near target size — split only if adding sections |
-| `features/rebuild/BuildProjectRightPanel.tsx` | ~380 | Near target size — split only if adding sections |
+| Component | Lines | Priority | Suggested extraction |
+|-----------|------:|:--------:|---------------------|
+| `features/artifacts/ArtifactsView.tsx` | ~1310 | 🔴 Urgent | Detail editor → `ArtifactDetailEditor.tsx`; list panel → `ArtifactListPanel.tsx`; section editor → `ArtifactSectionEditor.tsx` |
+| `features/outputs/OutputSection.tsx` | ~870 | 🟡 High | Reports section → `OutputReports.tsx`; build controls → `OutputBuildControls.tsx` |
+| `editor/markdownTableExtension.ts` | ~920 | 🟡 High | Table model → `markdownTableModel.ts`; table UI → `markdownTableUI.ts` |
+| `features/navigation/WorkflowSectionMenu.tsx` | ~615 | 🟢 Watch | Helper components → separate files if adding new section types |
+| `features/navigation/FileTreeNav.tsx` | ~558 | 🟢 Watch | Tree node → `FileTreeNode.tsx`; drag-drop → `useFileTreeDragDrop.ts` |
+| `features/questions/QuestionsWorkspace.tsx` | ~517 | 🟢 Watch | Question card → `QuestionCard.tsx`; AI assist panel → `QuestionAiAssist.tsx` |
+| `features/design/DesignWorkspace.tsx` | ~391 | 🟢 Watch | Near target size — split only if adding sections |
+| `features/rebuild/BuildProjectRightPanel.tsx` | ~382 | 🟢 Watch | Near target size — split only if adding sections |
 
 ### Server-side deferred items
 
 These are outside the front-end `src/` tree and should be addressed in a separate
 server-focused review:
 
-- `server/services/agentJobs.js`: rebuild, deepen, and artifact build pipeline orchestration.
-- `server/services/artifactService.js`: artifact spec CRUD, source resolution, prompt templates, and auto-generation.
+- `server/services/agentJobs.js` (~2300 lines): rebuild, deepen, and artifact build pipeline orchestration. Contains a ~668-line `runAgentJob()` function. Decomposition into `pipelines/` modules is planned.
+- `server/services/artifactService.js` (~1136 lines): artifact spec CRUD, source resolution, prompt templates, and auto-generation.
+- `server/services/topicsService.js` (~920 lines): topic lifecycle, reconciliation, and deepen queue.
+- `server/services/webResearch.js` (~823 lines): web research pipeline.
+- `server/services/promptBuilders.js` (~659 lines): prompt assembly for rebuild phases.
 
 ## Adding A New Workflow
 

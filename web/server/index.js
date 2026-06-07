@@ -29,6 +29,7 @@ import { createProjectFileService } from "./services/projectFiles.js";
 import { createProjectService } from "./services/projects.js";
 import { createProjectUiStateService } from "./services/projectUiState.js";
 import { createSecretStore } from "./services/secretStore.js";
+import { createSettingsService } from "./services/settingsHelpers.js";
 import { createSystemSettingsService } from "./services/systemSettings.js";
 
 // ── Process-level safety net ──
@@ -448,74 +449,13 @@ function execFileText(command, args, options = {}) {
 
 
 
-const defaultKeybindings = {
-  toggleLeftPanel: "Ctrl+Shift+Meta+ArrowLeft",
-  toggleRightPanel: "Ctrl+Shift+Meta+ArrowRight",
-};
-
-async function readKeybindings() {
-  const settingsPath = path.join(PROJECTS_ROOT, ".kiss_ai_settings.json");
-  try {
-    const raw = await fs.readFile(settingsPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    const userBindings = parsed?.keybindings ?? {};
-    return { ...defaultKeybindings, ...userBindings };
-  } catch {
-    return { ...defaultKeybindings };
-  }
-}
-
-async function readProjectsViewPreference() {
-  const settingsPath = path.join(PROJECTS_ROOT, ".kiss_ai_settings.json");
-  try {
-    const raw = await fs.readFile(settingsPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    const view = parsed?.projects_view;
-    return { view: view === "table" ? "table" : "cards" };
-  } catch {
-    return { view: "cards" };
-  }
-}
-
-async function writeProjectsViewPreference(view) {
-  const settingsPath = path.join(PROJECTS_ROOT, ".kiss_ai_settings.json");
-  let settings = {};
-
-  try {
-    const raw = await fs.readFile(settingsPath, "utf-8");
-    settings = JSON.parse(raw);
-  } catch { /* missing or malformed — start fresh */ }
-
-  settings.projects_view = view === "table" ? "table" : "cards";
-  await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
-  return { view: settings.projects_view };
-}
-
-async function readPinnedProjects() {
-  const settingsPath = path.join(PROJECTS_ROOT, ".kiss_ai_settings.json");
-  try {
-    const raw = await fs.readFile(settingsPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    const pinned = parsed?.pinned_projects;
-    return { pinned: Array.isArray(pinned) ? pinned : [] };
-  } catch {
-    return { pinned: [] };
-  }
-}
-
-async function writePinnedProjects(pinned) {
-  const settingsPath = path.join(PROJECTS_ROOT, ".kiss_ai_settings.json");
-  let settings = {};
-
-  try {
-    const raw = await fs.readFile(settingsPath, "utf-8");
-    settings = JSON.parse(raw);
-  } catch { /* missing or malformed — start fresh */ }
-
-  settings.pinned_projects = Array.isArray(pinned) ? pinned.filter((s) => typeof s === "string") : [];
-  await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
-  return { pinned: settings.pinned_projects };
-}
+const {
+  readKeybindings,
+  readPinnedProjects,
+  readProjectsViewPreference,
+  writePinnedProjects,
+  writeProjectsViewPreference,
+} = createSettingsService({ projectsRoot: PROJECTS_ROOT });
 
 registerApiRoutes(app, {
   assistQuestion,

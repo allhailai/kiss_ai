@@ -90,7 +90,7 @@ export type RebuildState = {
   finishedAt: string | null;
   message: string;
   activeAssistantMessageId: string | null;
-  runKind: "rebuild" | "full_rebuild" | "output_build" | "artifact_build" | "artifact_batch_build" | "human_attention_resolve";
+  runKind: "rebuild" | "full_rebuild" | "output_build" | "artifact_build" | "artifact_batch_build" | "section_regeneration" | "batch_section_regeneration" | "human_attention_resolve";
   attentionContext: Record<string, unknown> | null;
   events: AgentRunEvent[];
   log: string[];

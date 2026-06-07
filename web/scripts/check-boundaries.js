@@ -130,6 +130,7 @@ const serverRules = [
       (specifier === "node:fs" || specifier === "node:fs/promises") &&
       !new Set([
         "agentJobs.js",
+        "annotationService.js",
         "artifactService.js",
         "auth.js",
         "buildLogs.js",
@@ -154,6 +155,7 @@ const serverRules = [
         "questionsService.js",
         "secretStore.js",
         "serverValidation.js",
+        "settingsHelpers.js",
         "sourceMapping.js",
         "systemSettings.js",
         "topicsService.js",

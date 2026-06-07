@@ -34,13 +34,25 @@ The framework assumes an LLM agent is executing the command files. Commands shou
 
 ## Commands
 
-Three commands:
+Three user-facing entry points and seven pipeline sub-commands:
+
+### User-facing commands
 
 - [`commands/do_build.md`](commands/do_build.md) — Build the project. Reads `project.md`, gathers sources, processes annotations, generates outputs, leaves suggestions, and git snapshots. This is the single build entry point.
 - [`commands/do_assist.md`](commands/do_assist.md) — AI Assist. Helps users edit `project.md`, draft annotations, answer questions, and understand outputs. Does not modify files directly.
 - [`commands/do_init_project.md`](commands/do_init_project.md) — Create a new project from the template.
 
-When a command mentions `framework/...`, it means this centralized framework root. From a normal project folder, the explicit path is usually `../_kiss_ai/framework/...`, unless `KISS_AI_FRAMEWORK_ROOT` points somewhere else.
+### Pipeline sub-commands
+
+These are invoked by the build pipeline (`agentJobs.js`) or prompt builders, not run directly by users:
+
+- [`commands/do_build_research.md`](commands/do_build_research.md) — Phase 1 research: source gathering and web research.
+- [`commands/do_build_file.md`](commands/do_build_file.md) — Single file synthesis from source material.
+- [`commands/do_build_wiki_page.md`](commands/do_build_wiki_page.md) — Wiki page synthesis sub-phase.
+- [`commands/do_build_artifact.md`](commands/do_build_artifact.md) — Artifact build from spec and sources.
+- [`commands/do_deepen.md`](commands/do_deepen.md) — Targeted deeper research for specific topics.
+- [`commands/do_propose_output_artifacts.md`](commands/do_propose_output_artifacts.md) — Propose artifact specs from project outputs.
+- [`commands/do_resolve_human_attention_item.md`](commands/do_resolve_human_attention_item.md) — Resolve a human attention queue item.
 
 ## Annotation System
 
