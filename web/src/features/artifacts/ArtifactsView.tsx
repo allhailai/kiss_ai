@@ -104,7 +104,13 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   // Also reset building state — the recovery effect below will re-enable it
   // if this specific artifact is genuinely being built.
   const prevSlugRef = useRef<string | null>(null);
+  const prevArtifactStatusRef = useRef<string | undefined>(undefined);
+  // Tracks when tab defaulted to "spec" only because artifact status was unknown
+  const tabWasFallbackRef = useRef(false);
   useEffect(() => {
+    const statusChanged = selectedArtifact?.status !== prevArtifactStatusRef.current;
+    prevArtifactStatusRef.current = selectedArtifact?.status;
+
     if (selectedSlug !== prevSlugRef.current) {
       prevSlugRef.current = selectedSlug;
       // Reset building state from any previous artifact
@@ -112,14 +118,24 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
       buildRunStartedAtRef.current = null;
       // Use URL context tab if present, otherwise default to preview-if-built
       const urlTab = route.context.tab;
-      const defaultTab: Tab = (urlTab === "spec" || urlTab === "preview") ? urlTab
+      const hasExplicitTab = urlTab === "spec" || urlTab === "preview";
+      const defaultTab: Tab = hasExplicitTab ? urlTab
         : selectedArtifact?.status === "built" ? "preview" : "spec";
+      // Track if we fell back to "spec" because status was unknown
+      tabWasFallbackRef.current = !hasExplicitTab && !selectedArtifact?.status;
       setActiveTabRaw(defaultTab);
       // Default sections to open unless URL says closed
       const defaultSections = route.context.sections !== "closed";
       setSectionPanelOpenRaw(defaultSections);
       // Sync defaults into URL
       route.navigateTo("artifacts", selectedSlug, buildUrlContext(defaultTab, defaultSections));
+    } else if (tabWasFallbackRef.current && statusChanged && selectedArtifact?.status === "built") {
+      // The artifacts list loaded after the slug was already set (race on first
+      // navigation from another view). The tab had defaulted to "spec" only
+      // because the status was unknown — now switch to preview.
+      tabWasFallbackRef.current = false;
+      setActiveTabRaw("preview");
+      route.navigateTo("artifacts", selectedSlug, buildUrlContext("preview", sectionPanelOpen));
     }
   }, [selectedSlug, selectedArtifact?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
