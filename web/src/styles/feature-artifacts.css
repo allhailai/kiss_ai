@@ -789,29 +789,40 @@
 /* ── Inspect Button (in panel header) ────────────────────── */
 
 .artifacts-inspect-btn {
-  width: 28px;
-  height: 28px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 5px;
+  padding: 4px 10px;
   background: none;
-  border: 1px solid transparent;
-  border-radius: 4px;
+  border: 1px solid var(--color-border, #444);
+  border-radius: 5px;
   cursor: pointer;
-  font-size: 14px;
-  opacity: 0.5;
-  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted, #999);
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
-.artifacts-inspect-btn:hover {
-  opacity: 1;
+.artifacts-inspect-btn svg {
+  flex-shrink: 0;
+}
+
+.artifacts-inspect-btn:hover:not(.active) {
+  color: var(--color-text, #ccc);
   background: rgba(255, 255, 255, 0.06);
+  border-color: var(--color-text-muted, #666);
 }
 
 .artifacts-inspect-btn.active {
-  opacity: 1;
-  background: color-mix(in srgb, var(--color-accent, #c87040) 15%, transparent);
+  background: var(--color-accent, #c87040);
   border-color: var(--color-accent, #c87040);
+  color: var(--color-on-accent, #fff);
+  box-shadow: 0 1px 4px rgba(200, 112, 64, 0.35);
+}
+
+.artifacts-inspect-btn-label {
+  line-height: 1;
 }
 
 /* ── Docked Feedback Form (bottom of section panel) ──────── */
@@ -985,4 +996,297 @@
   letter-spacing: 0.5px;
   text-transform: uppercase;
   margin-top: 2px;
+}
+
+/* ── Annotation Count Badge ──────────────────────────────── */
+
+.artifacts-annotation-count-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--color-accent, #c87040);
+  color: var(--color-on-accent, #fff);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 3px;
+}
+
+.artifacts-section-comment-btn {
+  position: relative;
+}
+
+/* ── Quick-Add Input ─────────────────────────────────────── */
+
+.artifacts-quick-add {
+  padding: 6px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.artifacts-quick-add-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.artifacts-quick-add-input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border, #444);
+  border-radius: 5px;
+  background: var(--color-bg-subtle, rgba(255, 255, 255, 0.04));
+  color: var(--color-text, #ccc);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.artifacts-quick-add-input::placeholder {
+  color: var(--color-text-muted, #666);
+}
+
+.artifacts-quick-add-input:focus {
+  outline: none;
+  border-color: var(--color-accent, #c87040);
+}
+
+.artifacts-quick-add-btn,
+.artifacts-quick-add-close {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  border: 1px solid var(--color-border, #444);
+  background: none;
+  color: var(--color-text, #ccc);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.artifacts-quick-add-btn:hover:not(:disabled) {
+  background: var(--color-accent, #c87040);
+  color: var(--color-on-accent, #fff);
+  border-color: var(--color-accent, #c87040);
+}
+
+.artifacts-quick-add-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.artifacts-quick-add-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Annotation Queue ────────────────────────────────────── */
+
+.artifacts-annotation-queue {
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-border, #333);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.artifacts-annotation-queue-header {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ── Annotation Card ─────────────────────────────────────── */
+
+.artifacts-annotation-card {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border, rgba(255, 255, 255, 0.06));
+  transition: opacity 0.2s;
+}
+
+.artifacts-annotation-card.applied {
+  opacity: 0.4;
+}
+
+.artifacts-annotation-card.failed {
+  opacity: 0.5;
+  border-left: 2px solid #c44;
+}
+
+.artifacts-annotation-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 3px;
+}
+
+.artifacts-annotation-card-section {
+  background: none;
+  border: none;
+  color: var(--color-accent, #c87040);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.artifacts-annotation-card-section:hover {
+  text-decoration: underline;
+}
+
+.artifacts-annotation-card-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.artifacts-annotation-card-actions button {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--color-text-muted, #888);
+  font-size: 12px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.artifacts-annotation-card-actions button:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text, #ccc);
+}
+
+.artifacts-annotation-instruction {
+  font-size: 12px;
+  color: var(--color-text, #ccc);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.artifacts-annotation-edit-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.artifacts-annotation-status-badge {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.artifacts-annotation-status-badge.applied {
+  background: color-mix(in srgb, #4a9 15%, transparent);
+  color: #4a9;
+}
+
+.artifacts-annotation-status-badge.failed {
+  background: color-mix(in srgb, #c44 15%, transparent);
+  color: #c44;
+}
+
+/* ── Batch Regenerate Button ─────────────────────────────── */
+
+.artifacts-batch-regen-btn {
+  flex-shrink: 0;
+  margin: 10px 12px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--color-accent, #c87040);
+  background: var(--color-accent, #c87040);
+  color: var(--color-on-accent, #fff);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: opacity 0.15s;
+}
+
+.artifacts-batch-regen-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.artifacts-batch-regen-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.artifacts-batch-retry-btn {
+  flex-shrink: 0;
+  margin: 0 12px 10px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--color-text-muted, #888);
+  background: none;
+  color: var(--color-text, #ccc);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.artifacts-batch-retry-btn:hover {
+  border-color: var(--color-accent, #c87040);
+  background: rgba(200, 112, 64, 0.1);
+}
+
+.artifacts-annotation-reactivate {
+  color: var(--color-accent, #c87040) !important;
+}
+
+/* ── Annotation Tooltips ─────────────────────────────────── */
+
+.artifacts-annotation-card-actions button[data-tooltip] {
+  position: relative;
+}
+
+.artifacts-annotation-card-actions button[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--color-bg-elevated, #2a2a2a);
+  color: var(--color-text, #ccc);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+}
+
+.artifacts-annotation-card-actions button[data-tooltip]:hover::after {
+  opacity: 1;
 }

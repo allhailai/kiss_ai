@@ -5,9 +5,9 @@ import { downloadProjectFile, triggerDownload } from "../../data/downloadFile";
 import { useRouteContext } from "../../app/contexts/RouteContext";
 import { MarkdownEditor } from "../../editor/MarkdownEditor";
 import { groupModelsByTier, modelDisplayName, modelTierLabels } from "../../domain/modelLabels";
-import type { ArtifactSpec, ArtifactSpecDetail, ArtifactSection, ArtifactSectionsResponse, AvailableSourceFile, ElementContext, FileContent, RebuildModel } from "../../contracts/api";
+import type { Annotation, ArtifactSpec, ArtifactSpecDetail, ArtifactSection, ArtifactSectionsResponse, AvailableSourceFile, ElementContext, FileContent, RebuildModel } from "../../contracts/api";
 
-type FeedbackTarget = {
+type QuickAddTarget = {
   sectionId: string;
   sectionTitle: string;
   elementContext?: ElementContext;
@@ -44,11 +44,13 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   const [sectionPanelOpen, setSectionPanelOpen] = useState(false);
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
 
-  // Feedback form state (shared between section panel clicks and inspection mode clicks)
-  const [feedbackTarget, setFeedbackTarget] = useState<FeedbackTarget | null>(null);
-  const [feedbackInstruction, setFeedbackInstruction] = useState("");
+  // Annotation queue state
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [quickAddTarget, setQuickAddTarget] = useState<QuickAddTarget | null>(null);
+  const [quickAddText, setQuickAddText] = useState("");
+  const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
 
-  // Inspection / annotation mode (Phase 2)
+  // Inspection / annotation mode
   const [annotationMode, setAnnotationMode] = useState(false);
 
   const selectedArtifact = artifacts.find((a) => a.slug === selectedSlug) ?? null;
@@ -249,7 +251,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
         if (state.running) return;
 
         // The server is idle. Is this the completion of OUR build?
-        const isArtifactBuild = state.runKind === "artifact_build" || state.runKind === "artifact_batch_build";
+        const isArtifactBuild = state.runKind === "artifact_build" || state.runKind === "artifact_batch_build" || state.runKind === "section_regeneration" || state.runKind === "batch_section_regeneration";
 
         // Guard: if the server's startedAt doesn't match the build we initiated,
         // this is a stale state from a previous (or different) run. The server
@@ -304,6 +306,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
     };
   }, [building, projectSlug, refreshList]); // eslint-disable-line react-hooks/exhaustive-deps
 
+
   async function handleDelete() {
     if (!selectedSlug) return;
     if (!confirm(`Delete artifact "${selectedSlug}"?`)) return;
@@ -346,43 +349,132 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
 
   function handleScrollToSection(sectionId: string) {
     const iframe = iframeRef.current;
-    if (!iframe || !selectedSlug) return;
-    // Use hash fragment navigation — works with sandboxed iframes
-    const baseUrl = artifactsApi.previewUrl(projectSlug, selectedSlug);
-    iframe.src = `${baseUrl}#${sectionId}`;
+    if (!iframe?.contentWindow || !selectedSlug) return;
+    iframe.contentWindow.postMessage(
+      { type: 'kiss-scroll-to-section', sectionId },
+      '*',
+    );
   }
 
-  function handleOpenFeedback(sectionId: string, sectionTitle: string, elementContext?: ElementContext) {
-    setFeedbackTarget({ sectionId, sectionTitle, elementContext });
-    setFeedbackInstruction("");
+  // ─── Annotation CRUD ────────────────────────────────────────
+
+  const loadAnnotations = useCallback(async () => {
+    if (!selectedSlug) return;
+    try {
+      const { annotations: list } = await artifactsApi.listAnnotations(projectSlug, selectedSlug);
+      setAnnotations(list);
+    } catch { /* non-fatal */ }
+  }, [projectSlug, selectedSlug]);
+
+  useEffect(() => {
+    if (selectedSlug && isBuilt) {
+      void loadAnnotations();
+    }
+  }, [selectedSlug, isBuilt, loadAnnotations]);
+
+  // Always re-sync annotations when any build finishes (building → false).
+  // This is the single, durable reload point — no matter which polling path
+  // triggered the transition, annotations are guaranteed to refresh.
+  const prevBuildingRef = useRef(false);
+  useEffect(() => {
+    if (prevBuildingRef.current && !building && selectedSlug && isBuilt) {
+      void loadAnnotations();
+    }
+    prevBuildingRef.current = building;
+  }, [building, selectedSlug, isBuilt, loadAnnotations]);
+
+  function handleOpenQuickAdd(sectionId: string, sectionTitle: string, elementContext?: ElementContext) {
+    setQuickAddTarget({ sectionId, sectionTitle, elementContext });
+    setQuickAddText("");
     if (!sectionPanelOpen) setSectionPanelOpen(true);
   }
 
-  async function handleSubmitFeedback() {
-    if (!selectedSlug || !feedbackTarget || !feedbackInstruction.trim()) return;
-    const { sectionId, elementContext } = feedbackTarget;
-    setRegeneratingSection(sectionId);
+  async function handleAddAnnotation() {
+    if (!selectedSlug || !quickAddTarget || !quickAddText.trim()) return;
     try {
-      await artifactsApi.regenerateSection(
-        projectSlug,
-        selectedSlug,
-        sectionId,
-        feedbackInstruction.trim(),
-        String(selectedSpec?.frontmatter.modelId ?? ""),
-        elementContext,
-      );
-      setBuilding(true);
-      setFeedbackInstruction("");
-      setFeedbackTarget(null);
-      flash(`Regenerating section: ${sectionId}…`);
+      await artifactsApi.addAnnotation(projectSlug, selectedSlug, {
+        sectionId: quickAddTarget.sectionId,
+        sectionTitle: quickAddTarget.sectionTitle,
+        instruction: quickAddText.trim(),
+        elementContext: quickAddTarget.elementContext,
+      });
+      setQuickAddText("");
+      setQuickAddTarget(null);
+      await loadAnnotations();
     } catch (error) {
-      flash(error instanceof Error ? error.message : "Regeneration failed");
-    } finally {
-      setRegeneratingSection(null);
+      flash(error instanceof Error ? error.message : "Failed to add annotation");
     }
   }
 
-  // Inspection mode: toggle annotation overlay in the iframe
+  async function handleUpdateAnnotation(annotationId: string, instruction: string) {
+    if (!selectedSlug) return;
+    try {
+      await artifactsApi.updateAnnotation(projectSlug, selectedSlug, annotationId, { instruction });
+      setEditingAnnotationId(null);
+      await loadAnnotations();
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Failed to update annotation");
+    }
+  }
+
+  async function handleDeleteAnnotation(annotationId: string) {
+    if (!selectedSlug) return;
+    try {
+      await artifactsApi.deleteAnnotation(projectSlug, selectedSlug, annotationId);
+      await loadAnnotations();
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Failed to delete annotation");
+    }
+  }
+
+  async function handleApplyAnnotations() {
+    if (!selectedSlug) return;
+    try {
+      const result = await artifactsApi.applyAnnotations(projectSlug, selectedSlug);
+      buildRunStartedAtRef.current = result.startedAt ?? new Date().toISOString();
+      setBuilding(true);
+      flash(`Batch regenerating sections…`);
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Batch regeneration failed");
+    }
+  }
+
+  async function handleRetryFailed() {
+    if (!selectedSlug) return;
+    try {
+      await artifactsApi.retryAnnotations(projectSlug, selectedSlug);
+      await loadAnnotations();
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Retry failed");
+    }
+  }
+
+  async function handleToggleAnnotation(annotationId: string) {
+    if (!selectedSlug) return;
+    try {
+      await artifactsApi.toggleAnnotation(projectSlug, selectedSlug, annotationId);
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Toggle failed");
+    } finally {
+      await loadAnnotations();
+    }
+  }
+
+  function handleHighlightAnnotation(annotation: Annotation) {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    iframe.contentWindow.postMessage(
+      {
+        type: 'kiss-highlight-element',
+        cssPath: annotation.elementContext?.cssPath,
+        sectionId: annotation.sectionId,
+      },
+      '*',
+    );
+  }
+
+  // ─── Inspection mode ────────────────────────────────────────
+
   function toggleAnnotationMode() {
     const iframe = iframeRef.current;
     if (!iframe?.contentWindow) return;
@@ -402,7 +494,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
       if (!sectionId) return;
       const section = sections.find(s => s.id === sectionId);
       const sectionTitle = section?.title ?? sectionId;
-      handleOpenFeedback(sectionId, sectionTitle, {
+      handleOpenQuickAdd(sectionId, sectionTitle, {
         elementTag,
         elementId: elementId || undefined,
         cssPath: cssPath || undefined,
@@ -667,17 +759,26 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
                   regeneratedSections={regeneratedSections}
                   contractVersion={contractVersion}
                   loading={sectionsLoading}
-                  feedbackTarget={feedbackTarget}
-                  feedbackInstruction={feedbackInstruction}
-                  regeneratingSection={regeneratingSection}
+                  annotations={annotations}
+                  quickAddTarget={quickAddTarget}
+                  quickAddText={quickAddText}
+                  editingAnnotationId={editingAnnotationId}
                   building={building}
                   annotationMode={annotationMode}
                   onScrollTo={handleScrollToSection}
-                  onOpenFeedback={handleOpenFeedback}
-                  onFeedbackInstructionChange={setFeedbackInstruction}
-                  onSubmitFeedback={handleSubmitFeedback}
-                  onCloseFeedback={() => setFeedbackTarget(null)}
-                  onToggleAnnotation={toggleAnnotationMode}
+                  onOpenQuickAdd={handleOpenQuickAdd}
+                  onQuickAddTextChange={setQuickAddText}
+                  onAddAnnotation={handleAddAnnotation}
+                  onCloseQuickAdd={() => setQuickAddTarget(null)}
+                  onUpdateAnnotation={handleUpdateAnnotation}
+                  onDeleteAnnotation={handleDeleteAnnotation}
+                  onStartEditing={setEditingAnnotationId}
+                  onCancelEditing={() => setEditingAnnotationId(null)}
+                  onHighlightAnnotation={handleHighlightAnnotation}
+                  onApplyAnnotations={handleApplyAnnotations}
+                  onRetryFailed={handleRetryFailed}
+                  onToggleAnnotation={handleToggleAnnotation}
+                  onToggleInspection={toggleAnnotationMode}
                 />
               ) : null}
               <button
@@ -846,45 +947,76 @@ function SectionPanel({
   regeneratedSections,
   contractVersion,
   loading,
-  feedbackTarget,
-  feedbackInstruction,
-  regeneratingSection,
+  annotations,
+  quickAddTarget,
+  quickAddText,
+  editingAnnotationId,
   building,
   annotationMode,
   onScrollTo,
-  onOpenFeedback,
-  onFeedbackInstructionChange,
-  onSubmitFeedback,
-  onCloseFeedback,
+  onOpenQuickAdd,
+  onQuickAddTextChange,
+  onAddAnnotation,
+  onCloseQuickAdd,
+  onUpdateAnnotation,
+  onDeleteAnnotation,
+  onStartEditing,
+  onCancelEditing,
+  onHighlightAnnotation,
+  onApplyAnnotations,
+  onRetryFailed,
   onToggleAnnotation,
+  onToggleInspection,
 }: {
   sections: ArtifactSection[];
   regeneratedSections: string[];
   contractVersion: number | null;
   loading: boolean;
-  feedbackTarget: FeedbackTarget | null;
-  feedbackInstruction: string;
-  regeneratingSection: string | null;
+  annotations: Annotation[];
+  quickAddTarget: QuickAddTarget | null;
+  quickAddText: string;
+  editingAnnotationId: string | null;
   building: boolean;
   annotationMode: boolean;
   onScrollTo: (id: string) => void;
-  onOpenFeedback: (sectionId: string, sectionTitle: string) => void;
-  onFeedbackInstructionChange: (value: string) => void;
-  onSubmitFeedback: () => void;
-  onCloseFeedback: () => void;
-  onToggleAnnotation: () => void;
+  onOpenQuickAdd: (sectionId: string, sectionTitle: string) => void;
+  onQuickAddTextChange: (value: string) => void;
+  onAddAnnotation: () => void;
+  onCloseQuickAdd: () => void;
+  onUpdateAnnotation: (id: string, instruction: string) => void;
+  onDeleteAnnotation: (id: string) => void;
+  onStartEditing: (id: string) => void;
+  onCancelEditing: () => void;
+  onHighlightAnnotation: (annotation: Annotation) => void;
+  onApplyAnnotations: () => void;
+  onRetryFailed: () => void;
+  onToggleAnnotation: (id: string) => void;
+  onToggleInspection: () => void;
 }) {
+  const pendingAnnotations = annotations.filter(a => a.status === "pending");
+  const failedAnnotations = annotations.filter(a => a.status === "failed");
+  const pendingCount = pendingAnnotations.length;
+  const failedCount = failedAnnotations.length;
+  const affectedSectionIds = new Set(pendingAnnotations.map(a => a.sectionId));
+
   return (
     <div className="artifacts-section-panel">
       <div className="artifacts-section-panel-header">
         <h3>Sections</h3>
         <button
           className={`artifacts-inspect-btn ${annotationMode ? "active" : ""}`}
-          onClick={onToggleAnnotation}
+          onClick={onToggleInspection}
           type="button"
-          title={annotationMode ? "Exit inspection mode" : "Inspect elements in the preview"}
+          title={annotationMode ? "Exit inspection mode" : "Pick a UI element to annotate"}
         >
-          🎯
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="2" x2="12" y2="6" />
+            <line x1="12" y1="18" x2="12" y2="22" />
+            <line x1="2" y1="12" x2="6" y2="12" />
+            <line x1="18" y1="12" x2="22" y2="12" />
+          </svg>
+          <span className="artifacts-inspect-btn-label">Pick UI to Annotate</span>
         </button>
       </div>
       {contractVersion === null ? (
@@ -900,9 +1032,10 @@ function SectionPanel({
         <ul className="artifacts-section-list">
           {sections.map((section) => {
             const isModified = regeneratedSections.includes(section.id);
-            const isActive = feedbackTarget?.sectionId === section.id;
+            const sectionAnnotationCount = pendingAnnotations.filter(a => a.sectionId === section.id).length;
+            const isQuickAdding = quickAddTarget?.sectionId === section.id;
             return (
-              <li key={section.id} className={`artifacts-section-item ${isActive ? "active" : ""}`}>
+              <li key={section.id} className={`artifacts-section-item ${isQuickAdding ? "active" : ""}`}>
                 <div className="artifacts-section-item-header">
                   <button
                     className="artifacts-section-item-title"
@@ -915,92 +1048,184 @@ function SectionPanel({
                   </button>
                   <button
                     className="artifacts-section-comment-btn"
-                    onClick={() => onOpenFeedback(section.id, section.title)}
+                    onClick={() => onOpenQuickAdd(section.id, section.title)}
                     disabled={building}
                     type="button"
                     title="Comment on this section"
                   >
                     💬
+                    {sectionAnnotationCount > 0 ? (
+                      <span className="artifacts-annotation-count-badge">{sectionAnnotationCount}</span>
+                    ) : null}
                   </button>
                 </div>
+                {isQuickAdding ? (
+                  <div className="artifacts-quick-add">
+                    {quickAddTarget.elementContext ? (
+                      <div className="artifacts-section-feedback-element">
+                        <span className="artifacts-section-feedback-element-tag">{quickAddTarget.elementContext.elementTag}</span>
+                        {quickAddTarget.elementContext.cssPath ? (
+                          <span className="artifacts-section-feedback-element-path">{quickAddTarget.elementContext.cssPath}</span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <div className="artifacts-quick-add-row">
+                      <input
+                        className="artifacts-quick-add-input"
+                        placeholder="What should change?…"
+                        value={quickAddText}
+                        onChange={(e) => onQuickAddTextChange(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && quickAddText.trim()) { e.preventDefault(); onAddAnnotation(); } if (e.key === "Escape") onCloseQuickAdd(); }}
+                        autoFocus
+                      />
+                      <button
+                        className="artifacts-quick-add-btn"
+                        disabled={!quickAddText.trim()}
+                        onClick={onAddAnnotation}
+                        type="button"
+                        title="Add annotation"
+                      >
+                        +
+                      </button>
+                      <button
+                        className="artifacts-quick-add-close"
+                        onClick={onCloseQuickAdd}
+                        type="button"
+                        title="Cancel"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </li>
             );
           })}
         </ul>
       )}
 
-      {/* ─── Docked Feedback Form ─── */}
-      {feedbackTarget ? (
-        <SectionFeedbackForm
-          target={feedbackTarget}
-          instruction={feedbackInstruction}
-          submitting={regeneratingSection === feedbackTarget.sectionId}
+      {annotations.length > 0 ? (
+        <div className="artifacts-annotation-queue">
+          <div className="artifacts-annotation-queue-header">
+            📝 {pendingCount > 0 ? `${pendingCount} pending` : "No pending"} annotation{pendingCount !== 1 ? "s" : ""}
+          </div>
+          {annotations.map((ann) => (
+            <AnnotationCard
+              key={ann.id}
+              annotation={ann}
+              isEditing={editingAnnotationId === ann.id}
+              onHighlight={() => onHighlightAnnotation(ann)}
+              onStartEditing={() => onStartEditing(ann.id)}
+              onCancelEditing={onCancelEditing}
+              onUpdate={(instruction) => onUpdateAnnotation(ann.id, instruction)}
+              onDelete={() => onDeleteAnnotation(ann.id)}
+              onToggle={() => onToggleAnnotation(ann.id)}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {pendingCount > 0 ? (
+        <button
+          className="artifacts-batch-regen-btn"
           disabled={building}
-          onInstructionChange={onFeedbackInstructionChange}
-          onSubmit={onSubmitFeedback}
-          onClose={onCloseFeedback}
-        />
+          onClick={onApplyAnnotations}
+          type="button"
+        >
+          Regenerate {pendingCount} annotation{pendingCount !== 1 ? "s" : ""}
+        </button>
+      ) : null}
+
+      {failedCount > 0 && pendingCount === 0 ? (
+        <button
+          className="artifacts-batch-retry-btn"
+          onClick={onRetryFailed}
+          type="button"
+        >
+          Retry {failedCount} failed annotation{failedCount !== 1 ? "s" : ""}
+        </button>
       ) : null}
     </div>
   );
 }
 
-/* ─── Feedback Form (docked at bottom of section panel) ── */
+/* ─── Annotation Card ────────────────────────────────────── */
 
-function SectionFeedbackForm({
-  target,
-  instruction,
-  submitting,
-  disabled,
-  onInstructionChange,
-  onSubmit,
-  onClose,
+function AnnotationCard({
+  annotation,
+  isEditing,
+  onHighlight,
+  onStartEditing,
+  onCancelEditing,
+  onUpdate,
+  onDelete,
+  onToggle,
 }: {
-  target: FeedbackTarget;
-  instruction: string;
-  submitting: boolean;
-  disabled: boolean;
-  onInstructionChange: (value: string) => void;
-  onSubmit: () => void;
-  onClose: () => void;
+  annotation: Annotation;
+  isEditing: boolean;
+  onHighlight: () => void;
+  onStartEditing: () => void;
+  onCancelEditing: () => void;
+  onUpdate: (instruction: string) => void;
+  onDelete: () => void;
+  onToggle: () => void;
 }) {
+  const [editText, setEditText] = useState(annotation.instruction);
+  const isPending = annotation.status === "pending";
+
   return (
-    <div className="artifacts-section-feedback-form">
-      <div className="artifacts-section-feedback-header">
-        <span className="artifacts-section-feedback-title">{target.sectionTitle}</span>
+    <div className={`artifacts-annotation-card ${annotation.status}`}>
+      <div className="artifacts-annotation-card-header">
         <button
-          className="artifacts-section-feedback-close"
-          onClick={onClose}
+          className="artifacts-annotation-card-section"
+          onClick={onHighlight}
           type="button"
-          title="Close"
+          title="Scroll to this element"
         >
-          ×
+          {annotation.sectionTitle}
         </button>
+        {isPending ? (
+          <span className="artifacts-annotation-card-actions">
+            <button onClick={onStartEditing} type="button" data-tooltip="Edit">✎</button>
+            <button onClick={onToggle} type="button" data-tooltip="Deactivate">⏸</button>
+            <button onClick={onDelete} type="button" data-tooltip="Delete">✕</button>
+          </span>
+        ) : (
+          <span className="artifacts-annotation-card-actions">
+            <button onClick={onToggle} type="button" data-tooltip="Reactivate" className="artifacts-annotation-reactivate">↻</button>
+            <button onClick={onDelete} type="button" data-tooltip="Delete">✕</button>
+          </span>
+        )}
       </div>
-      {target.elementContext ? (
-        <div className="artifacts-section-feedback-element">
-          <span className="artifacts-section-feedback-element-tag">{target.elementContext.elementTag}</span>
-          {target.elementContext.cssPath ? (
-            <span className="artifacts-section-feedback-element-path">{target.elementContext.cssPath}</span>
+      {annotation.elementContext ? (
+        <div className="artifacts-section-feedback-element" style={{ marginTop: 2 }}>
+          <span className="artifacts-section-feedback-element-tag">{annotation.elementContext.elementTag}</span>
+          {annotation.elementContext.cssPath ? (
+            <span className="artifacts-section-feedback-element-path">{annotation.elementContext.cssPath}</span>
           ) : null}
         </div>
       ) : null}
-      <textarea
-        className="artifacts-section-feedback-textarea"
-        placeholder="What should change?…"
-        value={instruction}
-        onChange={(e) => onInstructionChange(e.target.value)}
-        rows={3}
-        autoFocus
-      />
-      <button
-        className="artifacts-section-feedback-submit"
-        disabled={!instruction.trim() || submitting || disabled}
-        onClick={onSubmit}
-        type="button"
-      >
-        {submitting ? "Regenerating…" : "Regenerate"}
-      </button>
+      {isEditing ? (
+        <div className="artifacts-annotation-edit-row">
+          <input
+            className="artifacts-quick-add-input"
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && editText.trim()) { e.preventDefault(); onUpdate(editText.trim()); } if (e.key === "Escape") onCancelEditing(); }}
+            autoFocus
+          />
+          <button
+            className="artifacts-quick-add-btn"
+            disabled={!editText.trim()}
+            onClick={() => onUpdate(editText.trim())}
+            type="button"
+          >
+            ✓
+          </button>
+        </div>
+      ) : (
+        <div className="artifacts-annotation-instruction">{annotation.instruction}</div>
+      )}
     </div>
   );
 }
