@@ -303,12 +303,6 @@
   color: #c00;
 }
 
-.artifacts-sources-empty {
-  color: #aaa;
-  font-size: 12px;
-  font-weight: 400;
-  font-style: italic;
-}
 
 /* ─── Auto-discovery empty state ─────────────────────────────── */
 
@@ -435,10 +429,6 @@
   color: var(--color-text-muted, #888);
 }
 
-.artifacts-body-editor {
-  flex: 1;
-  min-height: 200px;
-}
 
 .artifacts-spec-editor .markdown-editor-shell {
   flex: 1;
@@ -825,55 +815,8 @@
   line-height: 1;
 }
 
-/* ── Docked Feedback Form (bottom of section panel) ──────── */
 
-.artifacts-section-feedback-form {
-  flex-shrink: 0;
-  border-top: 1px solid var(--color-border, #333);
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: var(--color-bg-subtle, rgba(255, 255, 255, 0.02));
-}
-
-.artifacts-section-feedback-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.artifacts-section-feedback-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--color-accent, #c87040);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.artifacts-section-feedback-close {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--color-text-muted, #888);
-  font-size: 16px;
-  line-height: 1;
-}
-
-.artifacts-section-feedback-close:hover {
-  color: var(--color-text, #ccc);
-  background: rgba(255, 255, 255, 0.06);
-}
+/* ── Element Context Display (quick-add + annotation cards) ── */
 
 .artifacts-section-feedback-element {
   display: flex;
@@ -905,51 +848,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.artifacts-section-feedback-textarea {
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid var(--color-border, #444);
-  border-radius: 6px;
-  background: var(--color-bg-subtle, rgba(255, 255, 255, 0.04));
-  color: var(--color-text, #ccc);
-  font-size: 12px;
-  font-family: inherit;
-  resize: vertical;
-  min-height: 48px;
-  line-height: 1.5;
-}
-
-.artifacts-section-feedback-textarea::placeholder {
-  color: var(--color-text-muted, #666);
-}
-
-.artifacts-section-feedback-textarea:focus {
-  outline: none;
-  border-color: var(--color-accent, #c87040);
-}
-
-.artifacts-section-feedback-submit {
-  align-self: flex-end;
-  padding: 5px 16px;
-  border-radius: 6px;
-  border: 1px solid var(--color-accent, #c87040);
-  background: var(--color-accent, #c87040);
-  color: var(--color-on-accent, #fff);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.artifacts-section-feedback-submit:hover:not(:disabled) {
-  opacity: 0.9;
-}
-
-.artifacts-section-feedback-submit:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 /* ── Section Panel Toggle ────────────────────────────────────── */
@@ -1861,13 +1759,13 @@
 }
 
 .artifacts-rebuild-warning-modal {
-  background: #fff;
-  border: 1px solid #d0d0d0;
+  background: var(--color-bg-elevated, #2a2a2a);
+  border: 1px solid var(--color-border, #444);
   border-radius: 12px;
   padding: 28px 32px;
   max-width: 440px;
   width: 90%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
   animation: slideUp 0.2s ease;
 }
 
@@ -1884,13 +1782,13 @@
 .artifacts-rebuild-warning-title {
   font-size: 16px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--color-text, #ddd);
   margin: 0 0 10px;
 }
 
 .artifacts-rebuild-warning-text {
   font-size: 13px;
-  color: #444;
+  color: var(--color-text-muted, #aaa);
   margin: 0 0 8px;
   line-height: 1.5;
 }
@@ -1899,27 +1797,27 @@
   margin: 0 0 14px;
   padding: 0 0 0 20px;
   font-size: 13px;
-  color: #222;
+  color: var(--color-text, #ddd);
   line-height: 1.7;
 }
 
 .artifacts-rebuild-warning-list li::marker {
-  color: #b35a2a;
+  color: var(--color-accent, #c87040);
 }
 
 .artifacts-rebuild-warning-reassurance {
   font-size: 12px;
-  color: #555;
+  color: var(--color-text-muted, #aaa);
   margin: 0 0 20px;
   line-height: 1.5;
   padding: 8px 10px;
   border-radius: 6px;
-  background: #fdf5f0;
-  border-left: 3px solid #c87040;
+  background: color-mix(in srgb, var(--color-accent, #c87040) 8%, transparent);
+  border-left: 3px solid var(--color-accent, #c87040);
 }
 
 .artifacts-rebuild-warning-reassurance strong {
-  color: #b35a2a;
+  color: var(--color-accent, #c87040);
 }
 
 .artifacts-rebuild-warning-actions {
@@ -1932,25 +1830,25 @@
   padding: 7px 16px;
   font-size: 13px;
   font-weight: 600;
-  color: #555;
+  color: var(--color-text-muted, #aaa);
   background: none;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border, #555);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .artifacts-rebuild-warning-cancel:hover {
-  color: #222;
-  border-color: #999;
+  color: var(--color-text, #ddd);
+  border-color: var(--color-text-muted, #888);
 }
 
 .artifacts-rebuild-warning-proceed {
   padding: 7px 16px;
   font-size: 13px;
   font-weight: 600;
-  color: #fff;
-  background: #b35a2a;
+  color: var(--color-on-accent, #fff);
+  background: var(--color-accent, #c87040);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -1958,5 +1856,5 @@
 }
 
 .artifacts-rebuild-warning-proceed:hover {
-  background: #964a22;
+  background: color-mix(in srgb, var(--color-accent, #c87040) 80%, #000);
 }

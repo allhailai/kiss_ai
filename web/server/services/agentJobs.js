@@ -8,7 +8,7 @@ import { readArtifactSpec, resolveArtifactSources, discoverRelevantSources, ensu
 import { runFetchPhase, runDigestPhase } from "./fetchAndDigestPhases.js";
 import { getDeepenQueue, clearDeepenQueue, readTopics, writeTopics, reconcileTopicSources, computeWikiMetrics, autoAdvanceTopicStates } from "./topicsService.js";
 import { computeWikiTriage, updateWikiPageTracker, resetWikiPageTracker, regenerateWikiIndex } from "./wikiTriage.js";
-import { getPendingAnnotations, markApplied, markFailed, clearApplied } from "./annotationService.js";
+import { getPendingAnnotations, markApplied, markFailed } from "./annotationService.js";
 import { validateFileExistence, readManifest, writeManifest, prependBuildLogEntry, gitSnapshot, recordBuildFileChanges } from "./serverValidation.js";
 import { readLedger, buildSnapshot, diffSnapshot, writeLedger, recordKnowledgeBuild, recordOutputBuild } from "./contentLedger.js";
 
@@ -1951,12 +1951,38 @@ export function createAgentJobService({
           const crypto = await import("node:crypto");
           const specHash = crypto.createHash("sha256").update(spec.rawContent).digest("hex");
 
-          // Delete old build output
+          // Snapshot the current build before wiping (so user can revert)
+          try {
+            await createBuildSnapshot(project.path, artifactSlug);
+          } catch (snapErr) {
+            console.error(`[batch-build] Failed to snapshot before rebuild: ${snapErr.message}`);
+          }
+
+          // Delete old build output — preserve .versions/ through the rebuild
           const buildDir = path.join(project.path, "artifacts/builds", artifactSlug);
+          const versionsDir = path.join(buildDir, '.versions');
+          const tempVersionsDir = path.join(project.path, "artifacts/builds", `.versions-temp-${artifactSlug}`);
+          let hasVersions = false;
+          try {
+            await fs.access(versionsDir);
+            await fs.rename(versionsDir, tempVersionsDir);
+            hasVersions = true;
+          } catch { /* no versions dir yet */ }
+
           try {
             await fs.rm(buildDir, { recursive: true, force: true });
             await fs.mkdir(buildDir, { recursive: true });
           } catch { /* directory may not exist yet */ }
+
+          if (hasVersions) {
+            try {
+              await fs.mkdir(buildDir, { recursive: true });
+              await fs.rename(tempVersionsDir, versionsDir);
+            } catch (restoreErr) {
+              console.error(`[batch-build] Failed to restore .versions/: ${restoreErr.message}`);
+              try { await fs.rm(tempVersionsDir, { recursive: true, force: true }); } catch { /* best effort */ }
+            }
+          }
 
           const prompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory, specHash);
           const artifactName = spec.frontmatter.name || artifactSlug;
@@ -2127,14 +2153,18 @@ export function createAgentJobService({
       await fs.mkdir(buildDir, { recursive: true });
     } catch {
       // Ignore — directory may not exist yet
-    }
-
-    // Restore .versions/ after clean slate
-    if (hasVersions) {
-      try {
-        await fs.rename(tempVersionsDir, versionsDir);
-      } catch (restoreErr) {
-        console.error(`[versions] Failed to restore versions dir: ${restoreErr.message}`);
+    } finally {
+      // Always restore .versions/ from temp (even if rm/mkdir failed)
+      if (hasVersions) {
+        try {
+          // Ensure buildDir exists before restoring into it
+          await fs.mkdir(buildDir, { recursive: true });
+          await fs.rename(tempVersionsDir, versionsDir);
+        } catch (restoreErr) {
+          console.error(`[versions] Failed to restore versions dir: ${restoreErr.message}`);
+          // Last resort: clean up the orphaned temp dir
+          try { await fs.rm(tempVersionsDir, { recursive: true, force: true }); } catch { /* best effort */ }
+        }
       }
     }
 

@@ -331,13 +331,28 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
     if (!selectedSlug) return;
     try {
       await artifactsApi.revertVersion(projectSlug, selectedSlug, versionDirName);
-      flash("Reverted to previous version");
+      flash("Switched to previous version");
       setPreviewKey((k) => k + 1);
       void loadSections();
       void loadAnnotations();
       void loadVersions();
     } catch (error) {
       flash(error instanceof Error ? error.message : "Failed to revert");
+    }
+  }
+
+  // Switch back to the latest build
+  async function handleRevertToLatest() {
+    if (!selectedSlug) return;
+    try {
+      await artifactsApi.revertToLatest(projectSlug, selectedSlug);
+      flash("Switched to latest build");
+      setPreviewKey((k) => k + 1);
+      void loadSections();
+      void loadAnnotations();
+      void loadVersions();
+    } catch (error) {
+      flash(error instanceof Error ? error.message : "Failed to switch to latest");
     }
   }
 
@@ -935,6 +950,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
                   onUnhideSection={handleUnhideSection}
                   onAddSection={handleAddSection}
                   onRevertVersion={handleRevertVersion}
+                  onRevertToLatest={handleRevertToLatest}
                 />
               ) : null}
               <button
@@ -1165,6 +1181,7 @@ function SectionPanel({
   buildVersions,
   activeVersionDirName,
   onRevertVersion,
+  onRevertToLatest,
 }: {
   sections: ArtifactSection[];
   regeneratedSections: string[];
@@ -1196,6 +1213,7 @@ function SectionPanel({
   buildVersions: BuildVersion[];
   activeVersionDirName: string | null;
   onRevertVersion: (versionDirName: string) => void;
+  onRevertToLatest: () => void;
 }) {
   const pendingAnnotations = annotations.filter(a => a.status === "pending");
   const failedAnnotations = annotations.filter(a => a.status === "failed");
@@ -1542,14 +1560,27 @@ function SectionPanel({
             Version History ({buildVersions.length})
           </summary>
           <ul className="artifacts-version-list">
-            {!activeVersionDirName ? (
+            {activeVersionDirName ? (
+              <li className="artifacts-version-item">
+                <span className="artifacts-version-label">
+                  <span className="artifacts-version-current-text">Latest build</span>
+                </span>
+                <button
+                  className="artifacts-version-revert-btn"
+                  onClick={onRevertToLatest}
+                  disabled={building}
+                  type="button"
+                  title="Switch to latest build"
+                >Switch</button>
+              </li>
+            ) : (
               <li className="artifacts-version-item artifacts-version-current">
                 <span className="artifacts-version-label">
                   <span className="artifacts-version-current-dot">●</span>
                   <span className="artifacts-version-current-text">Latest build</span>
                 </span>
               </li>
-            ) : null}
+            )}
             {buildVersions.map((v) => {
               const dateStr = new Date(v.timestamp).toLocaleString(undefined, {
                 month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
@@ -1584,6 +1615,7 @@ function SectionPanel({
                     <button
                       className="artifacts-version-revert-btn"
                       onClick={() => setConfirmingRevertId(v.dirName)}
+                      disabled={building}
                       type="button"
                       title={`Revert to v${v.version}`}
                     >Revert</button>

@@ -1204,6 +1204,8 @@ export async function updateManifestForRegeneration(projectPath, artifactSlug, s
     manifest.regeneratedSections.push(sectionId);
   }
 
+  // contractVersion acts as a boolean flag — null means "pre-section-editing build",
+  // any value means section editing is safe. The value 2 is historical; there is no v1.
   if (!manifest.contractVersion) {
     manifest.contractVersion = 2;
   }
@@ -1229,12 +1231,17 @@ export async function stampManifestAfterBuild(projectPath, artifactSlug) {
     manifest = { slug: artifactSlug, format: 'html' };
   }
 
+  // contractVersion is a boolean flag (see updateManifestForRegeneration comment).
   manifest.contractVersion = 2;
   manifest.regenerationCount = 0;
   manifest.regeneratedSections = [];
   delete manifest.activeVersionDirName;
 
   await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+
+  // Clean up orphaned .latest dir — it's no longer valid after a full rebuild
+  const latestSnapshotDir = path.join(projectPath, ARTIFACT_BUILDS_DIR, artifactSlug, VERSIONS_DIR, '.latest');
+  try { await fs.rm(latestSnapshotDir, { recursive: true, force: true }); } catch { /* best effort */ }
 }
 
 // ─── Section Hide / Unhide (Soft-Delete) ──────────────────────────────────────
@@ -1440,7 +1447,11 @@ export async function listBuildVersions(projectPath, artifactSlug) {
       const dirStat = await fs.stat(path.join(versionsDir, entry.name));
       timestamp = dirStat.mtime.toISOString();
     } catch {
-      timestamp = match[2].replace(/-/g, ':'); // fallback: parse from dir name
+      // Fallback: reconstruct ISO timestamp from dir name encoding.
+      // Dir name format: "2026-06-07T10-30-00-000Z" — only the time separators need colons.
+      const raw = match[2];
+      const tIdx = raw.indexOf('T');
+      timestamp = tIdx === -1 ? raw : raw.slice(0, tIdx + 1) + raw.slice(tIdx + 1).replace(/-/g, ':');
     }
 
     versions.push({ version, timestamp, dirName: entry.name, sizeBytes });
@@ -1452,9 +1463,56 @@ export async function listBuildVersions(projectPath, artifactSlug) {
 }
 
 /**
- * Revert the current build to a previous version snapshot.
- * Snapshots the current build first (so nothing is lost), then copies
- * the selected version's files into the build root.
+ * Save the current build root files back to the appropriate snapshot directory.
+ * When viewing a named version, saves back to that version's snapshot dir.
+ * When viewing the latest build, saves to .versions/.latest/.
+ * Returns the activeVersionDirName (or null if latest), or undefined if save-back was skipped.
+ */
+async function saveBackToActiveVersion(buildDir, versionsDir) {
+  const manifestPath = path.join(buildDir, '.artifact-manifest.json');
+  let manifest;
+  try {
+    manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+  } catch {
+    return undefined; // No manifest — nothing to save back
+  }
+
+  const currentVersionDir = manifest.activeVersionDirName || null;
+  const saveTargetDir = currentVersionDir
+    ? path.join(versionsDir, currentVersionDir)
+    : path.join(versionsDir, '.latest');
+
+  // For named versions, verify the snapshot dir still exists
+  if (currentVersionDir) {
+    try {
+      await fs.access(saveTargetDir);
+    } catch {
+      return undefined; // Version dir was deleted — skip save-back
+    }
+  } else {
+    await fs.mkdir(saveTargetDir, { recursive: true });
+  }
+
+  for (const file of SNAPSHOT_FILES) {
+    const src = path.join(buildDir, file);
+    const dst = path.join(saveTargetDir, file);
+    try {
+      await fs.copyFile(src, dst);
+    } catch {
+      // File doesn't exist in build root (e.g. no annotations) — remove from snapshot too
+      try { await fs.unlink(dst); } catch { /* already gone */ }
+    }
+  }
+
+  console.log(`[versions] Saved edits back to ${currentVersionDir || '.latest'}`);
+  return currentVersionDir;
+}
+
+/**
+ * Switch the current build to a previous version snapshot.
+ * Saves any edits back to the currently active version's snapshot first,
+ * then copies the target version's files into the build root.
+ * No new version entries are created — this moves between existing versions.
  * Returns the restored version metadata.
  */
 export async function revertToBuildVersion(projectPath, artifactSlug, versionDirName) {
@@ -1469,7 +1527,16 @@ export async function revertToBuildVersion(projectPath, artifactSlug, versionDir
     throw new Error(`Version ${versionDirName} not found.`);
   }
 
-  // Copy snapshot files back to build root
+  // Save current build root back to the currently active version's snapshot
+  // so that any edits (annotations, hidden sections, regenerated sections) are retained.
+  try {
+    await saveBackToActiveVersion(buildDir, versionsDir);
+  } catch (saveErr) {
+    // Non-fatal — if we can't save back (no manifest, etc.), just proceed
+    console.error(`[versions] Could not save edits to active version: ${saveErr.message}`);
+  }
+
+  // Copy target version's snapshot files into build root
   for (const file of SNAPSHOT_FILES) {
     const src = path.join(snapshotDir, file);
     const dst = path.join(buildDir, file);
@@ -1483,7 +1550,10 @@ export async function revertToBuildVersion(projectPath, artifactSlug, versionDir
 
   console.log(`[versions] Reverted ${artifactSlug} to ${versionDirName}`);
 
-  // Record active version in manifest so the UI can show which version is displayed
+  // Record active version in manifest so the UI can show which version is displayed.
+  // Note: We write activeVersionDirName onto the VERSION's manifest (which was just
+  // copied from the snapshot). Fields like builtAt, specHash, regeneratedSections
+  // correctly reflect the version's state — this is intentional.
   const manifestPath = path.join(buildDir, '.artifact-manifest.json');
   let manifest = {};
   try {
@@ -1499,4 +1569,50 @@ export async function revertToBuildVersion(projectPath, artifactSlug, versionDir
     dirName: versionDirName,
     timestamp: new Date().toISOString(),
   };
+}
+
+/**
+ * Switch back to the latest build from a versioned view.
+ * Saves edits to the active version's snapshot first, then restores
+ * from the .latest snapshot (if any) and clears activeVersionDirName.
+ */
+export async function revertToLatestBuild(projectPath, artifactSlug) {
+  const buildDir = path.join(projectPath, ARTIFACT_BUILDS_DIR, artifactSlug);
+  const versionsDir = path.join(buildDir, VERSIONS_DIR);
+  const latestDir = path.join(versionsDir, '.latest');
+
+  // Save edits back to the currently active version's snapshot
+  try {
+    await saveBackToActiveVersion(buildDir, versionsDir);
+  } catch (saveErr) {
+    console.error(`[versions] Could not save edits to active version: ${saveErr.message}`);
+  }
+
+  // Restore from .latest snapshot if it exists
+  try {
+    await fs.access(latestDir);
+    for (const file of SNAPSHOT_FILES) {
+      const src = path.join(latestDir, file);
+      const dst = path.join(buildDir, file);
+      try {
+        await fs.copyFile(src, dst);
+      } catch {
+        try { await fs.unlink(dst); } catch { /* already gone */ }
+      }
+    }
+    // Clean up .latest — no longer needed until next version switch
+    try { await fs.rm(latestDir, { recursive: true, force: true }); } catch { /* best effort */ }
+    console.log(`[versions] Restored latest build for ${artifactSlug}`);
+  } catch {
+    // No .latest dir — just clear activeVersionDirName
+  }
+
+  // Clear activeVersionDirName in manifest
+  const manifestPath = path.join(buildDir, '.artifact-manifest.json');
+  let manifest = {};
+  try {
+    manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+  } catch { /* may not exist */ }
+  delete manifest.activeVersionDirName;
+  await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
 }
