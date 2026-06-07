@@ -1747,10 +1747,18 @@ export function createAgentJobService({
 
   async function runBatchSectionRegenerationJob({ project, apiKey, modelId, jobName, releaseProjectAgent, jobContext }) {
     activeRebuilds.add(project.slug);
-    const { artifactSlug, sectionJobs } = jobContext;
+    const { artifactSlug, sectionJobs, sharedContext } = jobContext;
     const totalCount = sectionJobs.length;
     let completed = 0;
     let failed = 0;
+
+    // Re-read the spec once (it doesn't change during the batch)
+    let spec;
+    try {
+      spec = await readArtifactSpec(project.path, artifactSlug);
+    } catch {
+      spec = sharedContext.spec;
+    }
 
     try {
       for (const job of sectionJobs) {
@@ -1784,12 +1792,85 @@ export function createAgentJobService({
           const fragmentPath = path.join(buildDir, '.section-fragment.html');
           const indexPath = path.join(buildDir, 'index.html');
 
-          // Build the file-write directive based on job type
-          const writeDirective = isAddSection
-            ? `\n\nWrite your output to: artifacts/builds/${artifactSlug}/.section-fragment.html\nWrite the COMPLETE <section id="...">...</section> block including the opening and closing section tags.`
-            : `\n\nWrite your output to: artifacts/builds/${artifactSlug}/.section-fragment.html\nWrite ONLY the inner HTML content for this section — no surrounding document tags.`;
+          // Re-read current HTML so the prompt reflects any sections already
+          // regenerated earlier in this batch (Finding 5 fix).
+          const freshHtml = await fs.readFile(indexPath, 'utf8');
+          const freshSections = discoverSections(freshHtml);
 
-          const fullPrompt = job.prompt + writeDirective;
+          let fullPrompt;
+
+          if (isAddSection) {
+            // Rebuild add-section prompt from fresh HTML
+            const existingSections = freshSections.map(s => {
+              const sectionContent = freshHtml.slice(s.startIdx, s.endIdx);
+              const textOnly = sectionContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+              return { id: s.id, title: s.title, snippet: textOnly.slice(0, 200) };
+            });
+
+            let adjacentSectionHTML = '';
+            const adjacentId = job.afterSectionId || (freshSections.length > 0 ? freshSections[0].id : null);
+            if (adjacentId) {
+              const adjSection = freshSections.find(s => s.id === adjacentId);
+              if (adjSection) {
+                adjacentSectionHTML = freshHtml.slice(adjSection.startIdx, adjSection.endIdx);
+              }
+            }
+
+            const prompt = await createAddSectionPrompt({
+              project,
+              artifactSpec: spec,
+              description: job.description,
+              afterSectionId: job.afterSectionId,
+              globalStylesheet: sharedContext.globalStylesheet,
+              existingSections,
+              resolvedSources: sharedContext.resolvedSources,
+              cdnDependencies: sharedContext.cdnDependencies,
+              adjacentSectionHTML,
+            });
+
+            const writeDirective = `\n\nWrite your output to: artifacts/builds/${artifactSlug}/.section-fragment.html\nWrite the COMPLETE <section id="...">...</section> block including the opening and closing section tags.`;
+            fullPrompt = prompt + writeDirective;
+          } else {
+            // Rebuild regenerate prompt from fresh HTML
+            const targetSection = freshSections.find(s => s.id === job.sectionId);
+            if (!targetSection) {
+              failed++;
+              try { await markFailed(project.path, artifactSlug, job.annotationIds); } catch { /* non-fatal */ }
+              continue;
+            }
+
+            const extracted = extractSection(freshHtml, job.sectionId);
+            if (!extracted) {
+              failed++;
+              try { await markFailed(project.path, artifactSlug, job.annotationIds); } catch { /* non-fatal */ }
+              continue;
+            }
+
+            const otherSections = freshSections
+              .filter(s => s.id !== job.sectionId)
+              .map(s => {
+                const sectionContent = freshHtml.slice(s.startIdx, s.endIdx);
+                const textOnly = sectionContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                return { id: s.id, title: s.title, snippet: textOnly.slice(0, 200) };
+              });
+
+            const prompt = await createSectionRegenerationPrompt({
+              project,
+              artifactSpec: spec,
+              sectionId: job.sectionId,
+              sectionTitle: targetSection.title,
+              currentSectionHTML: extracted.innerHTML,
+              globalStylesheet: sharedContext.globalStylesheet,
+              otherSections,
+              resolvedSources: sharedContext.resolvedSources,
+              userInstruction: job.annotations[0]?.instruction || '',
+              cdnDependencies: sharedContext.cdnDependencies,
+              annotations: job.annotations.map(a => ({ instruction: a.instruction, elementContext: a.elementContext })),
+            });
+
+            const writeDirective = `\n\nWrite your output to: artifacts/builds/${artifactSlug}/.section-fragment.html\nWrite ONLY the inner HTML content for this section — no surrounding document tags.`;
+            fullPrompt = prompt + writeDirective;
+          }
 
           const result = await runSingleAgentPhase({
             project,
@@ -2295,7 +2376,7 @@ export function createAgentJobService({
     const html = await readArtifactPreviewHtml(project.path, artifactSlug);
     const allSections = discoverSections(html);
 
-    // Extract shared context once
+    // Extract shared context once — these don't change during the batch
     const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
     const globalStylesheet = styleMatch ? styleMatch[1] : '';
 
@@ -2312,7 +2393,8 @@ export function createAgentJobService({
     const sourceGlobs = Array.isArray(spec.frontmatter.sources) ? spec.frontmatter.sources : [];
     const resolvedSources = await resolveArtifactSources(project.path, sourceGlobs);
 
-    // Build prompts for each section group
+    // Build lightweight job descriptors — prompts are built in the job runner
+    // using fresh HTML so otherSections context stays current (Finding 5 fix).
     const sectionJobs = [];
     for (const { sectionId, annotations } of sectionGroups) {
       // Handle add_section annotations separately
@@ -2324,79 +2406,23 @@ export function createAgentJobService({
         const targetSection = allSections.find(s => s.id === sectionId);
         if (!targetSection) continue;
 
-        const extracted = extractSection(html, sectionId);
-        if (!extracted) continue;
-
-        const otherSections = allSections
-          .filter(s => s.id !== sectionId)
-          .map(s => {
-            const sectionContent = html.slice(s.startIdx, s.endIdx);
-            const textOnly = sectionContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-            return { id: s.id, title: s.title, snippet: textOnly.slice(0, 200) };
-          });
-
-        const prompt = await createSectionRegenerationPrompt({
-          project,
-          artifactSpec: spec,
-          sectionId,
-          sectionTitle: targetSection.title,
-          currentSectionHTML: extracted.innerHTML,
-          globalStylesheet,
-          otherSections,
-          resolvedSources,
-          userInstruction: regularAnns[0]?.instruction || '',
-          cdnDependencies,
-          annotations: regularAnns.map(a => ({ instruction: a.instruction, elementContext: a.elementContext })),
-        });
-
         sectionJobs.push({
           type: 'regenerate',
           sectionId,
           sectionTitle: targetSection.title,
-          prompt,
+          annotations: regularAnns.map(a => ({ instruction: a.instruction, elementContext: a.elementContext })),
           annotationIds: regularAnns.map(a => a.id),
         });
       }
 
       // Process add_section annotations (new section creation)
       for (const ann of addSectionAnns) {
-        const existingSections = allSections
-          .map(s => {
-            const sectionContent = html.slice(s.startIdx, s.endIdx);
-            const textOnly = sectionContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-            return { id: s.id, title: s.title, snippet: textOnly.slice(0, 200) };
-          });
-
-        // Extract full HTML of the adjacent section so the agent can avoid duplicating content.
-        // If afterSectionId is set, the adjacent section is that one.
-        // If null (insert at beginning), the adjacent section is the first one.
-        let adjacentSectionHTML = '';
-        const adjacentId = ann.afterSectionId || (allSections.length > 0 ? allSections[0].id : null);
-        if (adjacentId) {
-          const adjSection = allSections.find(s => s.id === adjacentId);
-          if (adjSection) {
-            adjacentSectionHTML = html.slice(adjSection.startIdx, adjSection.endIdx);
-          }
-        }
-
-        const prompt = await createAddSectionPrompt({
-          project,
-          artifactSpec: spec,
-          description: ann.instruction,
-          afterSectionId: ann.afterSectionId || null,
-          globalStylesheet,
-          existingSections,
-          resolvedSources,
-          cdnDependencies,
-          adjacentSectionHTML,
-        });
-
         sectionJobs.push({
           type: 'add_section',
           sectionId: '__new_section__',
           sectionTitle: 'New Section',
           afterSectionId: ann.afterSectionId || null,
-          prompt,
+          description: ann.instruction,
           annotationIds: [ann.id],
         });
       }
@@ -2414,8 +2440,17 @@ export function createAgentJobService({
       noApiKeyMessage: 'No Cursor API key found. Batch section regeneration is unavailable.',
       noModelsMessage: 'No Cursor models available for batch section regeneration.',
       jobName: `Batch Sections: ${artifactSlug}`,
-      prompt: sectionJobs[0].prompt, // first prompt — rest handled in the job runner
-      jobContext: { artifactSlug, sectionJobs },
+      prompt: '', // prompts are built per-section in the job runner
+      jobContext: {
+        artifactSlug,
+        sectionJobs,
+        sharedContext: {
+          spec,
+          globalStylesheet,
+          cdnDependencies,
+          resolvedSources,
+        },
+      },
     });
   }
 

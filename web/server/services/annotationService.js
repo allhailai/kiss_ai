@@ -50,6 +50,7 @@ export async function addAnnotation(projectPath, artifactSlug, data, httpError) 
   const now = new Date().toISOString();
   const annotation = {
     id: crypto.randomBytes(8).toString("hex"),
+    type: data.type || "modify",
     sectionId: data.sectionId,
     sectionTitle: data.sectionTitle,
     instruction: data.instruction,
@@ -60,9 +61,8 @@ export async function addAnnotation(projectPath, artifactSlug, data, httpError) 
     updatedAt: now,
   };
 
-  // Support add_section annotation type
-  if (data.type === "add_section") {
-    annotation.type = "add_section";
+  // Support add_section annotation type — set afterSectionId
+  if (annotation.type === "add_section") {
     annotation.afterSectionId = data.afterSectionId || null;
   }
 

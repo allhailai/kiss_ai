@@ -63,7 +63,7 @@ export type Annotation = {
   elementContext?: ElementContext | null;
   status: "pending" | "applied" | "failed" | "inactive";
   previouslyApplied?: boolean;
-  type?: "add_section";
+  type?: "modify" | "add_section";
   afterSectionId?: string | null;
   createdAt: string;
   updatedAt: string;

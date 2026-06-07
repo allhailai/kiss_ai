@@ -19,7 +19,13 @@ function decodeHtmlEntities(str) {
     .replace(/&#0?39;|&apos;/g, "'")
     .replace(/&nbsp;/g, ' ')
     .replace(/&mdash;/g, '—')
-    .replace(/&ndash;/g, '–');
+    .replace(/&ndash;/g, '–')
+    .replace(/&hellip;/g, '…')
+    .replace(/&lsquo;/g, '\u2018')
+    .replace(/&rsquo;/g, '\u2019')
+    .replace(/&ldquo;/g, '\u201C')
+    .replace(/&rdquo;/g, '\u201D')
+    .replace(/&bull;/g, '•');
 }
 
 // Derive a human-readable display name from a slug.

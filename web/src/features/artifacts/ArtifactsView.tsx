@@ -274,7 +274,8 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
     // Check for modifications and show warning if needed
     const hasModifications = hiddenSectionIds.length > 0
       || regeneratedSections.length > 0
-      || annotations.some(a => a.status === "applied" && a.type === "add_section");
+      || annotations.some(a => a.status === "applied" && a.type === "add_section")
+      || activeVersionDirName !== null;
 
     if (hasModifications && isBuilt && !showRebuildWarning) {
       setShowRebuildWarning(true);
@@ -511,6 +512,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
       void loadAnnotations();
       void loadSections();
       void loadVersions();
+      setRegeneratingSection(null);
     }
     prevBuildingRef.current = building;
   }, [building, selectedSlug, isBuilt, loadAnnotations, loadSections, loadVersions]);
@@ -564,6 +566,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
     try {
       const result = await artifactsApi.applyAnnotations(projectSlug, selectedSlug);
       buildRunStartedAtRef.current = result.startedAt ?? new Date().toISOString();
+      setRegeneratingSection('batch');
       setBuilding(true);
       flash(`Batch regenerating sections…`);
     } catch (error) {
@@ -614,6 +617,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
       setSections(result.sections);
       setHiddenSectionIds(result.hiddenSectionIds);
       setPreviewKey((k) => k + 1); // immediately reload iframe
+      void loadVersions();
       flash("Section hidden");
     } catch (error) {
       flash(error instanceof Error ? error.message : "Failed to hide section");
@@ -627,6 +631,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
       setSections(result.sections);
       setHiddenSectionIds(result.hiddenSectionIds);
       setPreviewKey((k) => k + 1); // immediately reload iframe
+      void loadVersions();
       flash("Section visible again");
     } catch (error) {
       flash(error instanceof Error ? error.message : "Failed to show section");
@@ -994,8 +999,12 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
               {regeneratedSections.length > 0 ? (
                 <li>{regeneratedSections.length} edited section{regeneratedSections.length !== 1 ? "s" : ""}</li>
               ) : null}
-              {annotations.some(a => a.status === "applied" && a.type === "add_section") ? (
-                <li>{annotations.filter(a => a.status === "applied" && a.type === "add_section").length} added section{annotations.filter(a => a.status === "applied" && a.type === "add_section").length !== 1 ? "s" : ""}</li>
+              {(() => {
+                const addedCount = annotations.filter(a => a.status === "applied" && a.type === "add_section").length;
+                return addedCount > 0 ? <li>{addedCount} added section{addedCount !== 1 ? "s" : ""}</li> : null;
+              })()}
+              {activeVersionDirName ? (
+                <li>You are currently viewing an older version</li>
               ) : null}
             </ul>
             <p className="artifacts-rebuild-warning-reassurance">
