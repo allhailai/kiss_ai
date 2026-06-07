@@ -6,6 +6,23 @@ const ARTIFACT_BUILDS_DIR = "artifacts/builds";
 const ANNOTATIONS_FILE = ".artifact-annotations.json";
 const SOFT_CAP = 20;
 
+// Per-artifact write lock to serialize mutations and prevent TOCTOU races
+// (e.g. two concurrent addAnnotation calls both reading 19 pending and both succeeding).
+const writeLocks = new Map();
+async function withAnnotationLock(projectPath, artifactSlug, fn) {
+  const key = `${projectPath}:${artifactSlug}`;
+  const prev = writeLocks.get(key) ?? Promise.resolve();
+  let release;
+  const next = new Promise(r => { release = r; });
+  writeLocks.set(key, next);
+  try {
+    await prev;
+    return await fn();
+  } finally {
+    release();
+  }
+}
+
 function annotationsPath(projectPath, artifactSlug) {
   return path.join(projectPath, ARTIFACT_BUILDS_DIR, artifactSlug, ANNOTATIONS_FILE);
 }
@@ -37,71 +54,77 @@ export async function listAnnotations(projectPath, artifactSlug) {
  * Throws if the soft cap is reached.
  */
 export async function addAnnotation(projectPath, artifactSlug, data, httpError) {
-  const annotations = await readAnnotations(projectPath, artifactSlug);
-  const pendingCount = annotations.filter(a => a.status === "pending").length;
-  if (pendingCount >= SOFT_CAP) {
-    throw httpError(
-      `Annotation limit reached (${SOFT_CAP}). Regenerate or remove existing annotations before adding more.`,
-      422,
-      "annotation_cap_reached",
-    );
-  }
+  return await withAnnotationLock(projectPath, artifactSlug, async () => {
+    const annotations = await readAnnotations(projectPath, artifactSlug);
+    const pendingCount = annotations.filter(a => a.status === "pending").length;
+    if (pendingCount >= SOFT_CAP) {
+      throw httpError(
+        `Annotation limit reached (${SOFT_CAP}). Regenerate or remove existing annotations before adding more.`,
+        422,
+        "annotation_cap_reached",
+      );
+    }
 
-  const now = new Date().toISOString();
-  const annotation = {
-    id: crypto.randomBytes(8).toString("hex"),
-    type: data.type || "modify",
-    sectionId: data.sectionId,
-    sectionTitle: data.sectionTitle,
-    instruction: data.instruction,
-    elementContext: data.elementContext || null,
-    status: "pending",
-    previouslyApplied: false,
-    createdAt: now,
-    updatedAt: now,
-  };
+    const now = new Date().toISOString();
+    const annotation = {
+      id: crypto.randomBytes(8).toString("hex"),
+      type: data.type || "modify",
+      sectionId: data.sectionId,
+      sectionTitle: data.sectionTitle,
+      instruction: data.instruction,
+      elementContext: data.elementContext || null,
+      status: "pending",
+      previouslyApplied: false,
+      createdAt: now,
+      updatedAt: now,
+    };
 
-  // Support add_section annotation type — set afterSectionId
-  if (annotation.type === "add_section") {
-    annotation.afterSectionId = data.afterSectionId || null;
-  }
+    // Support add_section annotation type — set afterSectionId
+    if (annotation.type === "add_section") {
+      annotation.afterSectionId = data.afterSectionId || null;
+    }
 
-  annotations.push(annotation);
-  await writeAnnotations(projectPath, artifactSlug, annotations);
-  return annotation;
+    annotations.push(annotation);
+    await writeAnnotations(projectPath, artifactSlug, annotations);
+    return annotation;
+  });
 }
 
 /**
  * Update an existing annotation's instruction and/or elementContext.
  */
 export async function updateAnnotation(projectPath, artifactSlug, annotationId, updates, httpError) {
-  const annotations = await readAnnotations(projectPath, artifactSlug);
-  const idx = annotations.findIndex(a => a.id === annotationId);
-  if (idx === -1) {
-    throw httpError(`Annotation "${annotationId}" not found.`, 404, "annotation_not_found");
-  }
+  return await withAnnotationLock(projectPath, artifactSlug, async () => {
+    const annotations = await readAnnotations(projectPath, artifactSlug);
+    const idx = annotations.findIndex(a => a.id === annotationId);
+    if (idx === -1) {
+      throw httpError(`Annotation "${annotationId}" not found.`, 404, "annotation_not_found");
+    }
 
-  const annotation = annotations[idx];
-  if (updates.instruction !== undefined) annotation.instruction = updates.instruction;
-  if (updates.elementContext !== undefined) annotation.elementContext = updates.elementContext || null;
-  annotation.updatedAt = new Date().toISOString();
+    const annotation = annotations[idx];
+    if (updates.instruction !== undefined) annotation.instruction = updates.instruction;
+    if (updates.elementContext !== undefined) annotation.elementContext = updates.elementContext || null;
+    annotation.updatedAt = new Date().toISOString();
 
-  await writeAnnotations(projectPath, artifactSlug, annotations);
-  return annotation;
+    await writeAnnotations(projectPath, artifactSlug, annotations);
+    return annotation;
+  });
 }
 
 /**
  * Delete an annotation by ID.
  */
 export async function deleteAnnotation(projectPath, artifactSlug, annotationId, httpError) {
-  const annotations = await readAnnotations(projectPath, artifactSlug);
-  const idx = annotations.findIndex(a => a.id === annotationId);
-  if (idx === -1) {
-    throw httpError(`Annotation "${annotationId}" not found.`, 404, "annotation_not_found");
-  }
+  return await withAnnotationLock(projectPath, artifactSlug, async () => {
+    const annotations = await readAnnotations(projectPath, artifactSlug);
+    const idx = annotations.findIndex(a => a.id === annotationId);
+    if (idx === -1) {
+      throw httpError(`Annotation "${annotationId}" not found.`, 404, "annotation_not_found");
+    }
 
-  annotations.splice(idx, 1);
-  await writeAnnotations(projectPath, artifactSlug, annotations);
+    annotations.splice(idx, 1);
+    await writeAnnotations(projectPath, artifactSlug, annotations);
+  });
 }
 
 /**
@@ -138,48 +161,54 @@ export async function getPendingAnnotations(projectPath, artifactSlug) {
  * Mark specific annotations as applied.
  */
 export async function markApplied(projectPath, artifactSlug, annotationIds) {
-  const annotations = await readAnnotations(projectPath, artifactSlug);
-  const now = new Date().toISOString();
-  for (const a of annotations) {
-    if (annotationIds.includes(a.id)) {
-      a.status = "applied";
-      a.updatedAt = now;
+  return await withAnnotationLock(projectPath, artifactSlug, async () => {
+    const annotations = await readAnnotations(projectPath, artifactSlug);
+    const now = new Date().toISOString();
+    for (const a of annotations) {
+      if (annotationIds.includes(a.id)) {
+        a.status = "applied";
+        a.updatedAt = now;
+      }
     }
-  }
-  await writeAnnotations(projectPath, artifactSlug, annotations);
+    await writeAnnotations(projectPath, artifactSlug, annotations);
+  });
 }
 
 /**
  * Mark specific annotations as failed.
  */
 export async function markFailed(projectPath, artifactSlug, annotationIds) {
-  const annotations = await readAnnotations(projectPath, artifactSlug);
-  const now = new Date().toISOString();
-  for (const a of annotations) {
-    if (annotationIds.includes(a.id)) {
-      a.status = "failed";
-      a.updatedAt = now;
+  return await withAnnotationLock(projectPath, artifactSlug, async () => {
+    const annotations = await readAnnotations(projectPath, artifactSlug);
+    const now = new Date().toISOString();
+    for (const a of annotations) {
+      if (annotationIds.includes(a.id)) {
+        a.status = "failed";
+        a.updatedAt = now;
+      }
     }
-  }
-  await writeAnnotations(projectPath, artifactSlug, annotations);
+    await writeAnnotations(projectPath, artifactSlug, annotations);
+  });
 }
 
 /**
  * Reset all failed annotations back to pending.
  */
 export async function retryFailed(projectPath, artifactSlug) {
-  const annotations = await readAnnotations(projectPath, artifactSlug);
-  const now = new Date().toISOString();
-  let count = 0;
-  for (const a of annotations) {
-    if (a.status === "failed") {
-      a.status = "pending";
-      a.updatedAt = now;
-      count++;
+  return await withAnnotationLock(projectPath, artifactSlug, async () => {
+    const annotations = await readAnnotations(projectPath, artifactSlug);
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const a of annotations) {
+      if (a.status === "failed") {
+        a.status = "pending";
+        a.updatedAt = now;
+        count++;
+      }
     }
-  }
-  await writeAnnotations(projectPath, artifactSlug, annotations);
-  return count;
+    await writeAnnotations(projectPath, artifactSlug, annotations);
+    return count;
+  });
 }
 
 /**
@@ -188,23 +217,25 @@ export async function retryFailed(projectPath, artifactSlug) {
  *   applied/failed/inactive → pending (re-queued)
  */
 export async function toggleAnnotation(projectPath, artifactSlug, annotationId, httpError) {
-  const annotations = await readAnnotations(projectPath, artifactSlug);
-  const idx = annotations.findIndex(a => a.id === annotationId);
-  if (idx === -1) {
-    throw httpError(`Annotation "${annotationId}" not found.`, 404, "annotation_not_found");
-  }
+  return await withAnnotationLock(projectPath, artifactSlug, async () => {
+    const annotations = await readAnnotations(projectPath, artifactSlug);
+    const idx = annotations.findIndex(a => a.id === annotationId);
+    if (idx === -1) {
+      throw httpError(`Annotation "${annotationId}" not found.`, 404, "annotation_not_found");
+    }
 
-  const annotation = annotations[idx];
-  if (annotation.status === "pending") {
-    annotation.status = "inactive";
-  } else {
-    const wasApplied = annotation.status === "applied";
-    annotation.status = "pending";
-    annotation.previouslyApplied = wasApplied || annotation.previouslyApplied;
-  }
-  annotation.updatedAt = new Date().toISOString();
+    const annotation = annotations[idx];
+    if (annotation.status === "pending") {
+      annotation.status = "inactive";
+    } else {
+      const wasApplied = annotation.status === "applied";
+      annotation.status = "pending";
+      annotation.previouslyApplied = wasApplied || annotation.previouslyApplied;
+    }
+    annotation.updatedAt = new Date().toISOString();
 
-  await writeAnnotations(projectPath, artifactSlug, annotations);
-  return annotation;
+    await writeAnnotations(projectPath, artifactSlug, annotations);
+    return annotation;
+  });
 }
 

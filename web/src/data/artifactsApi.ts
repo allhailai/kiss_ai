@@ -54,15 +54,6 @@ export const artifactsApi = {
       `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/sections`,
     ),
 
-  regenerateSection: (projectSlug: string, artifactSlug: string, sectionId: string, instruction: string, modelId?: string, elementContext?: ElementContext) =>
-    request<RebuildState>(
-      `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/sections/${encodeURIComponent(sectionId)}/regenerate`,
-      {
-        method: "POST",
-        body: JSON.stringify({ instruction, modelId: modelId ?? null, ...(elementContext ? { elementContext } : {}) }),
-      },
-    ),
-
   addSection: (projectSlug: string, artifactSlug: string, description: string, afterSectionId: string | null) =>
     request<Annotation>(
       `${projectBase(projectSlug)}/artifacts/${encodeURIComponent(artifactSlug)}/sections`,
