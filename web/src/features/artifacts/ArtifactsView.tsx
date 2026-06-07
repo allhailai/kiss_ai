@@ -23,7 +23,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
 
   const [artifacts, setArtifacts] = useState<ArtifactSpec[]>([]);
   const [selectedSpec, setSelectedSpec] = useState<ArtifactSpecDetail | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>("spec");
+  const [activeTab, setActiveTabRaw] = useState<Tab>((route.context.tab === "spec" || route.context.tab === "preview") ? route.context.tab : "spec");
   const [building, setBuilding] = useState(false);
   const [editBody, setEditBody] = useState("");
   const [saving, setSaving] = useState(false);
@@ -41,7 +41,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   const [regeneratedSections, setRegeneratedSections] = useState<string[]>([]);
   const [contractVersion, setContractVersion] = useState<number | null>(null);
   const [sectionsLoading, setSectionsLoading] = useState(false);
-  const [sectionPanelOpen, setSectionPanelOpen] = useState(false);
+  const [sectionPanelOpen, setSectionPanelOpenRaw] = useState(route.context.sections === "closed" ? false : true);
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
 
   // Annotation queue state
@@ -52,6 +52,38 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
 
   // Inspection / annotation mode
   const [annotationMode, setAnnotationMode] = useState(false);
+
+  // ─── URL deep-link helpers ────────────────────────────────────
+  // Build context object for URL sync (preserves other keys like action)
+  function buildUrlContext(tab: Tab, sections: boolean, extra: Record<string, string> = {}): Record<string, string> {
+    return { ...extra, tab, sections: sections ? "open" : "closed" };
+  }
+
+  // Wrap setActiveTab to also sync to URL
+  function setActiveTab(tab: Tab) {
+    setActiveTabRaw(tab);
+    route.navigateTo("artifacts", selectedSlug, buildUrlContext(tab, sectionPanelOpen));
+  }
+
+  // Wrap setSectionPanelOpen to also sync to URL
+  function setSectionPanelOpen(open: boolean) {
+    setSectionPanelOpenRaw(open);
+    route.navigateTo("artifacts", selectedSlug, buildUrlContext(activeTab, open));
+  }
+
+  // Respond to URL changes (browser back/forward)
+  useEffect(() => {
+    const urlTab = route.context.tab;
+    const urlSections = route.context.sections;
+    if ((urlTab === "spec" || urlTab === "preview") && urlTab !== activeTab) {
+      setActiveTabRaw(urlTab);
+    }
+    if (urlSections === "open" && !sectionPanelOpen) {
+      setSectionPanelOpenRaw(true);
+    } else if (urlSections === "closed" && sectionPanelOpen) {
+      setSectionPanelOpenRaw(false);
+    }
+  }, [route.context.tab, route.context.sections]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedArtifact = artifacts.find((a) => a.slug === selectedSlug) ?? null;
   const isBuilt = selectedArtifact?.status === "built";
@@ -78,13 +110,18 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
       // Reset building state from any previous artifact
       setBuilding(false);
       buildRunStartedAtRef.current = null;
-      if (selectedArtifact?.status === "built") {
-        setActiveTab("preview");
-      } else {
-        setActiveTab("spec");
-      }
+      // Use URL context tab if present, otherwise default to preview-if-built
+      const urlTab = route.context.tab;
+      const defaultTab: Tab = (urlTab === "spec" || urlTab === "preview") ? urlTab
+        : selectedArtifact?.status === "built" ? "preview" : "spec";
+      setActiveTabRaw(defaultTab);
+      // Default sections to open unless URL says closed
+      const defaultSections = route.context.sections !== "closed";
+      setSectionPanelOpenRaw(defaultSections);
+      // Sync defaults into URL
+      route.navigateTo("artifacts", selectedSlug, buildUrlContext(defaultTab, defaultSections));
     }
-  }, [selectedSlug, selectedArtifact?.status]);
+  }, [selectedSlug, selectedArtifact?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // On mount or slug change, check server state to recover building state.
   // This ensures the building spinner survives page refreshes and navigation
@@ -100,7 +137,8 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
         // This specific artifact is currently being built — resume building UI
         buildRunStartedAtRef.current = state.startedAt;
         setBuilding(true);
-        setActiveTab("preview");
+        setActiveTabRaw("preview");
+        route.navigateTo("artifacts", selectedSlug, buildUrlContext("preview", sectionPanelOpen));
         flash("Resuming build — agent is generating HTML…");
       }
     }).catch(() => { /* ignore — recovery is best-effort */ });
@@ -175,10 +213,10 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
   useEffect(() => {
     if (route.context.action === "build" && selectedSlug) {
       setPendingBuild(true);
-      // Clear the context so it doesn't re-trigger
-      route.navigateTo("artifacts", selectedSlug, {});
+      // Clear the action context so it doesn't re-trigger, but preserve tab/sections
+      route.navigateTo("artifacts", selectedSlug, buildUrlContext(activeTab, sectionPanelOpen));
     }
-  }, [route.context.action, selectedSlug]);
+  }, [route.context.action, selectedSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fire the build once the spec is loaded
   useEffect(() => {
@@ -227,7 +265,8 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
 
       // Build completion is detected by the rebuildState polling effect below.
       // Switch to preview tab so the user sees the loading state.
-      setActiveTab("preview");
+      setActiveTabRaw("preview");
+      route.navigateTo("artifacts", selectedSlug, buildUrlContext("preview", sectionPanelOpen));
     } catch (error) {
       setBuilding(false);
       flash(error instanceof Error ? error.message : "Build failed");
