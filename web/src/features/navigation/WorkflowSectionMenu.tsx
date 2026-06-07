@@ -430,7 +430,7 @@ export function HumanInputActions({
           title="Create a new folder in human inputs"
           aria-expanded={activeForm === "folder"}
         >
-          <span className="human-input-action-icon" aria-hidden="true">📁</span>
+          <span className="human-input-action-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4.5V12a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1H8L6.5 3.5H3A1 1 0 002 4.5z"/><line x1="8" y1="7.5" x2="8" y2="11.5"/><line x1="6" y1="9.5" x2="10" y2="9.5"/></svg></span>
           <span>Add folder</span>
         </button>
 
@@ -442,7 +442,7 @@ export function HumanInputActions({
             title="Create a new Markdown text file"
             aria-expanded={activeForm === "file"}
           >
-            <span className="human-input-action-icon" aria-hidden="true">📝</span>
+            <span className="human-input-action-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><polyline points="9,2 9,6 13,6"/><line x1="8" y1="8" x2="8" y2="12"/><line x1="6" y1="10" x2="10" y2="10"/></svg></span>
             <span>New text file</span>
           </button>
         ) : null}
@@ -466,7 +466,7 @@ export function HumanInputActions({
             title="Upload files from your computer"
             disabled={uploading}
           >
-            <span className="human-input-action-icon" aria-hidden="true">📎</span>
+            <span className="human-input-action-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="12" x2="8" y2="3"/><polyline points="4,6 8,2 12,6"/><line x1="3" y1="14" x2="13" y2="14"/></svg></span>
             <span>{uploading ? "Uploading…" : "Upload files"}</span>
           </button>
         </div>
