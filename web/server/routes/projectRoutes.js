@@ -78,6 +78,21 @@ export function registerProjectRoutes(app, {
     }
   });
 
+  app.get("/api/projects/:projectSlug/export", async (request, response, next) => {
+    try {
+      const AdmZip = (await import("adm-zip")).default;
+      const zip = new AdmZip();
+      zip.addLocalFolder(request.project.path);
+      const buffer = zip.toBuffer();
+      
+      response.set("Content-Type", "application/zip");
+      response.set("Content-Disposition", `attachment; filename="${request.project.slug}.zip"`);
+      response.send(buffer);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.put("/api/projects/:projectSlug/ui-state", async (request, response, next) => {
     try {
       const body = parseRequestBody(updateProjectUiStateBodySchema, request.body, httpError);

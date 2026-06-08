@@ -48,7 +48,7 @@ export function useProjectWorkspace() {
   const [design, setDesign] = useState<DesignState | null>(null);
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([designProjectFile]);
   const [fileChanges, setFileChanges] = useState<Record<string, FileChangeStatus>>({});
-  const [humanInputEmptyDirectories, setHumanInputEmptyDirectories] = useState<string[]>([]);
+  const [humanInputEmptyDirectories, setHumanInputEmptyDirectories] = useState<Array<{ path: string; name: string }>>([]);
   const [fileLoading, setFileLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reverting, setReverting] = useState(false);

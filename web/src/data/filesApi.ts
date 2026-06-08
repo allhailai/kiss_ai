@@ -65,10 +65,10 @@ export const filesApi = {
       method: "POST",
       body: JSON.stringify({ name, content, folder } satisfies CreateHumanInputTextFileRequest),
     }),
-  createHumanInputFolder: (projectSlug: string, name: string) =>
+  createHumanInputFolder: (projectSlug: string, name: string, folder?: string) =>
     request<CreateHumanInputFolderResponse>(`${projectBase(projectSlug)}/inputs-human/create-folder`, {
       method: "POST",
-      body: JSON.stringify({ name } satisfies CreateHumanInputFolderRequest),
+      body: JSON.stringify({ name, folder } satisfies CreateHumanInputFolderRequest),
     }),
   deleteHumanInputFolder: (projectSlug: string, folder: string) =>
     request<DeleteHumanInputFolderResponse>(`${projectBase(projectSlug)}/inputs-human/folder`, {

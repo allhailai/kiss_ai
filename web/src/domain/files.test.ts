@@ -51,18 +51,34 @@ describe("buildFileTree", () => {
   });
 
   it("injects empty directories", () => {
-    const tree = buildFileTree([], ["inputs_human"]);
-    expect(tree).toHaveLength(1);
-    expect(tree[0].type).toBe("directory");
-    if (tree[0].type === "directory") {
-      expect(tree[0].children).toHaveLength(0);
-    }
+    const emptyDirectories = [
+      { path: "inputs_human/a", name: "a" },
+      { path: "inputs_human/b", name: "b" }
+    ];
+    const tree = buildFileTree([], emptyDirectories);
+
+    expect(tree).toEqual([
+      {
+        type: "directory",
+        key: "a",
+        name: "a",
+        fullPath: "inputs_human/a",
+        children: [],
+      },
+      {
+        type: "directory",
+        key: "b",
+        name: "b",
+        fullPath: "inputs_human/b",
+        children: [],
+      },
+    ]);
   });
 
   it("does not duplicate existing directories from empty directories list", () => {
     const tree = buildFileTree(
       [makeFile("mydir/file.md", { name: "mydir/file.md" })],
-      ["mydir"],
+      [{ path: "mydir", name: "mydir" }],
     );
     const dirs = tree.filter((n) => n.type === "directory" && n.name === "mydir");
     expect(dirs).toHaveLength(1);

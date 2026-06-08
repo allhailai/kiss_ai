@@ -63,11 +63,11 @@ export function useHumanInputs({
   );
 
   const createHumanInputFolder = useCallback(
-    async (name: string) => {
+    async (name: string, folder?: string) => {
       setInputMutationLoading(true);
       setNotice("");
       try {
-        const response = await filesApi.createHumanInputFolder(requireSelectedProjectSlug(), name);
+        const response = await filesApi.createHumanInputFolder(requireSelectedProjectSlug(), name, folder);
         await refreshProjectFiles();
         setNotice(`Created folder ${response.folder}.`);
       } catch (error) {

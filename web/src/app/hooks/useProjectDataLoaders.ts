@@ -20,7 +20,7 @@ export function useProjectDataLoaders({
   setBuildLog: (buildLog: BuildLogState | null) => void;
   setDesign: (design: DesignState | null) => void;
   setFileChanges: (changes: Record<string, FileChangeStatus>) => void;
-  setHumanInputEmptyDirectories: (dirs: string[]) => void;
+  setHumanInputEmptyDirectories: (dirs: Array<{ path: string; name: string }>) => void;
   setProjectFiles: (files: ProjectFile[]) => void;
   setRebuild: (rebuild: RebuildState | null) => void;
   setStatus: (status: ProjectStatus | null) => void;

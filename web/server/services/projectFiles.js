@@ -417,9 +417,11 @@ export function createProjectFileService({
   async function listProjectFiles(projectRoot, rootRelative) {
     const root = await resolveProjectDirectory(projectRoot, rootRelative, { allowMissing: true });
     const files = [];
+    const emptyDirectories = [];
 
-    async function walk(currentAbsolute) {
+    async function walk(currentAbsolute, currentRelativeDirName) {
       const entries = await fs.readdir(currentAbsolute, { withFileTypes: true });
+      let hasVisibleEntries = false;
 
       for (const entry of entries) {
         if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
@@ -429,7 +431,8 @@ export function createProjectFileService({
         await rejectSymlinkEntry(absolute);
 
         if (entry.isDirectory()) {
-          await walk(absolute);
+          hasVisibleEntries = true;
+          await walk(absolute, relative.replace(`${root.relative}/`, ""));
           continue;
         }
 
@@ -437,14 +440,22 @@ export function createProjectFileService({
         // Hide .pdf.md extraction companion files — they are internal to the agent.
         if (isPdfExtractionFile(relative)) continue;
 
+        hasVisibleEntries = true;
         const meta = classifyPath(projectRoot, relative);
         const stat = await fs.stat(absolute);
         files.push(projectFileItem(root.relative, relative, meta, stat));
       }
+
+      if (!hasVisibleEntries && currentRelativeDirName) {
+        emptyDirectories.push({
+          path: `${root.relative}/${currentRelativeDirName}`,
+          name: currentRelativeDirName,
+        });
+      }
     }
 
     try {
-      await walk(root.absolute);
+      await walk(root.absolute, "");
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }
@@ -457,28 +468,6 @@ export function createProjectFileService({
           file.previewable = true;
         }
       }
-    }
-
-    // Collect immediate empty subdirectories so newly created folders are visible in the tree.
-    const emptyDirectories = [];
-    try {
-      const rootEntries = await fs.readdir(root.absolute, { withFileTypes: true });
-      const populatedDirectories = new Set(
-        files
-          .map((file) => file.name.split("/")[0])
-          .filter(Boolean),
-      );
-
-      for (const entry of rootEntries) {
-        if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
-        if (populatedDirectories.has(entry.name)) continue;
-
-        const absolute = path.join(root.absolute, entry.name);
-        await rejectSymlinkEntry(absolute);
-        emptyDirectories.push(`${root.relative}/${entry.name}`);
-      }
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
     }
 
     return {
@@ -690,16 +679,11 @@ export function createProjectFileService({
     let relativePath;
 
     if (normalizedFolder) {
-      const folderSegments = normalizedFolder.split("/").filter(Boolean);
-      if (folderSegments.length > 1) {
-        throw httpError("Folders can only be 1 level deep in human inputs.", 400, "create_text_too_deep");
-      }
-
       if (hasTraversalSegment(normalizedFolder)) {
         throw httpError("Path escapes the project root.", 403, "path_escape");
       }
 
-      const folderPath = `inputs_human/${folderSegments[0]}`;
+      const folderPath = `inputs_human/${normalizedFolder}`;
       const folderTarget = await resolveProjectDirectory(projectRoot, folderPath, { allowMissing: false });
       const folderStat = await fs.stat(folderTarget.absolute);
       if (!folderStat.isDirectory()) {
@@ -730,14 +714,34 @@ export function createProjectFileService({
     return { file };
   }
 
-  async function createHumanInputFolder(projectRoot, rawName) {
+  async function createHumanInputFolder(projectRoot, rawName, folder = "") {
     const safeName = safeUploadFileName(rawName);
-    const relativePath = `inputs_human/${safeName}`;
+    const normalizedFolder = folder.replace(/\/+$/, "").trim();
+    let relativePath;
+
+    if (normalizedFolder) {
+      if (hasTraversalSegment(normalizedFolder)) {
+        throw httpError("Path escapes the project root.", 403, "path_escape");
+      }
+
+      const folderPath = `inputs_human/${normalizedFolder}`;
+      const folderTarget = await resolveProjectDirectory(projectRoot, folderPath, { allowMissing: false });
+      const folderStat = await fs.stat(folderTarget.absolute);
+      if (!folderStat.isDirectory()) {
+        throw httpError(`${folderPath} is not a folder.`, 400, "create_folder_target_not_folder");
+      }
+
+      relativePath = `${folderPath}/${safeName}`;
+    } else {
+      relativePath = `inputs_human/${safeName}`;
+    }
+
     const target = projectPath(projectRoot, relativePath);
     const { absolute } = await resolveProjectDirectory(projectRoot, target.relative, { allowMissing: true });
 
     if (await fileExists(absolute)) {
-      throw httpError(`A folder named ${safeName} already exists in inputs_human/.`, 409, "folder_already_exists");
+      const location = normalizedFolder ? `inputs_human/${normalizedFolder}/` : "inputs_human/";
+      throw httpError(`A folder named ${safeName} already exists in ${location}.`, 409, "folder_already_exists");
     }
 
     await fs.mkdir(absolute, { recursive: true });
@@ -752,17 +756,11 @@ export function createProjectFileService({
       throw httpError("A folder name is required.", 400, "delete_folder_empty");
     }
 
-    // Must be a single segment (1-level only)
-    const folderSegments = normalizedFolder.split("/").filter(Boolean);
-    if (folderSegments.length > 1) {
-      throw httpError("Only top-level human input folders can be deleted.", 400, "delete_folder_too_deep");
-    }
-
     if (hasTraversalSegment(normalizedFolder)) {
       throw httpError("Path escapes the project root.", 403, "path_escape");
     }
 
-    const relativePath = `inputs_human/${folderSegments[0]}`;
+    const relativePath = `inputs_human/${normalizedFolder}`;
     const target = await resolveProjectDirectory(projectRoot, relativePath, { allowMissing: false });
     const stat = await fs.stat(target.absolute);
 
@@ -915,17 +913,11 @@ export function createProjectFileService({
       // Move to inputs_human root
       destRelative = `inputs_human/${path.basename(sourceTarget.absolute)}`;
     } else {
-      // Must be a single segment (1-level deep only)
-      const folderSegments = normalizedFolder.split("/").filter(Boolean);
-      if (folderSegments.length > 1) {
-        throw httpError("Folders can only be 1 level deep in human inputs.", 400, "move_too_deep");
-      }
-
       if (hasTraversalSegment(normalizedFolder)) {
         throw httpError("Path escapes the project root.", 403, "path_escape");
       }
 
-      const folderPath = `inputs_human/${folderSegments[0]}`;
+      const folderPath = `inputs_human/${normalizedFolder}`;
       const folderTarget = await resolveProjectDirectory(projectRoot, folderPath, { allowMissing: false });
       const folderStat = await fs.stat(folderTarget.absolute);
       if (!folderStat.isDirectory()) {

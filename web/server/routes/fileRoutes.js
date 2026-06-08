@@ -107,7 +107,7 @@ export function registerFileRoutes(app, {
   app.post("/api/projects/:projectSlug/inputs-human/create-folder", async (request, response, next) => {
     try {
       const body = parseRequestBody(createHumanInputFolderBodySchema, request.body, httpError);
-      response.status(201).json(await createHumanInputFolder(request.project.path, body.name));
+      response.status(201).json(await createHumanInputFolder(request.project.path, body.name, body.folder));
     } catch (error) {
       next(error);
     }
