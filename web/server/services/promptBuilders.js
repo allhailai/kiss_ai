@@ -684,6 +684,14 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
    * Unlike regeneration, this generates a complete <section>...</section> block.
    *
    * @param {object} params
+   * @param {object} params.project
+   * @param {object} params.artifactSpec
+   * @param {string} params.description
+   * @param {string} params.afterSectionId
+   * @param {string} params.globalStylesheet
+   * @param {Array} params.existingSections
+   * @param {Array} params.resolvedSources
+   * @param {Array} params.cdnDependencies
    * @param {string} [params.adjacentSectionHTML] - full HTML of the section immediately before/after the insertion point
    */
   async function createAddSectionPrompt({
