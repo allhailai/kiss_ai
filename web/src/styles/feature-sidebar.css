@@ -11,7 +11,7 @@
   overflow: auto;
 }
 
-/* ── Sidebar Close Button (X) — visible when sidebar is open ── */
+/* ── Sidebar Close Button (×) — visible when sidebar is open ── */
 
 .sidebar-close-button {
   position: absolute;
@@ -20,17 +20,13 @@
   z-index: 60;
   display: grid;
   place-items: center;
-  min-width: 0;
-  height: 22px;
-  padding: 0 8px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: 6px;
   background: color-mix(in srgb, var(--color-background) 78%, white);
   color: var(--color-secondary);
-  font-size: 0.64rem;
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: 0.02em;
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
@@ -43,29 +39,34 @@
   outline: none;
 }
 
-/* ── Sidebar Open Button ("Nav") — visible when sidebar is collapsed ── */
+/* ── Sidebar Open Button (☰) — visible when sidebar is collapsed ── */
 
 .sidebar-open-button {
   position: fixed;
   top: 58px;
-  left: 18px;
+  left: 14px;
   z-index: 60;
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: var(--color-accent);
-  color: white;
-  font-size: 0.82rem;
-  font-weight: 900;
-  opacity: 0.3;
-  transition: opacity 0.18s ease;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  color: var(--color-secondary);
+  opacity: 0.4;
+  cursor: pointer;
+  transition: opacity 0.18s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .sidebar-open-button:hover,
 .sidebar-open-button:focus-visible {
-  background: color-mix(in srgb, var(--color-accent) 86%, var(--color-console-background));
-  outline: 2px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
-  outline-offset: 2px;
   opacity: 1;
+  background: var(--color-surface);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  outline: none;
 }
 
 /* Hide the open button when sidebar is expanded */

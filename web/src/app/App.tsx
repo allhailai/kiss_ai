@@ -296,6 +296,10 @@ export function App() {
             onOpenFile={openProjectFileWithAgentContext}
             onOpenProjectHome={() => route.navigateTo("ai")}
             onSwitchProject={project.clearSelectedProject}
+            sidebarOpen={!sidebarCollapsed}
+            onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
+            rightPanelOpen={isAgentPanelOpen}
+            onToggleRightPanel={toggleAgentPanel}
           />
           <RightPanelToggle active={isAgentPanelOpen} label="AI" onToggle={toggleAgentPanel} />
           <ToastViewport toasts={toastWorkspace.toasts} onDismiss={toastWorkspace.dismissToast} />

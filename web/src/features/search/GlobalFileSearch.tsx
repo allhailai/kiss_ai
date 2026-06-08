@@ -11,12 +11,20 @@ export function GlobalFileSearch({
   onOpenFile,
   onOpenProjectHome,
   onSwitchProject,
+  sidebarOpen,
+  onToggleSidebar,
+  rightPanelOpen,
+  onToggleRightPanel,
 }: {
   projectName: string;
   projectSlug: string;
   onOpenFile: (path: string) => void;
   onOpenProjectHome: () => void;
   onSwitchProject: () => void;
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
+  rightPanelOpen: boolean;
+  onToggleRightPanel: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProjectFile[]>([]);
@@ -126,6 +134,32 @@ export function GlobalFileSearch({
         </span>
         <button className="project-header-title" onClick={onOpenProjectHome} type="button">
           {projectName}
+        </button>
+      </div>
+      <div className="topbar-panel-toggles" role="group" aria-label="Panel layout">
+        <button
+          className={`topbar-panel-toggle-btn ${sidebarOpen ? "active" : ""}`}
+          onClick={onToggleSidebar}
+          type="button"
+          title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+          aria-pressed={sidebarOpen}
+        >
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+            <rect x="1" y="2" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" />
+            <rect x="1" y="2" width="6" height="16" rx="2" fill={sidebarOpen ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5" opacity={sidebarOpen ? 0.5 : 0.3} />
+          </svg>
+        </button>
+        <button
+          className={`topbar-panel-toggle-btn ${rightPanelOpen ? "active" : ""}`}
+          onClick={onToggleRightPanel}
+          type="button"
+          title={rightPanelOpen ? "Hide AI panel" : "Show AI panel"}
+          aria-pressed={rightPanelOpen}
+        >
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+            <rect x="1" y="2" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" />
+            <rect x="13" y="2" width="6" height="16" rx="2" fill={rightPanelOpen ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5" opacity={rightPanelOpen ? 0.5 : 0.3} />
+          </svg>
         </button>
       </div>
       <div className="global-search" role="search">

@@ -6,7 +6,7 @@
   min-width: 0;
   min-height: 55px;
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(420px, 760px) auto;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(420px, 760px) auto;
   align-items: center;
   gap: 16px;
   padding: 8px 24px;
@@ -222,4 +222,46 @@
 @keyframes activity-dot-pulse {
   0%, 100% { opacity: 0.45; transform: scale(0.8); }
   50% { opacity: 1; transform: scale(1.15); }
+}
+
+/* ── Panel Layout Toggles ── */
+
+.topbar-panel-toggles {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-background) 72%, white);
+}
+
+.topbar-panel-toggle-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-secondary);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.topbar-panel-toggle-btn:hover {
+  background: color-mix(in srgb, var(--color-secondary) 8%, transparent);
+  color: var(--color-primary);
+}
+
+.topbar-panel-toggle-btn.active {
+  background: color-mix(in srgb, var(--color-secondary) 12%, white);
+  border-color: color-mix(in srgb, var(--color-secondary) 24%, var(--color-border));
+  color: var(--color-primary);
+}
+
+.topbar-panel-toggle-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  outline-offset: -1px;
 }

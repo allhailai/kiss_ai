@@ -972,8 +972,12 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
                 type="button"
                 title={sectionPanelOpen ? "Hide sections" : "Show sections"}
               >
-                {sectionPanelOpen ? "›" : "‹"}
-                <span className="artifacts-sections-toggle-label">{sectionPanelOpen ? "" : "Sections"}</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  {sectionPanelOpen
+                    ? <polyline points="9 18 15 12 9 6" />
+                    : <polyline points="15 18 9 12 15 6" />
+                  }
+                </svg>
               </button>
             </div>
           ) : (
