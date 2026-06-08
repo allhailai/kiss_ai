@@ -31,7 +31,7 @@ function sortTreeNodes(nodes: FileTreeNode[]) {
   }
 }
 
-export function buildFileTree(files: ProjectFile[], emptyDirectories?: string[]) {
+export function buildFileTree(files: ProjectFile[], emptyDirectories?: Array<{ path: string; name: string }>) {
   const root: FileTreeNode[] = [];
 
   for (const file of files) {
@@ -75,25 +75,35 @@ export function buildFileTree(files: ProjectFile[], emptyDirectories?: string[])
 
   // Inject empty directories so they appear as expandable folder nodes.
   if (emptyDirectories?.length) {
-    for (const dirPath of emptyDirectories) {
-      const segments = dirPath.split("/").filter(Boolean);
-      // The directory name is the last segment; everything before it is the root prefix.
-      const dirName = segments.at(-1);
-      if (!dirName) continue;
+    for (const emptyDir of emptyDirectories) {
+      const segments = emptyDir.name.split("/").filter(Boolean);
+      const pathSegments = emptyDir.path.split("/").filter(Boolean);
+      const rootPathSegments = pathSegments.slice(0, Math.max(0, pathSegments.length - segments.length));
+      let children = root;
+      const directoryParts: string[] = [];
 
-      // Check if a node for this directory already exists at the root level.
-      const exists = root.some(
-        (node) => node.type === "directory" && node.name === dirName,
-      );
-      if (exists) continue;
+      for (const directoryName of segments) {
+        directoryParts.push(directoryName);
+        const directoryKey = directoryParts.join("/");
+        const fullPath = [...rootPathSegments, ...directoryParts].join("/");
+        let directory = children.find(
+          (node): node is Extract<FileTreeNode, { type: "directory" }> =>
+            node.type === "directory" && node.key === directoryKey,
+        );
 
-      root.push({
-        type: "directory",
-        key: dirName,
-        name: dirName,
-        fullPath: dirPath,
-        children: [],
-      });
+        if (!directory) {
+          directory = {
+            type: "directory",
+            key: directoryKey,
+            name: directoryName,
+            fullPath,
+            children: [],
+          };
+          children.push(directory);
+        }
+
+        children = directory.children;
+      }
     }
   }
 

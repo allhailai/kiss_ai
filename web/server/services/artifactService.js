@@ -1184,6 +1184,7 @@ export async function createSectionBackup(indexPath, backupsDir) {
 export async function updateManifestForRegeneration(projectPath, artifactSlug, sectionId) {
   const manifestPath = path.join(projectPath, ARTIFACT_BUILDS_DIR, artifactSlug, '.artifact-manifest.json');
 
+  /** @type {any} */
   let manifest = {};
   try {
     const raw = await fs.readFile(manifestPath, 'utf8');
@@ -1233,6 +1234,7 @@ export async function updateManifestForRegeneration(projectPath, artifactSlug, s
 export async function stampManifestAfterBuild(projectPath, artifactSlug) {
   const manifestPath = path.join(projectPath, ARTIFACT_BUILDS_DIR, artifactSlug, '.artifact-manifest.json');
 
+  /** @type {any} */
   let manifest = {};
   try {
     const raw = await fs.readFile(manifestPath, 'utf8');

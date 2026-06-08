@@ -257,19 +257,31 @@
 }
 
 .file-tree-row {
+  position: relative;
   width: 100%;
   min-width: 0;
   display: grid;
   grid-template-columns: 0.75rem minmax(0, 1fr) auto;
   align-items: center;
   gap: 3px;
-  padding: 2px 4px 2px calc(4px + (var(--tree-depth, 0) * 5px));
+  padding: 2px 4px 2px calc(4px + (var(--tree-depth, 0) * 12px));
   border: 1px solid transparent;
   border-radius: 7px;
   background: transparent;
   color: var(--color-primary);
   font-size: 0.8rem;
   text-align: left;
+}
+
+.file-tree-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--color-border);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .file-tree-directory {
@@ -286,7 +298,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 4px 2px calc(4px + (var(--tree-depth, 0) * 5px));
+  padding: 2px 4px 2px calc(4px + (var(--tree-depth, 0) * 12px));
 }
 
 .file-tree-open-button {
@@ -646,9 +658,14 @@
 /* Inline Create File Form (inside directory) */
 
 .file-tree-inline-form {
+  position: relative;
   display: flex;
   gap: 3px;
-  padding: 2px 4px 2px calc(4px + (var(--tree-depth, 0) * 5px));
+  padding: 2px 4px 2px calc(4px + (var(--tree-depth, 0) * 12px));
+}
+
+.file-tree-inline-create {
+  display: block;
 }
 
 .file-tree-inline-input {

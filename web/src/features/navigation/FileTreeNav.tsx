@@ -8,6 +8,7 @@ export function FileTreeNav({
   emptyDirectories,
   selectedPath,
   onCreateTextFile,
+  onCreateFolder,
   onDeleteFile,
   onDeleteFolder,
   onMoveFile,
@@ -15,9 +16,10 @@ export function FileTreeNav({
 }: {
   fileChanges?: Record<string, FileChangeStatus>;
   files: ProjectFile[];
-  emptyDirectories?: string[];
+  emptyDirectories?: Array<{ path: string; name: string }>;
   selectedPath: string | null;
   onCreateTextFile?: (name: string, folder?: string) => void;
+  onCreateFolder?: (name: string, folder?: string) => void;
   onDeleteFile?: (path: string) => void;
   onDeleteFolder?: (folder: string) => void;
   onMoveFile?: (sourcePath: string, targetFolder: string) => void;
@@ -30,7 +32,7 @@ export function FileTreeNav({
   }, [files, selectedPath]);
   const [expandedDirectories, setExpandedDirectories] = useState<Set<string>>(new Set());
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
-  const [inlineCreateFolder, setInlineCreateFolder] = useState<string | null>(null);
+  const [inlineCreate, setInlineCreate] = useState<{ folder: string, type: "file" | "folder" } | null>(null);
 
   // Track the path being dragged in a ref so it survives across events reliably.
   const draggingPathRef = useRef<string | null>(null);
@@ -66,18 +68,20 @@ export function FileTreeNav({
     });
   }
 
-  const handleToggleInlineCreate = useCallback((folderName: string) => {
-    setInlineCreateFolder((current) => (current === folderName ? null : folderName));
+  const handleToggleInlineCreate = useCallback((folderName: string, type: "file" | "folder") => {
+    setInlineCreate((current) => (current?.folder === folderName && current?.type === type ? null : { folder: folderName, type }));
   }, []);
 
   const handleInlineCreateSubmit = useCallback(
-    (name: string, folder: string) => {
-      if (onCreateTextFile) {
+    (name: string, folder: string, type: "file" | "folder") => {
+      if (type === "file" && onCreateTextFile) {
         onCreateTextFile(name, folder);
+      } else if (type === "folder" && onCreateFolder) {
+        onCreateFolder(name, folder);
       }
-      setInlineCreateFolder(null);
+      setInlineCreate(null);
     },
-    [onCreateTextFile],
+    [onCreateTextFile, onCreateFolder],
   );
 
   const handleFileDragStart = useCallback(
@@ -132,10 +136,11 @@ export function FileTreeNav({
           dragOverTarget={dragOverTarget}
           expandedDirectories={expandedDirectories}
           fileChanges={fileChanges}
-          inlineCreateFolder={inlineCreateFolder}
+          inlineCreate={inlineCreate}
           key={node.key}
           node={node}
           onCreateTextFile={onCreateTextFile}
+          onCreateFolder={onCreateFolder}
           onDeleteFile={onDeleteFile}
           onDeleteFolder={onDeleteFolder}
           onFileDragStart={onMoveFile ? handleFileDragStart : undefined}
@@ -161,9 +166,10 @@ function FileTreeNodeRow({
   dragOverTarget,
   expandedDirectories,
   fileChanges,
-  inlineCreateFolder,
+  inlineCreate,
   selectedPath,
   onCreateTextFile,
+  onCreateFolder,
   onDeleteFile,
   onDeleteFolder,
   onDrop,
@@ -181,29 +187,34 @@ function FileTreeNodeRow({
   dragOverTarget: string | null;
   expandedDirectories: Set<string>;
   fileChanges?: Record<string, FileChangeStatus>;
-  inlineCreateFolder: string | null;
+  inlineCreate: { folder: string, type: "file" | "folder" } | null;
   selectedPath: string | null;
   onCreateTextFile?: (name: string, folder?: string) => void;
+  onCreateFolder?: (name: string, folder?: string) => void;
   onDeleteFile?: (path: string) => void;
   onDeleteFolder?: (folder: string) => void;
   onDrop?: (event: DragEvent, targetFolder: string) => void;
   onFileDragStart?: (event: DragEvent<HTMLButtonElement | HTMLDivElement>, filePath: string) => void;
-  onInlineCreateSubmit: (name: string, folder: string) => void;
+  onInlineCreateSubmit: (name: string, folder: string, type: "file" | "folder") => void;
   onMoveFile?: (sourcePath: string, targetFolder: string) => void;
   onSelectFile: (path: string) => void;
   onToggleDirectory: (directoryKey: string) => void;
-  onToggleInlineCreate: (folderName: string) => void;
+  onToggleInlineCreate: (folderName: string, type: "file" | "folder") => void;
   setDragOverTarget?: (target: string | null) => void;
   draggingPathRef?: React.RefObject<string | null>;
 }) {
   const depthStyle = { "--tree-depth": String(Math.min(depth, 6)) } as CSSProperties;
+  
+  const indentGuides = Array.from({ length: Math.min(depth, 6) }).map((_, i) => (
+    <span key={i} className="file-tree-guide" style={{ left: `calc(4px + ${i * 12}px + 6px)` }} />
+  ));
 
   if (node.type === "directory") {
     const isExpanded = expandedDirectories.has(node.key);
     const visibleName = humanizePathSegment(node.name);
     const isDragOver = dragOverTarget === node.key;
-    const showInlineCreate = inlineCreateFolder === node.name;
-    const hasDirectoryActions = onDeleteFolder || onCreateTextFile;
+    const showInlineCreate = inlineCreate?.folder === node.key;
+    const hasDirectoryActions = onDeleteFolder || onCreateTextFile || onCreateFolder;
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [pendingDeleteFolder, setPendingDeleteFolder] = useState(false);
     // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -246,11 +257,11 @@ function FileTreeNodeRow({
           onDrop={onDrop
             ? (event: DragEvent<HTMLDivElement>) => {
                 dragDepthRef.current = 0;
-                onDrop(event, node.name);
+                onDrop(event, node.key);
               }
             : undefined}
         >
-
+          {indentGuides}
           <button
             aria-expanded={isExpanded}
             className="file-tree-dir-toggle"
@@ -268,13 +279,27 @@ function FileTreeNodeRow({
                   className="file-tree-dir-action-button file-tree-dir-add"
                   onClick={(event) => {
                     event.stopPropagation();
-                    onToggleInlineCreate(node.name);
+                    onToggleInlineCreate(node.key, "file");
                     if (!isExpanded) onToggleDirectory(node.key);
                   }}
                   title={`New file in ${visibleName}`}
                   type="button"
                 >
-                  +
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><polyline points="9,2 9,6 13,6"/><line x1="8" y1="8" x2="8" y2="12"/><line x1="6" y1="10" x2="10" y2="10"/></svg>
+                </button>
+              ) : null}
+              {onCreateFolder ? (
+                <button
+                  className="file-tree-dir-action-button file-tree-dir-add-folder"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleInlineCreate(node.key, "folder");
+                    if (!isExpanded) onToggleDirectory(node.key);
+                  }}
+                  title={`New folder in ${visibleName}`}
+                  type="button"
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4.5V12a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1H8L6.5 3.5H3A1 1 0 002 4.5z"/><line x1="8" y1="7.5" x2="8" y2="11.5"/><line x1="6" y1="9.5" x2="10" y2="9.5"/></svg>
                 </button>
               ) : null}
               {onDeleteFolder ? (
@@ -324,12 +349,13 @@ function FileTreeNodeRow({
 
         {isExpanded ? (
           <div className="file-tree-children" role="group">
-            {showInlineCreate ? (
+            {showInlineCreate && inlineCreate ? (
               <InlineCreateFileForm
                 depth={depth + 1}
-                folder={node.name}
-                onCancel={() => onToggleInlineCreate(node.name)}
-                onSubmit={onInlineCreateSubmit}
+                folder={node.key}
+                type={inlineCreate.type}
+                onCancel={() => onToggleInlineCreate(node.key, inlineCreate.type)}
+                onSubmit={(name, folder) => onInlineCreateSubmit(name, folder, inlineCreate.type)}
               />
             ) : null}
             {node.children.map((child) => (
@@ -338,10 +364,11 @@ function FileTreeNodeRow({
                 dragOverTarget={dragOverTarget}
                 expandedDirectories={expandedDirectories}
                 fileChanges={fileChanges}
-                inlineCreateFolder={inlineCreateFolder}
+                inlineCreate={inlineCreate}
                 key={child.key}
                 node={child}
                 onCreateTextFile={onCreateTextFile}
+                onCreateFolder={onCreateFolder}
                 onDeleteFile={onDeleteFile}
                 onDeleteFolder={onDeleteFolder}
                 onDrop={onDrop}
@@ -394,6 +421,7 @@ function FileTreeNodeRow({
         draggable={!!onMoveFile}
         fileLabel={fileLabel}
         filePath={node.file.path}
+        indentGuides={indentGuides}
         onDragStart={onFileDragStart}
         onDeleteFile={onDeleteFile}
         onSelectFile={onSelectFile}
@@ -411,6 +439,7 @@ function FileTreeNodeRow({
       style={depthStyle}
       title={node.file.previewable === false ? `${node.file.path} (saved, no preview)` : node.file.path}
     >
+      {indentGuides}
       {fileLabel}
     </button>
   );
@@ -422,6 +451,7 @@ function FileRowWithDelete({
   draggable,
   fileLabel,
   filePath,
+  indentGuides,
   onDragStart,
   onDeleteFile,
   onSelectFile,
@@ -431,6 +461,7 @@ function FileRowWithDelete({
   draggable: boolean;
   fileLabel: React.ReactNode;
   filePath: string;
+  indentGuides?: React.ReactNode;
   onDragStart?: (event: DragEvent<HTMLButtonElement | HTMLDivElement>, filePath: string) => void;
   onDeleteFile: (path: string) => void;
   onSelectFile: (path: string) => void;
@@ -444,6 +475,7 @@ function FileRowWithDelete({
       style={depthStyle}
       title={filePath}
     >
+      {indentGuides}
       <button
         className="file-tree-open-button"
         draggable={draggable}
@@ -495,11 +527,13 @@ function FileRowWithDelete({
 function InlineCreateFileForm({
   depth,
   folder,
+  type,
   onCancel,
   onSubmit,
 }: {
   depth: number;
   folder: string;
+  type: "file" | "folder";
   onCancel: () => void;
   onSubmit: (name: string, folder: string) => void;
 }) {
@@ -518,6 +552,10 @@ function InlineCreateFileForm({
 
   const depthStyle = { "--tree-depth": String(Math.min(depth, 6)) } as CSSProperties;
 
+  const indentGuides = Array.from({ length: Math.min(depth, 6) }).map((_, i) => (
+    <span key={i} className="file-tree-guide" style={{ left: `calc(4px + ${i * 12}px + 6px)` }} />
+  ));
+
   return (
     <form
       className="file-tree-inline-form"
@@ -527,11 +565,12 @@ function InlineCreateFileForm({
         handleSubmit();
       }}
     >
+      {indentGuides}
       <input
         ref={inputRef}
         className="file-tree-inline-input"
         type="text"
-        placeholder="File name…"
+        placeholder={type === "file" ? "File name…" : "Folder name…"}
         value={name}
         onChange={(event) => setName(event.target.value)}
         onKeyDown={(event) => {

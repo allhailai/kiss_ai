@@ -12,7 +12,7 @@ const writeLocks = new Map();
 async function withAnnotationLock(projectPath, artifactSlug, fn) {
   const key = `${projectPath}:${artifactSlug}`;
   const prev = writeLocks.get(key) ?? Promise.resolve();
-  let release;
+  let release = (v) => {};
   const next = new Promise(r => { release = r; });
   writeLocks.set(key, next);
   try {

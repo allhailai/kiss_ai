@@ -152,6 +152,7 @@ export const createHumanInputTextFileBodySchema = z.object({
 
 export const createHumanInputFolderBodySchema = z.object({
   name: z.string().trim().min(1).max(255),
+  folder: z.string().trim().max(255).optional().default(""),
 });
 
 export const deleteHumanInputFolderBodySchema = z.object({

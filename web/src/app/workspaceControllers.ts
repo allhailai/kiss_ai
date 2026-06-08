@@ -24,7 +24,7 @@ export type RouteController = {
 };
 
 export type FileWorkspaceController = {
-  createHumanInputFolder: (name: string) => Promise<void>;
+  createHumanInputFolder: (name: string, folder?: string) => Promise<void>;
   createHumanInputTextFile: (name: string, folder?: string) => Promise<void>;
   deleteHumanInputFile: (path: string) => Promise<void>;
   deleteHumanInputFolder: (folder: string) => Promise<void>;
@@ -35,7 +35,7 @@ export type FileWorkspaceController = {
   fileChanges: Record<string, FileChangeStatus>;
   fileLoading: boolean;
   hasUnsavedChanges: boolean;
-  humanInputEmptyDirectories: string[];
+  humanInputEmptyDirectories: Array<{ path: string; name: string }>;
   inputMutationLoading: boolean;
   loading: boolean;
   projectFiles: ProjectFile[];

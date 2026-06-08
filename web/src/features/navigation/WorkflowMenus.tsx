@@ -37,14 +37,14 @@ export function SimplifiedNavigator({
 }: {
   currentView: View;
   fileChanges: Record<string, FileChangeStatus>;
-  humanInputEmptyDirectories?: string[];
+  humanInputEmptyDirectories?: Array<{ path: string; name: string }>;
   projectFiles: ProjectFile[];
   projectSlug: string;
   loading: boolean;
   selectedPath: string | null;
   selectedArtifactSlug: string | null;
   rebuildRunning?: boolean;
-  onCreateFolder?: (name: string) => void;
+  onCreateFolder?: (name: string, folder?: string) => void;
   onCreateTextFile?: (name: string, folder?: string) => void;
   onDeleteFolder?: (folder: string) => void;
   onDeleteHumanInputFile?: (path: string) => void;
@@ -63,9 +63,22 @@ export function SimplifiedNavigator({
 
   // Track which numbered subsections (1-5) are expanded inside the parent groups.
   type SubsectionId = "define" | "source-data" | "wiki" | "reports" | "artifacts";
-  const [expandedSubsections, setExpandedSubsections] = useState<Set<SubsectionId>>(
-    () => new Set<SubsectionId>(["define", "source-data", "wiki", "reports", "artifacts"]),
-  );
+  const [expandedSubsections, setExpandedSubsections] = useState<Set<SubsectionId>>(() => {
+    try {
+      const stored = localStorage.getItem("kiss_ai_expanded_subsections");
+      if (stored) {
+        const parsed = JSON.parse(stored) as string[];
+        return new Set(parsed as SubsectionId[]);
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+    return new Set<SubsectionId>(["define", "source-data", "wiki", "reports", "artifacts"]);
+  });
+
+  useEffect(() => {
+    localStorage.setItem("kiss_ai_expanded_subsections", JSON.stringify(Array.from(expandedSubsections)));
+  }, [expandedSubsections]);
 
   const humanInputFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.humanInput)), [projectFiles]);
   const sourceFiles = useMemo(() => projectFiles.filter((file) => file.path.startsWith(projectPathPrefixes.sources)), [projectFiles]);

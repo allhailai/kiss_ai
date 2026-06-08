@@ -33,7 +33,7 @@ export function KnowledgebaseSectionBody({
   currentView: View;
   expandedSubsections: Set<string>;
   fileChanges: Record<string, FileChangeStatus>;
-  humanInputEmptyDirectories?: string[];
+  humanInputEmptyDirectories?: Array<{ path: string; name: string }>;
   humanInputFiles: ProjectFile[];
   loading: boolean;
   onCreateFolder?: (name: string) => void;
@@ -68,10 +68,7 @@ export function KnowledgebaseSectionBody({
       <div className="nav-subsection">
         <button
           className={`nav-section-trigger${currentView === "inputs" ? " active" : ""}`}
-          onClick={(event) => {
-            toggleSubsection("source-data", event);
-            onOpenView("inputs");
-          }}
+          onClick={(event) => toggleSubsection("source-data", event)}
           type="button"
           aria-expanded={expandedSubsections.has("source-data")}
         >
@@ -104,6 +101,7 @@ export function KnowledgebaseSectionBody({
               files={humanInputFiles}
               loading={loading && currentView === "inputs"}
               onCreateTextFile={onCreateTextFile}
+              onCreateFolder={onCreateFolder}
               onDeleteFile={onDeleteHumanInputFile}
               onDeleteFolder={onDeleteFolder}
               onMoveFile={onMoveFile}
@@ -139,10 +137,7 @@ export function KnowledgebaseSectionBody({
       <div className="nav-subsection">
         <button
           className={`nav-section-trigger${currentView === "outputs" ? " active" : ""}`}
-          onClick={(event) => {
-            toggleSubsection("wiki", event);
-            onOpenView("outputs");
-          }}
+          onClick={(event) => toggleSubsection("wiki", event)}
           type="button"
           aria-expanded={expandedSubsections.has("wiki")}
         >
@@ -208,10 +203,7 @@ export function OutputsSectionBody({
       <div className="nav-subsection">
         <button
           className={`nav-section-trigger${currentView === "reports" ? " active" : ""}`}
-          onClick={(event) => {
-            toggleSubsection("reports", event);
-            onOpenView("reports");
-          }}
+          onClick={(event) => toggleSubsection("reports", event)}
           type="button"
           aria-expanded={expandedSubsections.has("reports")}
         >
@@ -221,6 +213,16 @@ export function OutputsSectionBody({
 
         {expandedSubsections.has("reports") ? (
           <div className="nav-section-body">
+            <div className="human-input-actions" style={{ padding: "0 4px 4px" }}>
+              <button
+                className="human-input-action-button"
+                onClick={() => onOpenView("reports")}
+                type="button"
+                style={{ justifyContent: "center" }}
+              >
+                <span>Build Reports</span>
+              </button>
+            </div>
             <FileTreeBlock
               emptyLabel="No reports yet. Create one with the chat agent."
               fileChanges={fileChanges}
@@ -237,10 +239,7 @@ export function OutputsSectionBody({
       <div className="nav-subsection">
         <button
           className={`nav-section-trigger${currentView === "artifacts" ? " active" : ""}`}
-          onClick={(event) => {
-            toggleSubsection("artifacts", event);
-            onOpenView("artifacts");
-          }}
+          onClick={(event) => toggleSubsection("artifacts", event)}
           type="button"
           aria-expanded={expandedSubsections.has("artifacts")}
         >
@@ -250,6 +249,16 @@ export function OutputsSectionBody({
 
         {expandedSubsections.has("artifacts") ? (
           <div className="nav-section-body">
+            <div className="human-input-actions" style={{ padding: "0 4px 4px" }}>
+              <button
+                className="human-input-action-button"
+                onClick={() => onOpenView("artifacts")}
+                type="button"
+                style={{ justifyContent: "center" }}
+              >
+                <span>Build Artifacts</span>
+              </button>
+            </div>
             <ArtifactNavSection
               projectSlug={projectSlug}
               selectedArtifactSlug={selectedArtifactSlug}
@@ -515,6 +524,7 @@ export function FileTreeBlock({
   loading,
   selectedPath,
   onCreateTextFile,
+  onCreateFolder,
   onDeleteFile,
   onDeleteFolder,
   onMoveFile,
@@ -522,12 +532,13 @@ export function FileTreeBlock({
   onOpenFile,
 }: {
   emptyLabel: string;
-  emptyDirectories?: string[];
+  emptyDirectories?: Array<{ path: string; name: string }>;
   fileChanges?: Record<string, FileChangeStatus>;
   files: ProjectFile[];
   loading: boolean;
   selectedPath: string | null;
   onCreateTextFile?: (name: string, folder?: string) => void;
+  onCreateFolder?: (name: string, folder?: string) => void;
   onDeleteFile?: (path: string) => void;
   onDeleteFolder?: (folder: string) => void;
   onMoveFile?: (sourcePath: string, targetFolder: string) => void;
@@ -565,6 +576,7 @@ export function FileTreeBlock({
       emptyDirectories={emptyDirectories}
       selectedPath={selectedPath}
       onCreateTextFile={onCreateTextFile}
+      onCreateFolder={onCreateFolder}
       onDeleteFile={onDeleteFile}
       onDeleteFolder={onDeleteFolder}
       onMoveFile={onMoveFile}

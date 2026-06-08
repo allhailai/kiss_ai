@@ -41,11 +41,11 @@ export function AppSidebar({
   collapsed: boolean;
   fileWorkspace: {
     fileChanges: Record<string, FileChangeStatus>;
-    humanInputEmptyDirectories: string[];
+    humanInputEmptyDirectories: Array<{ path: string; name: string }>;
     loading: boolean;
     projectFiles: ProjectFile[];
     selected: { path: string } | null;
-    createHumanInputFolder: (name: string) => Promise<void>;
+    createHumanInputFolder: (name: string, folder?: string) => Promise<void>;
     createHumanInputTextFile: (name: string, folder?: string) => Promise<void>;
     deleteHumanInputFile: (path: string) => Promise<void>;
     deleteHumanInputFolder: (folder: string) => Promise<void>;
@@ -157,7 +157,7 @@ export function AppSidebar({
           selectedPath={fileWorkspace.selected?.path ?? null}
           projectSlug={projectSlug}
           selectedArtifactSlug={route.view === "artifacts" ? (route.filePath ?? null) : null}
-          onCreateFolder={(name) => void fileWorkspace.createHumanInputFolder(name)}
+          onCreateFolder={(name, folder) => void fileWorkspace.createHumanInputFolder(name, folder)}
           onCreateTextFile={(name, folder) => void fileWorkspace.createHumanInputTextFile(name, folder)}
           onDeleteFolder={(folder) => void fileWorkspace.deleteHumanInputFolder(folder)}
           onDeleteHumanInputFile={(path) => void fileWorkspace.deleteHumanInputFile(path)}

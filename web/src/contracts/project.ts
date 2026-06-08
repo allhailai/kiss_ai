@@ -101,7 +101,7 @@ export type FileChangeStatus = "new" | "edited";
 
 export type TreeResponse = {
   files: ProjectFile[];
-  emptyDirectories?: string[];
+  emptyDirectories?: Array<{ path: string; name: string }>;
   fileChanges?: Record<string, FileChangeStatus>;
 };
 
@@ -125,6 +125,7 @@ export type CreateHumanInputTextFileResponse = {
 
 export type CreateHumanInputFolderRequest = {
   name: string;
+  folder?: string;
 };
 
 export type CreateHumanInputFolderResponse = {
