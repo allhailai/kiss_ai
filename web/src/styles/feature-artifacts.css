@@ -1687,45 +1687,7 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
-.artifacts-version-confirm {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
 
-.artifacts-version-confirm-text {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--color-accent, #c87040);
-}
-
-.artifacts-version-confirm-yes,
-.artifacts-version-confirm-no {
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: 1px solid var(--color-border, #555);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 11px;
-  color: var(--color-text-muted, #aaa);
-  transition: all 0.15s;
-}
-
-.artifacts-version-confirm-yes:hover {
-  background: color-mix(in srgb, var(--color-accent, #c87040) 15%, transparent);
-  border-color: var(--color-accent, #c87040);
-  color: var(--color-accent, #c87040);
-}
-
-.artifacts-version-confirm-no:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--color-text, #ddd);
-}
 
 /* ── Rebuild Warning Modal ────────────────────────────────── */
 

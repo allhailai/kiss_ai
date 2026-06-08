@@ -2073,6 +2073,15 @@ export function createAgentJobService({
             pendingAnnotations = await getPendingAnnotations(project.path, artifactSlug);
           } catch { /* non-fatal — no annotations file yet */ }
 
+          // Extract hidden sections from current build before wipe (structural intent to preserve)
+          let hiddenSections = [];
+          try {
+            const currentHtml = await readArtifactPreviewHtml(project.path, artifactSlug);
+            hiddenSections = discoverSections(currentHtml)
+              .filter(s => s.hidden)
+              .map(s => ({ id: s.id, title: s.title }));
+          } catch { /* non-fatal — no existing build */ }
+
           // Snapshot the current build before wiping (so user can revert)
           try {
             await createBuildSnapshot(project.path, artifactSlug);
@@ -2083,7 +2092,7 @@ export function createAgentJobService({
           // Delete old build output — preserve .versions/ through the rebuild
           await wipeBuildDirPreservingVersions(project.path, artifactSlug);
 
-          const prompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory, specHash, pendingAnnotations);
+          const prompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory, specHash, pendingAnnotations, hiddenSections);
           const artifactName = spec.frontmatter.name || artifactSlug;
 
           await appendRunEvent(project.slug, {
@@ -2227,6 +2236,15 @@ export function createAgentJobService({
       pendingAnnotations = await getPendingAnnotations(project.path, artifactSlug);
     } catch { /* non-fatal — no annotations file yet */ }
 
+    // Extract hidden sections from current build before wipe (structural intent to preserve)
+    let hiddenSections = [];
+    try {
+      const currentHtml = await readArtifactPreviewHtml(project.path, artifactSlug);
+      hiddenSections = discoverSections(currentHtml)
+        .filter(s => s.hidden)
+        .map(s => ({ id: s.id, title: s.title }));
+    } catch { /* non-fatal — no existing build */ }
+
     // Snapshot the current build before wiping (so user can revert)
     try {
       await createBuildSnapshot(project.path, artifactSlug);
@@ -2239,7 +2257,7 @@ export function createAgentJobService({
     // Preserve .versions/ directory through the rebuild.
     await wipeBuildDirPreservingVersions(project.path, artifactSlug);
 
-    const prompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory, specHash, pendingAnnotations);
+    const prompt = await createArtifactPrompt(project, spec, resolvedSources, discoveryInventory, specHash, pendingAnnotations, hiddenSections);
 
     return await startAgentJob({
       project,

@@ -249,7 +249,7 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
   }
 
 
-  async function createArtifactPrompt(project, artifactSpec, resolvedSources, discoveryInventory = [], specHash = null, pendingAnnotations = []) {
+  async function createArtifactPrompt(project, artifactSpec, resolvedSources, discoveryInventory = [], specHash = null, pendingAnnotations = [], hiddenSections = []) {
     const lines = [
       `Build the artifact: ${artifactSpec.frontmatter.name || artifactSpec.slug}`,
       "",
@@ -368,6 +368,49 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
       }
     }
 
+    // ── User refinements from previous builds ──────────────────────────────
+    const modifyAnnotations = pendingAnnotations.filter(a => a.type !== 'add_section');
+    const addSectionAnnotations = pendingAnnotations.filter(a => a.type === 'add_section');
+
+    if (modifyAnnotations.length > 0 || addSectionAnnotations.length > 0 || hiddenSections.length > 0) {
+      lines.push(
+        '',
+        '── USER REFINEMENTS (from previous builds — incorporate these) ──────────',
+        '',
+        'The user made the following refinements to a previous build of this artifact.',
+        'Treat these as requirements — incorporate them into your new build alongside the spec.',
+        'Note: Section IDs from the previous build may differ from yours — use the intent, not the literal IDs.',
+        '',
+      );
+
+      if (modifyAnnotations.length > 0) {
+        lines.push('SECTION MODIFICATIONS:');
+        for (const ann of modifyAnnotations) {
+          lines.push(`- ${ann.sectionTitle || ann.sectionId}: "${ann.instruction}"`);
+        }
+        lines.push('');
+      }
+
+      if (addSectionAnnotations.length > 0) {
+        lines.push('SECTIONS TO ADD:');
+        for (const ann of addSectionAnnotations) {
+          const positionHint = ann.afterSectionId
+            ? `After the section that was "${ann.sectionTitle || ann.afterSectionId}"`
+            : 'Position at your discretion';
+          lines.push(`- ${positionHint}: "${ann.instruction}"`);
+        }
+        lines.push('');
+      }
+
+      if (hiddenSections.length > 0) {
+        lines.push('SECTIONS TO EXCLUDE (user has hidden these — do NOT generate them):');
+        for (const s of hiddenSections) {
+          lines.push(`- "${s.title}"`);
+        }
+        lines.push('');
+      }
+    }
+
     return lines.join("\n");
   }
   /**
@@ -446,14 +489,6 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
       lines.push("");
     }
 
-    // User annotations from previous builds (instruction text only — no element context)
-    if (pendingAnnotations.length > 0) {
-      lines.push('── USER ANNOTATIONS (incorporate into your design) ──────────', '');
-      for (const ann of pendingAnnotations) {
-        lines.push(`- ${ann.sectionTitle || ann.sectionId}: "${ann.instruction}"`);
-      }
-      lines.push('');
-    }
 
     return lines.join("\n");
   }

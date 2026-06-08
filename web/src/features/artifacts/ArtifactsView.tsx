@@ -1253,8 +1253,7 @@ function SectionPanel({
   const [addSectionDescription, setAddSectionDescription] = useState("");
   const [addSectionAfter, setAddSectionAfter] = useState<string | null>(null);
 
-  // Version revert confirmation
-  const [confirmingRevertId, setConfirmingRevertId] = useState<string | null>(null);
+
 
   const hiddenCount = sections.filter(s => s.hidden).length;
   const visibleSections = showHidden ? sections : sections.filter(s => !s.hidden);
@@ -1619,7 +1618,6 @@ function SectionPanel({
               const dateStr = new Date(v.timestamp).toLocaleString(undefined, {
                 month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
               });
-              const isConfirming = confirmingRevertId === v.dirName;
               const isActive = activeVersionDirName === v.dirName;
               return (
                 <li key={v.dirName} className={`artifacts-version-item${isActive ? " artifacts-version-active" : ""}`}>
@@ -1629,26 +1627,10 @@ function SectionPanel({
                     <span className="artifacts-version-date">{dateStr}</span>
                     {isActive ? <span className="artifacts-version-active-tag">(active)</span> : null}
                   </span>
-                  {isActive ? null : isConfirming ? (
-                    <span className="artifacts-version-confirm">
-                      <span className="artifacts-version-confirm-text">Revert?</span>
-                      <button
-                        className="artifacts-version-confirm-yes"
-                        onClick={() => { onRevertVersion(v.dirName); setConfirmingRevertId(null); }}
-                        type="button"
-                        title="Confirm revert"
-                      >✓</button>
-                      <button
-                        className="artifacts-version-confirm-no"
-                        onClick={() => setConfirmingRevertId(null)}
-                        type="button"
-                        title="Cancel"
-                      >✕</button>
-                    </span>
-                  ) : (
+                  {isActive ? null : (
                     <button
                       className="artifacts-version-revert-btn"
-                      onClick={() => setConfirmingRevertId(v.dirName)}
+                      onClick={() => onRevertVersion(v.dirName)}
                       disabled={building || switchingVersion}
                       type="button"
                       title={`Revert to v${v.version}`}
