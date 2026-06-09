@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useState, useRef, type KeyboardEvent } from "react";
 import type { ProjectFile } from "../../contracts/api";
 import { useBuildContext } from "../../app/contexts/BuildContext";
 import { filesApi } from "../../data/filesApi";
@@ -34,6 +34,20 @@ export function GlobalFileSearch({
   const [isOpen, setIsOpen] = useState(false);
   const [activeResultIndex, setActiveResultIndex] = useState(-1);
   const trimmedQuery = query.trim();
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     if (!trimmedQuery && filter === "all") {
@@ -163,7 +177,7 @@ export function GlobalFileSearch({
           </svg>
         </button>
       </div>
-      <div className="global-search" role="search">
+      <div className="global-search" role="search" ref={searchContainerRef}>
         <label className="global-search-label" htmlFor="global-file-search">
           Search file paths
         </label>
@@ -182,9 +196,6 @@ export function GlobalFileSearch({
           <input
             autoComplete="off"
             id="global-file-search"
-            onBlur={() => {
-              window.setTimeout(() => setIsOpen(false), 120);
-            }}
             onChange={(event) => {
               setQuery(event.target.value);
               setIsOpen(true);
