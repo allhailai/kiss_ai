@@ -199,7 +199,20 @@ export function useProjectWorkspace() {
         return;
       }
 
-      navigateTo(nextView, path);
+      let routePath = path;
+      if (nextView === "artifacts") {
+        const specMatch = path.match(/^artifacts\/artifact_specs\/(.+)\.artifact\.md$/);
+        if (specMatch) {
+          routePath = specMatch[1];
+        } else {
+          const buildMatch = path.match(/^artifacts\/artifact_builds\/(.+?)\//);
+          if (buildMatch) {
+            routePath = buildMatch[1];
+          }
+        }
+      }
+
+      navigateTo(nextView, routePath);
     },
     [navigateTo, projectFiles, setNotice],
   );
