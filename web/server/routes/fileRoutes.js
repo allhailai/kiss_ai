@@ -41,7 +41,7 @@ export function registerFileRoutes(app, {
   const searchProjectFiles = async (request, response, next) => {
     try {
       const query = parseRequestQuery(searchFilesQuerySchema, request.query, httpError);
-      response.json({ files: await searchPathFiles(request.project.path, query.q) });
+      response.json({ files: await searchPathFiles(request.project.path, query.q || "", query.filter) });
     } catch (error) {
       next(error);
     }

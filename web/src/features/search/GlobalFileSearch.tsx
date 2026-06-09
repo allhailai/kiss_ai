@@ -27,6 +27,7 @@ export function GlobalFileSearch({
   onToggleRightPanel: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
   const [results, setResults] = useState<ProjectFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -35,7 +36,7 @@ export function GlobalFileSearch({
   const trimmedQuery = query.trim();
 
   useEffect(() => {
-    if (!trimmedQuery) {
+    if (!trimmedQuery && filter === "all") {
       setResults([]);
       setLoading(false);
       setError("");
@@ -50,7 +51,7 @@ export function GlobalFileSearch({
 
     const timeoutId = window.setTimeout(() => {
       filesApi
-        .searchFiles(projectSlug, trimmedQuery, controller.signal)
+        .searchFiles(projectSlug, trimmedQuery, controller.signal, filter)
         .then((response) => {
           if (cancelled) return;
           setResults(response.files);
@@ -82,7 +83,7 @@ export function GlobalFileSearch({
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [projectSlug, trimmedQuery]);
+  }, [projectSlug, trimmedQuery, filter]);
 
   function openResult(path: string) {
     onOpenFile(path);
@@ -119,7 +120,7 @@ export function GlobalFileSearch({
     }
   }
 
-  const showResults = isOpen && Boolean(trimmedQuery);
+  const showResults = isOpen && (Boolean(trimmedQuery) || filter !== "all");
   const { isBuilding, openBuildPanel, rebuild } = useBuildContext();
   const buildPhaseLabel = rebuild?.buildPhase ? rebuild.buildPhase.replace(/_/g, " ") : null;
 
@@ -167,6 +168,17 @@ export function GlobalFileSearch({
           Search file paths
         </label>
         <div className="global-search-field">
+          <select
+            className="global-search-filter"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            aria-label="Filter search results"
+          >
+            <option value="all">All</option>
+            <option value="sources">Sources</option>
+            <option value="wiki">Wiki</option>
+            <option value="outputs">Outputs</option>
+          </select>
           <input
             autoComplete="off"
             id="global-file-search"

@@ -1091,12 +1091,36 @@ export function createProjectFileService({
     return uniqueCandidates;
   }
 
-  async function searchFiles(projectRoot, query) {
+  async function searchFiles(projectRoot, query, filter) {
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return [];
+    if (!normalizedQuery && (!filter || filter === "all")) return [];
 
-    return (await searchCandidates(projectRoot))
-      .filter((file) => file.searchableText.includes(normalizedQuery))
+    const tokens = normalizedQuery ? normalizedQuery.split(/\s+/) : [];
+
+    let candidates = await searchCandidates(projectRoot);
+
+    if (filter && filter !== "all") {
+      candidates = candidates.filter((file) => {
+        if (filter === "sources") {
+          return file.path.startsWith("sources/");
+        }
+        if (filter === "wiki") {
+          return file.path.startsWith("outputs_ai/wiki/");
+        }
+        if (filter === "outputs") {
+          return file.path.startsWith("artifacts/") || (file.path.startsWith("outputs_ai/") && !file.path.startsWith("outputs_ai/wiki/"));
+        }
+        return true;
+      });
+    }
+
+    if (tokens.length > 0) {
+      candidates = candidates.filter((file) => {
+        return tokens.every((token) => file.searchableText.includes(token));
+      });
+    }
+
+    return candidates
       .map(({ searchableText: _searchableText, ...file }) => file)
       .sort((left, right) => left.path.localeCompare(right.path))
       .slice(0, MAX_SEARCH_RESULTS);
