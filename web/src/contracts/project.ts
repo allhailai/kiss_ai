@@ -80,6 +80,7 @@ export type ProjectFile = {
   chatContextReadable?: boolean;
   modifiedAt?: string | null;
   previewable?: boolean;
+  snippet?: string;
 };
 
 export type FileContent = {

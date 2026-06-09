@@ -30,8 +30,11 @@ function fileToBase64(file: File) {
   });
 }
 
-function searchProjectFiles(projectSlug: string, query: string, signal?: AbortSignal) {
+function searchProjectFiles(projectSlug: string, query: string, signal?: AbortSignal, filter?: string) {
   const params = new URLSearchParams({ q: query });
+  if (filter && filter !== "all") {
+    params.set("filter", filter);
+  }
   return request<FileSearchResponse>(`${projectBase(projectSlug)}/search/files?${params}`, { signal });
 }
 

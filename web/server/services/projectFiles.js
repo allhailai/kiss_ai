@@ -1091,12 +1091,99 @@ export function createProjectFileService({
     return uniqueCandidates;
   }
 
-  async function searchFiles(projectRoot, query) {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return [];
+  async function gitGrepSearch(projectRoot, tokens) {
+    if (tokens.length === 0) return new Map();
 
-    return (await searchCandidates(projectRoot))
-      .filter((file) => file.searchableText.includes(normalizedQuery))
+    const args = ["grep", "-i", "-I", "-n", "--untracked", "--all-match"];
+    for (const token of tokens) {
+      args.push("-F", "-e", token);
+    }
+
+    return new Promise((resolve) => {
+      execFile("git", args, { cwd: projectRoot, maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
+        if (error) {
+          // Exit code 1 means no lines were selected.
+          resolve(new Map());
+          return;
+        }
+
+        const map = new Map();
+        for (const line of stdout.split("\n")) {
+          if (!line) continue;
+          const match = line.match(/^([^:]+):(\d+):(.*)$/);
+          if (!match) continue;
+          
+          const path = match[1];
+          if (!map.has(path)) {
+            let content = match[3].trim();
+            const lowerContent = content.toLowerCase();
+            let matchIndex = -1;
+            for (const token of tokens) {
+              const idx = lowerContent.indexOf(token);
+              if (idx !== -1) {
+                matchIndex = idx;
+                break;
+              }
+            }
+            if (matchIndex !== -1) {
+              const start = Math.max(0, matchIndex - 40);
+              const end = Math.min(content.length, matchIndex + 40);
+              content = (start > 0 ? "..." : "") + content.slice(start, end) + (end < content.length ? "..." : "");
+            } else {
+              content = content.slice(0, 80) + (content.length > 80 ? "..." : "");
+            }
+            map.set(path, content);
+          }
+        }
+        resolve(map);
+      });
+    });
+  }
+
+  async function searchFiles(projectRoot, query, filter) {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery && (!filter || filter === "all")) return [];
+
+    const tokens = normalizedQuery ? normalizedQuery.split(/\s+/) : [];
+
+    let candidates = await searchCandidates(projectRoot);
+
+    if (filter && filter !== "all") {
+      candidates = candidates.filter((file) => {
+        if (filter === "sources") {
+          return file.path.startsWith("sources/");
+        }
+        if (filter === "wiki") {
+          return file.path.startsWith("outputs_ai/wiki/");
+        }
+        if (filter === "outputs") {
+          return file.path.startsWith("artifacts/") || (file.path.startsWith("outputs_ai/") && !file.path.startsWith("outputs_ai/wiki/"));
+        }
+        return true;
+      });
+    }
+
+    if (tokens.length > 0) {
+      const fullTextMap = await gitGrepSearch(projectRoot, tokens);
+
+      candidates = candidates.filter((file) => {
+        const matchesPath = tokens.every((token) => file.searchableText.includes(token));
+        const snippet = fullTextMap.get(file.path);
+        
+        if (matchesPath) {
+          file.snippet = snippet;
+          return true;
+        }
+        
+        if (snippet) {
+          file.snippet = snippet;
+          return true;
+        }
+        return false;
+      });
+    }
+
+    return candidates
       .map(({ searchableText: _searchableText, ...file }) => file)
       .sort((left, right) => left.path.localeCompare(right.path))
       .slice(0, MAX_SEARCH_RESULTS);

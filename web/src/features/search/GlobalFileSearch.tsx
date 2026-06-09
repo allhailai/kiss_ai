@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useState, useRef, type KeyboardEvent } from "react";
 import type { ProjectFile } from "../../contracts/api";
 import { useBuildContext } from "../../app/contexts/BuildContext";
 import { filesApi } from "../../data/filesApi";
@@ -27,15 +27,30 @@ export function GlobalFileSearch({
   onToggleRightPanel: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
   const [results, setResults] = useState<ProjectFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [activeResultIndex, setActiveResultIndex] = useState(-1);
   const trimmedQuery = query.trim();
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!trimmedQuery) {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!trimmedQuery && filter === "all") {
       setResults([]);
       setLoading(false);
       setError("");
@@ -50,7 +65,7 @@ export function GlobalFileSearch({
 
     const timeoutId = window.setTimeout(() => {
       filesApi
-        .searchFiles(projectSlug, trimmedQuery, controller.signal)
+        .searchFiles(projectSlug, trimmedQuery, controller.signal, filter)
         .then((response) => {
           if (cancelled) return;
           setResults(response.files);
@@ -82,11 +97,12 @@ export function GlobalFileSearch({
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [projectSlug, trimmedQuery]);
+  }, [projectSlug, trimmedQuery, filter]);
 
   function openResult(path: string) {
     onOpenFile(path);
     setQuery("");
+    setFilter("all");
     setResults([]);
     setIsOpen(false);
     setActiveResultIndex(-1);
@@ -119,7 +135,7 @@ export function GlobalFileSearch({
     }
   }
 
-  const showResults = isOpen && Boolean(trimmedQuery);
+  const showResults = isOpen && (Boolean(trimmedQuery) || filter !== "all");
   const { isBuilding, openBuildPanel, rebuild } = useBuildContext();
   const buildPhaseLabel = rebuild?.buildPhase ? rebuild.buildPhase.replace(/_/g, " ") : null;
 
@@ -162,17 +178,25 @@ export function GlobalFileSearch({
           </svg>
         </button>
       </div>
-      <div className="global-search" role="search">
+      <div className="global-search" role="search" ref={searchContainerRef}>
         <label className="global-search-label" htmlFor="global-file-search">
           Search file paths
         </label>
         <div className="global-search-field">
+          <select
+            className="global-search-filter"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            aria-label="Filter search results"
+          >
+            <option value="all">All</option>
+            <option value="sources">Sources</option>
+            <option value="wiki">Wiki</option>
+            <option value="outputs">Outputs</option>
+          </select>
           <input
             autoComplete="off"
             id="global-file-search"
-            onBlur={() => {
-              window.setTimeout(() => setIsOpen(false), 120);
-            }}
             onChange={(event) => {
               setQuery(event.target.value);
               setIsOpen(true);
@@ -215,6 +239,9 @@ export function GlobalFileSearch({
                         {humanizePathSegment(fileBasename(file.path))}
                       </strong>
                       <span>{file.path}</span>
+                      {file.snippet ? (
+                        <span className="global-search-snippet">{file.snippet}</span>
+                      ) : null}
                     </button>
                   ))
                 : null}

@@ -200,6 +200,7 @@ export const filePathQuerySchema = z.object({
 
 export const searchFilesQuerySchema = z.object({
   q: optionalQueryString(300),
+  filter: optionalQueryString(50),
 });
 
 export const buildLogQuerySchema = z.object({
