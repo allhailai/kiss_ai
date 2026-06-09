@@ -143,7 +143,7 @@ describe("request schemas", () => {
     expect(parseRequestParams(treeSectionParamsSchema, { section: "outputs" }, httpError)).toEqual({ section: "outputs" });
     expect(parseRequestParams(conversationParamsSchema, { conversationId: "conv_123" }, httpError)).toEqual({ conversationId: "conv_123" });
     expect(parseRequestQuery(filePathQuerySchema, { path: "outputs_ai/report.md" }, httpError)).toEqual({ path: "outputs_ai/report.md" });
-    expect(parseRequestQuery(searchFilesQuerySchema, { q: ["report", "ignored"] }, httpError)).toEqual({ q: "report" });
+    expect(parseRequestQuery(searchFilesQuerySchema, { q: ["report", "ignored"] }, httpError)).toEqual({ q: "report", filter: "" });
     expect(parseRequestQuery(buildLogQuerySchema, { tab: "build-summary", summary: "change_logs/summaries/a.md" }, httpError)).toMatchObject({
       tab: "build-summary",
       summary: "change_logs/summaries/a.md",
