@@ -150,6 +150,20 @@
   overflow-wrap: anywhere;
 }
 
+.global-search-snippet {
+  font-family: monospace;
+  font-size: 0.75rem !important;
+  color: var(--color-text-dim) !important;
+  background: color-mix(in srgb, var(--color-border) 40%, transparent);
+  padding: 4px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .global-search-result:hover,
 .global-search-result:focus-visible,
 .global-search-result.active {

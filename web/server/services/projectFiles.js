@@ -1092,9 +1092,9 @@ export function createProjectFileService({
   }
 
   async function gitGrepSearch(projectRoot, tokens) {
-    if (tokens.length === 0) return new Set();
+    if (tokens.length === 0) return new Map();
 
-    const args = ["grep", "-i", "-I", "-l", "--untracked", "--all-match"];
+    const args = ["grep", "-i", "-I", "-n", "--untracked", "--all-match"];
     for (const token of tokens) {
       args.push("-F", "-e", token);
     }
@@ -1103,12 +1103,39 @@ export function createProjectFileService({
       execFile("git", args, { cwd: projectRoot, maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
         if (error) {
           // Exit code 1 means no lines were selected.
-          resolve(new Set());
+          resolve(new Map());
           return;
         }
 
-        const paths = stdout.split("\n").filter(Boolean);
-        resolve(new Set(paths));
+        const map = new Map();
+        for (const line of stdout.split("\n")) {
+          if (!line) continue;
+          const match = line.match(/^([^:]+):(\d+):(.*)$/);
+          if (!match) continue;
+          
+          const path = match[1];
+          if (!map.has(path)) {
+            let content = match[3].trim();
+            const lowerContent = content.toLowerCase();
+            let matchIndex = -1;
+            for (const token of tokens) {
+              const idx = lowerContent.indexOf(token);
+              if (idx !== -1) {
+                matchIndex = idx;
+                break;
+              }
+            }
+            if (matchIndex !== -1) {
+              const start = Math.max(0, matchIndex - 40);
+              const end = Math.min(content.length, matchIndex + 40);
+              content = (start > 0 ? "..." : "") + content.slice(start, end) + (end < content.length ? "..." : "");
+            } else {
+              content = content.slice(0, 80) + (content.length > 80 ? "..." : "");
+            }
+            map.set(path, content);
+          }
+        }
+        resolve(map);
       });
     });
   }
@@ -1137,12 +1164,22 @@ export function createProjectFileService({
     }
 
     if (tokens.length > 0) {
-      const fullTextPaths = await gitGrepSearch(projectRoot, tokens);
+      const fullTextMap = await gitGrepSearch(projectRoot, tokens);
 
       candidates = candidates.filter((file) => {
         const matchesPath = tokens.every((token) => file.searchableText.includes(token));
-        const matchesContent = fullTextPaths.has(file.path);
-        return matchesPath || matchesContent;
+        const snippet = fullTextMap.get(file.path);
+        
+        if (matchesPath) {
+          file.snippet = snippet;
+          return true;
+        }
+        
+        if (snippet) {
+          file.snippet = snippet;
+          return true;
+        }
+        return false;
       });
     }
 

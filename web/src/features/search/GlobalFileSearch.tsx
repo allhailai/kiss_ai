@@ -102,6 +102,7 @@ export function GlobalFileSearch({
   function openResult(path: string) {
     onOpenFile(path);
     setQuery("");
+    setFilter("all");
     setResults([]);
     setIsOpen(false);
     setActiveResultIndex(-1);
@@ -238,6 +239,9 @@ export function GlobalFileSearch({
                         {humanizePathSegment(fileBasename(file.path))}
                       </strong>
                       <span>{file.path}</span>
+                      {file.snippet ? (
+                        <span className="global-search-snippet">{file.snippet}</span>
+                      ) : null}
                     </button>
                   ))
                 : null}
