@@ -1091,6 +1091,28 @@ export function createProjectFileService({
     return uniqueCandidates;
   }
 
+  async function gitGrepSearch(projectRoot, tokens) {
+    if (tokens.length === 0) return new Set();
+
+    const args = ["grep", "-i", "-I", "-l", "--untracked", "--all-match"];
+    for (const token of tokens) {
+      args.push("-F", "-e", token);
+    }
+
+    return new Promise((resolve) => {
+      execFile("git", args, { cwd: projectRoot, maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
+        if (error) {
+          // Exit code 1 means no lines were selected.
+          resolve(new Set());
+          return;
+        }
+
+        const paths = stdout.split("\n").filter(Boolean);
+        resolve(new Set(paths));
+      });
+    });
+  }
+
   async function searchFiles(projectRoot, query, filter) {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery && (!filter || filter === "all")) return [];
@@ -1115,8 +1137,12 @@ export function createProjectFileService({
     }
 
     if (tokens.length > 0) {
+      const fullTextPaths = await gitGrepSearch(projectRoot, tokens);
+
       candidates = candidates.filter((file) => {
-        return tokens.every((token) => file.searchableText.includes(token));
+        const matchesPath = tokens.every((token) => file.searchableText.includes(token));
+        const matchesContent = fullTextPaths.has(file.path);
+        return matchesPath || matchesContent;
       });
     }
 
