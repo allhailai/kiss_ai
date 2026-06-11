@@ -22,6 +22,7 @@ function QuestionCard({
   question,
   models,
   onAnswer,
+  onDelete,
   onNavigateToFile,
   projectSlug,
   selectedModelId,
@@ -30,6 +31,7 @@ function QuestionCard({
   question: BuildQuestion;
   models: RebuildModel[];
   onAnswer: (questionId: string, answer: string) => void;
+  onDelete: (questionId: string) => void;
   onNavigateToFile: (path: string) => void;
   projectSlug: string;
   selectedModelId: string;
@@ -107,6 +109,12 @@ function QuestionCard({
     setAiError(null);
   }, []);
 
+  const handleDelete = useCallback(() => {
+    if (window.confirm("Are you sure you want to delete this question?")) {
+      onDelete(question.id);
+    }
+  }, [onDelete, question.id]);
+
   return (
     <article
       className={`question-card question-card-${question.status} question-card-priority-${question.priority}`}
@@ -118,6 +126,14 @@ function QuestionCard({
         <span className={`question-status-pill question-status-${question.status}`}>
           {isOpen ? "Open" : question.status === "applied" ? "Applied" : question.answeredBy === "ai_auto" ? "AI Answered" : "Answered"}
         </span>
+        <button
+          className="question-card-delete-button"
+          onClick={handleDelete}
+          title="Delete Question"
+          type="button"
+        >
+          ✕
+        </button>
       </header>
 
       <p className="question-card-text">{question.text}</p>
@@ -438,6 +454,26 @@ export function QuestionsWorkspace({
     [projectSlug, fetchQuestions],
   );
 
+  const handleDelete = useCallback(
+    async (questionId: string) => {
+      try {
+        const response = await fetch(
+          `/api/projects/${encodeURIComponent(projectSlug)}/questions/${encodeURIComponent(questionId)}`,
+          {
+            method: "DELETE",
+          }
+        );
+        if (!response.ok) throw new Error("Failed to delete question");
+
+        // Refresh the list
+        await fetchQuestions();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to delete question");
+      }
+    },
+    [projectSlug, fetchQuestions],
+  );
+
   const openCount = questions.filter((q) => q.status === "open").length;
   const answeredCount = questions.filter((q) => q.status === "answered" || q.status === "applied").length;
 
@@ -503,6 +539,7 @@ export function QuestionsWorkspace({
               key={q.id}
               models={models}
               onAnswer={handleAnswer}
+              onDelete={handleDelete}
               onModelChange={onModelChange}
               onNavigateToFile={onNavigateToFile}
               projectSlug={projectSlug}

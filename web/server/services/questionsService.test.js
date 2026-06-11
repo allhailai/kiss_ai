@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { readQuestions, writeQuestions, extractBuildQuestions, extractAllBuildQuestions, getQuestionCounts } from "./questionsService.js";
+import { readQuestions, writeQuestions, extractBuildQuestions, extractAllBuildQuestions, getQuestionCounts, deleteQuestion } from "./questionsService.js";
 
 describe("questionsService", () => {
   async function makeTempDir() {
@@ -172,6 +172,36 @@ More text.
         blockingQuestionsCount: 0,
         totalQuestionsCount: 0,
       });
+    });
+  });
+
+  describe("deleteQuestion", () => {
+    it("deletes an existing question by ID and returns true", async () => {
+      const dir = await makeTempDir();
+      const questions = [
+        { id: "q-1", text: "Q1", status: "open" },
+        { id: "q-2", text: "Q2", status: "open" },
+      ];
+      await writeQuestions(dir, questions);
+
+      const success = await deleteQuestion(dir, "q-1");
+      expect(success).toBe(true);
+
+      const updated = await readQuestions(dir);
+      expect(updated.questions).toHaveLength(1);
+      expect(updated.questions[0].id).toBe("q-2");
+    });
+
+    it("returns false and does not change file if question does not exist", async () => {
+      const dir = await makeTempDir();
+      const questions = [{ id: "q-1", text: "Q1", status: "open" }];
+      await writeQuestions(dir, questions);
+
+      const success = await deleteQuestion(dir, "nonexistent");
+      expect(success).toBe(false);
+
+      const updated = await readQuestions(dir);
+      expect(updated.questions).toHaveLength(1);
     });
   });
 });

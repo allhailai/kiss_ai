@@ -1,5 +1,6 @@
 import { buildLogQuerySchema, createProjectBodySchema, parseRequestBody, parseRequestQuery, updateProjectUiStateBodySchema } from "./requestSchemas.js";
-import { readQuestions, answerQuestion, getQuestionCounts } from "../services/questionsService.js";
+import { readQuestions, answerQuestion, getQuestionCounts, deleteQuestion } from "../services/questionsService.js";
+import { readFailedSources, deleteFailedSource } from "../services/failedSources.js";
 
 import { readTopics, resolveTopic, updateTopic, setDisposition, getTopicCounts, toggleDeepenQueue, queueAllShallowForDeepen, getDeepenLog, createTopic } from "../services/topicsService.js";
 
@@ -163,6 +164,45 @@ export function registerProjectRoutes(app, {
       }
 
       response.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/projects/:projectSlug/questions/:questionId", async (request, response, next) => {
+    try {
+      const { questionId } = request.params;
+      const success = await deleteQuestion(request.project.path, questionId);
+
+      if (!success) {
+        throw httpError(`Question '${questionId}' not found.`, 404, "question_not_found");
+      }
+
+      response.json({ success: true, deletedQuestionId: questionId });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/projects/:projectSlug/failed-sources", async (request, response, next) => {
+    try {
+      const failedSources = await readFailedSources(request.project.path);
+      response.json({ failedSources });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/projects/:projectSlug/failed-sources/:id", async (request, response, next) => {
+    try {
+      const { id } = request.params;
+      const success = await deleteFailedSource(request.project.path, id);
+
+      if (!success) {
+        throw httpError(`Failed source '${id}' not found.`, 404, "failed_source_not_found");
+      }
+
+      response.json({ success: true, deletedFailedSourceId: id });
     } catch (error) {
       next(error);
     }

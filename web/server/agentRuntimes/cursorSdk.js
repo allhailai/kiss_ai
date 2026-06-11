@@ -44,6 +44,8 @@ export async function runCursorAgent({ project, apiKey, modelId, prompt, onEvent
       metadata: { runId: run.id ?? null },
     });
 
+    let outputBytes = 0;
+
     if (run.supports("stream")) {
       for await (const event of run.stream()) {
         throwIfAborted(signal);
@@ -52,6 +54,7 @@ export async function runCursorAgent({ project, apiKey, modelId, prompt, onEvent
 
         for (const block of event.message.content) {
           if (block.type === "text" && block.text) {
+            outputBytes += Buffer.byteLength(block.text, "utf8");
             await onEvent({
               type: "assistant_delta",
               text: block.text,
@@ -65,7 +68,20 @@ export async function runCursorAgent({ project, apiKey, modelId, prompt, onEvent
 
     throwIfAborted(signal);
 
-    return await run.wait();
+    const promptBytes = Buffer.byteLength(prompt, "utf8");
+    await onEvent({
+      type: "run_usage",
+      title: "Agent Run Usage",
+      text: `Est. input tokens: ~${Math.round(promptBytes / 4).toLocaleString()}, Est. output tokens: ~${Math.round(outputBytes / 4).toLocaleString()}`,
+      status: "finished",
+      runtime: "cursor",
+      metadata: { promptBytes, outputBytes },
+    });
+
+    const result = await run.wait();
+    // @ts-expect-error -- custom outputBytes tracking
+    result.outputBytes = outputBytes;
+    return result;
   } catch (error) {
     if (error?.name === "AbortError") {
       throw error;
@@ -86,7 +102,7 @@ export async function runCursorAgent({ project, apiKey, modelId, prompt, onEvent
 export async function runCursorAgentText({ project, apiKey, modelId, prompt, onEvent, signal }) {
   let text = "";
 
-  await runCursorAgent({
+  const result = await runCursorAgent({
     project,
     apiKey,
     modelId,
@@ -102,6 +118,11 @@ export async function runCursorAgentText({ project, apiKey, modelId, prompt, onE
       }
     },
   });
+
+  const promptBytes = Buffer.byteLength(prompt, "utf8");
+  // @ts-expect-error -- custom outputBytes tracking
+  const outputBytes = result?.outputBytes ?? 0;
+  console.log(`[kiss_ai text] model=${modelId} prompt=~${Math.round(promptBytes / 4)} tokens (${(promptBytes / 1024).toFixed(1)} KB) output=~${Math.round(outputBytes / 4)} tokens (${(outputBytes / 1024).toFixed(1)} KB)`);
 
   return text.trim();
 }

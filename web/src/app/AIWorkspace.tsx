@@ -5,8 +5,9 @@ import type { ProjectChatController } from "./hooks/useProjectChat";
 import { QuestionsWorkspace } from "../features/questions/QuestionsWorkspace";
 import { TopicsWorkspace } from "../features/topics/TopicsWorkspace";
 import { ProjectChatConversationHistory } from "../features/chat/ProjectChatConversationHistory";
+import { FailedSourcesWorkspace, FailedSource } from "../features/questions/FailedSourcesWorkspace";
 
-const VALID_TABS = new Set<AiTab>(["conversations", "topics", "questions"]);
+const VALID_TABS = new Set<AiTab>(["conversations", "topics", "questions", "failed-sources"]);
 
 function parseTabFromContext(context: Record<string, string>): AiTab {
   const t = context.tab as AiTab | undefined;
@@ -153,7 +154,20 @@ export function AIWorkspace({
   // Fetch summary counts for the summary cards
   const [questions, setQuestions] = useState<BuildQuestion[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
+  const [failedSources, setFailedSources] = useState<FailedSource[]>([]);
   const [summaryLoading, setSummaryLoading] = useState(true);
+
+  const fetchFailedSources = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/projects/${encodeURIComponent(projectSlug)}/failed-sources`);
+      if (r.ok) {
+        const data = await r.json();
+        setFailedSources(data.failedSources ?? []);
+      }
+    } catch {
+      // Ignore
+    }
+  }, [projectSlug]);
 
   useEffect(() => {
     let cancelled = false;
@@ -162,10 +176,12 @@ export function AIWorkspace({
     Promise.all([
       fetch(`/api/projects/${encodeURIComponent(projectSlug)}/questions`).then((r) => r.ok ? r.json() : { questions: [] }),
       fetch(`/api/projects/${encodeURIComponent(projectSlug)}/topics`).then((r) => r.ok ? r.json() : { topics: [] }),
-    ]).then(([qData, tData]) => {
+      fetch(`/api/projects/${encodeURIComponent(projectSlug)}/failed-sources`).then((r) => r.ok ? r.json() : { failedSources: [] }),
+    ]).then(([qData, tData, fsData]) => {
       if (cancelled) return;
       setQuestions(qData.questions ?? []);
       setTopics(tData.topics ?? []);
+      setFailedSources(fsData.failedSources ?? []);
       setSummaryLoading(false);
     }).catch(() => {
       if (!cancelled) setSummaryLoading(false);
@@ -177,11 +193,13 @@ export function AIWorkspace({
   const openQuestions = questions.filter((q) => q.status === "open").length;
   const blockingQuestions = questions.filter((q) => q.status === "open" && q.priority === "blocking").length;
   const seedTopics = topics.filter((t) => t.state === "seed").length;
+  const failedSourcesCount = failedSources.length;
 
   const tabs: Array<{ id: AiTab; label: string; badge?: number; badgeClass?: string }> = [
     { id: "conversations", label: "Conversations" },
     { id: "topics", label: "Topics", badge: seedTopics > 0 ? seedTopics : undefined, badgeClass: "ai-tab-badge-open" },
     { id: "questions", label: "Questions", badge: openQuestions > 0 ? openQuestions : undefined, badgeClass: blockingQuestions > 0 ? "ai-tab-badge-blocking" : "ai-tab-badge-open" },
+    { id: "failed-sources", label: "Failed Sources", badge: failedSourcesCount > 0 ? failedSourcesCount : undefined, badgeClass: "ai-tab-badge-blocking" },
   ];
 
   return (
@@ -249,6 +267,13 @@ export function AIWorkspace({
             onNavigateToFile={onNavigateToFile}
             projectSlug={projectSlug}
             selectedModelId={selectedModelId}
+          />
+        ) : null}
+        {activeTab === "failed-sources" ? (
+          <FailedSourcesWorkspace
+            projectSlug={projectSlug}
+            failedSources={failedSources}
+            onRefresh={fetchFailedSources}
           />
         ) : null}
       </div>

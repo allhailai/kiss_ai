@@ -528,6 +528,9 @@ export function createAgentJobService({
     });
 
     await finishAssistantMessage(project.slug);
+
+    const outputBytes = result.outputBytes ?? 0;
+    result.promptBytes = promptBytes;
     return result;
   }
 
@@ -562,6 +565,15 @@ export function createAgentJobService({
     activeRebuilds.add(project.slug);
     const buildStartTime = Date.now();
     const phaseTimings = {};
+    const buildUsage = { phases: [], totalPromptBytes: 0, totalOutputBytes: 0 };
+
+    function recordPhaseUsage(phaseName, result, durationSeconds) {
+      const promptBytes = result?.promptBytes ?? 0;
+      const outputBytes = result?.outputBytes ?? 0;
+      buildUsage.totalPromptBytes += promptBytes;
+      buildUsage.totalOutputBytes += outputBytes;
+      buildUsage.phases.push({ phase: phaseName, promptBytes, outputBytes, durationSeconds });
+    }
 
     try {
       // ── Compute build scope ──
@@ -683,6 +695,7 @@ export function createAgentJobService({
           signal,
         });
         phaseTimings.research = Math.round((Date.now() - researchStart) / 1000);
+        recordPhaseUsage("Research Plan", researchResult, phaseTimings.research);
 
         if (researchResult.status !== "finished") {
           throw new Error(`Research plan phase failed: ${researchResult.result || "unknown error"}`);
@@ -795,6 +808,11 @@ export function createAgentJobService({
         });
         phaseTimings.wiki = Math.round((Date.now() - wikiStart) / 1000);
 
+        // Record usage for each wiki page
+        for (const pr of pageResults) {
+          recordPhaseUsage(`Wiki: ${pr.page}`, pr.result, pr.durationSeconds);
+        }
+
         // Update per-page edit tracker
         await updateWikiPageTracker(project.path, pageResults);
 
@@ -844,6 +862,7 @@ export function createAgentJobService({
           signal,
         });
         phaseTimings.wiki = Math.round((Date.now() - wikiStart) / 1000);
+        recordPhaseUsage("Wiki Synthesis (full)", wikiResult, phaseTimings.wiki);
 
         if (wikiResult.status !== "finished") {
           throw new Error(`Wiki synthesis phase failed: ${wikiResult.result || "unknown error"}`);
@@ -898,7 +917,8 @@ export function createAgentJobService({
 
           const autoAnswerPrompt = createAutoAnswerPrompt(project, openQuestions);
           const autoAnswerStart = Date.now();
-          await runSingleAgentPhase({
+          // (moved below — result captured for usage tracking)
+          const autoAnswerResult = await runSingleAgentPhase({
             project,
             apiKey,
             modelId,
@@ -907,6 +927,7 @@ export function createAgentJobService({
             signal,
           });
           phaseTimings.autoAnswer = Math.round((Date.now() - autoAnswerStart) / 1000);
+          recordPhaseUsage("Auto-Answer", autoAnswerResult, phaseTimings.autoAnswer);
 
           // Check results
           const updatedQuestions = await readQuestions(project.path);
@@ -997,9 +1018,11 @@ export function createAgentJobService({
         wikiPagesUpdated: triage.action === "skip" ? 0
           : triage.action === "targeted" ? triage.affectedPages.length : "all",
         sourcesFetched: fetchResults.fetched,
+        failedUrls: fetchResults.failedUrls,
         feedbackApplied: scope.feedbackMarkers.length,
         topicsDeepened: deepenQueue.length,
         notes: null,
+        usage: buildUsage,
       });
 
       // Git snapshot
@@ -1144,6 +1167,74 @@ export function createAgentJobService({
       const completedState = await getRebuildState(project.slug);
       const buildDurationSeconds = Math.round((Date.now() - buildStartTime) / 1000);
       const { attentionCount, finishedWithAttention, message, status } = await createAgentJobCompletionMessage(jobName)({ project, result: synthesisResult });
+
+      // Emit usage summary event
+      const estInputTokens = Math.round(buildUsage.totalPromptBytes / 4);
+      const estOutputTokens = Math.round(buildUsage.totalOutputBytes / 4);
+      const estTotalTokens = estInputTokens + estOutputTokens;
+
+      // Context window usage details
+      let peakPhase = null;
+      let peakPromptBytes = 0;
+      if (buildUsage.phases?.length > 0) {
+        for (const p of buildUsage.phases) {
+          if (p.promptBytes > peakPromptBytes) {
+            peakPromptBytes = p.promptBytes;
+            peakPhase = p;
+          }
+        }
+      }
+
+      const getModelContextWindowLimit = (mId) => {
+        const id = String(mId || "").toLowerCase();
+        if (id.includes("gemini-1.5-pro") || id.includes("gemini-2.5-pro")) return 2097152;
+        if (id.includes("gemini-1.5-flash")) return 1048576;
+        if (id.includes("gemini-2.0") || id.includes("gemini-2.5")) return 1048576;
+        if (id.includes("claude-3-5") || id.includes("claude-3.5") || id.includes("claude-3")) return 200000;
+        if (id.includes("gpt-4o") || id.includes("gpt-4-turbo")) return 128000;
+        if (id.includes("composer")) return 200000;
+        return null;
+      };
+
+      const limit = getModelContextWindowLimit(modelId);
+      let contextUsageLine = "";
+      if (peakPhase) {
+        const peakIn = Math.round(peakPromptBytes / 4);
+        if (limit) {
+          const util = ((peakIn / limit) * 100).toFixed(2);
+          contextUsageLine = `Peak context used (phase "${peakPhase.phase}"): ~${peakIn.toLocaleString()} tokens (${util}% of ${limit.toLocaleString()} model limit)`;
+        } else {
+          contextUsageLine = `Peak context used (phase "${peakPhase.phase}"): ~${peakIn.toLocaleString()} tokens`;
+        }
+      }
+
+      const usageSummaryLines = [
+        `Est. input tokens: ~${estInputTokens.toLocaleString()} (${(buildUsage.totalPromptBytes / 1024).toFixed(1)} KB prompt)`,
+        `Est. output tokens: ~${estOutputTokens.toLocaleString()} (${(buildUsage.totalOutputBytes / 1024).toFixed(1)} KB response)`,
+        `Est. total tokens: ~${estTotalTokens.toLocaleString()}`,
+        contextUsageLine,
+        "",
+        ...buildUsage.phases.map((p) =>
+          `  ${p.phase}: ~${Math.round(p.promptBytes / 4).toLocaleString()} in / ~${Math.round(p.outputBytes / 4).toLocaleString()} out (${p.durationSeconds}s)`
+        ),
+      ].filter((line) => line !== "");
+
+      await appendRunEvent(project.slug, {
+        type: "system",
+        title: `Token usage: ~${estTotalTokens.toLocaleString()} est. tokens (${buildUsage.phases.length} phase${buildUsage.phases.length === 1 ? "" : "s"})`,
+        text: usageSummaryLines.join("\n"),
+        status: "usage_summary",
+        runtime: "server",
+        metadata: {
+          buildUsage,
+          estInputTokens,
+          estOutputTokens,
+          estTotalTokens,
+          peakPhase: peakPhase ? { phase: peakPhase.phase, promptTokens: Math.round(peakPromptBytes / 4) } : null,
+          modelContextLimit: limit,
+        },
+      });
+
       await setRebuildState(project.slug, {
         ...completedState,
         running: false,
@@ -1167,6 +1258,7 @@ export function createAgentJobService({
           buildDurationSeconds,
           modelId,
           phaseTimings,
+          buildUsage,
         },
       });
     } catch (error) {

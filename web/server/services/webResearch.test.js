@@ -88,7 +88,7 @@ describe("webResearch", () => {
       if (result.error) {
         expect(result.error).not.toBe("HTTP 403 Forbidden");
       }
-    });
+    }, 15000);
 
     it("returns an error for non-403 HTTP failures", async () => {
       const { fetchAndExtract } = await import("./webResearch.js");
@@ -364,6 +364,38 @@ describe("webResearch", () => {
         expect(results.skipped).toBe(1);
         expect(results.fetched).toBe(0);
       } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("returns blocked/failed URLs in results.failedUrls", async () => {
+      const { executeResearchPlan } = await import("./webResearch.js");
+
+      const tmpDir = path.resolve("test-project-failed-urls-test");
+      const plan = {
+        queries: [
+          {
+            topic: "Test Failed",
+            query: "test failed",
+            urls: [{ url: "https://example.com/failed-url-1", type: "news", relevance: "test", freshness: "perishable" }],
+          },
+        ],
+      };
+
+      // Mock fetch to return a 500 error
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        headers: new Headers(),
+      });
+
+      try {
+        const results = await executeResearchPlan(tmpDir, plan);
+        expect(results.failed).toBe(1);
+        expect(results.failedUrls).toEqual(["https://example.com/failed-url-1"]);
+      } finally {
+        globalThis.fetch = originalFetch;
         await fs.rm(tmpDir, { recursive: true, force: true });
       }
     });

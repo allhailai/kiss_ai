@@ -255,7 +255,7 @@ export function createProjectFileService({
     }
 
     if (normalized.startsWith("change_logs/")) {
-      return { path: normalized, kind: "log", editable: false, annotation: false };
+      return { path: normalized, kind: "log", editable: false, annotation: false, previewable: isPreviewablePath(normalized) };
     }
 
     throw httpError("Path is not allowlisted for the lab UI.", 403, "path_not_allowlisted");

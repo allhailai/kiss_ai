@@ -403,7 +403,7 @@ export async function executeResearchPlan(projectPath, plan, onProgress) {
     return true;
   });
 
-  const results = { fetched: 0, failed: 0, skipped: 0, total: uniqueUrls.length };
+  const results = { fetched: 0, failed: 0, skipped: 0, total: uniqueUrls.length, failedUrls: [] };
   const sourceLogEntries = [];
 
   // Process in batches with concurrency limit
@@ -485,6 +485,7 @@ export async function executeResearchPlan(projectPath, plan, onProgress) {
         });
         await fs.writeFile(filePath, note, "utf-8");
         results.failed++;
+        results.failedUrls.push(entry.url);
         sourceLogEntries.push({
           name: slug,
           url: entry.url,
@@ -523,6 +524,7 @@ export async function executeResearchPlan(projectPath, plan, onProgress) {
           total: results.total,
           lastUrl: entry.url,
           lastStatus: result.error ? "failed" : "ok",
+          lastError: result.error ? result.error : undefined,
         });
       }
     }
