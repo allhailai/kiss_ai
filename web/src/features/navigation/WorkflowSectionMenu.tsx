@@ -56,7 +56,7 @@ export function KnowledgebaseSectionBody({
       {/* ── 1) Project Definition ──────────────────────────── */}
       <div className="nav-subsection">
         <button
-          className={`nav-section-trigger${currentView === "requirements" ? " active" : ""}`}
+          className={`nav-subsection-trigger${currentView === "requirements" ? " active" : ""}`}
           onClick={() => onOpenView(defineNavTarget.view, defineNavTarget.path)}
           type="button"
         >
@@ -67,7 +67,7 @@ export function KnowledgebaseSectionBody({
       {/* ── 2) Source Data ─────────────────────────────────── */}
       <div className="nav-subsection">
         <button
-          className={`nav-section-trigger${currentView === "inputs" ? " active" : ""}`}
+          className={`nav-subsection-trigger${currentView === "inputs" ? " active" : ""}`}
           onClick={(event) => toggleSubsection("source-data", event)}
           type="button"
           aria-expanded={expandedSubsections.has("source-data")}
@@ -136,7 +136,7 @@ export function KnowledgebaseSectionBody({
       {/* ── 3) Wiki ───────────────────────────────────────── */}
       <div className="nav-subsection">
         <button
-          className={`nav-section-trigger${currentView === "outputs" ? " active" : ""}`}
+          className={`nav-subsection-trigger${currentView === "outputs" ? " active" : ""}`}
           onClick={(event) => toggleSubsection("wiki", event)}
           type="button"
           aria-expanded={expandedSubsections.has("wiki")}
@@ -202,7 +202,7 @@ export function OutputsSectionBody({
       {/* ── Reports ───────────────────────────────────────── */}
       <div className="nav-subsection">
         <button
-          className={`nav-section-trigger${currentView === "reports" ? " active" : ""}`}
+          className={`nav-subsection-trigger${currentView === "reports" ? " active" : ""}`}
           onClick={(event) => toggleSubsection("reports", event)}
           type="button"
           aria-expanded={expandedSubsections.has("reports")}
@@ -238,7 +238,7 @@ export function OutputsSectionBody({
       {/* ── Artifacts ─────────────────────────────────────── */}
       <div className="nav-subsection">
         <button
-          className={`nav-section-trigger${currentView === "artifacts" ? " active" : ""}`}
+          className={`nav-subsection-trigger${currentView === "artifacts" ? " active" : ""}`}
           onClick={(event) => toggleSubsection("artifacts", event)}
           type="button"
           aria-expanded={expandedSubsections.has("artifacts")}

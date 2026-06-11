@@ -176,6 +176,8 @@ export function createChatAgentPipelines({
         }
 
         const assistantText = assistantTextChunks.join("");
+        const promptBytes = Buffer.byteLength(prompt, "utf8");
+        console.log(`[kiss_ai chat] model=${modelId} prompt=~${Math.round(promptBytes / 4)} tokens (${(promptBytes / 1024).toFixed(1)} KB) output=~${Math.round(assistantTextBytes / 4)} tokens (${(assistantTextBytes / 1024).toFixed(1)} KB)`);
         const fileEdits = extractFileEditProposals(assistantText, conversationWithUser, authorizedEditablePaths);
         const fileRenames = extractFileRenameProposals(assistantText);
         const artifactRenames = extractArtifactRenameProposals(assistantText);
@@ -450,8 +452,9 @@ export function createChatAgentPipelines({
       let assistantText = "";
       const applyController = new AbortController();
       activeChatControllers.set(project.slug, applyController);
+      let runResult;
       try {
-        await runCursorAgent({
+        runResult = await runCursorAgent({
           project,
           apiKey: cursorApiKey.apiKey,
           modelId,
@@ -464,6 +467,10 @@ export function createChatAgentPipelines({
       } finally {
         activeChatControllers.delete(project.slug);
       }
+
+      const promptBytes = Buffer.byteLength(prompt, "utf8");
+      const outputBytes = runResult?.outputBytes ?? 0;
+      console.log(`[kiss_ai apply] model=${modelId} prompt=~${Math.round(promptBytes / 4)} tokens (${(promptBytes / 1024).toFixed(1)} KB) output=~${Math.round(outputBytes / 4)} tokens (${(outputBytes / 1024).toFixed(1)} KB)`);
 
       const applyResult = extractApplyResult(assistantText, approvedConceptualDiffIds);
       const completedAt = nowIso();

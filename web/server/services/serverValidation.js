@@ -99,6 +99,56 @@ export async function prependBuildLogEntry(projectPath, entry) {
     existing = await fs.readFile(logPath, "utf-8");
   } catch { /* file may not exist yet */ }
 
+  const getModelContextWindowLimit = (mId) => {
+    const id = String(mId || "").toLowerCase();
+    if (id.includes("gemini-1.5-pro") || id.includes("gemini-2.5-pro")) return 2097152;
+    if (id.includes("gemini-1.5-flash")) return 1048576;
+    if (id.includes("gemini-2.0") || id.includes("gemini-2.5")) return 1048576;
+    if (id.includes("claude-3-5") || id.includes("claude-3.5") || id.includes("claude-3")) return 200000;
+    if (id.includes("gpt-4o") || id.includes("gpt-4-turbo")) return 128000;
+    if (id.includes("composer")) return 200000;
+    return null;
+  };
+
+  const usageLines = [];
+  if (entry.usage && entry.usage.totalPromptBytes > 0) {
+    const estIn = Math.round(entry.usage.totalPromptBytes / 4);
+    const estOut = Math.round(entry.usage.totalOutputBytes / 4);
+    usageLines.push(`- **Est. input tokens**: ~${estIn.toLocaleString()} (${(entry.usage.totalPromptBytes / 1024).toFixed(1)} KB prompt)`);
+    usageLines.push(`- **Est. output tokens**: ~${estOut.toLocaleString()} (${(entry.usage.totalOutputBytes / 1024).toFixed(1)} KB response)`);
+    usageLines.push(`- **Est. total tokens**: ~${(estIn + estOut).toLocaleString()}`);
+
+    // Context window usage details
+    let peakPhase = null;
+    let peakPromptBytes = 0;
+    if (entry.usage.phases?.length > 0) {
+      for (const p of entry.usage.phases) {
+        if (p.promptBytes > peakPromptBytes) {
+          peakPromptBytes = p.promptBytes;
+          peakPhase = p;
+        }
+      }
+    }
+
+    if (peakPhase) {
+      const peakIn = Math.round(peakPromptBytes / 4);
+      const limit = getModelContextWindowLimit(entry.modelId);
+      if (limit) {
+        const util = ((peakIn / limit) * 100).toFixed(2);
+        usageLines.push(`- **Context window usage**: Peak phase *${peakPhase.phase}* used ~${peakIn.toLocaleString()} tokens (${util}% of ${limit.toLocaleString()} model limit)`);
+      } else {
+        usageLines.push(`- **Context window usage**: Peak phase *${peakPhase.phase}* used ~${peakIn.toLocaleString()} tokens`);
+      }
+    }
+
+    if (entry.usage.phases?.length > 0) {
+      usageLines.push(`- **Phase breakdown**:`);
+      for (const p of entry.usage.phases) {
+        usageLines.push(`  - ${p.phase}: ~${Math.round(p.promptBytes / 4).toLocaleString()} in / ~${Math.round(p.outputBytes / 4).toLocaleString()} out (${p.durationSeconds}s)`);
+      }
+    }
+  }
+
   const newEntry = [
     `## Build — ${entry.timestamp}`,
     "",
@@ -108,9 +158,13 @@ export async function prependBuildLogEntry(projectPath, entry) {
     `- **Wiki pages updated**: ${entry.wikiPagesUpdated}`,
     `- **Directed outputs updated**: ${entry.directedOutputsUpdated}`,
     `- **Sources fetched**: ${entry.sourcesFetched}`,
+    entry.failedUrls && entry.failedUrls.length > 0
+      ? `- **Sources failed/blocked**: ${entry.failedUrls.length}\n` + entry.failedUrls.map((u) => `  - ${u}`).join("\n")
+      : null,
     `- **FEEDBACK markers applied**: ${entry.feedbackApplied}`,
     `- **Topics deepened**: ${entry.topicsDeepened ?? 0}`,
     entry.notes ? `- **Notes**: ${entry.notes}` : null,
+    ...usageLines,
     "",
   ].filter(Boolean).join("\n");
 

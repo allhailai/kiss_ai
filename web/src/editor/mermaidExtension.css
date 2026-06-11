@@ -15,8 +15,8 @@
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: color-mix(in srgb, var(--color-surface) 50%, white);
-  overflow-x: auto;
-  overflow-y: visible;
+  max-height: 420px;
+  overflow: auto;
 }
 
 /* ---------------------------------------------------------------------------
@@ -32,7 +32,9 @@
 
 .markdown-editor-shell .cm-mermaid-diagram svg {
   max-width: 100%;
+  max-height: 380px;
   height: auto;
+  display: block;
 }
 
 /* ---------------------------------------------------------------------------

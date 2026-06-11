@@ -121,3 +121,19 @@ export async function getQuestionCounts(projectPath) {
     totalQuestionsCount: data.questions.length,
   };
 }
+
+/**
+ * Delete a question by ID.
+ * Returns true if deleted, false if not found.
+ */
+export async function deleteQuestion(projectPath, questionId) {
+  const data = await readQuestions(projectPath);
+  const index = data.questions.findIndex((q) => q.id === questionId);
+
+  if (index === -1) return false;
+
+  data.questions.splice(index, 1);
+  await writeQuestions(projectPath, data.questions);
+  return true;
+}
+

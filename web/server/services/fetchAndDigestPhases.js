@@ -1,4 +1,5 @@
 import { parseResearchPlan, executeResearchPlan, generateSourceDigests } from "./webResearch.js";
+import { addFailedSources } from "./failedSources.js";
 
 /**
  * Server-side fetch phase: parses the research plan and fetches all URLs.
@@ -21,10 +22,15 @@ export async function runFetchPhase(projectPath, { appendRunEvent, projectSlug, 
 
     let lastReportedPercent = -1;
     const failedUrls = [];
+    const failedSourcesToPersist = [];
 
     const fetchResults = await executeResearchPlan(projectPath, plan, async (progress) => {
       if (progress.lastStatus === "failed") {
         failedUrls.push(progress.lastUrl);
+        failedSourcesToPersist.push({
+          url: progress.lastUrl,
+          error: progress.lastError,
+        });
       }
 
       const percent = Math.floor((progress.completed / progress.total) * 10) * 10;
@@ -52,7 +58,24 @@ export async function runFetchPhase(projectPath, { appendRunEvent, projectSlug, 
       runtime: "server",
     });
 
-    return fetchResults;
+    if (failedUrls.length > 0) {
+      await appendRunEvent(projectSlug, {
+        type: "system",
+        title: `⚠️ Action Required: ${failedUrls.length} fetch failures`,
+        text: `The agent failed to fetch or was blocked from the following URLs. Please download them manually and place them in the 'inputs_human/' folder:\n\n${failedUrls.map((u) => `- ${u}`).join("\n")}`,
+        status: "fetch_complete",
+        runtime: "server",
+      });
+    }
+
+    if (failedSourcesToPersist.length > 0) {
+      await addFailedSources(projectPath, failedSourcesToPersist);
+    }
+
+    return {
+      ...fetchResults,
+      failedUrls,
+    };
   } catch (fetchError) {
     const errorMsg = fetchError instanceof Error ? fetchError.message : "Unknown fetch error";
     await appendRunEvent(projectSlug, {
@@ -62,7 +85,7 @@ export async function runFetchPhase(projectPath, { appendRunEvent, projectSlug, 
       status: "fetch_skipped",
       runtime: "server",
     });
-    return { fetched: 0, failed: 0, skipped: 0, total: 0 };
+    return { fetched: 0, failed: 0, skipped: 0, total: 0, failedUrls: [] };
   }
 }
 

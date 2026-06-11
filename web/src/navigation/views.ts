@@ -7,7 +7,7 @@ export type LegacyAiView = "chat" | "review" | "questions" | "topics" | "suggest
 export const legacyAiViews = new Set<string>(["chat", "review", "questions", "topics", "suggestions"]);
 
 /** Tab IDs for the unified AI workspace. */
-export type AiTab = "conversations" | "topics" | "questions";
+export type AiTab = "conversations" | "topics" | "questions" | "failed-sources";
 
 export type RouteState = {
   projectSlug: string | null;
@@ -30,6 +30,7 @@ export function viewForProjectPath(path: string): View | null {
   if (path.startsWith(projectPathPrefixes.humanInput)) return "inputs";
   if (path.startsWith(projectPathPrefixes.sources)) return "inputs";
   if (path.startsWith(projectPathPrefixes.output)) return "outputs";
+  if (path.startsWith(projectPathPrefixes.changeLogs)) return "reports";
   if (path.startsWith("artifacts/")) return "artifacts";
   return null;
 }
