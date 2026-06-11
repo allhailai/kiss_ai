@@ -2,10 +2,42 @@ import express from "express";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { registerChatRoutes } from "./chatRoutes.js";
 import { registerFileRoutes } from "./fileRoutes.js";
 import { registerProjectRoutes } from "./projectRoutes.js";
+import { registerArtifactRoutes } from "./artifactRoutes.js";
+
+// Mock artifact services imported by registerArtifactRoutes
+vi.mock("../services/artifactService.js", () => ({
+  listArtifactSpecs: vi.fn(),
+  listAvailableSourceFiles: vi.fn(),
+  readArtifactSpec: vi.fn(),
+  renameArtifact: vi.fn(),
+  writeArtifactSpec: vi.fn(),
+  deleteArtifactSpec: vi.fn(),
+  readArtifactPreviewHtml: vi.fn(),
+  slugifyArtifactName: (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+  getArtifactBuildStatus: vi.fn(),
+  discoverSections: vi.fn(() => []),
+  hideSectionInHtml: vi.fn(),
+  unhideSectionInHtml: vi.fn(),
+  listBuildVersions: vi.fn(),
+  revertToBuildVersion: vi.fn(),
+  revertToLatestBuild: vi.fn(),
+}));
+
+vi.mock("../services/annotationService.js", () => ({
+  listAnnotations: vi.fn(),
+  addAnnotation: vi.fn(),
+  updateAnnotation: vi.fn(),
+  deleteAnnotation: vi.fn(),
+  getPendingBySection: vi.fn(),
+  retryFailed: vi.fn(),
+  toggleAnnotation: vi.fn(),
+}));
+
+import { readArtifactSpec, readArtifactPreviewHtml } from "../services/artifactService.js";
 
 import { registerSystemRoutes } from "./systemRoutes.js";
 import { apiErrorHandler, httpError } from "../services/httpErrors.js";
@@ -557,6 +589,56 @@ describe("API routes", () => {
       expect(text).toContain("event: snapshot");
       expect(text).toContain('"type":"snapshot"');
       expect(text).toContain('"conversation":{"id":"conv_1"');
+    });
+  });
+
+  it("matches artifact routes with slash-containing slugs (wildcards)", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/projects/:projectSlug", (request, _response, next) => {
+      request.project = { slug: request.params.projectSlug, path: "/tmp/demo" };
+      next();
+    });
+
+    let lastReadSlug = null;
+    let lastSectionSlug = null;
+
+    // @ts-ignore
+    vi.mocked(readArtifactSpec).mockImplementation(async (projectPath, slug) => {
+      lastReadSlug = slug;
+      return { frontmatter: { title: "Test Spec" }, body: "Body content" };
+    });
+
+    // @ts-ignore
+    vi.mocked(readArtifactPreviewHtml).mockImplementation(async (projectPath, slug) => {
+      lastSectionSlug = slug;
+      return "<div>Section content</div>";
+    });
+
+    registerArtifactRoutes(app, {
+      httpError,
+      startArtifactBuild: async () => ({}),
+      startSectionRegeneration: async () => ({}),
+      startBatchSectionRegeneration: async () => ({}),
+      getRebuildState: async () => ({ running: false }),
+    });
+    app.use(apiErrorHandler);
+
+    await withServer(app, async (baseUrl) => {
+      // 1. Test flat slug mapping
+      const res1 = await fetch(`${baseUrl}/api/projects/demo/artifacts/simple-slug`);
+      expect(res1.status).toBe(200);
+      expect(lastReadSlug).toBe("simple-slug");
+
+      // 2. Test slash-containing (nested) slug mapping (without percent-encoding, i.e., proxy decoded)
+      const res2 = await fetch(`${baseUrl}/api/projects/demo/artifacts/outputs_ai/wiki/_index.md`);
+      expect(res2.status).toBe(200);
+      expect(lastReadSlug).toBe("outputs_ai/wiki/_index.md");
+
+      // 3. Test nested section route
+      const res3 = await fetch(`${baseUrl}/api/projects/demo/artifacts/outputs_ai/wiki/_index.md/sections`);
+      expect(res3.status).toBe(200);
+      expect(lastSectionSlug).toBe("outputs_ai/wiki/_index.md");
     });
   });
 });

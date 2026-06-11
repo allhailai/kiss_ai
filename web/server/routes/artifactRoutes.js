@@ -38,6 +38,11 @@ import {
 } from "./requestSchemas.js";
 
 export function registerArtifactRoutes(app, { httpError, startArtifactBuild, startSectionRegeneration, startBatchSectionRegeneration, getRebuildState }) {
+  function getArtifactSlug(request) {
+    const slug = request.params.artifactSlug;
+    return Array.isArray(slug) ? slug.join("/") : slug;
+  }
+
   // List all artifact specs + build status
   app.get("/api/projects/:projectSlug/artifacts", async (request, response, next) => {
     try {
@@ -54,17 +59,6 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
       const files = await listAvailableSourceFiles(request.project.path);
       response.json({ files });
     } catch (error) {
-      next(error);
-    }
-  });
-
-  // Read a single artifact spec
-  app.get("/api/projects/:projectSlug/artifacts/:artifactSlug", async (request, response, next) => {
-    try {
-      const spec = await readArtifactSpec(request.project.path, request.params.artifactSlug);
-      response.json(spec);
-    } catch (error) {
-      if (error.code === "ENOENT") return next(httpError("Artifact spec not found.", 404, "artifact_not_found"));
       next(error);
     }
   });
@@ -93,53 +87,20 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
     }
   });
 
-  // Update an artifact spec
-  app.put("/api/projects/:projectSlug/artifacts/:artifactSlug", async (request, response, next) => {
-    try {
-      const { frontmatter, body } = parseRequestBody(updateArtifactBodySchema, request.body, httpError);
-
-      // Read existing spec to merge
-      let existing;
-      try {
-        existing = await readArtifactSpec(request.project.path, request.params.artifactSlug);
-      } catch {
-        return next(httpError("Artifact spec not found.", 404, "artifact_not_found"));
-      }
-
-      const mergedFrontmatter = { ...existing.frontmatter, ...frontmatter };
-      const mergedBody = body !== undefined ? body : existing.body;
-
-      const result = await writeArtifactSpec(request.project.path, request.params.artifactSlug, mergedFrontmatter, mergedBody);
-      response.json(result);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  // Delete an artifact spec
-  app.delete("/api/projects/:projectSlug/artifacts/:artifactSlug", async (request, response, next) => {
-    try {
-      await deleteArtifactSpec(request.project.path, request.params.artifactSlug);
-      response.json({ deleted: true, slug: request.params.artifactSlug });
-    } catch (error) {
-      if (error.code === "ENOENT") return next(httpError("Artifact spec not found.", 404, "artifact_not_found"));
-      next(error);
-    }
-  });
-
   // Trigger artifact build (single)
-  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/build", async (request, response, next) => {
+  app.post("/api/projects/:projectSlug/artifacts/*artifactSlug/build", async (request, response, next) => {
     try {
+      const artifactSlug = getArtifactSlug(request);
       const { modelId: requestedModelId } = parseRequestBody(buildArtifactBodySchema, request.body || {}, httpError);
       let modelId = requestedModelId ?? null;
       // Fall back to the model saved in the artifact spec's frontmatter
       if (!modelId) {
         try {
-          const spec = await readArtifactSpec(request.project.path, request.params.artifactSlug);
+          const spec = await readArtifactSpec(request.project.path, artifactSlug);
           modelId = spec.frontmatter.modelId ?? null;
         } catch { /* spec read failures are non-fatal here */ }
       }
-      const result = await startArtifactBuild(request.project, request.params.artifactSlug, modelId);
+      const result = await startArtifactBuild(request.project, artifactSlug, modelId);
       response.json(result);
     } catch (error) {
       next(error);
@@ -147,10 +108,10 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   });
 
   // Rename an artifact (slug change)
-  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/rename", async (request, response, next) => {
+  app.post("/api/projects/:projectSlug/artifacts/*artifactSlug/rename", async (request, response, next) => {
     try {
       const { newSlug } = parseRequestBody(renameArtifactBodySchema, request.body, httpError);
-      const result = await renameArtifact(request.project.path, request.params.artifactSlug, newSlug);
+      const result = await renameArtifact(request.project.path, getArtifactSlug(request), newSlug);
       response.json({ renamed: true, ...result });
     } catch (error) {
       if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
@@ -159,9 +120,10 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   });
 
   // Serve built artifact HTML (with annotation script injected)
-  app.get("/api/projects/:projectSlug/artifacts/:artifactSlug/preview", async (request, response, next) => {
+  app.get("/api/projects/:projectSlug/artifacts/*artifactSlug/preview", async (request, response, next) => {
     try {
-      let html = await readArtifactPreviewHtml(request.project.path, request.params.artifactSlug);
+      const artifactSlug = getArtifactSlug(request);
+      let html = await readArtifactPreviewHtml(request.project.path, artifactSlug);
       // Inject the annotation script before </body> so inspection mode works
       const annotationScript = getAnnotationScript();
       if (html.includes('</body>')) {
@@ -179,12 +141,13 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   // ─── Section-Level Editing Routes ─────────────────────────────────────────
 
   // List sections discovered in the built HTML
-  app.get("/api/projects/:projectSlug/artifacts/:artifactSlug/sections", async (request, response, next) => {
+  app.get("/api/projects/:projectSlug/artifacts/*artifactSlug/sections", async (request, response, next) => {
     try {
-      const html = await readArtifactPreviewHtml(request.project.path, request.params.artifactSlug);
+      const artifactSlug = getArtifactSlug(request);
+      const html = await readArtifactPreviewHtml(request.project.path, artifactSlug);
       const sections = discoverSections(html);
       // Also return manifest info for UI indicators (regeneratedSections, contractVersion)
-      const manifest = await getArtifactBuildStatus(request.project.path, request.params.artifactSlug);
+      const manifest = await getArtifactBuildStatus(request.project.path, artifactSlug);
       const hiddenSectionIds = sections.filter(s => s.hidden).map(s => s.id);
       response.json({
         sections: sections.map(s => ({ id: s.id, title: s.title, hidden: s.hidden || false })),
@@ -200,10 +163,10 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   });
 
   // Add a new section (creates an add_section annotation)
-  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/sections", async (request, response, next) => {
+  app.post("/api/projects/:projectSlug/artifacts/*artifactSlug/sections", async (request, response, next) => {
     try {
       const { description, afterSectionId } = parseRequestBody(addSectionBodySchema, request.body, httpError);
-      const annotation = await addAnnotation(request.project.path, request.params.artifactSlug, {
+      const annotation = await addAnnotation(request.project.path, getArtifactSlug(request), {
         type: "add_section",
         sectionId: "__new_section__",
         sectionTitle: "New Section",
@@ -218,10 +181,10 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   });
 
   // Hide (soft-delete) a section
-  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/sections/:sectionId/hide", async (request, response, next) => {
+  app.post("/api/projects/:projectSlug/artifacts/*artifactSlug/sections/:sectionId/hide", async (request, response, next) => {
     try {
       const sectionId = request.params.sectionId;
-      const sections = await hideSectionInHtml(request.project.path, request.params.artifactSlug, sectionId);
+      const sections = await hideSectionInHtml(request.project.path, getArtifactSlug(request), sectionId);
       response.json({
         sections: sections.map(s => ({ id: s.id, title: s.title, hidden: s.hidden || false })),
         hiddenSectionIds: sections.filter(s => s.hidden).map(s => s.id),
@@ -233,10 +196,10 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   });
 
   // Unhide (restore) a section
-  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/sections/:sectionId/unhide", async (request, response, next) => {
+  app.post("/api/projects/:projectSlug/artifacts/*artifactSlug/sections/:sectionId/unhide", async (request, response, next) => {
     try {
       const sectionId = request.params.sectionId;
-      const sections = await unhideSectionInHtml(request.project.path, request.params.artifactSlug, sectionId);
+      const sections = await unhideSectionInHtml(request.project.path, getArtifactSlug(request), sectionId);
       response.json({
         sections: sections.map(s => ({ id: s.id, title: s.title, hidden: s.hidden || false })),
         hiddenSectionIds: sections.filter(s => s.hidden).map(s => s.id),
@@ -250,9 +213,9 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   // ── Build Versioning ──────────────────────────────────────────────────
 
   // List build version snapshots
-  app.get("/api/projects/:projectSlug/artifacts/:artifactSlug/versions", async (request, response, next) => {
+  app.get("/api/projects/:projectSlug/artifacts/*artifactSlug/versions", async (request, response, next) => {
     try {
-      const { versions, activeVersionDirName } = await listBuildVersions(request.project.path, request.params.artifactSlug);
+      const { versions, activeVersionDirName } = await listBuildVersions(request.project.path, getArtifactSlug(request));
       response.json({ versions, activeVersionDirName });
     } catch (error) {
       next(error);
@@ -260,14 +223,14 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   });
 
   // Switch back to the latest build (must be before :versionDirName route)
-  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/versions/latest/revert", async (request, response, next) => {
+  app.post("/api/projects/:projectSlug/artifacts/*artifactSlug/versions/latest/revert", async (request, response, next) => {
     try {
       // Guard: prevent revert while a build is in progress
       const state = await getRebuildState(request.project.slug);
       if (state.running) {
         return next(httpError('Cannot switch versions while a build is in progress.', 409, 'build_in_progress'));
       }
-      await revertToLatestBuild(request.project.path, request.params.artifactSlug);
+      await revertToLatestBuild(request.project.path, getArtifactSlug(request));
       response.json({ ok: true });
     } catch (error) {
       next(error);
@@ -275,14 +238,14 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   });
 
   // Revert to a previous build version
-  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/versions/:versionDirName/revert", async (request, response, next) => {
+  app.post("/api/projects/:projectSlug/artifacts/*artifactSlug/versions/:versionDirName/revert", async (request, response, next) => {
     try {
       // Guard: prevent revert while a build is in progress
       const state = await getRebuildState(request.project.slug);
       if (state.running) {
         return next(httpError('Cannot switch versions while a build is in progress.', 409, 'build_in_progress'));
       }
-      const result = await revertToBuildVersion(request.project.path, request.params.artifactSlug, request.params.versionDirName);
+      const result = await revertToBuildVersion(request.project.path, getArtifactSlug(request), request.params.versionDirName);
       response.json(result);
     } catch (error) {
       if (error.message?.includes('not found')) return next(httpError(error.message, 404, 'version_not_found'));
@@ -291,8 +254,9 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   });
 
   // Regenerate a single section
-  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/sections/:sectionId/regenerate", async (request, response, next) => {
+  app.post("/api/projects/:projectSlug/artifacts/*artifactSlug/sections/:sectionId/regenerate", async (request, response, next) => {
     try {
+      const artifactSlug = getArtifactSlug(request);
       const { instruction, modelId: requestedModelId, elementContext } = parseRequestBody(regenerateSectionBodySchema, request.body, httpError);
       const sectionId = request.params.sectionId;
       // Validate sectionId matches the kebab-case contract from do_build_artifact.md
@@ -302,13 +266,13 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
       let modelId = requestedModelId ?? null;
       if (!modelId) {
         try {
-          const spec = await readArtifactSpec(request.project.path, request.params.artifactSlug);
+          const spec = await readArtifactSpec(request.project.path, artifactSlug);
           modelId = spec.frontmatter.modelId ?? null;
         } catch { /* non-fatal */ }
       }
       const result = await startSectionRegeneration(
         request.project,
-        request.params.artifactSlug,
+        artifactSlug,
         sectionId,
         instruction,
         modelId,
@@ -324,9 +288,9 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   // ─── Annotation Routes ──────────────────────────────────────────────────────
 
   // List all annotations for an artifact
-  app.get("/api/projects/:projectSlug/artifacts/:artifactSlug/annotations", async (request, response, next) => {
+  app.get("/api/projects/:projectSlug/artifacts/*artifactSlug/annotations", async (request, response, next) => {
     try {
-      const annotations = await listAnnotations(request.project.path, request.params.artifactSlug);
+      const annotations = await listAnnotations(request.project.path, getArtifactSlug(request));
       response.json({ annotations });
     } catch (error) {
       next(error);
@@ -334,10 +298,10 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   });
 
   // Add an annotation
-  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/annotations", async (request, response, next) => {
+  app.post("/api/projects/:projectSlug/artifacts/*artifactSlug/annotations", async (request, response, next) => {
     try {
       const data = parseRequestBody(createAnnotationBodySchema, request.body, httpError);
-      const annotation = await addAnnotation(request.project.path, request.params.artifactSlug, data, httpError);
+      const annotation = await addAnnotation(request.project.path, getArtifactSlug(request), data, httpError);
       response.status(201).json(annotation);
     } catch (error) {
       if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
@@ -346,10 +310,10 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   });
 
   // Update an annotation
-  app.put("/api/projects/:projectSlug/artifacts/:artifactSlug/annotations/:annotationId", async (request, response, next) => {
+  app.put("/api/projects/:projectSlug/artifacts/*artifactSlug/annotations/:annotationId", async (request, response, next) => {
     try {
       const updates = parseRequestBody(updateAnnotationBodySchema, request.body, httpError);
-      const annotation = await updateAnnotation(request.project.path, request.params.artifactSlug, request.params.annotationId, updates, httpError);
+      const annotation = await updateAnnotation(request.project.path, getArtifactSlug(request), request.params.annotationId, updates, httpError);
       response.json(annotation);
     } catch (error) {
       if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
@@ -358,9 +322,9 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   });
 
   // Delete an annotation
-  app.delete("/api/projects/:projectSlug/artifacts/:artifactSlug/annotations/:annotationId", async (request, response, next) => {
+  app.delete("/api/projects/:projectSlug/artifacts/*artifactSlug/annotations/:annotationId", async (request, response, next) => {
     try {
-      await deleteAnnotation(request.project.path, request.params.artifactSlug, request.params.annotationId, httpError);
+      await deleteAnnotation(request.project.path, getArtifactSlug(request), request.params.annotationId, httpError);
       response.json({ ok: true });
     } catch (error) {
       if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
@@ -369,9 +333,10 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   });
 
   // Apply all pending annotations (batch section regeneration)
-  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/annotations/apply", async (request, response, next) => {
+  app.post("/api/projects/:projectSlug/artifacts/*artifactSlug/annotations/apply", async (request, response, next) => {
     try {
-      const sectionGroups = await getPendingBySection(request.project.path, request.params.artifactSlug);
+      const artifactSlug = getArtifactSlug(request);
+      const sectionGroups = await getPendingBySection(request.project.path, artifactSlug);
       if (sectionGroups.length === 0) {
         return next(httpError("No pending annotations to apply.", 422, "no_pending_annotations"));
       }
@@ -379,13 +344,13 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
       // Determine model from spec
       let modelId = null;
       try {
-        const spec = await readArtifactSpec(request.project.path, request.params.artifactSlug);
+        const spec = await readArtifactSpec(request.project.path, artifactSlug);
         modelId = spec.frontmatter.modelId ?? null;
       } catch { /* non-fatal */ }
 
       const result = await startBatchSectionRegeneration(
         request.project,
-        request.params.artifactSlug,
+        artifactSlug,
         sectionGroups,
         modelId,
       );
@@ -397,9 +362,9 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   });
 
   // Retry all failed annotations (reset to pending)
-  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/annotations/retry", async (request, response, next) => {
+  app.post("/api/projects/:projectSlug/artifacts/*artifactSlug/annotations/retry", async (request, response, next) => {
     try {
-      const count = await retryFailed(request.project.path, request.params.artifactSlug);
+      const count = await retryFailed(request.project.path, getArtifactSlug(request));
       response.json({ retriedCount: count });
     } catch (error) {
       next(error);
@@ -407,12 +372,60 @@ export function registerArtifactRoutes(app, { httpError, startArtifactBuild, sta
   });
 
   // Toggle annotation status (pending ↔ applied/failed)
-  app.post("/api/projects/:projectSlug/artifacts/:artifactSlug/annotations/:annotationId/toggle", async (request, response, next) => {
+  app.post("/api/projects/:projectSlug/artifacts/*artifactSlug/annotations/:annotationId/toggle", async (request, response, next) => {
     try {
-      const annotation = await toggleAnnotation(request.project.path, request.params.artifactSlug, request.params.annotationId, httpError);
+      const annotation = await toggleAnnotation(request.project.path, getArtifactSlug(request), request.params.annotationId, httpError);
       response.json(annotation);
     } catch (error) {
       if (error.statusCode) return next(httpError(error.message, error.statusCode, error.code));
+      next(error);
+    }
+  });
+
+  // ─── Generic Artifact Spec Fallbacks (Must be defined last to avoid wildcard greediness) ───
+
+  // Read a single artifact spec
+  app.get("/api/projects/:projectSlug/artifacts/*artifactSlug", async (request, response, next) => {
+    try {
+      const spec = await readArtifactSpec(request.project.path, getArtifactSlug(request));
+      response.json(spec);
+    } catch (error) {
+      if (error.code === "ENOENT") return next(httpError("Artifact spec not found.", 404, "artifact_not_found"));
+      next(error);
+    }
+  });
+
+  // Update an artifact spec
+  app.put("/api/projects/:projectSlug/artifacts/*artifactSlug", async (request, response, next) => {
+    try {
+      const { frontmatter, body } = parseRequestBody(updateArtifactBodySchema, request.body, httpError);
+
+      // Read existing spec to merge
+      let existing;
+      try {
+        existing = await readArtifactSpec(request.project.path, getArtifactSlug(request));
+      } catch {
+        return next(httpError("Artifact spec not found.", 404, "artifact_not_found"));
+      }
+
+      const mergedFrontmatter = { ...existing.frontmatter, ...frontmatter };
+      const mergedBody = body !== undefined ? body : existing.body;
+
+      const result = await writeArtifactSpec(request.project.path, getArtifactSlug(request), mergedFrontmatter, mergedBody);
+      response.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Delete an artifact spec
+  app.delete("/api/projects/:projectSlug/artifacts/*artifactSlug", async (request, response, next) => {
+    try {
+      const artifactSlug = getArtifactSlug(request);
+      await deleteArtifactSpec(request.project.path, artifactSlug);
+      response.json({ deleted: true, slug: artifactSlug });
+    } catch (error) {
+      if (error.code === "ENOENT") return next(httpError("Artifact spec not found.", 404, "artifact_not_found"));
       next(error);
     }
   });
