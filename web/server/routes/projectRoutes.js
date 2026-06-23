@@ -26,6 +26,7 @@ export function registerProjectRoutes(app, {
   httpError,
   writeProjectUiState,
   uploadExternalRepoZip,
+  cloneExternalRepo,
 }) {
   app.get("/api/projects", async (_request, response, next) => {
     try {
@@ -378,6 +379,20 @@ export function registerProjectRoutes(app, {
 
       const buffer = Buffer.from(contentBase64, "base64");
       const result = await uploadExternalRepoZip(request.project.path, name, buffer);
+      response.json({ success: true, ...result });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/external-repos/clone", async (request, response, next) => {
+    try {
+      const { name, url } = request.body || {};
+      if (!name || !url) {
+        throw httpError("Repository name and Git URL are required.", 400, "bad_request");
+      }
+
+      const result = await cloneExternalRepo(request.project.path, name, url);
       response.json({ success: true, ...result });
     } catch (error) {
       next(error);
