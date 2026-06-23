@@ -40,6 +40,7 @@ describe("systemSettings service", () => {
       cursorApiKeyAvailable: true,
       cursorApiKeySource: "test-store item cursor_api_key",
       cursorApiKeyWarnings: [],
+      githubPatAvailable: false,
     });
   });
 
@@ -161,6 +162,33 @@ describe("systemSettings service", () => {
       expect(envContent).not.toContain("old-key");
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("saves the GitHub PAT to web/.env and updates process.env", async () => {
+    const tmpDir = path.join(import.meta.dirname, "__test_tmp_dotenv_pat_" + Date.now());
+    await fs.mkdir(tmpDir, { recursive: true });
+
+    try {
+      const service = createSystemSettingsService({
+        httpError,
+        listCursorModels: async () => [],
+        resolveCursorApiKey: async () => ({ available: false, source: null, warnings: [] }),
+        secretStore: createMockSecretStore({ supported: false }),
+        WEB_ROOT: tmpDir,
+      });
+
+      await expect(service.saveGithubPat("my-github-pat-token")).resolves.toEqual({
+        ok: true,
+        message: "Success! API key has been saved and works.",
+      });
+
+      const envContent = await fs.readFile(path.join(tmpDir, ".env"), "utf8");
+      expect(envContent).toBe('KISS_AI_GITHUB_PAT="my-github-pat-token"\n');
+      expect(process.env.KISS_AI_GITHUB_PAT).toBe("my-github-pat-token");
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+      delete process.env.KISS_AI_GITHUB_PAT;
     }
   });
 });

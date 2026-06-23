@@ -13,6 +13,7 @@ export function SettingsModal() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [cursorApiKey, setCursorApiKey] = useState("");
+  const [githubPat, setGithubPat] = useState("");
   const [showUserAdmin, setShowUserAdmin] = useState(false);
   const [isServerAdmin, setIsServerAdmin] = useState(false);
 
@@ -72,6 +73,26 @@ export function SettingsModal() {
     }
   };
 
+  const saveGithubPat = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextGithubPat = githubPat.trim();
+    if (!nextGithubPat || saving) return;
+
+    setError("");
+    setMessage("");
+    setSaving(true);
+    try {
+      const result = await systemApi.saveGithubPat({ githubPat: nextGithubPat });
+      setMessage(result.message);
+      setSettings(await systemApi.systemSettings());
+      setGithubPat("");
+    } catch {
+      setError("Failed to save GitHub PAT! Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <>
       <button disabled={loading || saving} onClick={() => void openSettings()} type="button">
@@ -91,9 +112,23 @@ export function SettingsModal() {
               </button>
             </div>
 
-            {loading ? <p>Checking Cursor API key status...</p> : null}
-            {!loading && settings?.cursorApiKeyAvailable ? <p>Cursor API Key Found</p> : null}
-            {!loading && settings && !settings.cursorApiKeyAvailable ? <p>No Cursor API key found.</p> : null}
+            {loading ? <p>Checking settings status...</p> : null}
+            {!loading && settings && (
+              <div style={{ display: "grid", gap: 6, marginBottom: "1rem", fontSize: "0.85rem", color: "var(--color-secondary)", border: "1px solid var(--color-border)", borderRadius: "8px", padding: 10, background: "rgba(255, 255, 255, 0.02)" }}>
+                <div>
+                  Cursor API Key:{" "}
+                  <strong style={{ color: settings.cursorApiKeyAvailable ? "var(--color-accent)" : "var(--color-secondary)" }}>
+                    {settings.cursorApiKeyAvailable ? "✓ Found" : "✗ Missing"}
+                  </strong>
+                </div>
+                <div>
+                  GitHub PAT (Personal Access Token):{" "}
+                  <strong style={{ color: settings.githubPatAvailable ? "var(--color-accent)" : "var(--color-secondary)" }}>
+                    {settings.githubPatAvailable ? "✓ Found" : "✗ Missing"}
+                  </strong>
+                </div>
+              </div>
+            )}
 
             {error ? (
               <div className="warning-callout" role="alert">
@@ -122,6 +157,23 @@ export function SettingsModal() {
               </label>
               <button disabled={saving || !cursorApiKey.trim()} type="submit">
                 {saving ? "Saving..." : "Save API Key"}
+              </button>
+            </form>
+
+            <form className="settings-api-key-form" onSubmit={saveGithubPat} style={{ marginTop: "1rem" }}>
+              <label>
+                <span>KISS_AI_GITHUB_PAT (For Private Repositories)</span>
+                <input
+                  autoComplete="off"
+                  disabled={saving}
+                  onChange={(event) => setGithubPat(event.target.value)}
+                  placeholder="Paste your GitHub Personal Access Token"
+                  type="password"
+                  value={githubPat}
+                />
+              </label>
+              <button disabled={saving || !githubPat.trim()} type="submit">
+                {saving ? "Saving..." : "Save GitHub PAT"}
               </button>
             </form>
 

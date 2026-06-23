@@ -1,6 +1,6 @@
-import { parseRequestBody, saveCursorApiKeyBodySchema } from "./requestSchemas.js";
+import { parseRequestBody, saveCursorApiKeyBodySchema, saveGithubPatBodySchema } from "./requestSchemas.js";
 
-export function registerSystemRoutes(app, { authMiddleware, checkKissAiUpdate, httpError, KISS_AI_MODE, readKeybindings, readPinnedProjects, readProjectsViewPreference, saveCursorApiKey, systemSettings, updateAndRestart, updateKissAi, writePinnedProjects, writeProjectsViewPreference }) {
+export function registerSystemRoutes(app, { authMiddleware, checkKissAiUpdate, httpError, KISS_AI_MODE, readKeybindings, readPinnedProjects, readProjectsViewPreference, saveCursorApiKey, saveGithubPat, systemSettings, updateAndRestart, updateKissAi, writePinnedProjects, writeProjectsViewPreference }) {
   // In server mode, system mutation routes require admin. In standalone, no-op passthrough.
   const adminOnly = KISS_AI_MODE === "server" && authMiddleware ? authMiddleware.requireAdmin : (_req, _res, next) => next();
 
@@ -64,6 +64,15 @@ export function registerSystemRoutes(app, { authMiddleware, checkKissAiUpdate, h
     try {
       const body = parseRequestBody(saveCursorApiKeyBodySchema, request.body, httpError);
       response.json(await saveCursorApiKey(body.cursorApiKey));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/system/settings/github-pat", adminOnly, async (request, response, next) => {
+    try {
+      const body = parseRequestBody(saveGithubPatBodySchema, request.body, httpError);
+      response.json(await saveGithubPat(body.githubPat));
     } catch (error) {
       next(error);
     }
