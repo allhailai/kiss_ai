@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { outputsApi } from "../../data/outputsApi";
 import { artifactsApi } from "../../data/artifactsApi";
 import { rebuildApi } from "../../data/rebuildApi";
@@ -20,6 +20,8 @@ type ReportFileRow = {
   builtAt: string | null;
   /** Whether the file's build is stale relative to last knowledge build */
   stale: boolean;
+  /** Optional map of external repository names to their build commit hashes */
+  externalRepoHashes?: Record<string, string>;
 };
 
 export function OutputSection({
@@ -64,6 +66,8 @@ export function OutputSection({
   // ── Rename state ──────────────────────────────────────────────
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+
+
 
   // Sync buildModelId when the project-level model changes
   useEffect(() => {
@@ -169,16 +173,17 @@ export function OutputSection({
           folder: null,
           builtAt: spec.lastBuilt,
           stale: spec.status !== "built" || isStale,
+          externalRepoHashes: spec.externalRepoHashes,
         };
       });
     }
 
     // Reports: join projectFiles with outputsApi.status() ledger data
     const prefix = "outputs_ai/reports/";
-    const statusByPath = new Map<string, { builtAt: string | null; stale: boolean }>();
+    const statusByPath = new Map<string, { builtAt: string | null; stale: boolean; externalRepoHashes?: Record<string, string> }>();
     if (outputStatus) {
       for (const o of outputStatus.outputs) {
-        statusByPath.set(o.path, { builtAt: o.builtAt ?? null, stale: o.stale });
+        statusByPath.set(o.path, { builtAt: o.builtAt ?? null, stale: o.stale, externalRepoHashes: o.externalRepoHashes });
       }
     }
     return projectFiles
@@ -196,6 +201,7 @@ export function OutputSection({
           folder,
           builtAt: status?.builtAt ?? null,
           stale: status?.stale ?? true,
+          externalRepoHashes: status?.externalRepoHashes,
         };
       });
   }, [type, artifactSpecs, projectFiles, outputStatus]);
@@ -311,6 +317,8 @@ export function OutputSection({
     if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
     noticeTimeoutRef.current = setTimeout(() => setNotice(null), 5000);
   }
+
+
 
   // ── Build selected outputs ────────────────────────────────────
   async function handleBuild() {
@@ -481,15 +489,18 @@ export function OutputSection({
             </p>
           )}
         </div>
-        {type === "report" ? (
-          <button
-            className="output-section-new-btn"
-            onClick={handleNewFormToggle}
-            type="button"
-          >
-            + New {typeSingular}
-          </button>
-        ) : null}
+        <div style={{ display: "flex", gap: 8 }}>
+
+          {type === "report" ? (
+            <button
+              className="output-section-new-btn"
+              onClick={handleNewFormToggle}
+              type="button"
+            >
+              + New {typeSingular}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* New file form */}
@@ -713,6 +724,8 @@ export function OutputSection({
           </div>
         </div>
       ) : null}
+
+
     </div>
   );
 }
@@ -841,22 +854,33 @@ function FileRow({
           <button className="output-rename-cancel" type="button" onClick={onRenameCancel} title="Cancel">✕</button>
         </form>
       ) : (
-        <>
-          <span className="output-file-name" title={row.path}>
-            {row.name}
-          </span>
-          <button
-            className="output-rename-btn"
-            type="button"
-            title="Rename"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRenameStart();
-            }}
-          >
-            ✎
-          </button>
-        </>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span className="output-file-name" title={row.path} style={{ flex: 1 }}>
+              {row.name}
+            </span>
+            <button
+              className="output-rename-btn"
+              type="button"
+              title="Rename"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRenameStart();
+              }}
+            >
+              ✎
+            </button>
+          </div>
+          {row.externalRepoHashes && Object.keys(row.externalRepoHashes).length > 0 ? (
+            <div className="output-file-repos" style={{ fontSize: "10px", color: "var(--color-secondary, #5d6d7e)", marginTop: 2, display: "flex", gap: 8 }}>
+              {Object.entries(row.externalRepoHashes).map(([repoName, hash]) => (
+                <span key={repoName} title={`${repoName} built at hash: ${hash}`}>
+                  📁 {repoName} (<code style={{ fontFamily: "monospace" }}>{hash.slice(0, 7)}</code>)
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
       )}
       {builtAtLabel ? (
         <span className="output-file-time" title={row.builtAt ?? undefined}>

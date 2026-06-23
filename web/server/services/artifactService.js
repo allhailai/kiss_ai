@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import matter from "gray-matter";
 import { readTopics } from "./topicsService.js";
+import { getCurrentRepoHashes } from "./externalRepos.js";
 
 const ARTIFACT_SPECS_DIR = "artifacts/artifact_specs";
 const ARTIFACT_BUILDS_DIR = "artifacts/builds";
@@ -140,6 +141,12 @@ export async function listArtifactSpecs(projectPath) {
     topicsData = await readTopics(projectPath);
   } catch { /* topics may not exist */ }
 
+  // Get current external repo hashes for staleness checks
+  let currentRepoHashes = {};
+  try {
+    currentRepoHashes = await getCurrentRepoHashes(projectPath);
+  } catch { /* ignore */ }
+
   const specs = [];
 
   for (const file of files) {
@@ -165,6 +172,16 @@ export async function listArtifactSpecs(projectPath) {
         }
       }
 
+      // Check if external repo is stale
+      let externalRepoStale = false;
+      const recordedRepoHashes = buildStatus?.externalRepoHashes || {};
+      for (const [repoName, currentHash] of Object.entries(currentRepoHashes)) {
+        if (recordedRepoHashes[repoName] !== currentHash) {
+          externalRepoStale = true;
+          break;
+        }
+      }
+
       specs.push({
         slug,
         name: humanizeSlug(slug),
@@ -178,6 +195,8 @@ export async function listArtifactSpecs(projectPath) {
         buildSpecHash: buildStatus?.specHash || null,
         currentSpecHash,
         sourcesUpdatedSinceLastBuild,
+        externalRepoStale,
+        externalRepoHashes: recordedRepoHashes,
       });
     } catch {
       specs.push({
@@ -192,6 +211,8 @@ export async function listArtifactSpecs(projectPath) {
         buildSpecHash: null,
         currentSpecHash: null,
         sourcesUpdatedSinceLastBuild: false,
+        externalRepoStale: false,
+        externalRepoHashes: {},
       });
     }
   }
@@ -1249,6 +1270,11 @@ export async function stampManifestAfterBuild(projectPath, artifactSlug) {
   manifest.regenerationCount = 0;
   manifest.regeneratedSections = [];
   delete manifest.activeVersionDirName;
+
+  // Record current external repo hashes
+  try {
+    manifest.externalRepoHashes = await getCurrentRepoHashes(projectPath);
+  } catch { /* ignore */ }
 
   await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
 

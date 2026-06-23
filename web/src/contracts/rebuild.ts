@@ -131,6 +131,7 @@ export type OutputFileInfo = {
   path: string;
   builtAt: string;
   stale: boolean;
+  externalRepoHashes?: Record<string, string>;
 };
 
 export type OutputStatusResponse = {

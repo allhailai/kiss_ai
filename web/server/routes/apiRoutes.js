@@ -62,6 +62,7 @@ export function registerApiRoutes(app, deps) {
   });
 
   registerFileRoutes(app, {
+    browseLocalDirs: deps.browseLocalDirs,
     createHumanInputFolder: deps.createHumanInputFolder,
     createHumanInputTextFile: deps.createHumanInputTextFile,
     deleteHumanInputFile: deps.deleteHumanInputFile,

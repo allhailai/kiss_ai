@@ -1,7 +1,45 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { parseExternalRepos, listDocsFiles } from "./externalRepos.js";
 
 export function createPromptBuilders(FRAMEWORK_ROOT) {
+
+  async function injectExternalRepos(projectPath, lines) {
+    try {
+      const repos = await parseExternalRepos(projectPath);
+      if (repos.length > 0) {
+        lines.push(
+          "",
+          "── EXTERNAL REPOSITORIES (read-only context) ──",
+          "These external repositories are reference documentation. Read them to understand the project structure, design, or logic.",
+          "These repositories are READ-ONLY. Never write, modify, or create files in these repositories.",
+          ""
+        );
+        for (const repo of repos) {
+          const readmePath = path.join(repo.path, "docs", "README.md");
+          try {
+            await fs.access(readmePath);
+            lines.push(`Repository: ${repo.name}`);
+            lines.push(`  - Docs entry point (read first): ${readmePath}`);
+            
+            // List discoverable docs
+            const docsFiles = await listDocsFiles(repo.path);
+            const markdownDocs = docsFiles.filter((f) => f.endsWith(".md") && !f.endsWith("README.md"));
+            if (markdownDocs.length > 0) {
+              lines.push("  - Progressively discoverable files:");
+              for (const docFile of markdownDocs) {
+                lines.push(`    - ${docFile}`);
+              }
+            }
+          } catch {
+            lines.push(`Repository: ${repo.name} (Docs entry point docs/README.md not found at ${readmePath})`);
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[promptBuilders] Error injecting external repos: ${err.message}`);
+    }
+  }
 
   function createResearchPrompt(project) {
     return [
@@ -146,6 +184,8 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
     // Add the project.md output requirements section
     lines.push("", "PROJECT REQUIREMENTS:");
     lines.push("  - Read the output requirements sections of project.md");
+
+    await injectExternalRepos(project.path, lines);
 
     return lines.join("\n");
   }
@@ -410,6 +450,8 @@ export function createPromptBuilders(FRAMEWORK_ROOT) {
         lines.push('');
       }
     }
+
+    await injectExternalRepos(project.path, lines);
 
     return lines.join("\n");
   }

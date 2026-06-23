@@ -94,6 +94,15 @@ export const filesApi = {
       body: JSON.stringify({ folder }),
     }),
   searchFiles: searchProjectFiles,
+  browseLocalDirs: (projectSlug: string, path?: string) => {
+    const params = new URLSearchParams();
+    if (path) params.set("path", path);
+    return request<{
+      currentPath: string;
+      parentPath: string;
+      directories: Array<{ name: string; path: string }>;
+    }>(`${projectBase(projectSlug)}/browse-dir?${params.toString()}`);
+  },
   file: (projectSlug: string, path: string) => request<FileContent>(`${projectBase(projectSlug)}/file?${filePathQuery(path)}`),
   fileDiff: (projectSlug: string, path: string) => request<FileDiff>(`${projectBase(projectSlug)}/file/diff?${filePathQuery(path)}`),
   saveFile: (projectSlug: string, path: string, content: string, expectedContentHash: string) =>
