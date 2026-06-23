@@ -302,6 +302,7 @@ const {
   uploadHumanInputFiles,
   writeProjectJson,
   writeTextFile,
+  uploadExternalRepoZip,
 } = createProjectFileService({
   WEB_ROOT,
   MAX_FILE_BYTES,
@@ -529,6 +530,7 @@ registerApiRoutes(app, {
   writePinnedProjects,
   writeProjectsViewPreference,
   writeProjectUiState,
+  uploadExternalRepoZip,
 });
 
 registerArtifactRoutes(app, { httpError, startArtifactBuild, startSectionRegeneration, startBatchSectionRegeneration, getRebuildState });

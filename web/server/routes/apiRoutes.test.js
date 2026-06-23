@@ -111,6 +111,7 @@ function createUiStateProjectApp(projectRoot) {
     readTextFile: async () => ({ content: "" }),
     resolveCursorApiKey: async () => ({ available: false, source: null, warnings: [] }),
     writeProjectUiState: service.writeProjectUiState,
+    uploadExternalRepoZip: async () => ({ name: "", path: "" }),
   });
   app.use(apiErrorHandler);
 
@@ -421,6 +422,7 @@ describe("API routes", () => {
       readTextFile: async () => ({ content: "" }),
       resolveCursorApiKey: async () => ({ available: false, source: null, warnings: [] }),
       writeProjectUiState: async (_projectRoot, state) => ({ version: 1, ...state }),
+      uploadExternalRepoZip: async () => ({ name: "", path: "" }),
     });
     app.use(apiErrorHandler);
 

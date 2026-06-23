@@ -25,6 +25,7 @@ export function registerProjectRoutes(app, {
   resolveCursorApiKey,
   httpError,
   writeProjectUiState,
+  uploadExternalRepoZip,
 }) {
   app.get("/api/projects", async (_request, response, next) => {
     try {
@@ -363,6 +364,21 @@ export function registerProjectRoutes(app, {
     try {
       const log = await getDeepenLog(request.project.path);
       response.json({ entries: log });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectSlug/external-repos/upload", async (request, response, next) => {
+    try {
+      const { name, contentBase64 } = request.body || {};
+      if (!name || !contentBase64) {
+        throw httpError("Repository name and ZIP content are required.", 400, "bad_request");
+      }
+
+      const buffer = Buffer.from(contentBase64, "base64");
+      const result = await uploadExternalRepoZip(request.project.path, name, buffer);
+      response.json({ success: true, ...result });
     } catch (error) {
       next(error);
     }

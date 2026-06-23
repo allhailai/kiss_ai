@@ -1404,6 +1404,49 @@ export function createProjectFileService({
     }
   }
 
+  async function uploadExternalRepoZip(projectRoot, name, buffer) {
+    const targetDir = path.join(projectRoot, ".kiss_ai", "repos", name);
+
+    // Clean/recreate target directory
+    await fs.rm(targetDir, { recursive: true, force: true });
+    await fs.mkdir(targetDir, { recursive: true });
+
+    const AdmZip = (await import("adm-zip")).default;
+    const zip = new AdmZip(buffer);
+    zip.extractAllTo(targetDir, true);
+
+    // Save to external_repos.json
+    let currentRepos = [];
+    const jsonFilePath = path.join(projectRoot, ".kiss_ai", "external_repos.json");
+    try {
+      const jsonContent = await fs.readFile(jsonFilePath, "utf8");
+      currentRepos = JSON.parse(jsonContent);
+    } catch (err) {
+      // file doesn't exist yet, start empty
+    }
+
+    if (!Array.isArray(currentRepos)) {
+      if (currentRepos && typeof currentRepos === "object") {
+        currentRepos = Object.entries(currentRepos).map(([n, p]) => ({ name: n, path: p }));
+      } else {
+        currentRepos = [];
+      }
+    }
+
+    const relativePath = path.join(".kiss_ai", "repos", name);
+    const existingIdx = currentRepos.findIndex((r) => r.name.toLowerCase() === name.toLowerCase());
+    if (existingIdx >= 0) {
+      currentRepos[existingIdx].path = relativePath;
+    } else {
+      currentRepos.push({ name, path: relativePath });
+    }
+
+    await fs.mkdir(path.dirname(jsonFilePath), { recursive: true });
+    await fs.writeFile(jsonFilePath, JSON.stringify(currentRepos, null, 2), "utf8");
+
+    return { name, path: relativePath };
+  }
+
   return {
     browseLocalDirs,
     classifyPath,
@@ -1431,6 +1474,7 @@ export function createProjectFileService({
     uploadHumanInputFiles,
     writeProjectJson,
     writeTextFile,
+    uploadExternalRepoZip,
   };
 }
 
