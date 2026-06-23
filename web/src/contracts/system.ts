@@ -35,6 +35,7 @@ export type SystemSettingsResponse = {
   cursorApiKeyAvailable: boolean;
   cursorApiKeySource: string | null;
   cursorApiKeyWarnings: string[];
+  githubPatAvailable?: boolean;
 };
 
 export type SaveCursorApiKeyRequest = {
@@ -42,6 +43,15 @@ export type SaveCursorApiKeyRequest = {
 };
 
 export type SaveCursorApiKeyResponse = {
+  ok: boolean;
+  message: string;
+};
+
+export type SaveGithubPatRequest = {
+  githubPat: string;
+};
+
+export type SaveGithubPatResponse = {
   ok: boolean;
   message: string;
 };

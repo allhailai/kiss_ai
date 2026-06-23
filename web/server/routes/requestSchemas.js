@@ -71,6 +71,10 @@ export const saveCursorApiKeyBodySchema = z.object({
   cursorApiKey: z.string().trim().min(1).max(500),
 });
 
+export const saveGithubPatBodySchema = z.object({
+  githubPat: z.string().trim().min(1).max(500),
+});
+
 const projectRouteHashSchema = z
   .string()
   .trim()

@@ -17,6 +17,7 @@ export function registerApiRoutes(app, deps) {
     readPinnedProjects: deps.readPinnedProjects,
     readProjectsViewPreference: deps.readProjectsViewPreference,
     saveCursorApiKey: deps.saveCursorApiKey,
+    saveGithubPat: deps.saveGithubPat,
     systemSettings: deps.systemSettings,
     updateAndRestart: deps.updateAndRestart,
     updateKissAi: deps.updateKissAi,

@@ -354,6 +354,16 @@ const { attachProject, createProjectFromTemplate, discoverProjects } = createPro
 
 const secretStore = createSecretStore({ execFileText });
 
+if (secretStore.supported) {
+  secretStore.read("github_pat").then((storedPat) => {
+    if (storedPat && !process.env.KISS_AI_GITHUB_PAT) {
+      process.env.KISS_AI_GITHUB_PAT = storedPat;
+    }
+  }).catch((err) => {
+    console.warn(`[kiss_ai UI warning] Failed to load GitHub PAT from secret store: ${err.message}`);
+  });
+}
+
 const { listCursorModels, pickRebuildModelId, resolveCursorApiKey } = createCursorModelService({
   WEB_ROOT,
   httpError,
@@ -361,7 +371,7 @@ const { listCursorModels, pickRebuildModelId, resolveCursorApiKey } = createCurs
   warnedCursorKeyMessages,
 });
 
-const { saveCursorApiKey, systemSettings } = createSystemSettingsService({
+const { saveCursorApiKey, saveGithubPat, systemSettings } = createSystemSettingsService({
   httpError,
   listCursorModels,
   resolveCursorApiKey,
@@ -504,6 +514,7 @@ registerApiRoutes(app, {
   resolveCursorApiKey,
   restoreFileFromHead,
   saveCursorApiKey,
+  saveGithubPat,
   searchFiles,
   applyEditProposal,
   cancelChatAgent,

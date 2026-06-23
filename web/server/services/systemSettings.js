@@ -18,6 +18,7 @@ export function createSystemSettingsService({
       cursorApiKeyAvailable: cursorApiKey.available,
       cursorApiKeySource: cursorApiKey.source,
       cursorApiKeyWarnings: cursorApiKey.warnings ?? [],
+      githubPatAvailable: Boolean(process.env.KISS_AI_GITHUB_PAT),
     };
   }
 
@@ -79,8 +80,58 @@ export function createSystemSettingsService({
     };
   }
 
+  async function writeDotEnvGithubPat(pat) {
+    const envPath = path.join(WEB_ROOT, ".env");
+    const entry = `KISS_AI_GITHUB_PAT="${pat}"`;
+    let content = "";
+
+    try {
+      content = await fs.readFile(envPath, "utf8");
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+
+    if (content) {
+      const lines = content.split("\n");
+      const index = lines.findIndex(
+        (line) => line.trim().startsWith("KISS_AI_GITHUB_PAT=") && !line.trim().startsWith("#"),
+      );
+
+      if (index !== -1) {
+        lines[index] = entry;
+        content = lines.join("\n");
+      } else {
+        content = content.trimEnd() + "\n" + entry + "\n";
+      }
+    } else {
+      content = entry + "\n";
+    }
+
+    await fs.writeFile(envPath, content, "utf8");
+    process.env.KISS_AI_GITHUB_PAT = pat;
+  }
+
+  async function saveGithubPat(pat) {
+    try {
+      if (secretStore.supported) {
+        await secretStore.write("github_pat", pat);
+      } else {
+        await writeDotEnvGithubPat(pat);
+      }
+      process.env.KISS_AI_GITHUB_PAT = pat;
+    } catch {
+      throw httpError(settingsFailureMessage, 500, "github_pat_save_failed");
+    }
+
+    return {
+      ok: true,
+      message: settingsSuccessMessage,
+    };
+  }
+
   return {
     saveCursorApiKey,
+    saveGithubPat,
     systemSettings,
   };
 }
