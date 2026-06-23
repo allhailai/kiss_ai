@@ -11,6 +11,8 @@ export type ArtifactSpec = {
   buildSpecHash: string | null;
   currentSpecHash: string | null;
   sourcesUpdatedSinceLastBuild: boolean;
+  externalRepoStale?: boolean;
+  externalRepoHashes?: Record<string, string>;
 };
 
 export type ArtifactSpecDetail = {

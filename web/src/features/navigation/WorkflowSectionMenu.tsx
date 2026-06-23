@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { defineNavTarget } from "../../navigation/navigationModel";
 import { projectPathPrefixes } from "../../domain/projectPaths";
 import { type View } from "../../navigation/views";
 import type { ArtifactSpec, FileChangeStatus, ProjectFile } from "../../contracts/api";
 import { FileTreeNav } from "./FileTreeNav";
 import { artifactsApi } from "../../data/artifactsApi";
+import { filesApi } from "../../data/filesApi";
 
 /* ─── Knowledgebase Section Body ───────────────────────────────── */
 
@@ -29,6 +30,8 @@ export function KnowledgebaseSectionBody({
   sourceFiles,
   toggleSubsection,
   wikiFiles,
+  projectSlug,
+  projectFiles,
 }: {
   currentView: View;
   expandedSubsections: Set<string>;
@@ -50,7 +53,126 @@ export function KnowledgebaseSectionBody({
   sourceFiles: ProjectFile[];
   toggleSubsection: (id: string, event?: React.MouseEvent<HTMLButtonElement>) => void;
   wikiFiles: ProjectFile[];
+  projectSlug: string;
+  projectFiles: ProjectFile[];
 }) {
+  // ── Load repository modal state ──────────────────────────────
+  const [isLoadRepoOpen, setIsLoadRepoOpen] = useState(false);
+  const [newRepoName, setNewRepoName] = useState("");
+  const [newRepoPath, setNewRepoPath] = useState("");
+  const [loadRepoError, setLoadRepoError] = useState("");
+  const [loadRepoSaving, setLoadRepoSaving] = useState(false);
+
+  // ── Local folder browsing state ──────────────────────────────
+  const [browsingDirs, setBrowsingDirs] = useState<Array<{ name: string; path: string }>>([]);
+  const [browsingParentPath, setBrowsingParentPath] = useState<string | null>(null);
+  const [currentBrowsedPath, setCurrentBrowsedPath] = useState<string>("");
+
+  // ── External repositories loaded list ────────────────────────
+  const [externalRepos, setExternalRepos] = useState<Array<{ name: string; path: string }>>([]);
+
+  const loadExternalRepos = useCallback(async () => {
+    try {
+      const res = await filesApi.file(projectSlug, ".kiss_ai/external_repos.json");
+      const parsed = JSON.parse(res.content);
+      if (Array.isArray(parsed)) {
+        setExternalRepos(parsed);
+      } else {
+        setExternalRepos([]);
+      }
+    } catch (err) {
+      setExternalRepos([]);
+    }
+  }, [projectSlug]);
+
+  useEffect(() => {
+    void loadExternalRepos();
+  }, [loadExternalRepos, projectFiles]);
+
+  async function loadDirectory(path?: string) {
+    try {
+      const res = await filesApi.browseLocalDirs(projectSlug, path);
+      setBrowsingDirs(res.directories);
+      setBrowsingParentPath(res.parentPath);
+      setCurrentBrowsedPath(res.currentPath);
+      setNewRepoPath(res.currentPath);
+    } catch (err: any) {
+      console.error(err);
+      setLoadRepoError(`Cannot browse directory: ${err.message || "Unknown error"}`);
+    }
+  }
+
+  function handleLoadRepo() {
+    setIsLoadRepoOpen(true);
+    setNewRepoName("");
+    setNewRepoPath("");
+    setLoadRepoError("");
+    // Trigger initial browse starting from /opt
+    void loadDirectory("/opt");
+  }
+
+  async function handleLoadRepoSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const name = newRepoName.trim();
+    const pathInput = newRepoPath.trim();
+    if (!name) {
+      setLoadRepoError("Repository name is required.");
+      return;
+    }
+    if (!pathInput) {
+      setLoadRepoError("Repository path is required.");
+      return;
+    }
+
+    setLoadRepoError("");
+    setLoadRepoSaving(true);
+    try {
+      let currentRepos: any[] = [];
+      let hash = "";
+      try {
+        const fileRes = await filesApi.file(projectSlug, ".kiss_ai/external_repos.json");
+        currentRepos = JSON.parse(fileRes.content);
+        hash = fileRes.contentHash;
+      } catch (err) {
+        // Doesn't exist or is invalid, start clean
+        hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"; // SHA-256 hash of empty string
+      }
+
+      if (!Array.isArray(currentRepos)) {
+        if (currentRepos && typeof currentRepos === "object") {
+          currentRepos = Object.entries(currentRepos).map(([n, p]) => ({ name: n, path: p }));
+        } else {
+          currentRepos = [];
+        }
+      }
+
+      const existingIdx = currentRepos.findIndex((r: any) => r.name.toLowerCase() === name.toLowerCase());
+      if (existingIdx >= 0) {
+        currentRepos[existingIdx].path = pathInput;
+      } else {
+        currentRepos.push({ name: name, path: pathInput });
+      }
+
+      await filesApi.saveFile(
+        projectSlug,
+        ".kiss_ai/external_repos.json",
+        JSON.stringify(currentRepos, null, 2),
+        hash
+      );
+
+      setIsLoadRepoOpen(false);
+      setNewRepoName("");
+      setNewRepoPath("");
+      
+      void loadExternalRepos();
+    } catch (err: any) {
+      console.error(err);
+      setLoadRepoError(`Failed to load repository: ${err.message || "Unknown error"}`);
+    } finally {
+      setLoadRepoSaving(false);
+    }
+  }
+
   return (
     <>
       {/* ── 1) Project Definition ──────────────────────────── */}
@@ -129,6 +251,47 @@ export function KnowledgebaseSectionBody({
               onOpenFile={onOpenFile}
               selectedPath={selectedPath}
             />
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", borderBottom: "1px solid color-mix(in srgb, var(--color-secondary) 22%, var(--color-border))" }}>
+              <span style={{ fontWeight: 800, fontSize: "0.84rem", color: "var(--color-primary)", padding: "5px 0 3px" }}>
+                External Repos
+              </span>
+              <button
+                className="human-input-action-button"
+                onClick={handleLoadRepo}
+                type="button"
+                style={{ width: "auto", padding: "2px 8px", margin: 0, fontSize: "0.72rem", borderStyle: "dashed" }}
+              >
+                📁 Load
+              </button>
+            </div>
+            {externalRepos.length === 0 ? (
+              <p className="simple-nav-state">No repositories loaded.</p>
+            ) : (
+              <div className="simple-nav-children" style={{ marginTop: "4px", display: "grid", gap: "4px" }}>
+                {externalRepos.map((repo) => (
+                  <div
+                    key={repo.name}
+                    style={{
+                      display: "grid",
+                      gap: "2px",
+                      padding: "4px 8px",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: "8px",
+                      background: "var(--color-surface)",
+                      color: "var(--color-primary)",
+                      fontSize: "0.8rem",
+                      lineHeight: "1.18",
+                    }}
+                  >
+                    <span style={{ fontWeight: 700 }}>{repo.name}</span>
+                    <small style={{ wordBreak: "break-all", fontSize: "0.68rem", color: "var(--color-secondary)" }}>
+                      {repo.path}
+                    </small>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : null}
       </div>
@@ -158,6 +321,159 @@ export function KnowledgebaseSectionBody({
           </div>
         ) : null}
       </div>
+
+      {isLoadRepoOpen ? (
+        <div className="kiss-ai-update-modal-backdrop" role="presentation" onClick={() => setIsLoadRepoOpen(false)}>
+          <section
+            className="kiss-ai-update-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="kiss-ai-load-repo-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "min(460px, 100%)", backdropFilter: "blur(8px)" }}
+          >
+            <div className="kiss-ai-update-modal-header">
+              <div>
+                <span className="eyebrow">Load External Repository</span>
+                <h2 id="kiss-ai-load-repo-title">Load Repository</h2>
+              </div>
+              <button
+                className="kiss-ai-update-close"
+                onClick={() => {
+                  setIsLoadRepoOpen(false);
+                  setLoadRepoError("");
+                }}
+                type="button"
+                aria-label="Close load repository dialog"
+              >
+                x
+              </button>
+            </div>
+
+            <p style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}>
+              Provide a name and local absolute path to an external git repository to use it as a read-only source.
+            </p>
+
+            {loadRepoError ? (
+              <div className="project-create-error" role="alert" style={{ marginBottom: "0.5rem" }}>
+                <p>{loadRepoError}</p>
+              </div>
+            ) : null}
+
+            <form className="settings-api-key-form" onSubmit={handleLoadRepoSubmit}>
+              <label>
+                <span>REPOSITORY NAME</span>
+                <input
+                  autoComplete="off"
+                  disabled={loadRepoSaving}
+                  onChange={(event) => setNewRepoName(event.target.value)}
+                  placeholder="e.g. allhai-core"
+                  type="text"
+                  value={newRepoName}
+                  required
+                />
+              </label>
+
+              <label style={{ marginTop: "0.5rem" }}>
+                <span>ABSOLUTE PATH</span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input
+                    autoComplete="off"
+                    disabled={loadRepoSaving}
+                    onChange={(event) => setNewRepoPath(event.target.value)}
+                    placeholder="e.g. /opt/all_hail_ai/omnibox/tenants/core"
+                    type="text"
+                    value={newRepoPath}
+                    required
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void loadDirectory(newRepoPath)}
+                    disabled={loadRepoSaving}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "10px",
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-background)",
+                      color: "var(--color-primary)",
+                      cursor: "pointer",
+                      fontSize: "0.78rem"
+                    }}
+                  >
+                    Go
+                  </button>
+                </div>
+              </label>
+
+              <div style={{ marginTop: "0.8rem", border: "1px solid var(--color-border)", borderRadius: "10px", padding: 8, background: "rgba(255,255,255,0.02)" }}>
+                <span className="eyebrow" style={{ fontSize: "0.68rem", display: "block", marginBottom: 6 }}>
+                  Folder Browser: <code style={{ fontFamily: "monospace", fontSize: "0.72rem", color: "var(--color-primary)" }}>{currentBrowsedPath || "/"}</code>
+                </span>
+                <div style={{ maxHeight: "140px", overflowY: "auto", display: "grid", gap: 4, paddingRight: 4 }}>
+                  {browsingParentPath && browsingParentPath !== currentBrowsedPath ? (
+                    <button
+                      type="button"
+                      onClick={() => void loadDirectory(browsingParentPath)}
+                      style={{
+                        textAlign: "left",
+                        padding: "4px 8px",
+                        borderRadius: "6px",
+                        border: "none",
+                        background: "transparent",
+                        color: "var(--color-accent)",
+                        cursor: "pointer",
+                        fontSize: "0.8125rem",
+                        fontWeight: 700
+                      }}
+                    >
+                      📁 .. (Up to Parent Folder)
+                    </button>
+                  ) : null}
+                  {browsingDirs.map((dir) => (
+                    <button
+                      key={dir.path}
+                      type="button"
+                      onClick={() => void loadDirectory(dir.path)}
+                      style={{
+                        textAlign: "left",
+                        padding: "4px 8px",
+                        borderRadius: "6px",
+                        border: "none",
+                        background: "transparent",
+                        color: "var(--color-primary)",
+                        cursor: "pointer",
+                        fontSize: "0.8125rem"
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = "color-mix(in srgb, var(--color-border) 40%, transparent)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                    >
+                      📁 {dir.name}
+                    </button>
+                  ))}
+                  {browsingDirs.length === 0 ? (
+                    <span style={{ fontSize: "0.78rem", color: "var(--color-secondary)", padding: "4px 8px" }}>
+                      No subdirectories found
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              <button
+                disabled={loadRepoSaving || !newRepoName.trim() || !newRepoPath.trim()}
+                type="submit"
+                style={{ marginTop: "1rem" }}
+              >
+                {loadRepoSaving ? "Loading..." : "Load Repo"}
+              </button>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </>
   );
 }

@@ -145,6 +145,7 @@ const serverRules = [
         "contentLedger.js",
         "conversations.js",
         "cursorModels.js",
+        "externalRepos.js",
         "failedSources.js",
         "fileChanges.js",
         "harnessState.js",
@@ -168,7 +169,7 @@ const serverRules = [
   {
     from: "services",
     test: (specifier, filePath) =>
-      specifier === "node:child_process" && !new Set(["buildScope.js", "cursorModels.js", "designIdentity.js", "kissAiUpdate.js", "projectFiles.js", "secretStore.js", "serverValidation.js"]).has(path.basename(filePath)),
+      specifier === "node:child_process" && !new Set(["buildScope.js", "cursorModels.js", "designIdentity.js", "externalRepos.js", "kissAiUpdate.js", "projectFiles.js", "secretStore.js", "serverValidation.js"]).has(path.basename(filePath)),
     message: "server services must keep process execution in approved service modules",
   },
   {

@@ -223,6 +223,10 @@ export function createProjectFileService({
       return { path: normalized, kind: "human", editable: true, annotation: false };
     }
 
+    if (normalized === ".kiss_ai/external_repos.json") {
+      return { path: normalized, kind: "human", editable: true, annotation: false };
+    }
+
     if (/^human_[^/]+\.md$/i.test(normalized)) {
       return { path: normalized, kind: "human", editable: true, annotation: false };
     }
@@ -1374,7 +1378,34 @@ export function createProjectFileService({
     return { oldPath: normalizedFrom, newPath: normalizedTo, ...result };
   }
 
+  async function browseLocalDirs(startPath) {
+    let target = startPath ? String(startPath) : process.env.HOME || "/";
+    target = path.resolve(target);
+
+    try {
+      const entries = await fs.readdir(target, { withFileTypes: true });
+      const directories = [];
+      for (const entry of entries) {
+        if (entry.isDirectory() && !entry.name.startsWith(".")) {
+          directories.push({
+            name: entry.name,
+            path: path.join(target, entry.name),
+          });
+        }
+      }
+      directories.sort((a, b) => a.name.localeCompare(b.name));
+      return {
+        currentPath: target,
+        parentPath: path.dirname(target),
+        directories,
+      };
+    } catch (err) {
+      throw httpError(`Cannot read directory "${target}": ${err.message}`, 400, "directory_inaccessible");
+    }
+  }
+
   return {
+    browseLocalDirs,
     classifyPath,
     createHumanInputFolder,
     createHumanInputTextFile,

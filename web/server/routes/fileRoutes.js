@@ -18,6 +18,7 @@ import {
 import { getFileChanges, dismissFileChange, recordFileChange } from "../services/fileChanges.js";
 
 export function registerFileRoutes(app, {
+  browseLocalDirs,
   createHumanInputFolder,
   createHumanInputTextFile,
   deleteHumanInputFile,
@@ -232,6 +233,15 @@ export function registerFileRoutes(app, {
       const body = parseRequestBody(recordFileChangeBodySchema, request.body, httpError);
       await recordFileChange(request.project.path, body.path, body.status);
       response.json({ ok: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/projects/:projectSlug/browse-dir", async (request, response, next) => {
+    try {
+      const pathParam = request.query.path ? String(request.query.path) : undefined;
+      response.json(await browseLocalDirs(pathParam));
     } catch (error) {
       next(error);
     }

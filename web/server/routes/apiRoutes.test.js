@@ -328,6 +328,7 @@ describe("API routes", () => {
       next();
     });
     registerFileRoutes(app, {
+      browseLocalDirs: service.browseLocalDirs,
       createHumanInputFolder: async () => ({ folder: "" }),
       createHumanInputTextFile: async () => ({ file: {} }),
       deleteHumanInputFile: service.deleteHumanInputFile,
@@ -510,6 +511,7 @@ describe("API routes", () => {
       next();
     });
     registerFileRoutes(app, {
+      browseLocalDirs: service.browseLocalDirs,
       createHumanInputFolder: async () => ({ folder: "" }),
       createHumanInputTextFile: async () => ({ file: {} }),
       deleteHumanInputFile: service.deleteHumanInputFile,

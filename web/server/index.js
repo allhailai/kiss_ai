@@ -278,6 +278,7 @@ function displayProjectName(projectName, projectSlug) {
 }
 
 const {
+  browseLocalDirs,
   classifyPath,
   createHumanInputFolder,
   createHumanInputTextFile,
@@ -463,6 +464,7 @@ registerApiRoutes(app, {
   KISS_AI_MODE,
   PROJECTS_ROOT,
   attachProject,
+  browseLocalDirs,
   buildLogTabState,
   checkKissAiUpdate,
   createHumanInputFolder,

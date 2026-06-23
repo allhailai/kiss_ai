@@ -244,6 +244,8 @@ export function SimplifiedNavigator({
           sourceFiles={sourceFiles}
           toggleSubsection={toggleSubsection}
           wikiFiles={wikiFiles}
+          projectSlug={projectSlug}
+          projectFiles={projectFiles}
         />
       );
     }

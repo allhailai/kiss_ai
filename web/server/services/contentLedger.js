@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { getCurrentRepoHashes } from "./externalRepos.js";
 
 const LEDGER_PATH = ".build/content_ledger.json";
 
@@ -197,6 +198,18 @@ export async function recordOutputBuild(projectPath, filePath) {
   if (!ledger.output_builds) ledger.output_builds = {};
   const timestamp = new Date().toISOString();
   ledger.output_builds[filePath] = timestamp;
+
+  // Record current external repo hashes
+  try {
+    const repoHashes = await getCurrentRepoHashes(projectPath);
+    if (!ledger.output_external_repo_hashes) {
+      ledger.output_external_repo_hashes = {};
+    }
+    ledger.output_external_repo_hashes[filePath] = repoHashes;
+  } catch (err) {
+    console.error(`[ledger] Failed to record external repo hashes: ${err.message}`);
+  }
+
   await writeLedger(projectPath, ledger);
   return timestamp;
 }
@@ -204,13 +217,25 @@ export async function recordOutputBuild(projectPath, filePath) {
 /**
  * Check if a single output file is stale.
  * An output is stale when its build time is older than the last knowledge build
- * (or when it has never been built).
+ * (or when it has never been built), or if any of its external repo hashes changed.
  */
-export function isOutputStale(ledger, filePath) {
+export function isOutputStale(ledger, filePath, currentRepoHashes = {}) {
   if (!ledger?.last_knowledge_build) return false; // no knowledge build yet — nothing is stale
   const outputTime = ledger?.output_builds?.[filePath];
   if (!outputTime) return true; // never built
-  return new Date(outputTime) < new Date(ledger.last_knowledge_build);
+  
+  const isTimeStale = new Date(outputTime) < new Date(ledger.last_knowledge_build);
+  if (isTimeStale) return true;
+
+  // Compare external repo hashes
+  const recordedHashes = ledger?.output_external_repo_hashes?.[filePath] ?? {};
+  for (const [repoName, currentHash] of Object.entries(currentRepoHashes)) {
+    if (recordedHashes[repoName] !== currentHash) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -221,11 +246,22 @@ export async function getOutputStatus(projectPath) {
   const lastKnowledgeBuild = ledger.last_knowledge_build ?? null;
   const outputBuilds = ledger.output_builds ?? {};
 
-  const outputs = Object.entries(outputBuilds).map(([filePath, builtAt]) => ({
-    path: filePath,
-    builtAt,
-    stale: isOutputStale(ledger, filePath),
-  }));
+  let currentRepoHashes = {};
+  try {
+    currentRepoHashes = await getCurrentRepoHashes(projectPath);
+  } catch (err) {
+    console.error(`[ledger] Failed to resolve current repo hashes for staleness check: ${err.message}`);
+  }
+
+  const outputs = Object.entries(outputBuilds).map(([filePath, builtAt]) => {
+    const repoHashes = ledger.output_external_repo_hashes?.[filePath] ?? {};
+    return {
+      path: filePath,
+      builtAt,
+      stale: isOutputStale(ledger, filePath, currentRepoHashes),
+      externalRepoHashes: repoHashes,
+    };
+  });
 
   return { lastKnowledgeBuild, outputs };
 }

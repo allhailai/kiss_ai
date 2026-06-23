@@ -106,6 +106,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
     if (selectedArtifact.sourcesUpdatedSinceLastBuild) reasons.push("deepened");
     if (selectedArtifact.buildSpecHash && selectedArtifact.currentSpecHash
         && selectedArtifact.buildSpecHash !== selectedArtifact.currentSpecHash) reasons.push("spec");
+    if (selectedArtifact.externalRepoStale) reasons.push("repo");
     return reasons;
   }, [selectedArtifact, lastProjectBuildAt]);
 
@@ -756,6 +757,7 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
               {staleReasons.includes("build") ? <span className="artifacts-stale-pill">🔨 Build</span> : null}
               {staleReasons.includes("deepened") ? <span className="artifacts-stale-pill">📚 Deepened</span> : null}
               {staleReasons.includes("spec") ? <span className="artifacts-stale-pill">✏️ Spec</span> : null}
+              {staleReasons.includes("repo") ? <span className="artifacts-stale-pill">📁 Repo</span> : null}
             </span>
           ) : null}
         </div>
@@ -891,6 +893,18 @@ export function ArtifactsView({ lastProjectBuildAt, models, projectSlug, selecte
                 <>
                   <dt>Last Built</dt>
                   <dd>{new Date(selectedArtifact.lastBuilt).toLocaleString()}</dd>
+                </>
+              ) : null}
+              {selectedArtifact?.externalRepoHashes && Object.keys(selectedArtifact.externalRepoHashes).length > 0 ? (
+                <>
+                  <dt>External Repositories</dt>
+                  <dd>
+                    {Object.entries(selectedArtifact.externalRepoHashes).map(([repoName, hash]) => (
+                      <div key={repoName} className="artifacts-repo-hash" style={{ display: "flex", gap: 6, fontSize: "11px", color: "var(--color-secondary, #5d6d7e)", marginTop: 2 }}>
+                        📁 <strong>{repoName}</strong>: <code style={{ fontFamily: "monospace", fontSize: "10px" }}>{hash.slice(0, 7)}</code>
+                      </div>
+                    ))}
+                  </dd>
                 </>
               ) : null}
             </dl>
