@@ -62,8 +62,9 @@ export function KnowledgebaseSectionBody({
   const [newRepoPath, setNewRepoPath] = useState("");
   const [loadRepoError, setLoadRepoError] = useState("");
   const [loadRepoSaving, setLoadRepoSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<"path" | "zip">("path");
+  const [activeTab, setActiveTab] = useState<"path" | "zip" | "clone">("path");
   const [uploadRepoFile, setUploadRepoFile] = useState<File | null>(null);
+  const [cloneRepoUrl, setCloneRepoUrl] = useState("");
 
   // ── Local folder browsing state ──────────────────────────────
   const [browsingDirs, setBrowsingDirs] = useState<Array<{ name: string; path: string }>>([]);
@@ -137,7 +138,25 @@ export function KnowledgebaseSectionBody({
     setLoadRepoError("");
     setLoadRepoSaving(true);
     try {
-      if (activeTab === "zip") {
+      if (activeTab === "clone") {
+        const url = cloneRepoUrl.trim();
+        if (!url) {
+          setLoadRepoError("Git repository URL is required.");
+          setLoadRepoSaving(false);
+          return;
+        }
+
+        const response = await fetch(`/api/projects/${projectSlug}/external-repos/clone`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, url }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.message || "Failed to clone Git repository.");
+        }
+      } else if (activeTab === "zip") {
         if (!uploadRepoFile) {
           setLoadRepoError("ZIP file is required.");
           setLoadRepoSaving(false);
@@ -207,6 +226,7 @@ export function KnowledgebaseSectionBody({
       setNewRepoName("");
       setNewRepoPath("");
       setUploadRepoFile(null);
+      setCloneRepoUrl("");
       
       void loadExternalRepos();
     } catch (err: any) {
@@ -427,11 +447,29 @@ export function KnowledgebaseSectionBody({
               >
                 Upload ZIP
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("clone")}
+                style={{
+                  padding: "6px 12px",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: activeTab === "clone" ? "2px solid var(--color-accent)" : "2px solid transparent",
+                  color: activeTab === "clone" ? "var(--color-accent)" : "var(--color-secondary)",
+                  cursor: "pointer",
+                  fontSize: "0.84rem",
+                  fontWeight: 700,
+                }}
+              >
+                Clone Git URL
+              </button>
             </div>
 
             <p style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}>
               {activeTab === "zip"
                 ? "Upload a ZIP archive of a git repository from your machine to register it as a read-only source."
+                : activeTab === "clone"
+                ? "Clone a git repository from a public HTTPS URL directly to the server."
                 : "Provide a name and local absolute path to an external git repository to use it as a read-only source."}
             </p>
 
@@ -546,7 +584,7 @@ export function KnowledgebaseSectionBody({
                     </div>
                   </div>
                 </>
-              ) : (
+              ) : activeTab === "zip" ? (
                 <label style={{ marginTop: "0.5rem" }}>
                   <span>REPOSITORY ZIP ARCHIVE</span>
                   <input
@@ -565,14 +603,59 @@ export function KnowledgebaseSectionBody({
                     }}
                   />
                 </label>
+              ) : (
+                <label style={{ marginTop: "0.5rem" }}>
+                  <span>GIT REPOSITORY URL</span>
+                  <input
+                    type="text"
+                    disabled={loadRepoSaving}
+                    onChange={(event) => {
+                      const url = event.target.value;
+                      setCloneRepoUrl(url);
+                      if (url.trim()) {
+                        const parts = url.trim().split("/");
+                        let lastPart = parts[parts.length - 1] || "";
+                        if (lastPart.endsWith(".git")) {
+                          lastPart = lastPart.slice(0, -4);
+                        }
+                        if (lastPart) {
+                          setNewRepoName(lastPart);
+                        }
+                      }
+                    }}
+                    placeholder="e.g. https://github.com/octocat/Spoon-Knife.git"
+                    value={cloneRepoUrl}
+                    required
+                    style={{
+                      padding: "8px",
+                      borderRadius: "10px",
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-surface)",
+                      color: "var(--color-primary)",
+                      width: "100%"
+                    }}
+                  />
+                </label>
               )}
 
               <button
-                disabled={loadRepoSaving || !newRepoName.trim() || (activeTab === "path" && !newRepoPath.trim()) || (activeTab === "zip" && !uploadRepoFile)}
+                disabled={
+                  loadRepoSaving ||
+                  !newRepoName.trim() ||
+                  (activeTab === "path" && !newRepoPath.trim()) ||
+                  (activeTab === "zip" && !uploadRepoFile) ||
+                  (activeTab === "clone" && !cloneRepoUrl.trim())
+                }
                 type="submit"
                 style={{ marginTop: "1rem" }}
               >
-                {loadRepoSaving ? "Loading..." : activeTab === "zip" ? "Upload & Load" : "Load Repo"}
+                {loadRepoSaving
+                  ? "Loading..."
+                  : activeTab === "zip"
+                  ? "Upload & Load"
+                  : activeTab === "clone"
+                  ? "Clone & Load"
+                  : "Load Repo"}
               </button>
             </form>
           </section>

@@ -303,6 +303,7 @@ const {
   writeProjectJson,
   writeTextFile,
   uploadExternalRepoZip,
+  cloneExternalRepo,
 } = createProjectFileService({
   WEB_ROOT,
   MAX_FILE_BYTES,
@@ -531,6 +532,7 @@ registerApiRoutes(app, {
   writeProjectsViewPreference,
   writeProjectUiState,
   uploadExternalRepoZip,
+  cloneExternalRepo,
 });
 
 registerArtifactRoutes(app, { httpError, startArtifactBuild, startSectionRegeneration, startBatchSectionRegeneration, getRebuildState });

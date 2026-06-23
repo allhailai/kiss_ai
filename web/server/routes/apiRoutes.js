@@ -42,6 +42,7 @@ export function registerApiRoutes(app, deps) {
     resolveCursorApiKey: deps.resolveCursorApiKey,
     writeProjectUiState: deps.writeProjectUiState,
     uploadExternalRepoZip: deps.uploadExternalRepoZip,
+    cloneExternalRepo: deps.cloneExternalRepo,
   });
 
   registerChatRoutes(app, {
