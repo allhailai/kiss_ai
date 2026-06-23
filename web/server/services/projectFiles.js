@@ -1454,16 +1454,43 @@ export function createProjectFileService({
     await fs.rm(targetDir, { recursive: true, force: true });
     await fs.mkdir(targetDir, { recursive: true });
 
-    // Execute git clone --depth 1 <url> <targetDir>
+    // Inject token if GITHUB_PAT is set and url is HTTP/HTTPS
+    const pat = process.env.KISS_AI_GITHUB_PAT;
+    let cloneUrl = url.trim();
+    const cleanUrl = cloneUrl; // store the clean URL for setting remote origin later
+
+    if (pat && (cloneUrl.startsWith("https://") || cloneUrl.startsWith("http://"))) {
+      const protocol = cloneUrl.startsWith("https://") ? "https://" : "http://";
+      const remainingUrl = cloneUrl.slice(protocol.length);
+      cloneUrl = `${protocol}${encodeURIComponent(pat)}@${remainingUrl}`;
+    }
+
+    // Execute git clone --depth 1 <cloneUrl> <targetDir>
     await new Promise((resolve, reject) => {
-      execFile("git", ["clone", "--depth", "1", url, targetDir], (error, stdout, stderr) => {
+      execFile("git", ["clone", "--depth", "1", cloneUrl, targetDir], (error, stdout, stderr) => {
         if (error) {
-          reject(new Error(`Failed to clone git repository: ${stderr || error.message}`));
+          let errorMsg = stderr || error.message;
+          if (!pat) {
+            errorMsg += " (Note: If this is a private repository, please ensure KISS_AI_GITHUB_PAT is set.)";
+          }
+          reject(new Error(`Failed to clone git repository: ${errorMsg}`));
         } else {
           resolve();
         }
       });
     });
+
+    // Reset remote origin to the cleanUrl (scrub the GITHUB_PAT from config)
+    if (pat && (cloneUrl.startsWith("https://") || cloneUrl.startsWith("http://"))) {
+      await new Promise((resolve) => {
+        execFile("git", ["-C", targetDir, "remote", "set-url", "origin", cleanUrl], (error) => {
+          if (error) {
+            console.error("Failed to clean Git remote URL:", error.message);
+          }
+          resolve();
+        });
+      });
+    }
 
     // Save to external_repos.json
     let currentRepos = [];

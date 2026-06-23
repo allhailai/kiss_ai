@@ -154,7 +154,7 @@ export function KnowledgebaseSectionBody({
 
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.message || "Failed to clone Git repository.");
+          throw new Error(errData.error || errData.message || "Failed to clone Git repository.");
         }
       } else if (activeTab === "zip") {
         if (!uploadRepoFile) {
@@ -178,7 +178,7 @@ export function KnowledgebaseSectionBody({
 
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.message || "Failed to upload repository ZIP.");
+          throw new Error(errData.error || errData.message || "Failed to upload repository ZIP.");
         }
       } else {
         const pathInput = newRepoPath.trim();

@@ -50,22 +50,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(__dirname, "..");
 const HUB_ROOT = path.resolve(WEB_ROOT, "..");
 
-// ── Load .env file for KISS_AI_PROJECTS_ROOT (before resolving paths) ──
+// ── Load .env file (before resolving paths) ──
 // Node 20's --env-file isn't used by default, so manually parse the .env
 // next to the web root so symlink-based layouts resolve correctly.
-if (!process.env.KISS_AI_PROJECTS_ROOT) {
-  try {
-    const envPath = path.join(WEB_ROOT, ".env");
-    const envContent = readFileSync(envPath, "utf-8");
-    for (const line of envContent.split("\n")) {
-      const match = line.match(/^\s*KISS_AI_PROJECTS_ROOT\s*=\s*(.+?)\s*$/);
-      if (match) {
-        process.env.KISS_AI_PROJECTS_ROOT = match[1].replace(/^["']|["']$/g, "");
-        break;
+try {
+  const envPath = path.join(WEB_ROOT, ".env");
+  const envContent = readFileSync(envPath, "utf-8");
+  for (const line of envContent.split("\n")) {
+    const match = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.+?)\s*$/);
+    if (match) {
+      const key = match[1];
+      const val = match[2].replace(/^["']|["']$/g, "").trim();
+      if (process.env[key] === undefined) {
+        process.env[key] = val;
       }
     }
-  } catch { /* .env missing — use default path resolution */ }
-}
+  }
+} catch { /* .env missing — use default path resolution */ }
 
 const PROJECTS_ROOT = path.resolve(process.env.KISS_AI_PROJECTS_ROOT ?? path.resolve(WEB_ROOT, "..", ".."));
 const PORT = Number(process.env.KISS_AI_UI_PORT ?? 8787);
