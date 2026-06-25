@@ -5,6 +5,23 @@ import fs from "node:fs/promises";
 // Mock fetch globally for controlled testing
 const originalFetch = globalThis.fetch;
 
+vi.mock("puppeteer-core", () => {
+  return {
+    default: {
+      launch: vi.fn().mockResolvedValue({
+        newPage: vi.fn().mockResolvedValue({
+          setUserAgent: vi.fn().mockResolvedValue(undefined),
+          goto: vi.fn().mockResolvedValue(undefined),
+          title: vi.fn().mockResolvedValue("Mocked Title"),
+          content: vi.fn().mockResolvedValue("<html><body>Mock content description text to pass Readability check.</body></html>"),
+          evaluate: vi.fn().mockResolvedValue("Mock content description text to pass Readability check."),
+        }),
+        close: vi.fn().mockResolvedValue(undefined),
+      }),
+    },
+  };
+});
+
 describe("webResearch", () => {
   describe("parseResearchPlan", () => {
     it("parses a valid research plan JSON", async () => {
