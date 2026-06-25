@@ -534,6 +534,17 @@
   cursor: default;
 }
 
+.chat-file-action-undo {
+  background: transparent !important;
+  color: var(--color-secondary) !important;
+  border-color: var(--color-secondary) !important;
+}
+
+.chat-file-action-undo:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-secondary) 8%, transparent) !important;
+  box-shadow: none !important;
+}
+
 /* Applied card state */
 .chat-file-action-card-applied {
   border-color: color-mix(in srgb, var(--color-success) 36%, var(--color-border));

@@ -232,6 +232,7 @@ export const fileEditStatusParamsSchema = chatMessageParamsSchema.extend({
 
 export const updateFileEditStatusBodySchema = z.object({
   status: z.enum(["proposed", "applied", "rejected", "failed"]),
+  originalContent: z.string().nullable().optional(),
 });
 
 export const renameOutputFileBodySchema = z.object({

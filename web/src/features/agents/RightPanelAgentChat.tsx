@@ -74,6 +74,7 @@ export function RightPanelAgentChat({
   onApplyFileEdit,
   onApplyFileRename,
   onApplyArtifactRename,
+  onUndoFileEdit,
   onContextFilesChange,
   onContextTopicsChange,
   onCreateTopic,
@@ -99,6 +100,7 @@ export function RightPanelAgentChat({
   onApplyFileEdit: (edit: ChatMessageFileEdit, editIndex: number, messageId: string) => Promise<boolean>;
   onApplyFileRename: (rename: ChatMessageFileRename, renameIndex: number, messageId: string) => Promise<boolean>;
   onApplyArtifactRename: (rename: ChatMessageArtifactRename, renameIndex: number, messageId: string) => Promise<boolean>;
+  onUndoFileEdit: (edit: ChatMessageFileEdit, editIndex: number, messageId: string) => Promise<boolean>;
   onContextFilesChange: Dispatch<SetStateAction<ChatContextFile[]>>;
   onContextTopicsChange: Dispatch<SetStateAction<ChatContextTopic[]>>;
   onCreateTopic: (proposal: ChatMessageTopicProposal) => Promise<void>;
@@ -400,6 +402,7 @@ export function RightPanelAgentChat({
           onApplyFileEdit={onApplyFileEdit}
           onApplyFileRename={onApplyFileRename}
           onApplyArtifactRename={onApplyArtifactRename}
+          onUndoFileEdit={onUndoFileEdit}
           onCreateArtifact={handleCreateArtifact}
           onCreateTopic={onCreateTopic}
           onJumpToLatest={() => chat.scrollToLatest()}

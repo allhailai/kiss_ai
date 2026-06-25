@@ -57,6 +57,8 @@ export function useChatActions({
         return false;
       }
 
+      let originalContent: string | null = null;
+
       if (decision.kind === "create") {
         // Write the file — try creating first (hash of empty string for new files),
         // and fall back to reading the fresh hash for existing files.
@@ -64,9 +66,11 @@ export function useChatActions({
           const emptyHash = await hashDraftContent("");
           try {
             await filesApi.saveFile(projectSlug!, decision.path, decision.content, emptyHash);
+            originalContent = null;
           } catch {
             // File likely already exists — read its current hash and update instead.
             const fresh = await filesApi.file(projectSlug!, decision.path);
+            originalContent = fresh.content;
             await filesApi.saveFile(projectSlug!, decision.path, decision.content, fresh.contentHash);
           }
           toastWorkspace.setNotice(`Applied and saved ${decision.path}.`);
@@ -88,6 +92,7 @@ export function useChatActions({
         //  3. An auto-save timer from the annotation editor may have raced us
         try {
           const fresh = await filesApi.file(projectSlug!, edit.path);
+          originalContent = fresh.content;
           const saved = await filesApi.saveFile(projectSlug!, edit.path, decision.content, fresh.contentHash);
 
           fileWorkspace.setDraft(saved.content);
@@ -111,7 +116,7 @@ export function useChatActions({
       const conversationId = projectChat.activeConversation?.id;
       if (conversationId && projectSlug) {
         try {
-          const updated = await chatApi.markFileEditApplied(projectSlug, conversationId, messageId, editIndex);
+          const updated = await chatApi.updateFileEditStatus(projectSlug, conversationId, messageId, editIndex, "applied", originalContent);
           projectChat.setActiveConversation(updated);
         } catch {
           // Non-critical — the edit was still applied to the file, just the status badge won't persist
@@ -123,6 +128,77 @@ export function useChatActions({
     },
     [fileWorkspace, projectChat, projectSlug, rebuildWorkspace, route, toastWorkspace],
   );
+
+  const undoChatFileEdit = useCallback(
+    async (edit: ChatMessageFileEdit, editIndex: number, messageId: string): Promise<boolean> => {
+      if (!projectSlug) return false;
+      const originalContent = edit.originalContent;
+
+      try {
+        if (originalContent === null) {
+          // File was newly created by the agent, delete it
+          await filesApi.deleteProjectFile(projectSlug, edit.path);
+          toastWorkspace.setNotice(`Undid changes: deleted ${edit.path}.`);
+        } else if (typeof originalContent === "string") {
+          // File existed before, restore original content
+          const fresh = await filesApi.file(projectSlug, edit.path);
+          const saved = await filesApi.saveFile(projectSlug, edit.path, originalContent, fresh.contentHash);
+          fileWorkspace.setDraft(saved.content);
+          toastWorkspace.setNotice(`Undid changes: restored ${edit.path}.`);
+        } else {
+          toastWorkspace.setNotice(`Cannot undo: original content not found.`);
+          return false;
+        }
+
+        // Refresh project files and editor so UI updates
+        await fileWorkspace.refreshProjectFiles();
+        await fileWorkspace.refreshSelectedFile();
+        await rebuildWorkspace.refreshStatus();
+      } catch (err) {
+        console.error("[kiss_ai:undo] Undo failed for", edit.path, err);
+        toastWorkspace.setNotice(`Could not undo edit for ${edit.path}.`);
+        return false;
+      }
+
+      // Persist the "proposed" status server-side
+      const conversationId = projectChat.activeConversation?.id;
+      if (conversationId) {
+        try {
+          const updated = await chatApi.updateFileEditStatus(projectSlug, conversationId, messageId, editIndex, "proposed", null);
+          projectChat.setActiveConversation(updated);
+        } catch {
+          console.warn("[kiss_ai] Could not persist file edit proposed status.");
+        }
+      }
+
+      return true;
+    },
+    [fileWorkspace, projectChat, projectSlug, rebuildWorkspace, toastWorkspace],
+  );
+
+  const getMostRecentAppliedEdit = useCallback((filePath: string) => {
+    const conversation = projectChat.activeConversation;
+    if (!conversation || !conversation.messages) return null;
+    for (let i = conversation.messages.length - 1; i >= 0; i--) {
+      const msg = conversation.messages[i];
+      if (msg.role === "assistant" && msg.metadata?.fileEdits) {
+        const edits = msg.metadata.fileEdits;
+        for (let j = edits.length - 1; j >= 0; j--) {
+          const edit = edits[j];
+          if (edit.path === filePath && edit.status === "applied") {
+            return { messageId: msg.id, editIndex: j, edit };
+          }
+        }
+      }
+    }
+    return null;
+  }, [projectChat.activeConversation]);
+
+  const undoLastAgentEditForFile = useCallback(async (filePath: string) => {
+    const match = getMostRecentAppliedEdit(filePath);
+    if (!match) return false;
+    return await undoChatFileEdit(match.edit, match.editIndex, match.messageId);
+  }, [getMostRecentAppliedEdit, undoChatFileEdit]);
 
   const applyChatFileRename = useCallback(
     async (rename: ChatMessageFileRename, renameIndex: number, messageId: string): Promise<boolean> => {
@@ -261,12 +337,28 @@ export function useChatActions({
       applyChatArtifactRename,
       applyChatFileEdit,
       applyChatFileRename,
+      undoChatFileEdit,
+      getMostRecentAppliedEdit,
+      undoLastAgentEditForFile,
       assistCurrentFile,
       handleCreateTopic,
       refreshAfterMutation,
       requestNewArtifactViaChat,
       requestNewTopicViaChat,
     }),
-    [agentDraftSeed, applyChatArtifactRename, applyChatFileEdit, applyChatFileRename, assistCurrentFile, handleCreateTopic, refreshAfterMutation, requestNewArtifactViaChat, requestNewTopicViaChat],
+    [
+      agentDraftSeed,
+      applyChatArtifactRename,
+      applyChatFileEdit,
+      applyChatFileRename,
+      undoChatFileEdit,
+      getMostRecentAppliedEdit,
+      undoLastAgentEditForFile,
+      assistCurrentFile,
+      handleCreateTopic,
+      refreshAfterMutation,
+      requestNewArtifactViaChat,
+      requestNewTopicViaChat,
+    ],
   );
 }

@@ -30,6 +30,8 @@ export function MainContentArea({
   rebuildWorkspace,
   selectProjectChatConversation,
   topicsRefreshKey,
+  canUndoAgentEdit = false,
+  onUndoAgentEdit,
 }: {
   designWorkspace: DesignWorkspaceController;
   fileWorkspace: FileWorkspaceController;
@@ -42,6 +44,8 @@ export function MainContentArea({
   rebuildWorkspace: RebuildWorkspaceController;
   selectProjectChatConversation: (conversationId: string) => void;
   topicsRefreshKey: number;
+  canUndoAgentEdit?: boolean;
+  onUndoAgentEdit?: () => void;
 }) {
   const route = useRouteContext();
   const toastWorkspace = useToastContext();
@@ -81,6 +85,8 @@ export function MainContentArea({
           onRevert={() => void fileWorkspace.revertSelected()}
           onSave={() => void fileWorkspace.saveSelected()}
           projectSlug={projectSlug}
+          canUndoAgentEdit={canUndoAgentEdit}
+          onUndoAgentEdit={onUndoAgentEdit}
         />
       ) : null}
       {route.view === "design" ? (
@@ -112,6 +118,8 @@ export function MainContentArea({
           onRevert={() => void fileWorkspace.revertSelected()}
           onSave={() => void fileWorkspace.saveSelected()}
           projectSlug={projectSlug}
+          canUndoAgentEdit={canUndoAgentEdit}
+          onUndoAgentEdit={onUndoAgentEdit}
         />
       ) : null}
       {route.view === "reports" && !route.filePath ? (

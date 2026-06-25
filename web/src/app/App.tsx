@@ -328,6 +328,12 @@ export function App() {
             rebuildWorkspace={rebuildWorkspace}
             selectProjectChatConversation={selectProjectChatConversation}
             topicsRefreshKey={topicsRefreshKey}
+            canUndoAgentEdit={Boolean(chatActions.getMostRecentAppliedEdit(fileWorkspace.selected?.path ?? ""))}
+            onUndoAgentEdit={() => {
+              if (fileWorkspace.selected?.path) {
+                void chatActions.undoLastAgentEditForFile(fileWorkspace.selected.path);
+              }
+            }}
           />
 
           {rightPanelSurface.rightPanel ? (
@@ -336,6 +342,7 @@ export function App() {
               applyChatFileEdit={chatActions.applyChatFileEdit}
               applyChatFileRename={chatActions.applyChatFileRename}
               applyChatArtifactRename={chatActions.applyChatArtifactRename}
+              undoChatFileEdit={chatActions.undoChatFileEdit}
               closeRightPanel={closeRightPanel}
               draftSeed={chatActions.agentDraftSeed}
               fileWorkspaceProjectFiles={fileWorkspace.projectFiles}

@@ -15,6 +15,7 @@ export function RightPanelOrchestrator({
   applyChatFileEdit,
   applyChatFileRename,
   applyChatArtifactRename,
+  undoChatFileEdit,
   closeRightPanel,
   draftSeed,
   fileWorkspaceProjectFiles,
@@ -40,6 +41,7 @@ export function RightPanelOrchestrator({
   applyChatFileEdit: (edit: ChatMessageFileEdit, editIndex: number, messageId: string) => Promise<boolean>;
   applyChatFileRename: (rename: ChatMessageFileRename, renameIndex: number, messageId: string) => Promise<boolean>;
   applyChatArtifactRename: (rename: ChatMessageArtifactRename, renameIndex: number, messageId: string) => Promise<boolean>;
+  undoChatFileEdit: (edit: ChatMessageFileEdit, editIndex: number, messageId: string) => Promise<boolean>;
   closeRightPanel: () => void;
   draftSeed: { id: string; draft: string } | null;
   fileWorkspaceProjectFiles: ProjectFile[];
@@ -95,6 +97,7 @@ export function RightPanelOrchestrator({
             onApplyFileEdit={applyChatFileEdit}
             onApplyFileRename={applyChatFileRename}
             onApplyArtifactRename={applyChatArtifactRename}
+            onUndoFileEdit={undoChatFileEdit}
             onContextFilesChange={projectChat.setContextFiles}
             onContextTopicsChange={projectChat.setContextTopics}
             onCreateTopic={onCreateTopic}

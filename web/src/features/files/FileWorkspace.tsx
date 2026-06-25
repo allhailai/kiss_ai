@@ -22,6 +22,8 @@ export function FileWorkspace({
   onRevert,
   onSave,
   projectSlug,
+  canUndoAgentEdit = false,
+  onUndoAgentEdit,
 }: {
   title?: string;
 
@@ -39,6 +41,8 @@ export function FileWorkspace({
   onRevert: () => void;
   onSave: () => void;
   projectSlug: string;
+  canUndoAgentEdit?: boolean;
+  onUndoAgentEdit?: () => void;
 }) {
   return (
     <div className="document-workspace">
@@ -63,6 +67,8 @@ export function FileWorkspace({
         onOpenFile={onOpenFile}
         onRevert={onRevert}
         onSave={onSave}
+        canUndoAgentEdit={canUndoAgentEdit}
+        onUndoAgentEdit={onUndoAgentEdit}
       />
     </div>
   );
@@ -82,6 +88,8 @@ function EditorPane({
   onOpenFile,
   onRevert,
   onSave,
+  canUndoAgentEdit,
+  onUndoAgentEdit,
 }: {
   selected: FileContent | null;
   selectedDiff: FileDiff | null;
@@ -96,6 +104,8 @@ function EditorPane({
   onOpenFile: (path: string) => void;
   onRevert: () => void;
   onSave: () => void;
+  canUndoAgentEdit: boolean;
+  onUndoAgentEdit?: () => void;
 }) {
   if (!selected) {
     return (
@@ -141,6 +151,11 @@ function EditorPane({
           >
             ↓ Download
           </button>
+          {canUndoAgentEdit ? (
+            <button className="editor-secondary-button" onClick={onUndoAgentEdit} type="button">
+              Undo Agent Edit
+            </button>
+          ) : null}
           {hasSavedDiff ? (
             <button className="editor-secondary-button" disabled={!canWrite} onClick={onRevert} type="button">
               Revert to Committed State
