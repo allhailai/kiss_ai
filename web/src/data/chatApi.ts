@@ -54,12 +54,19 @@ export const chatApi = {
         body: JSON.stringify(body),
       },
     ),
-  markFileEditApplied: (projectSlug: string, conversationId: string, messageId: string, editIndex: number) =>
+  updateFileEditStatus: (
+    projectSlug: string,
+    conversationId: string,
+    messageId: string,
+    editIndex: number,
+    status: "proposed" | "applied" | "rejected" | "failed",
+    originalContent?: string | null,
+  ) =>
     request<Conversation>(
       `${projectBase(projectSlug)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/file-edits/${editIndex}/status`,
       {
         method: "PATCH",
-        body: JSON.stringify({ status: "applied" }),
+        body: JSON.stringify({ status, originalContent }),
       },
     ),
   markFileRenameApplied: (projectSlug: string, conversationId: string, messageId: string, renameIndex: number) =>

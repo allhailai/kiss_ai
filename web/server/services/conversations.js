@@ -427,7 +427,7 @@ export function createConversationService({ httpError, projectPath }) {
     return await withProjectMutation(project, () => editUserMessageUnlocked(project, conversationId, messageId, content));
   }
 
-  async function updateMessageFileEditStatusUnlocked(project, conversationId, messageId, editIndex, status) {
+  async function updateMessageFileEditStatusUnlocked(project, conversationId, messageId, editIndex, status, originalContent) {
     const conversation = await readConversation(project, conversationId);
     const message = conversation.messages.find((m) => m.id === messageId);
     if (!message) throw httpError("Chat message not found.", 404, "chat_message_not_found");
@@ -446,14 +446,20 @@ export function createConversationService({ httpError, projectPath }) {
       ...fileEdits[editIndex],
       status,
       ...(status === "applied" ? { appliedAt: nowIso() } : {}),
+      ...(originalContent !== undefined ? { originalContent } : {}),
     };
+
+    if (status === "proposed") {
+      delete fileEdits[editIndex].appliedAt;
+      delete fileEdits[editIndex].originalContent;
+    }
 
     return await writeConversationUnlocked(project, { ...conversation, updatedAt: nowIso() });
   }
 
-  async function updateMessageFileEditStatus(project, conversationId, messageId, editIndex, status) {
+  async function updateMessageFileEditStatus(project, conversationId, messageId, editIndex, status, originalContent) {
     return await withProjectMutation(project, () =>
-      updateMessageFileEditStatusUnlocked(project, conversationId, messageId, editIndex, status),
+      updateMessageFileEditStatusUnlocked(project, conversationId, messageId, editIndex, status, originalContent),
     );
   }
 

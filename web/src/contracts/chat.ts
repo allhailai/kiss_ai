@@ -38,6 +38,7 @@ export type ChatMessageFileEdit = {
   draftContentHashBefore?: string;
   appliedAt?: string;
   status: "proposed" | "applied" | "rejected" | "failed";
+  originalContent?: string | null;
 };
 
 export type ChatMessageFileRename = {

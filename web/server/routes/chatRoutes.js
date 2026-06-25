@@ -110,8 +110,8 @@ export function registerChatRoutes(app, {
   app.patch("/api/projects/:projectSlug/conversations/:conversationId/messages/:messageId/file-edits/:editIndex/status", async (request, response, next) => {
     try {
       const { conversationId, messageId, editIndex } = parseRequestParams(fileEditStatusParamsSchema, request.params, httpError);
-      const { status } = parseRequestBody(updateFileEditStatusBodySchema, request.body, httpError);
-      response.json(await updateMessageFileEditStatus(request.project, conversationId, messageId, editIndex, status));
+      const { status, originalContent } = parseRequestBody(updateFileEditStatusBodySchema, request.body, httpError);
+      response.json(await updateMessageFileEditStatus(request.project, conversationId, messageId, editIndex, status, originalContent));
     } catch (error) {
       next(error);
     }

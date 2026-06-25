@@ -21,6 +21,7 @@ export function ChatThread({
   onApplyFileEdit,
   onApplyFileRename,
   onApplyArtifactRename,
+  onUndoFileEdit,
   onJumpToLatest,
   onViewEditProposal,
   onSaveEdit = () => undefined,
@@ -49,6 +50,7 @@ export function ChatThread({
   onApplyFileEdit?: (edit: ChatMessageFileEdit, editIndex: number, messageId: string) => Promise<boolean>;
   onApplyFileRename?: (rename: ChatMessageFileRename, renameIndex: number, messageId: string) => Promise<boolean>;
   onApplyArtifactRename?: (rename: ChatMessageArtifactRename, renameIndex: number, messageId: string) => Promise<boolean>;
+  onUndoFileEdit?: (edit: ChatMessageFileEdit, editIndex: number, messageId: string) => Promise<boolean>;
   onJumpToLatest?: () => void;
   onViewEditProposal?: (proposalId: string) => void;
   onSaveEdit?: (message: ChatMessage) => void;
@@ -106,6 +108,7 @@ export function ChatThread({
               onApplyFileEdit={onApplyFileEdit}
               onApplyFileRename={onApplyFileRename}
               onApplyArtifactRename={onApplyArtifactRename}
+              onUndoFileEdit={onUndoFileEdit}
               onCancelEdit={onCancelEdit}
               onCreateArtifact={onCreateArtifact}
               onCreateTopic={onCreateTopic}

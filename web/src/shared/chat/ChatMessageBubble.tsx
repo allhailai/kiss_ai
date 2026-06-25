@@ -28,6 +28,7 @@ function ChatMessageBubbleComponent({
   onApplyFileEdit,
   onApplyFileRename,
   onApplyArtifactRename,
+  onUndoFileEdit,
   onCreateArtifact,
   onCreateTopic,
   onSaveEdit,
@@ -47,6 +48,7 @@ function ChatMessageBubbleComponent({
   onApplyFileEdit?: (edit: ChatMessageFileEdit, editIndex: number, messageId: string) => Promise<boolean>;
   onApplyFileRename?: (rename: ChatMessageFileRename, renameIndex: number, messageId: string) => Promise<boolean>;
   onApplyArtifactRename?: (rename: ChatMessageArtifactRename, renameIndex: number, messageId: string) => Promise<boolean>;
+  onUndoFileEdit?: (edit: ChatMessageFileEdit, editIndex: number, messageId: string) => Promise<boolean>;
   onCreateArtifact?: (proposal: ChatMessageArtifactProposal) => void;
   onCreateTopic?: (proposal: ChatMessageTopicProposal) => void;
   onSaveEdit: (message: ChatMessage) => void;
@@ -215,7 +217,25 @@ function ChatMessageBubbleComponent({
                   </span>
                   <span className="chat-file-action-path">{edit.path}</span>
                 </div>
-                {!isApplied ? (
+                {isApplied ? (
+                  <button
+                    className="chat-file-action-apply chat-file-action-undo"
+                    disabled={disabled || applying}
+                    onClick={async () => {
+                      markApplying(key);
+                      try {
+                        await onUndoFileEdit?.(edit, editIndex, message.id);
+                      } catch (error: unknown) {
+                        console.error("[kiss_ai] Could not undo chat file edit.", error);
+                      }
+                      clearApplying(key);
+                    }}
+                    title="Undo this change"
+                    type="button"
+                  >
+                    {applying ? "Undoing\u2026" : "Undo"}
+                  </button>
+                ) : (
                   <button
                     className="chat-file-action-apply"
                     disabled={disabled || applying || !edit.proposedContent || edit.status !== "proposed"}
@@ -233,7 +253,7 @@ function ChatMessageBubbleComponent({
                   >
                     {applying ? "Applying\u2026" : "Apply"}
                   </button>
-                ) : null}
+                )}
               </div>
             );
           })}
